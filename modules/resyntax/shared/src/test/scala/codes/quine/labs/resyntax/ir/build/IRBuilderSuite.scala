@@ -7,11 +7,13 @@ import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.AssertNameStyle
 import codes.quine.labs.resyntax.ast.BackReferenceStyle
 import codes.quine.labs.resyntax.ast.BackslashKind
+import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
 import codes.quine.labs.resyntax.ast.BoundaryModifier
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
 import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.NameStyle
 import codes.quine.labs.resyntax.ast.Node
@@ -403,7 +405,7 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   )
   checkPattern("(a)(?i)\\1", "", Perl(), Ruby()): pattern =>
     val Sequence(Seq(_, _, IRNode(BackReference(_, _, folding), _))) = pattern.node.data: @unchecked
-    assertEquals(folding, IRBackReferenceFolding.Full(0))
+    assertEquals(folding, IRBackReferenceFolding.Full(0, foldsDottedCapitalI = true))
   check("(?<x>a)\\k<x+0>", "", Ruby())(
     Sequence(
       Capture(1, Some("x"), char('a')),
@@ -490,8 +492,65 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
     assert(patternOf(Ruby()).captures.unsetWhileOpen)
     assertEquals(
       patternOf(PCRE).emptyIteration,
-      IREmptyIterationSemantics(IREmptyIteration.ExitFromMin, IREmptyIteration.Ignore)
+      IREmptyIterationSemantics(IREmptyIteration.ExitFromMin, IREmptyIteration.Ignore, countsReferencedCaptures = false)
     )
     assertEquals(patternOf(Python()).emptyIteration.bounded, IREmptyIteration.ExitOptional)
+    assertEquals(
+      patternOf(PythonRegex()).emptyIteration,
+      IREmptyIterationSemantics(IREmptyIteration.ExitAll, IREmptyIteration.ExitAll, countsReferencedCaptures = true)
+    )
     assertEquals(patternOf(Perl()).backtrackControl, IRBacktrackControlSemantics(true, true))
     assertEquals(patternOf(PCRE).backtrackControl, IRBacktrackControlSemantics(false, false))
+
+  // python-regex validates the versions anywhere, and the encodings at the end of the pattern out of groups.
+  error("(?V0)(?V1)a", "", PythonRegex())("VERSION0 and VERSION1 flags are incompatible")
+  error("(?V1)a", "V0", PythonRegex())("VERSION0 and VERSION1 flags are incompatible")
+  error("(?a)(?u)", "", PythonRegex())("ASCII, LOCALE and UNICODE flags are incompatible")
+  error("(?a)|(?L)", "", PythonRegex())("ASCII, LOCALE and UNICODE flags are incompatible")
+  error("(?u)", "a", PythonRegex())("ASCII, LOCALE and UNICODE flags are incompatible")
+  error("(?u)", "", PythonRegex(Python.Type.Bytes))("Cannot use UNICODE flag with a bytes pattern")
+  check("(?a)(?-a)(?u)", "", PythonRegex())(Sequence(Empty, Empty, Empty))
+  check("(?a:(?u))", "", PythonRegex())(Empty)
+  check("(?u:)", "", PythonRegex(Python.Type.Bytes))(Empty)
+
+  // python-regex's `p` (POSIX) and `r` (REVERSE) change the whole matching, and `w` (WORD) the boundaries and lines.
+  check("a(?r)", "", PythonRegex())(
+    Unsupported(NodeData.Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(nonDestructive = true), None))))
+  )
+  check("(?p:a)", "", PythonRegex())(
+    Unsupported(
+      NodeData.Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(preserve = true), None)), Node(NodeData.Literal('a')))
+    )
+  )
+  check("a", "p", PythonRegex())(
+    Unsupported(NodeData.Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(preserve = true), None))))
+  )
+  check("(?be)a", "", PythonRegex())(Sequence(Empty, char('a')))
+  check("(?w)\\b", "", PythonRegex())(
+    Sequence(Empty, Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.Boundary(None)))))
+  )
+  check("(?w:.^$)a", "", PythonRegex())(
+    Sequence(Sequence(Unsupported(NodeData.Dot), Unsupported(NodeData.Caret), Unsupported(NodeData.Dollar)), char('a'))
+  )
+
+  // python-regex's `\m` and `\M`.
+  checkWith("\\m\\M", "", PythonRegex())(_ =>
+    val word = build("\\w", "", PythonRegex()).node.data.asInstanceOf[Chars].set
+    Sequence(
+      Sequence(Assert(IRAssertKind.WordBoundary(word)), LookAhead(false, Chars(word))),
+      Sequence(Assert(IRAssertKind.WordBoundary(word)), LookBehind(false, Chars(word)))
+    )
+  )
+
+  // python-regex's conditionals, `(*PRUNE)`, `(*SKIP)` and fuzzy constraints are unsupported, but `(*FAIL)` is not.
+  check("(a)(?(1)b)", "", PythonRegex())(
+    Sequence(
+      Capture(1, None, char('a')),
+      Unsupported(NodeData.Command(CommandKind.Conditional(ConditionalTest.Indexed(1), NodeData.Literal('b'))))
+    )
+  )
+  check("(*PRUNE)", "", PythonRegex())(
+    Unsupported(NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Prune), None)))
+  )
+  check("(*FAIL)", "", PythonRegex())(Chars(CharSet.empty))
+  check("a{e}", "", PythonRegex())(Unsupported(NodeData.Command(CommandKind.Fuzzy(NodeData.Literal('a'), "e"))))

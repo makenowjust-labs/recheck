@@ -331,3 +331,75 @@ class IRPropertyLookupSuite extends munit.FunSuite with IRHelper:
       "XDigit" -> ascii(Digits + "ABCDEFabcdef")
     )
   do chars(s"\\p{$name}", "", Ruby())(expected.diff(UTF16Encoding.Surrogates))
+
+  // python-regex's properties by `lookup_property` of regex 2026.9.29.
+  val PR: Dialect = PythonRegex()
+  val Latin1: CharSet = CharSet.range(0, 0xff)
+  val NonASCII: CharSet = CharSet.range(0x80, 0x10ffff)
+  chars("\\p{L}", "", PR)(gc("L"))
+  chars("\\pL", "", PR)(gc("L"))
+  chars("\\p{L&}", "", PR)(gc("L"))
+  chars("\\p{LC}", "", PR)(gc("LC"))
+  chars("\\p{Lowercase Letter}", "", PR)(gc("Ll"))
+  chars("\\p{gc=Assigned}", "", PR)(gc("Cn").complement(UnitMode.CodePoint))
+  chars("\\p{General_Category=Assigned}", "", PR)(gc("Cn").complement(UnitMode.CodePoint))
+  chars("\\p{Assigned}", "", PR)(gc("Cn").complement(UnitMode.CodePoint))
+  chars("\\p{Script=Greek}", "", PR)(value(PropertyTable.Script, "Greek"))
+  chars("\\p{sc:Thai}", "", PR)(value(PropertyTable.Script, "Thai"))
+  chars("\\p{Hrkt}", "", PR)(CharSet.empty)
+  chars("\\p{Greek}", "", PR)(value(PropertyTable.Script, "Greek"))
+  chars("\\p{IsGreek}", "", PR)(value(PropertyTable.Script, "Greek"))
+  chars("\\p{InBasicLatin}", "", PR)(CharSet.range(0, 0x7f))
+  chars("\\p{IsAlpha}", "", PR)(binary("Alphabetic"))
+  chars("\\p{Alpha=No}", "", PR)(binary("Alphabetic").complement(UnitMode.CodePoint))
+  chars("\\p{Script}", "", PR)(value(PropertyTable.Script, "Zzzz").complement(UnitMode.CodePoint))
+  chars("\\p{NV}", "", PR)(PropertyTable.NumericValue.nan.set.complement(UnitMode.CodePoint))
+  chars("\\p{NFCQC}", "", PR)(value(PropertyTable.NFCQuickCheck, "N").complement(UnitMode.CodePoint))
+  chars("\\p{NV=0.5}", "", PR)(
+    PropertyTable.NumericValue.values.find(v => v.numerator == 1 && v.denominator == 2).get.set
+  )
+  chars("\\p{NV=-1_0/2_0}", "", PR)(
+    PropertyTable.NumericValue.values.find(v => v.numerator == -1 && v.denominator == 2).get.set
+  )
+  chars("\\p{NV=1e1}", "", PR)(
+    PropertyTable.NumericValue.values.find(v => v.numerator == 10 && v.denominator == 1).get.set
+  )
+  chars("\\p{NV=NaN}", "", PR)(PropertyTable.NumericValue.nan.set)
+  chars("\\p{NV=0.33333}", "", PR)(
+    PropertyTable.NumericValue.values.find(v => v.numerator == 1 && v.denominator == 3).get.set
+  )
+  chars("\\p{ccc=230}", "", PR)(value(PropertyTable.CanonicalCombiningClass, "Above"))
+  chars("\\p{Word}", "", PR)(
+    binary("Alphabetic").union(gc("M")).union(gc("Nd")).union(gc("Pc")).union(binary("Join_Control"))
+  )
+  chars("\\p{HorizSpace}", "", PR)(IRClassLookup.pcreHorizontal)
+  chars("\\p{OAlpha}", "", PR)(binary("Alphabetic").diff(gc("L", "Nl")))
+  chars("[[:alnum:]]", "", PR)(binary("Alphabetic").union(IRClassLookup.ASCIIDigit))
+  // ASCII reads a character above ASCII as `U+10FFFF`, and the C locale (`L`) has the value `0` above `U+00FF`.
+  chars("\\p{L}", "a", PR)(gc("L").intersect(CharSet.range(0, 0x7f)))
+  chars("\\p{Cn}", "a", PR)(gc("Cn").union(NonASCII))
+  chars("\\P{L}", "", PythonRegex(Python.Type.Bytes))(Latin1.diff(gc("L")).union(CharSet.range(0x80, 0xff)))
+  chars("(?u:\\p{L})", "", PythonRegex(Python.Type.Bytes))(gc("L").intersect(Latin1))
+  chars("\\p{Alpha}", "L", PR)(IRClassLookup.ASCII_POSIX("alpha"))
+  chars("\\p{Alpha=No}", "L", PR)(IRClassLookup.ASCII_POSIX("alpha").complement(UnitMode.CodePoint))
+  chars("\\p{Lu}", "L", PR)(IRClassLookup.ASCII_POSIX("upper"))
+  chars("\\p{P&}", "L", PR)(IRClassLookup.ASCII_POSIX("punct"))
+  chars("\\p{Cn}", "L", PR)(CharSet.range(0x100, 0x10ffff))
+  chars("\\p{Latin}", "L", PR)(CharSet.empty)
+  chars("\\p{Script=Unknown}", "L", PR)(UnitMode.CodePoint.universe)
+  chars("\\p{ASCII}", "L", PR)(CharSet.range(0, 0x7f))
+  chars("\\p{Block}", "L", PR)(CharSet.range(0, 0x7f))
+  chars("\\p{Any}", "L", PR)(Latin1)
+  test("IRBuilder.build: python-regex's unknown properties"):
+    for s <- Seq(
+        "\\p{NV=1e999}",
+        "\\p{NV=1/2/3}",
+        "\\p{IsL}",
+        "\\p{Foo}",
+        "\\p{sc=Foo}",
+        "\\p{Foo=Bar}",
+        "\\p{Jpan}",
+        "\\p{Alpha=Maybe}",
+        "\\p{NV=7/3}"
+      )
+    do interceptMessage[IRBuildingException]("Unknown Unicode property name at 0")(build(s, "", PR))

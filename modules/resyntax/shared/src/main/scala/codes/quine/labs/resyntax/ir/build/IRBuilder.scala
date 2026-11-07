@@ -12,6 +12,7 @@ import codes.quine.labs.resyntax.ast.ConditionalTest
 import codes.quine.labs.resyntax.ast.EscapeClassKind
 import codes.quine.labs.resyntax.ast.EscapeStyle
 import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
@@ -36,14 +37,20 @@ object IRBuilder:
   def build(parsed: Node, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): IRPattern =
     val node = stripSource(parsed)
     val starts = startOptions(node)
-    val featureSet = IRFeatureSet.from(flagSet, dialect, starts)
+    // python-regex's global inline flags (e.g. `(?V1)`) apply to the whole pattern, so they join the flags.
+    val globalFlagSet =
+      if IRFeatureSet.from(flagSet, dialect, starts).hasGlobalInlineFlag then withGlobalInlineFlags(node, flagSet)
+      else flagSet
+    val featureSet = IRFeatureSet.from(globalFlagSet, dialect, starts)
     if featureSet.validatesCharsetFlags then
       if mode == UnitMode.CodePoint && flagSet.localeUpper then
         throw new IRBuildingException("Cannot use LOCALE flag with a str pattern", SourceLocation.Invalid)
       if mode == UnitMode.Byte && flagSet.unicode then
         throw new IRBuildingException("Cannot use UNICODE flag with a bytes pattern", SourceLocation.Invalid)
       validatePythonGlobalFlags(node, flagSet)
-    val context = BuildingContext(flagSet, featureSet)
+    if featureSet.validatesPythonRegexFlags then validatePythonRegexFlags(node, globalFlagSet, mode)
+    val initialFlagSet = if featureSet.fullCaseByDefault then globalFlagSet.copy(fullCase = true) else globalFlagSet
+    val context = BuildingContext(initialFlagSet, featureSet)
     val table = CaptureAnalyzer.analyze(node, context)
     val resolver = new ReferenceResolver(table, featureSet)
     val perlUnicodeRules =
@@ -62,7 +69,7 @@ object IRBuilder:
       )
     val backReferences = new SemanticAnalyzer(table, resolver, lookBehindAnalyzer, featureSet).analyze(node)
     val builder = new IRBuilder(context, table, backReferences, chars, lookBehindAnalyzer, hasCall(node))
-    val root = builder.build(node)
+    val root = unsupportedGlobalFlag(node, globalFlagSet, featureSet).getOrElse(builder.build(node))
     IRPattern(
       root,
       table.count,
@@ -74,15 +81,19 @@ object IRBuilder:
         restoredByNegativeCondition = featureSet.restoresCapturesByNegativeCondition,
         unsetWhileOpen = featureSet.unsetsCapturesWhileOpen
       ),
-      IREmptyIterationSemantics(featureSet.unboundedEmptyIteration, featureSet.boundedEmptyIteration),
+      IREmptyIterationSemantics(
+        featureSet.unboundedEmptyIteration,
+        featureSet.boundedEmptyIteration,
+        featureSet.countsReferencedCaptures
+      ),
       IRBacktrackControlSemantics(featureSet.thenPassesAssertions, featureSet.acceptEndsAtomic),
       featureSet.anchored,
       mode,
       notEmpty(starts)
     )
 
-  /** Returns the node without what only its source has: the blanks of the extended mode are removed, and Ruby's
-    * `\u{...}` of several code points and the case regions become their nodes.
+  /** Returns the node without what only its source has: the blanks of the extended mode are removed, Ruby's `\u{...}`
+    * of several code points and the case regions become their nodes, and python-regex's `||` becomes a union.
     *
     * A sequence or a class union left with one item becomes the item, and a blank alone becomes an empty one.
     */
@@ -141,6 +152,10 @@ object IRBuilder:
       ClassItem(ClassItemData.ClassIntersection(stripClassSource(left), stripClassSource(right)), item.loc)
     case ClassItemData.ClassDiff(left, right) =>
       ClassItem(ClassItemData.ClassDiff(stripClassSource(left), stripClassSource(right)), item.loc)
+    case ClassItemData.ClassSymmetricDiff(left, right) =>
+      ClassItem(ClassItemData.ClassSymmetricDiff(stripClassSource(left), stripClassSource(right)), item.loc)
+    case ClassItemData.ClassExplicitUnion(left, right) =>
+      ClassItem(ClassItemData.ClassUnion(Seq(stripClassSource(left), stripClassSource(right))), item.loc)
     case ClassItemData.ClassNest(invert, inner) =>
       ClassItem(ClassItemData.ClassNest(invert, stripClassSource(inner)), item.loc)
     case _ => item
@@ -235,6 +250,69 @@ object IRBuilder:
                       chars.rubyClassWidths(node, flags).fold(single(1))(ws => Width(ws.min, ws.max.toLong))
                 case _ => single(1)
       case _ => nodes => single(nodes.size)
+
+  /** Returns the flags with python-regex's global inline flags anywhere in the pattern: `b`, `e`, `p`, `r`, `V0` and
+    * `V1`.
+    */
+  private def withGlobalInlineFlags(node: Node, flagSet: FlagSet): FlagSet =
+    inlineFlagSets(node).foldLeft(flagSet): (f, added) =>
+      f.copy(
+        bestMatch = f.bestMatch || added.bestMatch,
+        evaluate = f.evaluate || added.evaluate,
+        preserve = f.preserve || added.preserve,
+        nonDestructive = f.nonDestructive || added.nonDestructive,
+        version0 = f.version0 || added.version0,
+        version1 = f.version1 || added.version1
+      )
+
+  /** Returns the flags that the inline flags of the pattern add, in the source order. */
+  private def inlineFlagSets(node: Node): Seq[FlagSet] = node.data match
+    case NodeData.Command(CommandKind.InlineFlag(diff))    => Seq(diff.added)
+    case NodeData.Group(GroupKind.InlineFlag(diff), child) => diff.added +: inlineFlagSets(child)
+    case _                                                 => NodeKey.children(node).flatMap(inlineFlagSets)
+
+  /** Validates python-regex's flags: the versions, and the character sets at the end of the pattern, which have the
+    * inline flags out of groups.
+    */
+  private def validatePythonRegexFlags(node: Node, globalFlagSet: FlagSet, mode: UnitMode): Unit =
+    // `regex` raises `KeyError` on `V0` and `V1` together, which is a bug of its error message.
+    if globalFlagSet.version0 && globalFlagSet.version1 then
+      throw new IRBuildingException("VERSION0 and VERSION1 flags are incompatible", SourceLocation.Invalid)
+
+    def topLevel(node: Node): Seq[FlagSetDiff] = node.data match
+      case NodeData.Disjunction(nodes)                    => nodes.flatMap(topLevel)
+      case NodeData.Sequence(nodes)                       => nodes.flatMap(topLevel)
+      case NodeData.Command(CommandKind.InlineFlag(diff)) => Seq(diff)
+      case _                                              => Seq.empty
+
+    val last = topLevel(node).foldLeft(globalFlagSet): (f, diff) =>
+      val removed = diff.removed.getOrElse(FlagSet())
+      f.copy(
+        ascii = (f.ascii || diff.added.ascii) && !removed.ascii,
+        localeUpper = (f.localeUpper || diff.added.localeUpper) && !removed.localeUpper,
+        unicode = (f.unicode || diff.added.unicode) && !removed.unicode
+      )
+    if Seq(last.ascii, last.localeUpper, last.unicode).count(identity) > 1 then
+      throw new IRBuildingException("ASCII, LOCALE and UNICODE flags are incompatible", SourceLocation.Invalid)
+    if mode == UnitMode.Byte && last.unicode then
+      throw new IRBuildingException("Cannot use UNICODE flag with a bytes pattern", SourceLocation.Invalid)
+
+  /** Returns an unsupported node for python-regex's `p` (POSIX) or `r` (REVERSE), which change the whole matching. */
+  private def unsupportedGlobalFlag(node: Node, globalFlagSet: FlagSet, featureSet: IRFeatureSet): Option[IRNode] =
+    def isUnsupported(f: FlagSet): Boolean = f.preserve || f.nonDestructive
+
+    def find(node: Node): Option[Node] = node.data match
+      case NodeData.Command(CommandKind.InlineFlag(diff)) if isUnsupported(diff.added) => Some(node)
+      case NodeData.Group(GroupKind.InlineFlag(diff), _) if isUnsupported(diff.added)  => Some(node)
+      case _                                                                           =>
+        NodeKey.children(node).iterator.flatMap(find).nextOption()
+
+    Option.when(featureSet.hasGlobalInlineFlag && isUnsupported(globalFlagSet)):
+      find(node) match
+        case Some(flag) => IRNode(IRNodeData.Unsupported(flag.data), flag.loc)
+        case None       =>
+          val flagSet = FlagSet(preserve = globalFlagSet.preserve, nonDestructive = globalFlagSet.nonDestructive)
+          IRNode(IRNodeData.Unsupported(NodeData.Command(CommandKind.InlineFlag(FlagSetDiff(flagSet, None)))))
 
   /** Validates Python's flags with the global inline flags, which `re` validates together. */
   private def validatePythonGlobalFlags(node: Node, flagSet: FlagSet): Unit =
@@ -342,6 +420,7 @@ private[build] class IRBuilder(
       case NodeData.Repeat(child, quantifier, _)                     => Left(buildRepeat(node, child, quantifier))
       case NodeData.Group(kind, child)                               => buildGroup(node, kind, child)
       case NodeData.Command(kind)                                    => buildCommand(node, kind)
+      case NodeData.Caret | NodeData.Dollar if isWordFlag            => Left(IRNodeData.Unsupported(node.data))
       case NodeData.Caret                                            => Left(buildCaret())
       case NodeData.Dollar                                           => Left(buildDollar())
       case NodeData.Backslash(kind)                                  => Left(buildBackslash(node, kind))
@@ -361,7 +440,11 @@ private[build] class IRBuilder(
     val flags = charFlags
     // Java's CANON_EQ matches canonically equivalent sequences, which the checkers do not handle.
     if flags.canonicalEquivalence then IRNodeData.Unsupported(node.data)
+    else if node.data == NodeData.Dot && isWordFlag then IRNodeData.Unsupported(node.data)
     else chars.resolve(node, flags)
+
+  /** Whether python-regex's `w` (WORD) is on, which changes the word boundaries and the line terminators. */
+  def isWordFlag: Boolean = featureSet.hasUnsupportedWordFlag && context.flagSet.word
 
   /** Builds a part, which is literal characters in a row, together (e.g. for multi-character case folding). */
   def buildPart(nodes: Seq[Node]): Seq[IRNode] =
@@ -446,19 +529,25 @@ private[build] class IRBuilder(
           case nodes     => Left(IRNodeData.Disjunction(nodes.map(build)))
     case CommandKind.Comment(_) => Left(IRNodeData.Empty)
     // The start options are of the whole pattern, which `IRBuilder.build` reads.
-    case CommandKind.StartOption(_, _)            => Left(IRNodeData.Empty)
-    case CommandKind.RCall                        => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.IndexedCall(_)               => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.RelativeCall(_)              => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.NamedCall(_)                 => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.PNamedCall(_)                => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.InlineCode(_)                => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.EmbedCode(_)                 => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.Callout                      => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.CalloutInt(_)                => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.CalloutString(_, _, _)       => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.Conditional(test, yes, no)   => buildConditional(node, test, yes, no)
+    case CommandKind.StartOption(_, _)      => Left(IRNodeData.Empty)
+    case CommandKind.RCall                  => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.IndexedCall(_)         => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.RelativeCall(_)        => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.NamedCall(_)           => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.PNamedCall(_)          => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.InlineCode(_)          => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.EmbedCode(_)           => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.Callout                => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.CalloutInt(_)          => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.CalloutString(_, _, _) => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.Conditional(_, _, _) if featureSet.buildsConditionalAsUnsupported =>
+      Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.Conditional(test, yes, no) => buildConditional(node, test, yes, no)
+    case CommandKind.BacktrackControl(Some(BacktrackControlKind.Prune | BacktrackControlKind.Skip), _)
+        if featureSet.buildsBacktrackControlAsUnsupported =>
+      Left(IRNodeData.Unsupported(node.data))
     case CommandKind.BacktrackControl(kind, name) => Left(buildBacktrackControl(kind, name))
+    case CommandKind.Fuzzy(_, _)                  => Left(IRNodeData.Unsupported(node.data))
     case CommandKind.AbsenceExpression(_, _)      => Left(IRNodeData.Unsupported(node.data))
     case CommandKind.AbsenceStopper(_)            => Left(IRNodeData.Unsupported(node.data))
     case CommandKind.AbsenceRangeClear            => Left(IRNodeData.Unsupported(node.data))
@@ -589,6 +678,15 @@ private[build] class IRBuilder(
     chars.backReference(backReferences(NodeKey(node)), charFlags)
 
   def buildAssert(node: Node, kind: AssertKind): IRNodeData = kind match
+    case AssertKind.Boundary(_) | AssertKind.NonBoundary(_) | AssertKind.WordStart | AssertKind.WordEnd if isWordFlag =>
+      IRNodeData.Unsupported(node.data)
+    // python-regex's `\m` and `\M` are a boundary before and after a word character.
+    case AssertKind.WordStart | AssertKind.WordEnd =>
+      val word = chars.wordSet(charFlags)
+      val look =
+        if kind == AssertKind.WordStart then IRNodeData.LookAhead(false, IRNodeData.Chars(word))
+        else IRNodeData.LookBehind(false, IRNodeData.Chars(word))
+      IRNodeData.Sequence(IRNodeData.Assert(IRAssertKind.WordBoundary(word)), look)
     case AssertKind.Boundary(None) =>
       val word = chars.wordSet(charFlags)
       IRNodeData.Assert(

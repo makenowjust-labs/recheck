@@ -49,18 +49,26 @@ private[build] sealed abstract class IRClassLookup:
     throw new IllegalArgumentException(s"No POSIX class in $this")
   // $COVERAGE-ON$
 
+  /** Returns the characters of `\h` as a blank (python-regex) under the flags. */
+  // The parsers of the other dialects read `\h` otherwise.
+  // $COVERAGE-OFF$
+  def blank(flags: IRCharFlagSet): CharSet =
+    throw new IllegalArgumentException(s"No blank class in $this")
+  // $COVERAGE-ON$
+
 object IRClassLookup:
 
   /** Returns the table of the kind in the unit mode, where `perlUnicodeRules` makes Perl's `/d` use Unicode rules. */
   private[build] def from(kind: IRClassLookupKind, mode: UnitMode, perlUnicodeRules: Boolean): IRClassLookup =
     kind match
-      case IRClassLookupKind.JavaScript => JavaScript(mode)
-      case IRClassLookupKind.Java       => Java
-      case IRClassLookupKind.DotNet     => DotNet
-      case IRClassLookupKind.PCRE       => PCRE
-      case IRClassLookupKind.Perl       => Perl(native = !perlUnicodeRules)
-      case IRClassLookupKind.Python     => Python(mode)
-      case IRClassLookupKind.Ruby       => Ruby(mode)
+      case IRClassLookupKind.JavaScript  => JavaScript(mode)
+      case IRClassLookupKind.Java        => Java
+      case IRClassLookupKind.DotNet      => DotNet
+      case IRClassLookupKind.PCRE        => PCRE
+      case IRClassLookupKind.Perl        => Perl(native = !perlUnicodeRules)
+      case IRClassLookupKind.Python      => Python(mode)
+      case IRClassLookupKind.PythonRegex => PythonRegex(mode)
+      case IRClassLookupKind.Ruby        => Ruby(mode)
 
   private enum Rule:
 
@@ -197,6 +205,32 @@ object IRClassLookup:
     def space(flags: IRCharFlagSet): CharSet = pick(ruleOf(flags), ASCIISpace, pythonSpace)
 
     def word(flags: IRCharFlagSet): CharSet = pick(ruleOf(flags), ASCIIWord, pythonWord)
+
+  /** PythonRegex is the table of python-regex, whose classes are its properties (e.g. `\w` is `\p{Word}`) under the
+    * encoding of the flags.
+    */
+  private[build] final case class PythonRegex(mode: UnitMode) extends IRClassLookup:
+
+    private def property(name: String, flags: IRCharFlagSet): CharSet =
+      val PropertyResult.Found(set, _) = IRPropertyLookup.pythonRegex(None, name, false, flags, mode): @unchecked
+      set.chars
+
+    def digit(flags: IRCharFlagSet): CharSet = property("Digit", flags)
+
+    def space(flags: IRCharFlagSet): CharSet = property("Space", flags)
+
+    def word(flags: IRCharFlagSet): CharSet = property("Word", flags)
+
+    override def blank(flags: IRCharFlagSet): CharSet = property("Blank", flags)
+
+    // The parser keeps the value of `[[:name=value:]]` after `=`.
+    override def posix(name: String, flags: IRCharFlagSet): Option[CharSet] =
+      val result = name.indexOf('=') match
+        case -1 => IRPropertyLookup.pythonRegex(None, name, true, flags, mode)
+        case i  => IRPropertyLookup.pythonRegex(Some(name.take(i)), name.drop(i + 1), true, flags, mode)
+      result match
+        case PropertyResult.Found(set, _) => Some(set.chars)
+        case _                            => None
 
   /** Ruby is the table of Ruby, whose escape classes are of Unicode with `u`, and POSIX classes without `a`. */
   private[build] final case class Ruby(mode: UnitMode) extends IRClassLookup:

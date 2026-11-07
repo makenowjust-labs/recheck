@@ -218,8 +218,12 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
         if !nameIndices.contains(name) then nameIndices(name) = Vector.empty
         scoped(walk(child))
     else
-      val index = next
-      next += 1
+      // python-regex's group takes the index of the earlier group of its name, or the next index that has no name.
+      val earlier = if featureSet.sharesIndexOfName then nameIndices.get(name).flatMap(_.headOption) else None
+      val index = earlier.getOrElse:
+        if featureSet.sharesIndexOfName then while indexNames.contains(next) do next += 1
+        next += 1
+        next - 1
       addName(node, name, index)
       capture(node, index, child)
 

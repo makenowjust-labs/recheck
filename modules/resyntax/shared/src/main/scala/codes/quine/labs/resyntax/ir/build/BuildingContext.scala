@@ -80,6 +80,7 @@ final case class BuildingContext(flagSet: FlagSet, featureSet: IRFeatureSet):
       unicodeCase = !featureSet.hasUnicodeCaseFlag || f.unicode || unicodeClass,
       unicodeClass = unicodeClass,
       charset = charset,
+      fullCaseFolding = !featureSet.hasFullCaseFlag || f.fullCase && !f.ascii,
       // Perl's `aa` forbids ASCII and non-ASCII characters to match case-insensitively, as PCRE's `r` does.
       caselessRestrict = featureSet.hasCaselessRestrictFlag && f.nonDestructive || featureSet.caselessRestrict ||
         featureSet.hasASCIIRestrictFlag && f.asciiRestrict,

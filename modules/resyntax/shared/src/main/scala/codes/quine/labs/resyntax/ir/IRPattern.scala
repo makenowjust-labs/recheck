@@ -433,7 +433,11 @@ final case class IREmptyIterationSemantics(
     /** The handling in an unbounded repetition (e.g. `*`). */
     unbounded: IREmptyIteration,
     /** The handling in a bounded repetition, including an exact one (e.g. `?` and `{2}`). */
-    bounded: IREmptyIteration
+    bounded: IREmptyIteration,
+    /** Whether an iteration that changes a capture that a back-reference refers to is not empty, even if it does not
+      * advance (python-regex).
+      */
+    countsReferencedCaptures: Boolean
 )
 
 /** IREmptyIteration is how a repetition handles an iteration matching the empty string. */
@@ -451,7 +455,7 @@ enum IREmptyIteration:
   /** ExitFromMin ends the repetition with the last mandatory one or an optional one (.NET, PCRE and Perl). */
   case ExitFromMin
 
-  /** ExitAll ends the repetition with any one, even before the minimum (Java's `Loop`). */
+  /** ExitAll ends the repetition with any one, even before the minimum (Java's `Loop`, and python-regex). */
   case ExitAll
 
 /** IRBacktrackControlSemantics is where the backtracking control verbs act, which differs among dialects. */
@@ -490,9 +494,11 @@ object IRBackReferenceFolding:
     *
     * A folding of a character to several characters counts only if all its code values are `minFoldedValue` or more;
     * otherwise, the character keeps its other folding (`minFoldedValue` is `0x80` under `aa`, and `0x100` under `l`).
+    * Without `foldsDottedCapitalI`, `İ` (U+0130) keeps its other folding too (python-regex).
     */
-  final case class Full(minFoldedValue: Int) extends IRBackReferenceFolding:
+  final case class Full(minFoldedValue: Int, foldsDottedCapitalI: Boolean) extends IRBackReferenceFolding:
 
     /** Returns the folding of a character to several characters, if any. */
     def fold(c: UChar): Option[UString] =
-      Some(FullCaseFolding(c)).filter(key => key.length >= 2 && key.iterator.forall(_ >= minFoldedValue))
+      Some(FullCaseFolding(c)).filter: key =>
+        key.length >= 2 && key.iterator.forall(_ >= minFoldedValue) && (foldsDottedCapitalI || c != 0x130)

@@ -17,7 +17,7 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
 
   // `\n^` with `m` matches `a\n` in .NET, JavaScript and Python, but not in Java, Perl, PCRE and Ruby.
   // `^` with `m` matches the empty string except in Java.
-  check("^", "m", DotNet, Python())(Assert(LineBegin(LT.LF, AfterTerminator)))
+  check("^", "m", DotNet, Python(), PythonRegex())(Assert(LineBegin(LT.LF, AfterTerminator)))
   check("^", "m", JavaScript)(Assert(LineBegin(LT.JavaScript, AfterTerminator)))
   check("^", "m", Java)(Assert(LineBegin(LT.Java, Never)))
   check("^", "m", PCRE, Perl())(Assert(LineBegin(LT.LF, InputBegin)))
@@ -26,7 +26,7 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
 
   // `a$` matches `a\n` except in JavaScript; Java also before `\r\n`, `\r`, U+0085 and U+2028 at the end.
   check("$", "", JavaScript)(Assert(TextEnd))
-  check("$", "", DotNet, PCRE, Perl(), Python())(Assert(ChompTextEnd(LT.LF)))
+  check("$", "", DotNet, PCRE, Perl(), Python(), PythonRegex())(Assert(ChompTextEnd(LT.LF)))
   check("$", "", Java)(Assert(ChompTextEnd(LT.Java)))
   check("$", "", Ruby())(Assert(LineEnd(LT.LF)))
   check("$", "m", DotNet, PCRE, Perl(), Python(), Ruby())(Assert(LineEnd(LT.LF)))
@@ -60,10 +60,10 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
   // Inline flags apply to the rest of the enclosing group, including the following alternatives.
   checkWith("(?m:^)^", "", All*)(d =>
     val begin = d match
-      case JavaScript               => LineBegin(LT.JavaScript, AfterTerminator)
-      case DotNet | _: Python       => LineBegin(LT.LF, AfterTerminator)
-      case Java                     => LineBegin(LT.Java, Never)
-      case PCRE | _: Perl | _: Ruby => LineBegin(LT.LF, InputBegin)
+      case JavaScript                          => LineBegin(LT.JavaScript, AfterTerminator)
+      case DotNet | _: Python | _: PythonRegex => LineBegin(LT.LF, AfterTerminator)
+      case Java                                => LineBegin(LT.Java, Never)
+      case PCRE | _: Perl | _: Ruby            => LineBegin(LT.LF, InputBegin)
     Sequence(Assert(begin), Assert(if d == Ruby() then begin else TextBegin))
   )
   // `(?:(?m))^a` does not match `b\na`, but `(?:(?m)x|^)a` matches it.
@@ -115,6 +115,11 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
     for d <- All do
       assertEquals(flagsOf(d).charset, IRCharset.Default)
       assertEquals(flagsOf(d).ignoreCase, false)
+      assertEquals(flagsOf(d).fullCaseFolding, true)
+    // python-regex folds characters to several ones with `f`, but not with `a`.
+    assertEquals(flagsOf(PythonRegex()).fullCaseFolding, false)
+    assertEquals(flagsOf(PythonRegex(), "f").fullCaseFolding, true)
+    assertEquals(flagsOf(PythonRegex(), "af").fullCaseFolding, false)
   checkChars("(*UTF)(*UCP)\\d", "", PCRE)(d => charsIn("\\d", "u", d))
   // `(*UTF)(*TURKISH_CASING)(?i)i` matches `İ` but not `I`.
   checkChars("(*UTF)(*TURKISH_CASING)(?i)i", "", PCRE)(_ => Seq(Chars(CharSet.of('i', 0x0130))))

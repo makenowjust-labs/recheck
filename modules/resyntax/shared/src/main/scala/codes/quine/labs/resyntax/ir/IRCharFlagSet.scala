@@ -17,10 +17,14 @@ final case class IRCharFlagSet(
     unicodeCase: Boolean,
     /** The option making escape classes Unicode-aware (Java `U`, PCRE `(*UCP)` or PHP's `u`). */
     unicodeClass: Boolean,
-    /** The character set modifier (Perl and Ruby `a`/`d`/`u`, Perl `l`, Python `a`/`u`/`L`, PCRE `a` and its
-      * sub-options).
+    /** The character set modifier (Perl and Ruby `a`/`d`/`u`, Perl `l`, Python and python-regex `a`/`u`/`L`, PCRE `a`
+      * and its sub-options).
       */
     charset: IRCharset,
+    /** Case-insensitive matching with the foldings to several characters (python-regex `f`, which `V1` turns on,
+      * without `a`; always true in the other dialects).
+      */
+    fullCaseFolding: Boolean,
     /** PCRE `r` or `(*CASELESS_RESTRICT)`, and Perl `aa`. */
     caselessRestrict: Boolean,
     turkishCasing: Boolean,
@@ -37,10 +41,10 @@ object IRCharset:
   /** Default is the dialect's default character set rules. */
   case object Default extends IRCharset
 
-  /** Unicode is the Unicode rules (Perl and Ruby `u`, Python `u`). */
+  /** Unicode is the Unicode rules (Perl and Ruby `u`, Python and python-regex `u`). */
   case object Unicode extends IRCharset
 
-  /** Locale is the locale rules (Perl `l`, Python `L`). */
+  /** Locale is the locale rules (Perl `l`, Python and python-regex `L`). */
   case object Locale extends IRCharset
 
   /** ASCII restricts the classes to ASCII (`a`, and PCRE's `aD`, `aS`, `aW`, `aP` and `aT`). */

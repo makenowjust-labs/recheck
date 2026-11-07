@@ -13,11 +13,11 @@ final case class IRFeatureSet(
     caretIsLineBegin: Boolean,
     // Ruby
     dollarIsLineEnd: Boolean,
-    // .NET, Java, PCRE (without `D`), Perl, Python, Ruby
+    // .NET, Java, PCRE (without `D`), Perl, Python, python-regex, Ruby
     dollarIsChompTextEnd: Boolean,
-    // Python
+    // Python, python-regex
     upperEndIsTextEnd: Boolean,
-    // .NET, JavaScript, Python: AfterTerminator, Java: Never, the others: InputBegin
+    // .NET, JavaScript, Python, python-regex: AfterTerminator, Java: Never, the others: InputBegin
     lineBeginAtEnd: IRLineBeginAtEnd,
     // JavaScript: LineTerminator, Java: six characters with atomic `\r\n`, PCRE: `(*CR)` and so on, the others: `\n`
     lineTerminators: LineTerminatorSet,
@@ -27,7 +27,7 @@ final case class IRFeatureSet(
     hasUngreedyFlag: Boolean,
     // .NET, PCRE, Perl
     hasExplicitCaptureFlag: Boolean,
-    // Perl, Python, Ruby
+    // Perl, Python, python-regex, Ruby
     hasExclusiveCharsetFlag: Boolean,
     // PCRE
     hasASCIIOptionFlag: Boolean,
@@ -49,11 +49,21 @@ final case class IRFeatureSet(
     multilineIsDotAll: Boolean,
     // PCRE
     resetFlagKeepsCharset: Boolean,
+    // python-regex
+    hasFullCaseFlag: Boolean,
+    // python-regex (with `V1`)
+    fullCaseByDefault: Boolean,
+    // python-regex
+    hasGlobalInlineFlag: Boolean,
     // Python
     validatesCharsetFlags: Boolean,
+    // python-regex
+    validatesPythonRegexFlags: Boolean,
     // .NET
     numbersNamedCaptureLast: Boolean,
-    // .NET
+    // python-regex
+    sharesIndexOfName: Boolean,
+    // .NET, python-regex
     readsNumericNameAsIndex: Boolean,
     // .NET
     ignoresGroupAfterLookAroundCondition: Boolean,
@@ -69,9 +79,11 @@ final case class IRFeatureSet(
     allowsBackReferenceToMissingGroup: Boolean,
     // Python
     requiresClosedGroupReference: Boolean,
+    // python-regex (without `V1`)
+    rejectsOpenGroupReference: Boolean,
     // Java, Python, Ruby
     requiresNameDefinedBefore: Boolean,
-    // .NET, PCRE, Python, Ruby
+    // .NET, PCRE, Python, python-regex, Ruby
     validatesIndexedCaptureTest: Boolean,
     // PCRE
     validatesIndexedRecursionTest: Boolean,
@@ -95,15 +107,21 @@ final case class IRFeatureSet(
     restoresCapturesByNegativeCondition: Boolean,
     // Ruby
     unsetsCapturesWhileOpen: Boolean,
-    // JavaScript: Reject, Java: ExitAll, Python, Ruby: ExitOptional, the others: ExitFromMin
+    // JavaScript: Reject, Java, python-regex: ExitAll, Python, Ruby: ExitOptional, the others: ExitFromMin
     unboundedEmptyIteration: IREmptyIteration,
-    // JavaScript: Reject, Java: ExitAll, PCRE: Ignore, Python, Ruby: ExitOptional, .NET, Perl: ExitFromMin
+    // JavaScript: Reject, Java, python-regex: ExitAll, PCRE: Ignore, Python, Ruby: ExitOptional, .NET, Perl: ExitFromMin
     boundedEmptyIteration: IREmptyIteration,
+    // python-regex
+    countsReferencedCaptures: Boolean,
     // Perl
     thenPassesAssertions: Boolean,
     // Perl
     acceptEndsAtomic: Boolean,
-    // .NET, JavaScript: Unrestricted, Java: Java, PCRE: PCRE, Perl: Perl, Python: Python, Ruby: Ruby
+    // python-regex
+    buildsBacktrackControlAsUnsupported: Boolean,
+    // python-regex
+    buildsConditionalAsUnsupported: Boolean,
+    // .NET, JavaScript, python-regex: Unrestricted, Java: Java, PCRE: PCRE, Perl: Perl, Python: Python, Ruby: Ruby
     lookBehindRule: IRLookBehindRule,
     // Perl
     hasNativeString: Boolean,
@@ -111,19 +129,19 @@ final case class IRFeatureSet(
     matchesUTF8String: Boolean,
     // Perl (`String` source with `utf8`)
     hasUTF8Source: Boolean,
-    // .NET: DotNet, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, Python: Python, Ruby: Ruby
+    // .NET: DotNet, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, Python: Python, python-regex: PythonRegex, Ruby: Ruby
     caseEquivalenceKind: IRCaseEquivalenceKind,
-    // Perl: Perl, Ruby: Ruby, the others: OneToOne
+    // Perl: Perl, python-regex: PythonRegex, Ruby: Ruby, the others: OneToOne
     multiCharFoldingKind: IRMultiCharFoldingKind,
     // Ruby
     readsByteEscapesAsUTF8: Boolean,
-    // .NET: DotNet, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, Python: Python, Ruby: Ruby
+    // .NET: DotNet, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, Python: Python, python-regex: PythonRegex, Ruby: Ruby
     classLookupKind: IRClassLookupKind,
-    // .NET: DotNet, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, Ruby: Ruby, Python: none
+    // .NET: DotNet, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, python-regex: PythonRegex, Ruby: Ruby, Python: none
     propertyLookupKind: Option[IRPropertyLookupKind],
-    // .NET, PCRE: CasedLetter, JavaScript: Canonicalized, Perl: CasedLetterAndCased, Ruby: ClosedBeforeNegation, the others: Unchanged
+    // .NET, PCRE: CasedLetter, JavaScript: Canonicalized, Perl: CasedLetterAndCased, python-regex: ClosedInClass, Ruby: ClosedBeforeNegation, the others: Unchanged
     caselessPropertyKind: IRCaselessPropertyKind,
-    // Ruby
+    // python-regex, Ruby
     closesCaselessClassPOSIX: Boolean,
     // PCRE
     hasClassPOSIXWordBoundary: Boolean,
@@ -133,11 +151,21 @@ final case class IRFeatureSet(
     hasMarkWordBoundary: Boolean,
     // Java
     backtracksIntoGeneralNewline: Boolean,
+    // python-regex (`bytes`)
+    hasASCIIGeneralNewline: Boolean,
     // PCRE
     nonNewlineExcludesLineTerminators: Boolean,
     // PCRE
     hasPCREGraphemeCluster: Boolean,
-    // Java, Python
+    // python-regex
+    hasCharsetGraphemeCluster: Boolean,
+    // python-regex
+    masksOctalEscapeByCharset: Boolean,
+    // python-regex
+    allowsWideEscapeInByteMode: Boolean,
+    // python-regex
+    hasUnsupportedWordFlag: Boolean,
+    // Java, Python, python-regex
     validatesCharName: Boolean,
     // JavaScript (with `y`), PCRE (with `A`)
     anchored: Boolean,
@@ -203,6 +231,12 @@ enum IRCaseEquivalenceKind:
   /** Python matches by `upper(lower(c))`, and only ASCII letters with `a` or in a bytes pattern. */
   case Python
 
+  /** PythonRegex matches by the simple case folding, where `I`, `i`, `İ` and `ı` match by their case mappings without
+    * transitivity (e.g. `I` matches `ı`, but `ı` does not match `i`), and only ASCII letters with `a` or `L` or in a
+    * bytes pattern.
+    */
+  case PythonRegex
+
   /** Ruby matches by the simple case folding, and only ASCII letters in byte mode. */
   case Ruby
 
@@ -220,11 +254,16 @@ enum IRMultiCharFoldingKind:
   /** Ruby folds literals other than escapes of ASCII characters, classes, properties and back-references in UTF-8. */
   case Ruby
 
+  /** PythonRegex folds literals, classes, back-references and look-behinds of a `str` pattern with `f`, which `V1`
+    * turns on, and without `a`.
+    */
+  case PythonRegex
+
   /** Whether characters match their foldings to several characters in the unit mode. */
   def foldsIn(mode: UnitMode): Boolean = this match
-    case OneToOne => false
-    case Perl     => true
-    case Ruby     => mode.isCodePoint
+    case OneToOne           => false
+    case Perl               => true
+    case Ruby | PythonRegex => mode.isCodePoint
 
   /** Whether an escape of an ASCII character takes part in the folding of the literals around it.
     *
@@ -233,27 +272,33 @@ enum IRMultiCharFoldingKind:
     * as the characters (e.g. `\u00DF` and `\xC3\x9F` are `ß`).
     */
   def foldsASCIIEscapes: Boolean = this match
-    case OneToOne | Ruby => false
-    case Perl            => true
+    case OneToOne | Ruby    => false
+    case Perl | PythonRegex => true
 
   /** Whether a literal folded to several characters joins the literals next to it in a folding (e.g. `ﬀi` matches `ﬃ`).
     *
     * Onigmo joins several literals only when each of them folds to one character.
     */
   def joinsMultiCharFoldings: Boolean = this match
-    case OneToOne | Ruby => false
-    case Perl            => true
+    case OneToOne | Ruby    => false
+    case Perl | PythonRegex => true
 
   /** Returns how a case-insensitive class matches the foldings of its characters to several characters. */
   def classFoldingKind: IRClassFoldingKind = this match
-    case OneToOne => IRClassFoldingKind.OneToOne
-    case Perl     => IRClassFoldingKind.Perl
-    case Ruby     => IRClassFoldingKind.Ruby
+    case OneToOne    => IRClassFoldingKind.OneToOne
+    case Perl        => IRClassFoldingKind.Perl
+    case Ruby        => IRClassFoldingKind.Ruby
+    case PythonRegex => IRClassFoldingKind.PythonRegex
 
   /** Whether the charset flags restrict the foldings (e.g. `/l` forbids a folding with a character below `U+0100`). */
   def isRestrictedByCharset: Boolean = this match
-    case OneToOne | Ruby => false
-    case Perl            => true
+    case OneToOne | Ruby | PythonRegex => false
+    case Perl                          => true
+
+  /** Whether `İ` (U+0130) folds to `i` and U+0307, which python-regex leaves out of its full case folding. */
+  def foldsDottedCapitalI: Boolean = this match
+    case OneToOne | Perl | Ruby => true
+    case PythonRegex            => false
 
 /** IRClassFoldingKind is how a case-insensitive class matches the foldings of its characters to several characters. */
 enum IRClassFoldingKind:
@@ -268,6 +313,11 @@ enum IRClassFoldingKind:
 
   /** Ruby matches the foldings of the characters of a class or a property after it (e.g. `[ßx]` is `[ßẞx]|ss|ss`). */
   case Ruby
+
+  /** PythonRegex matches the distinct foldings of the characters of a class after it, in the order of the characters,
+    * but not of a property out of a class (e.g. `[ßx]` is `[ßẞx]|ss`).
+    */
+  case PythonRegex
 
 /** IRClassLookupKind is the family of a dialect's table of escape classes and POSIX classes.
   *
@@ -296,6 +346,9 @@ enum IRClassLookupKind:
   /** Python has classes of Unicode in a `str` pattern without `a`. */
   case Python
 
+  /** PythonRegex has the classes of its properties (e.g. `\w` is `\p{Word}`), by the encoding of the flags. */
+  case PythonRegex
+
   /** Ruby has escape classes of Unicode with `u`, and POSIX classes of Unicode without `a`, in a code point mode. */
   case Ruby
 
@@ -323,6 +376,9 @@ enum IRPropertyLookupKind:
   /** Ruby has Onigmo's properties, and only the POSIX names in ASCII in byte mode. */
   case Ruby
 
+  /** PythonRegex has the properties of python-regex, by the encoding of the flags (Unicode, ASCII or the C locale). */
+  case PythonRegex
+
 /** IRCaselessPropertyKind is how a Unicode property (`\p{...}` or `\P{...}`) matches case-insensitively. */
 enum IRCaselessPropertyKind:
 
@@ -345,6 +401,11 @@ enum IRCaselessPropertyKind:
   /** ClosedBeforeNegation closes the property before negating it. */
   case ClosedBeforeNegation
 
+  /** ClosedInClass closes the property before negating it in a class, and matches the cased letters for `Lu`, `Ll` and
+    * `Lt` and `Cased` for `Lowercase` and `Uppercase` out of a class, as the lookup gives them for the encoding.
+    */
+  case ClosedInClass
+
 object IRFeatureSet:
 
   def from(flagSet: FlagSet, dialect: Dialect, startOptions: Seq[String]): IRFeatureSet =
@@ -354,6 +415,7 @@ object IRFeatureSet:
     val isPCRE = dialect.isPCRE
     val isPerl = dialect.isPerl
     val isPython = dialect.isPython
+    val isPythonRegex = dialect.isPythonRegex
     val isRuby = dialect.isRuby
 
     val bsr = startOptions.reverseIterator.collectFirst:
@@ -363,10 +425,11 @@ object IRFeatureSet:
     IRFeatureSet(
       caretIsLineBegin = isRuby,
       dollarIsLineEnd = isRuby,
-      dollarIsChompTextEnd = isDotNet || isJava || isPCRE && !flagSet.dollarEndOnly || isPerl || isPython || isRuby,
-      upperEndIsTextEnd = isPython,
+      dollarIsChompTextEnd =
+        isDotNet || isJava || isPCRE && !flagSet.dollarEndOnly || isPerl || isPython || isPythonRegex || isRuby,
+      upperEndIsTextEnd = isPython || isPythonRegex,
       lineBeginAtEnd =
-        if isDotNet || isJavaScript || isPython then IRLineBeginAtEnd.AfterTerminator
+        if isDotNet || isJavaScript || isPython || isPythonRegex then IRLineBeginAtEnd.AfterTerminator
         else if isJava then IRLineBeginAtEnd.Never
         else IRLineBeginAtEnd.InputBegin,
       lineTerminators =
@@ -377,7 +440,7 @@ object IRFeatureSet:
       hasUnixLinesFlag = isJava,
       hasUngreedyFlag = isPCRE,
       hasExplicitCaptureFlag = isDotNet || isPCRE || isPerl,
-      hasExclusiveCharsetFlag = isPerl || isPython || isRuby,
+      hasExclusiveCharsetFlag = isPerl || isPython || isPythonRegex || isRuby,
       hasASCIIOptionFlag = isPCRE,
       hasASCIIRestrictFlag = isPerl,
       hasCaselessRestrictFlag = isPCRE,
@@ -388,9 +451,14 @@ object IRFeatureSet:
       hasCanonicalEquivalenceFlag = isJava,
       multilineIsDotAll = isRuby,
       resetFlagKeepsCharset = isPCRE,
+      hasFullCaseFlag = isPythonRegex,
+      fullCaseByDefault = isPythonRegex && flagSet.version1,
+      hasGlobalInlineFlag = isPythonRegex,
       validatesCharsetFlags = isPython,
+      validatesPythonRegexFlags = isPythonRegex,
       numbersNamedCaptureLast = isDotNet,
-      readsNumericNameAsIndex = isDotNet,
+      sharesIndexOfName = isPythonRegex,
+      readsNumericNameAsIndex = isDotNet || isPythonRegex,
       ignoresGroupAfterLookAroundCondition = isDotNet,
       ignoresUnnamedCaptureWithNamedCapture = isRuby,
       rejectsMismatchedNameAndIndex = isPCRE,
@@ -398,8 +466,9 @@ object IRFeatureSet:
       backReferenceChoice = if isRuby then IRBackReferenceChoice.LastMatching else IRBackReferenceChoice.FirstSet,
       allowsBackReferenceToMissingGroup = isJava,
       requiresClosedGroupReference = isPython,
+      rejectsOpenGroupReference = isPythonRegex && !flagSet.version1,
       requiresNameDefinedBefore = isJava || isPython || isRuby,
-      validatesIndexedCaptureTest = isDotNet || isPCRE || isPython || isRuby,
+      validatesIndexedCaptureTest = isDotNet || isPCRE || isPython || isPythonRegex || isRuby,
       validatesIndexedRecursionTest = isPCRE,
       readsRecursionTestAsCaptureTest = isPCRE,
       testsFirstGroupOfName = isRuby,
@@ -413,73 +482,86 @@ object IRFeatureSet:
       unsetsCapturesWhileOpen = isRuby,
       unboundedEmptyIteration =
         if isJavaScript then IREmptyIteration.Reject
-        else if isJava then IREmptyIteration.ExitAll
+        else if isJava || isPythonRegex then IREmptyIteration.ExitAll
         else if isPython || isRuby then IREmptyIteration.ExitOptional
         else IREmptyIteration.ExitFromMin,
       boundedEmptyIteration =
         if isJavaScript then IREmptyIteration.Reject
-        else if isJava then IREmptyIteration.ExitAll
+        else if isJava || isPythonRegex then IREmptyIteration.ExitAll
         // PCRE repeats copies of the node for a bounded repetition.
         else if isPCRE then IREmptyIteration.Ignore
         else if isPython || isRuby then IREmptyIteration.ExitOptional
         else IREmptyIteration.ExitFromMin,
+      countsReferencedCaptures = isPythonRegex,
       thenPassesAssertions = isPerl,
       acceptEndsAtomic = isPerl,
+      buildsBacktrackControlAsUnsupported = isPythonRegex,
+      buildsConditionalAsUnsupported = isPythonRegex,
       lookBehindRule = dialect match
-        case Dialect.DotNet | Dialect.JavaScript => IRLookBehindRule.Unrestricted
-        case Dialect.Java                        => IRLookBehindRule.Java
-        case Dialect.PCRE                        => IRLookBehindRule.PCRE
-        case _: Dialect.Perl                     => IRLookBehindRule.Perl
-        case _: Dialect.Python                   => IRLookBehindRule.Python
-        case _: Dialect.Ruby                     => IRLookBehindRule.Ruby,
+        case Dialect.DotNet | Dialect.JavaScript | _: Dialect.PythonRegex => IRLookBehindRule.Unrestricted
+        case Dialect.Java                                                 => IRLookBehindRule.Java
+        case Dialect.PCRE                                                 => IRLookBehindRule.PCRE
+        case _: Dialect.Perl                                              => IRLookBehindRule.Perl
+        case _: Dialect.Python                                            => IRLookBehindRule.Python
+        case _: Dialect.Ruby                                              => IRLookBehindRule.Ruby,
       hasNativeString = isPerl,
       matchesUTF8String = dialect match
         case Dialect.Perl(utf8, _) => utf8
         case _                     => false,
       hasUTF8Source = dialect == Dialect.Perl(true, PerlSource.String),
       caseEquivalenceKind = dialect match
-        case Dialect.DotNet     => IRCaseEquivalenceKind.DotNet
-        case Dialect.Java       => IRCaseEquivalenceKind.Java
-        case Dialect.JavaScript => IRCaseEquivalenceKind.JavaScript
-        case Dialect.PCRE       => IRCaseEquivalenceKind.PCRE
-        case _: Dialect.Perl    => IRCaseEquivalenceKind.Perl
-        case _: Dialect.Python  => IRCaseEquivalenceKind.Python
-        case _: Dialect.Ruby    => IRCaseEquivalenceKind.Ruby,
+        case Dialect.DotNet         => IRCaseEquivalenceKind.DotNet
+        case Dialect.Java           => IRCaseEquivalenceKind.Java
+        case Dialect.JavaScript     => IRCaseEquivalenceKind.JavaScript
+        case Dialect.PCRE           => IRCaseEquivalenceKind.PCRE
+        case _: Dialect.Perl        => IRCaseEquivalenceKind.Perl
+        case _: Dialect.Python      => IRCaseEquivalenceKind.Python
+        case _: Dialect.PythonRegex => IRCaseEquivalenceKind.PythonRegex
+        case _: Dialect.Ruby        => IRCaseEquivalenceKind.Ruby,
       multiCharFoldingKind =
         if isPerl then IRMultiCharFoldingKind.Perl
+        else if isPythonRegex then IRMultiCharFoldingKind.PythonRegex
         else if isRuby then IRMultiCharFoldingKind.Ruby
         else IRMultiCharFoldingKind.OneToOne,
       readsByteEscapesAsUTF8 = isRuby,
       classLookupKind = dialect match
-        case Dialect.DotNet     => IRClassLookupKind.DotNet
-        case Dialect.Java       => IRClassLookupKind.Java
-        case Dialect.JavaScript => IRClassLookupKind.JavaScript
-        case Dialect.PCRE       => IRClassLookupKind.PCRE
-        case _: Dialect.Perl    => IRClassLookupKind.Perl
-        case _: Dialect.Python  => IRClassLookupKind.Python
-        case _: Dialect.Ruby    => IRClassLookupKind.Ruby,
+        case Dialect.DotNet         => IRClassLookupKind.DotNet
+        case Dialect.Java           => IRClassLookupKind.Java
+        case Dialect.JavaScript     => IRClassLookupKind.JavaScript
+        case Dialect.PCRE           => IRClassLookupKind.PCRE
+        case _: Dialect.Perl        => IRClassLookupKind.Perl
+        case _: Dialect.Python      => IRClassLookupKind.Python
+        case _: Dialect.PythonRegex => IRClassLookupKind.PythonRegex
+        case _: Dialect.Ruby        => IRClassLookupKind.Ruby,
       propertyLookupKind = dialect match
-        case Dialect.DotNet     => Some(IRPropertyLookupKind.DotNet)
-        case Dialect.Java       => Some(IRPropertyLookupKind.Java)
-        case Dialect.JavaScript => Some(IRPropertyLookupKind.JavaScript)
-        case Dialect.PCRE       => Some(IRPropertyLookupKind.PCRE)
-        case _: Dialect.Perl    => Some(IRPropertyLookupKind.Perl)
-        case _: Dialect.Python  => None
-        case _: Dialect.Ruby    => Some(IRPropertyLookupKind.Ruby),
+        case Dialect.DotNet         => Some(IRPropertyLookupKind.DotNet)
+        case Dialect.Java           => Some(IRPropertyLookupKind.Java)
+        case Dialect.JavaScript     => Some(IRPropertyLookupKind.JavaScript)
+        case Dialect.PCRE           => Some(IRPropertyLookupKind.PCRE)
+        case _: Dialect.Perl        => Some(IRPropertyLookupKind.Perl)
+        case _: Dialect.Python      => None
+        case _: Dialect.PythonRegex => Some(IRPropertyLookupKind.PythonRegex)
+        case _: Dialect.Ruby        => Some(IRPropertyLookupKind.Ruby),
       caselessPropertyKind =
         if isDotNet || isPCRE then IRCaselessPropertyKind.CasedLetter
         else if isJavaScript then IRCaselessPropertyKind.Canonicalized
         else if isPerl then IRCaselessPropertyKind.CasedLetterAndCased
+        else if isPythonRegex then IRCaselessPropertyKind.ClosedInClass
         else if isRuby then IRCaselessPropertyKind.ClosedBeforeNegation
         else IRCaselessPropertyKind.Unchanged,
-      closesCaselessClassPOSIX = isRuby,
+      closesCaselessClassPOSIX = isPythonRegex || isRuby,
       hasClassPOSIXWordBoundary = isPCRE,
       negatesClassBeforeSubtraction = isDotNet,
       hasMarkWordBoundary = isJava,
       backtracksIntoGeneralNewline = isJava,
+      hasASCIIGeneralNewline = dialect == Dialect.PythonRegex(Dialect.Python.Type.Bytes),
       nonNewlineExcludesLineTerminators = isPCRE,
       hasPCREGraphemeCluster = isPCRE,
-      validatesCharName = isJava || isPython,
+      hasCharsetGraphemeCluster = isPythonRegex,
+      masksOctalEscapeByCharset = isPythonRegex,
+      allowsWideEscapeInByteMode = isPythonRegex,
+      hasUnsupportedWordFlag = isPythonRegex,
+      validatesCharName = isJava || isPython || isPythonRegex,
       anchored = isJavaScript && flagSet.sticky || isPCRE && flagSet.anchored,
       ucp = isPCRE && startOptions.contains("UCP"),
       caselessRestrict = isPCRE && startOptions.contains("CASELESS_RESTRICT"),

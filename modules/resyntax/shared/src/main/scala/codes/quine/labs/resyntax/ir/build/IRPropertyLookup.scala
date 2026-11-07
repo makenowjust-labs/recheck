@@ -35,6 +35,9 @@ private[build] enum CaseKind:
   /** Cased is a property of upper, lower or title case (e.g. `Lowercase`), which some dialects take as cased. */
   case Cased
 
+  /** Replaced is a property that case-insensitivity replaces with the set (e.g. python-regex's `Lu` with `LC`). */
+  case Replaced(set: CharSet)
+
 /** IRPropertyLookup is a table that `IRCharResolver` looks up by the name of a Unicode property (`\p{...}`), giving its
   * code points by each dialect's rules.
   */
@@ -182,12 +185,17 @@ private[build] object IRPropertyLookup:
       flags: IRCharFlagSet,
       mode: UnitMode
   ): PropertyResult = kind match
-    case IRPropertyLookupKind.JavaScript => javaScript(name, value, flags.unicodeSets)
-    case IRPropertyLookupKind.Java       => java(name, value, flags)
-    case IRPropertyLookupKind.DotNet     => if value.isEmpty then dotNet(name) else Unknown
-    case IRPropertyLookupKind.PCRE       => pcre(name, value)
-    case IRPropertyLookupKind.Perl       => perl(name, value)
-    case IRPropertyLookupKind.Ruby       => ruby(name, value, mode == UnitMode.Byte)
+    case IRPropertyLookupKind.JavaScript  => javaScript(name, value, flags.unicodeSets)
+    case IRPropertyLookupKind.Java        => java(name, value, flags)
+    case IRPropertyLookupKind.DotNet      => if value.isEmpty then dotNet(name) else Unknown
+    case IRPropertyLookupKind.PCRE        => pcre(name, value)
+    case IRPropertyLookupKind.Perl        => perl(name, value)
+    case IRPropertyLookupKind.Ruby        => ruby(name, value, mode == UnitMode.Byte)
+    case IRPropertyLookupKind.PythonRegex =>
+      // python-regex looks up `\p{name=value}` by both, and `\p{name}` by the name as a value.
+      value match
+        case Some(value) => pythonRegex(Some(name), value, posix = false, flags, mode)
+        case None        => pythonRegex(None, name, posix = false, flags, mode)
 
   def isJavaScriptStringProperty(name: String): Boolean = JavaScriptStringProperties.contains(name)
 
@@ -900,8 +908,11 @@ private[build] object IRPropertyLookup:
   private lazy val rubyBinaryIndex: Map[String, BinaryProperty] =
     index(RubyBinary.map(n => PropertyTable.binary(n).get).map(p => (p.names, p)), rubyKey)
 
-  /** The contributory properties of PropList.txt (e.g. `Other_Alphabetic`). */
   private lazy val rubyContributory: Map[String, CharSet] =
+    contributory.flatMap((names, set) => names.map(rubyKey(_) -> set)).toMap
+
+  /** The contributory properties of PropList.txt (e.g. `Other_Alphabetic`), with their names. */
+  private lazy val contributory: Seq[(Seq[String], CharSet)] =
     // The data of resyntax-charset lacks them, so each is the derived property without the other parts of its definition.
     def other(derived: String, parts: CharSet): CharSet = binary(derived).diff(parts)
 
@@ -915,7 +926,7 @@ private[build] object IRPropertyLookup:
       Seq("Other_Lowercase", "OLower") -> other("Lowercase", gc("Ll")),
       Seq("Other_Math", "OMath") -> other("Math", gc("Sm")),
       Seq("Other_Uppercase", "OUpper") -> other("Uppercase", gc("Lu"))
-    ).flatMap((names, set) => names.map(rubyKey(_) -> set)).toMap
+    )
 
   private lazy val rubyGeneralCategory = enumIndex(PropertyTable.GeneralCategory, rubyKey)
 
@@ -974,3 +985,387 @@ private[build] object IRPropertyLookup:
             .orElse(rubyContributory.get(key).map(found(_)))
             .orElse(if key.startsWith("in") then rubyBlock.get(key.drop(2)).map(foundValue) else None)
         )
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // python-regex
+
+  /** Returns python-regex's key of a name (`standardise_name` of `_regex_core.py`): a number as its rational number
+    * (e.g. `0.5` as `1/2`), or the name without spaces, hyphens and underscores in upper case.
+    */
+  private def pythonRegexKey(name: String): String =
+    pythonRegexRational(name).getOrElse(upperASCII(name.filterNot(c => c == ' ' || c == '-' || c == '_')))
+
+  private val PythonRegexFloat = """\s*[+-]?(?=\.?\d)(\d(_?\d)*)?(\.(\d(_?\d)*)?)?([eE][+-]?\d(_?\d)*)?\s*""".r
+
+  /** Returns the rational number of a number as python-regex writes it (`numeric_to_rational`), if it is one. */
+  private def pythonRegexRational(name: String): Option[String] =
+    val (sign, body) = if name.startsWith("-") then ("-", name.drop(1)) else ("", name)
+    def float(s: String): Option[Double] = Option.when(PythonRegexFloat.matches(s))(s.trim.replace("_", "").toDouble)
+
+    // `float_to_rational` finds the continued fraction within an error of 0.0001.
+    def rational(value: Double): Option[(BigInt, BigInt)] =
+      if value.isInfinite then None
+      else
+        val int = BigDecimal(value).toBigInt
+        val error = value - int.toDouble
+        if math.abs(error) < 0.0001 then Some((int, BigInt(1)))
+        else rational(1.0 / error).map((den, num) => (int * den + num, den))
+
+    val value = body.split("/", -1) match
+      case Array(n)    => float(n)
+      case Array(n, d) => for n <- float(n); d <- float(d) if d != 0 yield n / d
+      case _           => None
+    value
+      .flatMap(rational)
+      .map: (num, den) =>
+        val result = s"$sign$num/$den"
+        if result.endsWith("/1") then result.dropRight(2) else result
+
+  /** The names of the properties of python-regex 2026.9.29 (`_regex.get_properties()`) as keys, one property in a row.
+    */
+  private val PythonRegexNames: Seq[Seq[String]] = Seq(
+    Seq("ALPHABETIC", "ALPHA"),
+    Seq("ALPHANUMERIC", "ALNUM"),
+    Seq("ANY"),
+    Seq("ASCIIHEXDIGIT", "AHEX"),
+    Seq("BIDICLASS", "BC"),
+    Seq("BIDICONTROL", "BIDIC"),
+    Seq("BIDIMIRRORED", "BIDIM"),
+    Seq("BLANK"),
+    Seq("BLOCK", "BLK"),
+    Seq("CANONICALCOMBININGCLASS", "CCC"),
+    Seq("CASED"),
+    Seq("CASEIGNORABLE", "CI"),
+    Seq("CHANGESWHENCASEFOLDED", "CWCF"),
+    Seq("CHANGESWHENCASEMAPPED", "CWCM"),
+    Seq("CHANGESWHENLOWERCASED", "CWL"),
+    Seq("CHANGESWHENTITLECASED", "CWT"),
+    Seq("CHANGESWHENUPPERCASED", "CWU"),
+    Seq("DASH"),
+    Seq("DECOMPOSITIONTYPE", "DT"),
+    Seq("DEFAULTIGNORABLECODEPOINT", "DI"),
+    Seq("DEPRECATED", "DEP"),
+    Seq("DIACRITIC", "DIA"),
+    Seq("EASTASIANWIDTH", "EA"),
+    Seq("EMOJI"),
+    Seq("EMOJICOMPONENT", "ECOMP"),
+    Seq("EMOJIMODIFIER", "EMOD"),
+    Seq("EMOJIMODIFIERBASE", "EBASE"),
+    Seq("EMOJIPRESENTATION", "EPRES"),
+    Seq("EXTENDEDPICTOGRAPHIC", "EXTPICT"),
+    Seq("EXTENDER", "EXT"),
+    Seq("GENERALCATEGORY", "GC"),
+    Seq("GRAPH"),
+    Seq("GRAPHEMEBASE", "GRBASE"),
+    Seq("GRAPHEMECLUSTERBREAK", "GCB"),
+    Seq("GRAPHEMEEXTEND", "GREXT"),
+    Seq("GRAPHEMELINK", "GRLINK"),
+    Seq("HANGULSYLLABLETYPE", "HST"),
+    Seq("HEXDIGIT", "HEX"),
+    Seq("HORIZSPACE", "H"),
+    Seq("HYPHEN"),
+    Seq("IDCOMPATMATHCONTINUE"),
+    Seq("IDCOMPATMATHSTART"),
+    Seq("IDCONTINUE", "IDC"),
+    Seq("IDEOGRAPHIC", "IDEO"),
+    Seq("IDSBINARYOPERATOR", "IDSB"),
+    Seq("IDSTART", "IDS"),
+    Seq("IDSTRINARYOPERATOR", "IDST"),
+    Seq("IDSUNARYOPERATOR", "IDSU"),
+    Seq("INDICCONJUNCTBREAK", "INCB"),
+    Seq("INDICPOSITIONALCATEGORY", "INPC"),
+    Seq("INDICSYLLABICCATEGORY", "INSC"),
+    Seq("JOINCONTROL", "JOINC"),
+    Seq("JOININGGROUP", "JG"),
+    Seq("JOININGTYPE", "JT"),
+    Seq("LINEBREAK", "LB"),
+    Seq("LOGICALORDEREXCEPTION", "LOE"),
+    Seq("LOWERCASE", "LOWER"),
+    Seq("MATH"),
+    Seq("MODIFIERCOMBININGMARK", "MCM"),
+    Seq("NFCQUICKCHECK", "NFCQC"),
+    Seq("NFDQUICKCHECK", "NFDQC"),
+    Seq("NFKCQUICKCHECK", "NFKCQC"),
+    Seq("NFKDQUICKCHECK", "NFKDQC"),
+    Seq("NONCHARACTERCODEPOINT", "NCHAR"),
+    Seq("NUMERICTYPE", "NT"),
+    Seq("NUMERICVALUE", "NV"),
+    Seq("OTHERALPHABETIC", "OALPHA"),
+    Seq("OTHERDEFAULTIGNORABLECODEPOINT", "ODI"),
+    Seq("OTHERGRAPHEMEEXTEND", "OGREXT"),
+    Seq("OTHERIDCONTINUE", "OIDC"),
+    Seq("OTHERIDSTART", "OIDS"),
+    Seq("OTHERLOWERCASE", "OLOWER"),
+    Seq("OTHERMATH", "OMATH"),
+    Seq("OTHERUPPERCASE", "OUPPER"),
+    Seq("PATTERNSYNTAX", "PATSYN"),
+    Seq("PATTERNWHITESPACE", "PATWS"),
+    Seq("POSIXALNUM"),
+    Seq("POSIXDIGIT"),
+    Seq("POSIXPUNCT"),
+    Seq("POSIXXDIGIT"),
+    Seq("PREPENDEDCONCATENATIONMARK", "PCM"),
+    Seq("PRINT"),
+    Seq("QUOTATIONMARK", "QMARK"),
+    Seq("RADICAL"),
+    Seq("REGIONALINDICATOR", "RI"),
+    Seq("SCRIPT", "SC"),
+    Seq("SCRIPTEXTENSIONS", "SCX"),
+    Seq("SENTENCEBREAK", "SB"),
+    Seq("SENTENCETERMINAL", "STERM"),
+    Seq("SOFTDOTTED", "SD"),
+    Seq("TERMINALPUNCTUATION", "TERM"),
+    Seq("UNIFIEDIDEOGRAPH", "UIDEO"),
+    Seq("UPPERCASE", "UPPER"),
+    Seq("VARIATIONSELECTOR", "VS"),
+    Seq("VERTSPACE", "V"),
+    Seq("WHITESPACE", "WSPACE", "SPACE"),
+    Seq("WORD"),
+    Seq("WORDBREAK", "WB"),
+    Seq("XDIGIT"),
+    Seq("XIDCONTINUE", "XIDC"),
+    Seq("XIDSTART", "XIDS")
+  )
+
+  private lazy val pythonRegexNameIndex: Map[String, String] =
+    PythonRegexNames.flatMap(names => names.map(_ -> names.head)).toMap
+
+  /** The properties of python-regex that resyntax-charset does not have, by the first key of their names. */
+  private lazy val pythonRegexSpecialBinary: Map[String, CharSet] =
+    val alpha = binary("Alphabetic")
+    Map(
+      "HORIZSPACE" -> IRClassLookup.pcreHorizontal,
+      "VERTSPACE" -> IRClassLookup.Vertical,
+      "POSIXALNUM" -> alpha.union(IRClassLookup.ASCIIDigit),
+      "POSIXDIGIT" -> IRClassLookup.ASCIIDigit,
+      "POSIXPUNCT" -> gc("P").union(gc("S").diff(alpha)),
+      "POSIXXDIGIT" -> IRClassLookup.ASCII_POSIX("xdigit"),
+      "WORD" -> alpha.union(gc("M", "Nd", "Pc")).union(binary("Join_Control"))
+    ) ++ contributory.map((names, set) => pythonRegexKey(names.head) -> set)
+
+  /** The binary properties of python-regex by the first key of their names. */
+  private lazy val pythonRegexBinary: Map[String, CharSet] =
+    PythonRegexNames
+      .flatMap: names =>
+        pythonRegexSpecialBinary
+          .get(names.head)
+          .orElse(
+            PropertyTable.binaryProperties.find(p => p.names.exists(n => names.contains(pythonRegexKey(n)))).map(_.set)
+          )
+          .map(names.head -> _)
+      .toMap
+
+  private lazy val pythonRegexEnumerated: Map[String, EnumeratedProperty] =
+    PythonRegexNames
+      .flatMap: names =>
+        PropertyTable.enumeratedProperties
+          .find(p => p.names.exists(n => names.contains(pythonRegexKey(n))))
+          .map(names.head -> _)
+      .toMap
+
+  /** The value `0` of each enumerated property of python-regex, which a character above the C locale has under `L`. */
+  private val PythonRegexZeroValues: Map[String, String] = Map(
+    "BIDICLASS" -> "R",
+    "BLOCK" -> "NB",
+    "CANONICALCOMBININGCLASS" -> "NR",
+    "DECOMPOSITIONTYPE" -> "None",
+    "EASTASIANWIDTH" -> "W",
+    "GENERALCATEGORY" -> "Cn",
+    "GRAPHEMECLUSTERBREAK" -> "XX",
+    "HANGULSYLLABLETYPE" -> "NA",
+    "INDICCONJUNCTBREAK" -> "None",
+    "INDICPOSITIONALCATEGORY" -> "NA",
+    "INDICSYLLABICCATEGORY" -> "Other",
+    "JOININGGROUP" -> "No_Joining_Group",
+    "JOININGTYPE" -> "U",
+    "LINEBREAK" -> "XX",
+    "NFCQUICKCHECK" -> "N",
+    "NFDQUICKCHECK" -> "N",
+    "NFKCQUICKCHECK" -> "N",
+    "NFKDQUICKCHECK" -> "N",
+    "NUMERICTYPE" -> "None",
+    "SCRIPT" -> "Zzzz",
+    "SCRIPTEXTENSIONS" -> "Zzzz",
+    "SENTENCEBREAK" -> "XX",
+    "WORDBREAK" -> "XX"
+  )
+
+  /** The values of python-regex's `General_Category` that resyntax-charset does not have, by their keys. */
+  private lazy val pythonRegexGeneralCategory: Map[String, CharSet] =
+    Seq("C", "L", "M", "N", "P", "S", "Z").map(c => s"$c&" -> gc(c)).toMap +
+      ("ASSIGNED" -> gc("Cn").complement(unicodeUniverse))
+
+  /** The values of each enumerated property of python-regex by their keys, without the scripts that python-regex does
+    * not know (the codes of ISO 15924 without a long name nor characters, e.g. `Jpan`).
+    */
+  private lazy val pythonRegexValues: Map[String, Map[String, PropertyValue]] =
+    pythonRegexEnumerated.map: (key, property) =>
+      val isScript = (property eq PropertyTable.Script) || (property eq PropertyTable.ScriptExtensions)
+      val values = if isScript then property.values.filter(v => v.names.size > 1 || v.set.nonEmpty) else property.values
+      key -> index(values.map(v => (v.names, v)), pythonRegexKey)
+
+  /** The sets of the C locale under `L` for the characters up to `U+00FF`, by the first key of a property, or of a
+    * value of `General_Category`.
+    */
+  private lazy val pythonRegexLocale: Map[String, CharSet] =
+    import IRClassLookup.ASCII_POSIX
+    val latin1 = CharSet.range(0, 0xff)
+    val posix = Seq("POSIXALNUM", "POSIXDIGIT", "POSIXPUNCT", "POSIXXDIGIT")
+    posix.map(key => key -> pythonRegexSpecialBinary(key).intersect(latin1)).toMap ++ Map(
+      "ALPHANUMERIC" -> ASCII_POSIX("alnum"),
+      "ALPHABETIC" -> ASCII_POSIX("alpha"),
+      "ANY" -> latin1,
+      "BLANK" -> ASCII_POSIX("blank"),
+      "GRAPH" -> ASCII_POSIX("graph"),
+      "LOWERCASE" -> ASCII_POSIX("lower"),
+      "PRINT" -> ASCII_POSIX("print"),
+      "WHITESPACE" -> ASCII_POSIX("space"),
+      "UPPERCASE" -> ASCII_POSIX("upper"),
+      "WORD" -> ASCII_POSIX("word"),
+      "XDIGIT" -> ASCII_POSIX("xdigit"),
+      "GC=ASSIGNED" -> latin1,
+      "GC=LC" -> ASCII_POSIX("alpha"),
+      "GC=CC" -> ASCII_POSIX("cntrl"),
+      "GC=ND" -> ASCII_POSIX("digit"),
+      "GC=LL" -> ASCII_POSIX("lower"),
+      "GC=LU" -> ASCII_POSIX("upper"),
+      "GC=P" -> ASCII_POSIX("punct"),
+      "GC=CN" -> CharSet.empty,
+      // `L` reads `Block` as `ASCII` (`Basic_Latin`) or not.
+      "BLOCK=ASCII" -> CharSet.range(0, 0x7f),
+      "BLOCK=NB" -> CharSet.range(0x80, 0xff)
+    )
+
+  /** PythonRegexValue is a value of a property of python-regex: its characters in Unicode, whether it is the value `0`,
+    * its characters up to `U+00FF` in the C locale if they are not by the value `0`, and its replacement under
+    * case-insensitivity in Unicode.
+    */
+  private final case class PythonRegexValue(
+      set: CharSet,
+      isZero: Boolean,
+      locale: Option[CharSet],
+      caseless: Option[CharSet]
+  )
+
+  /** Returns the value of a property of python-regex by the keys, if any. */
+  private def pythonRegexValue(property: String, value: String): Option[PythonRegexValue] =
+    val yes = Set("YES", "Y", "TRUE", "T")
+    val no = Set("NO", "N", "FALSE", "F")
+    pythonRegexBinary.get(property) match
+      case Some(set) =>
+        val locale = pythonRegexLocale.get(property)
+        val caseless = Option.when(property == "UPPERCASE" || property == "LOWERCASE")(binary("Cased"))
+        if yes.contains(value) then Some(PythonRegexValue(set, false, locale, caseless))
+        else if no.contains(value) then
+          val latin1 = CharSet.range(0, 0xff)
+          Some(PythonRegexValue(set.complement(unicodeUniverse), true, locale.map(latin1.diff), None))
+        else None
+      case None if property == "NUMERICVALUE" =>
+        PropertyTable.NumericValue.values
+          .find: v =>
+            val key = if v.isNaN then "NAN"
+            else if v.denominator == 1 then s"${v.numerator}"
+            else s"${v.numerator}/${v.denominator}"
+            key == value
+          .map(v => PythonRegexValue(v.set, v.isNaN, None, None))
+      case None =>
+        pythonRegexEnumerated
+          .get(property)
+          .flatMap: p =>
+            val zero = p.value(PythonRegexZeroValues(property)).get
+            val isGeneralCategory = p eq PropertyTable.GeneralCategory
+            pythonRegexValues(property).get(value) match
+              case Some(v) =>
+                val shortKey = pythonRegexKey(v.shortName)
+                val locale =
+                  if isGeneralCategory then pythonRegexLocale.get(s"GC=$shortKey")
+                  else pythonRegexLocale.get(s"$property=$shortKey")
+                val caseless = Option.when(isGeneralCategory && Set("LU", "LL", "LT").contains(shortKey))(gc("LC"))
+                Some(PythonRegexValue(v.set, v eq zero, locale, caseless))
+              case None =>
+                pythonRegexGeneralCategory
+                  .get(value)
+                  .filter(_ => isGeneralCategory)
+                  .map(set =>
+                    PythonRegexValue(set, false, pythonRegexLocale.get(s"GC=${value.stripSuffix("&")}"), None)
+                  )
+
+  /** Looks up python-regex's property by `lookup_property` of `_regex_core.py`, where `posix` tells a POSIX class (e.g.
+    * `[[:alpha:]]`).
+    */
+  def pythonRegex(
+      name: Option[String],
+      value: String,
+      posix: Boolean,
+      flags: IRCharFlagSet,
+      mode: UnitMode
+  ): PropertyResult =
+    val propertyKey = name.map(pythonRegexKey).filter(_.nonEmpty)
+    val valueKey0 = pythonRegexKey(value)
+    // `\p{General_Category=Assigned}` is the negation of `Unassigned`, but `\p{gc=Assigned}` is a value.
+    val (valueKey1, negated) =
+      if propertyKey.contains("GENERALCATEGORY") && valueKey0 == "ASSIGNED" then ("UNASSIGNED", true)
+      else (valueKey0, false)
+    val valueKey =
+      if posix && propertyKey.isEmpty && Set("ALNUM", "DIGIT", "PUNCT", "XDIGIT").contains(valueKey1) then
+        s"POSIX$valueKey1"
+      else valueKey1
+
+    val found: Option[(PythonRegexValue, Boolean)] = propertyKey match
+      case Some(key) =>
+        pythonRegexNameIndex.get(key).flatMap(p => pythonRegexValue(p, valueKey)).map((_, negated))
+      case None =>
+        def named(property: String, key: String): Option[PythonRegexValue] = pythonRegexValue(property, key)
+
+        Seq("GENERALCATEGORY", "SCRIPT", "BLOCK")
+          .collectFirst(Function.unlift(named(_, valueKey)))
+          .map((_, false))
+          .orElse:
+            pythonRegexNameIndex
+              .get(valueKey)
+              .flatMap: property =>
+                // A property alone is its value `Yes`, or the negation of its value `0` (e.g. `\p{Script}`).
+                if pythonRegexBinary.contains(property) then named(property, "YES").map((_, false))
+                else
+                  val zero = PythonRegexZeroValues.get(property).fold("NAN")(pythonRegexKey)
+                  named(property, zero).map((_, true))
+          .orElse:
+            Option
+              .when(valueKey.startsWith("IS"))(valueKey.drop(2))
+              .flatMap(pythonRegexNameIndex.get)
+              .flatMap(named(_, "YES"))
+              .map((_, false))
+          .orElse(Option.when(valueKey.startsWith("IS"))(named("SCRIPT", valueKey.drop(2))).flatten.map((_, false)))
+          .orElse(Option.when(valueKey.startsWith("IN"))(named("BLOCK", valueKey.drop(2))).flatten.map((_, false)))
+
+    found match
+      case None              => Unknown
+      case Some((v, negate)) =>
+        val set = pythonRegexCharset(v, flags, mode)
+        val caseKind = v.caseless match
+          case Some(caseless) if !negate =>
+            flags.charset match
+              case IRCharset.Unicode | IRCharset.Default if mode.isCodePoint => CaseKind.Replaced(caseless)
+              case IRCharset.Locale => CaseKind.Replaced(IRClassLookup.ASCII_POSIX("alpha"))
+              case _                => CaseKind.Other
+          case _ => CaseKind.Other
+        Found(ClassSet(if negate then set.complement(mode.universe) else set), caseKind)
+
+  /** Returns the characters of a value of python-regex under the encoding of the flags.
+    *
+    * ASCII (`a`, and a bytes pattern by default) reads a character above ASCII as `U+10FFFF`, and the C locale (`L`)
+    * has its own classes up to `U+00FF` and the value `0` above it.
+    */
+  private def pythonRegexCharset(v: PythonRegexValue, flags: IRCharFlagSet, mode: UnitMode): CharSet =
+    def above(start: Int): CharSet = CharSet.range(start, 0x10ffff)
+
+    def asASCII: CharSet =
+      v.set.intersect(CharSet.range(0, 0x7f)).union(if v.set.contains(0x10ffff) then above(0x80) else CharSet.empty)
+
+    flags.charset match
+      case IRCharset.Locale =>
+        val low = v.locale.getOrElse(if v.isZero then CharSet.range(0, 0xff) else CharSet.empty)
+        if v.isZero then low.union(above(0x100)) else low
+      case _: IRCharset.ASCII                     => asASCII
+      case IRCharset.Default if !mode.isCodePoint => asASCII
+      case _                                      => v.set
