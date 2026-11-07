@@ -4,6 +4,7 @@
     "config:recommended"
   ],
   "automerge": true,
+  "minimumReleaseAge": "1 day",
   "packageRules": [
     {
       "description": "An update of a runtime that recheck checks against needs the checked versions in the tests and the docs updated too.",
@@ -19,6 +20,19 @@
         "perl"
       ],
       "automerge": false
+    },
+    {
+      "description": "mise installs Perl from the stable builds of skaji/relocatable-perl (e.g. 5.44.0.0), not from the tags of Perl itself, which include development releases.",
+      "matchManagers": [
+        "mise"
+      ],
+      "matchDepNames": [
+        "perl"
+      ],
+      "overrideDatasource": "github-releases",
+      "overridePackageName": "skaji/relocatable-perl",
+      "extractVersion": "^(?<version>\\d+\\.\\d+\\.\\d+\\.\\d+)$",
+      "versioning": "loose"
     }
   ],
   "customManagers": [
