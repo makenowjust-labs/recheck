@@ -98,6 +98,12 @@ object ClassItemData:
 
   final case class ClassPOSIX(invert: Boolean, name: String) extends ClassItemData
 
+  /** ClassCollatingElement is POSIX's collating element `[.name.]` in a class (e.g. `[[.space.]]`). */
+  final case class ClassCollatingElement(name: String) extends ClassItemData
+
+  /** ClassEquivalence is POSIX's equivalence class `[=name=]` in a class (e.g. `[[=a=]]`). */
+  final case class ClassEquivalence(name: String) extends ClassItemData
+
   final case class ClassRange(begin: ClassItem.Value, end: ClassItem.Value) extends ClassItemData
 
   object ClassRange:

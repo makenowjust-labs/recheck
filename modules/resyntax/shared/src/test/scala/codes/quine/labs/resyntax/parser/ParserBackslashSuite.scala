@@ -389,7 +389,7 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   check("\\P{Script=Hira}", "", DotNet, Java, PCRE, Perl(), Ruby()):
     Backslash(EscapeClass(NonUnicodePropertyValue("Script", "Hira")))
   check("\\P{Script=Hira}", "u", JavaScript)(Backslash(EscapeClass(NonUnicodePropertyValue("Script", "Hira"))))
-  check("\\PL", "", Java, PCRE, Perl())(Backslash(EscapeClass(NonUnicodeBareProperty("L"))))
+  check("\\PL", "", Java, PCRE, Perl(), BoostRegex())(Backslash(EscapeClass(NonUnicodeBareProperty("L"))))
   check("\\Qab\\E", "", Java, PCRE):
     CaseRegion(QuoteCommand, Seq(part(Literal('a'), "a"), part(Literal('b'), "b")), Closed)
   check("\\Qab", "", Java, PCRE):
@@ -686,3 +686,116 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
       (Seq.fill(10)(Group(IndexedCapture, Literal('a'))) :+
         Backslash(EscapeBackReference(BareBackReference, IndexedReference(11))))*
     )
+
+  // Boost.Regex's escapes (Boost.Regex 1.92.0): an unknown letter is the letter, and `\cX` is `X` modulo 32.
+  val U32Regex: BoostRegex = BoostRegex(BoostRegex.Type.U32Regex)
+  check("\\y\\j\\o\\E", "", BoostRegex())(Sequence("yjoE".map(c => Backslash(Unknown(c)))*))
+  check("\\c1\\c?", "", BoostRegex())(
+    Sequence(Backslash(Escape(Control('1'), 0x11)), Backslash(Escape(Control('?'), 0x1f)))
+  )
+  error("a\\c", "", BoostRegex())("Invalid backslash escape at 3")
+  check("\\l\\u\\L\\U", "", BoostRegex()):
+    Sequence(
+      Backslash(EscapeClass(Lower)),
+      Backslash(EscapeClass(Upper)),
+      Backslash(EscapeClass(NonLower)),
+      Backslash(EscapeClass(NonUpper))
+    )
+  // The AST does not keep `` \` `` and `\'`, which are `\A` and `\z`.
+  checkPrinted("\\<\\>\\`\\'", "\\<\\>\\A\\z", "", BoostRegex()):
+    Sequence(
+      Backslash(Assert(WordStart)),
+      Backslash(Assert(WordEnd)),
+      Backslash(Assert(Begin)),
+      Backslash(Assert(LowerEnd))
+    )
+  check("\\<\\>\\`\\'", "", JavaScript, Java, DotNet, PCRE, Perl(), Ruby(), ICU):
+    Sequence("<>`'".map(c => Backslash(Unknown(c)))*)
+  check("\\x4g", "", BoostRegex())(Sequence(Backslash(Escape(Hex1, 0x04)), Literal('g')))
+  error("\\x", "", BoostRegex())("Invalid backslash escape at 2")
+  // `char` reads a number as `std::istream` does, and its `\x{...}` is at most `\x{7f}`, since `char` is signed.
+  check("\\x{ +41}\\x 41\\x{0x41}\\x{0X41}\\x80", "", BoostRegex()):
+    Sequence(
+      Backslash(Escape(HexBracket, 0x41, Some("{ +41}"))),
+      Backslash(Escape(Hex2, 0x04, Some(" 4"))),
+      Literal('1'),
+      Backslash(Escape(HexBracket, 0x41, Some("{0x41}"))),
+      Backslash(Escape(HexBracket, 0x41, Some("{0X41}"))),
+      Backslash(Escape(Hex2, 0x80))
+    )
+  error("\\x{ 41 }", "", BoostRegex())("Invalid backslash escape at 6")
+  error("\\x{-1}", "", BoostRegex())("Invalid backslash escape at 3")
+  error("\\x-1", "", BoostRegex())("Invalid backslash escape at 2")
+  error("\\x{80}", "", BoostRegex())("Code point too large at 3")
+  // `u32regex` reads the digits of Unicode (e.g. the fullwidth `\uff21`), and a code point up to `INT32_MAX`.
+  check("\\x{100}\\x{\uff21\uff22}\\x{\uff41\uff42}\\x{7fffffff}", "", U32Regex):
+    Sequence(
+      Backslash(Escape(HexBracket, 0x100)),
+      Backslash(Escape(HexBracket, 0xab, Some("{ＡＢ}"))),
+      Backslash(Escape(HexBracket, 0xab, Some("{ａｂ}"))),
+      Backslash(Escape(HexBracket, 0x7fffffff, Some("{7fffffff}")))
+    )
+  error("\\x{ 41}", "", U32Regex)("Invalid backslash escape at 3")
+  error("\\x{\uff47}", "", U32Regex)("Invalid backslash escape at 3")
+  error("\\x{80000000}", "", U32Regex)("Code point too large at 3")
+  // `\0` reads at most three octal digits after it, and the others are back-references of one digit.
+  check("\\0\\0123\\0128", "", BoostRegex()):
+    Sequence(
+      Backslash(Escape(BareOctal, 0, Some(""))),
+      Backslash(Escape(BareOctal, 0x53)),
+      Backslash(Escape(BareOctal, 0x0a, Some("12"))),
+      Literal('8')
+    )
+  error("\\0400", "", BoostRegex())("Octal escape value too large at 1")
+  error("\\0200", "", BoostRegex())("Octal escape value too large at 1")
+  check("\\0777", "", U32Regex)(Backslash(Escape(BareOctal, 0x1ff)))
+  check("(a)\\10", "", BoostRegex()):
+    Sequence(
+      Group(IndexedCapture, Literal('a')),
+      Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))),
+      Literal('0')
+    )
+  // `\g` and `\k` are the same back-reference, whose brackets are `{}`, `<>` or `''`.
+  check("\\g1\\k-1\\g{12}\\k<n>\\g'n'\\k{}", "", BoostRegex()):
+    Sequence(
+      Backslash(EscapeBackReference(GBackReference(Bare), IndexedReference(1))),
+      Backslash(EscapeBackReference(KBackReference(Bare), RelativeReference(-1))),
+      Backslash(EscapeBackReference(GBackReference(Curly), IndexedReference(12))),
+      Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("n"))),
+      Backslash(EscapeBackReference(GBackReference(Quote), NamedReference("n"))),
+      Backslash(EscapeBackReference(KBackReference(Curly), NamedReference("")))
+    )
+  // `\g{-0}` refers to the next group, and `char` reads a number as `std::istream` does.
+  checkPrinted("\\g{-0}\\g 1\\k{+2}\\g- 1", "\\g{-0}\\g1\\k{2}\\g-1", "", BoostRegex()):
+    Sequence(
+      Backslash(EscapeBackReference(GBackReference(Curly), RelativeReference(1))),
+      Backslash(EscapeBackReference(GBackReference(Bare), IndexedReference(1))),
+      Backslash(EscapeBackReference(KBackReference(Curly), IndexedReference(2))),
+      Backslash(EscapeBackReference(GBackReference(Bare), RelativeReference(-1)))
+    )
+  check("\\g{ -1}", "", BoostRegex())(Backslash(EscapeBackReference(GBackReference(Curly), NamedReference(" -1"))))
+  error("\\g{-a}", "", BoostRegex())("Invalid backslash escape at 4")
+  error("\\g0", "", BoostRegex())("Invalid backslash escape at 2")
+  error("\\g 1", "", U32Regex)("Invalid backslash escape at 2")
+  error("\\gn", "", BoostRegex())("Invalid backslash escape at 2")
+  error("\\k", "", BoostRegex())("Invalid backslash escape at 2")
+  error("\\g{1x}", "", BoostRegex())("Invalid backslash escape at 4")
+  error("\\k<n", "", BoostRegex())("Invalid backslash escape at 4")
+  // `\p` takes a name of one character or in braces, which the IR builder looks up.
+  check("\\pL\\P{Lu}\\p{ L u }", "", BoostRegex()):
+    Sequence(
+      Backslash(EscapeClass(UnicodeBareProperty("L"))),
+      Backslash(EscapeClass(NonUnicodeProperty("Lu"))),
+      Backslash(EscapeClass(UnicodeProperty(" L u ")))
+    )
+  check("\\p\u00e9", "", U32Regex)(Backslash(EscapeClass(UnicodeBareProperty("\u00e9"))))
+  error("\\p", "", BoostRegex())("Invalid backslash escape at 2")
+  error("\\p{L", "", BoostRegex())("Invalid backslash escape at 4")
+  check("\\N{newline}\\C\\R\\X", "", BoostRegex()):
+    Sequence(
+      Backslash(EscapeClass(CharName("newline"))),
+      Backslash(EscapeClass(CodeUnit)),
+      Backslash(EscapeClass(GeneralNewline)),
+      Backslash(EscapeClass(GraphemeCluster))
+    )
+  error("\\N", "", BoostRegex())("Invalid backslash escape at 2")

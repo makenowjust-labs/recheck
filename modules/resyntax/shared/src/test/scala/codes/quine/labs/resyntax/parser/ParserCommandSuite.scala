@@ -367,3 +367,21 @@ class ParserCommandSuite extends munit.FunSuite with ParserHelper:
   check("(?1)", "", PythonRegex())(Command(IndexedCall(1)))
   check("(?-1)", "", PythonRegex())(Command(RelativeCall(-1)))
   check("(?&n)", "", PythonRegex())(Command(NamedCall("n")))
+
+  // Boost.Regex's verbs have no names, and its `(?#` without `)` is a comment to the end (Boost.Regex 1.92.0).
+  check("(*FAIL)(*F)(*ACCEPT)(*COMMIT)(*PRUNE)(*SKIP)(*THEN)", "", BoostRegex()):
+    Sequence(
+      Seq(Fail, F, Accept, Commit, Prune, Skip, Then).map(kind => Command(BacktrackControl(Some(kind), None)))*
+    )
+  error("(*SKIP:x)", "", BoostRegex())("Invalid group at 0")
+  error("(*FA)", "", BoostRegex())("Invalid group at 0")
+  // The AST does not keep whether a comment at the end has its `)`.
+  checkPrinted("a(?#c", "a(?#c)", "", BoostRegex())(Sequence(Literal('a'), Command(Comment("c"))))
+  check("(?(1)a|b)(?(<n>)a)(?(?=a)a)(?(R)a)(?(DEFINE)a)", "", BoostRegex()):
+    Sequence(
+      Command(Conditional(Indexed(1), Literal('a'), Literal('b'))),
+      Command(Conditional(Named(Angle, "n"), Literal('a'))),
+      Command(Conditional(LookAround(PositiveLookAhead(Symbolic), Literal('a')), Literal('a'))),
+      Command(Conditional(RRecursion, Literal('a'))),
+      Command(Conditional(Define, Literal('a')))
+    )

@@ -278,3 +278,13 @@ class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
   error("(?)", "", ICU)("Invalid flag at 2")
   check("(?-i-i)", "", ICU):
     Command(InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(ignoreCase = true)), Some("-i-i"))))
+
+  // Boost.Regex's inline flags are `imsx` (Boost.Regex 1.92.0).
+  check("(?imsx-imsx)", "", BoostRegex()):
+    val flagSet = FlagSet(ignoreCase = true, multiline = true, dotAll = true, verbose = true)
+    Command(InlineFlag(FlagSetDiff(flagSet, Some(flagSet))))
+  check("(?-)", "", BoostRegex())(Command(InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet())))))
+  error("(?)", "", BoostRegex())("Invalid flag at 2")
+  error("(?n)", "", BoostRegex())("Invalid flag at 2")
+  error("(?^i)", "", BoostRegex())("Invalid group at 2")
+  error("(?i-m-s)", "", BoostRegex())("Invalid flag at 5")

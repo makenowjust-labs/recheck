@@ -8,12 +8,16 @@ import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 final case class FeatureSet(
     // Java (with `d`)
     unixLines: Boolean,
-    // PCRE (without `u`)
+    // Boost.Regex (with `N`)
+    readsNewlineAsAlternation: Boolean,
+    // Boost.Regex (`char`), PCRE (without `u`)
     limitsCodePointTo0xFF: Boolean,
     // Java, JavaScript (with `uv`), PCRE (with `u`), Perl (with `utf8`), Python (`str`), Ruby (UTF-8 without `n`)
     readsAsUnicode: Boolean,
     // Python and python-regex (`bytes`): Latin-1, PCRE (without `u`), Perl (without `utf8`), Ruby (ASCII-8BIT): UTF-8, the others: text
     sourceEncoding: SourceEncoding,
+    // Boost.Regex (`char`): Stream, Boost.Regex (`u32regex`): UnicodeDigits, the others: Digits
+    numberSyntax: NumberSyntax,
     escape: FeatureSet.Escape,
     charClass: FeatureSet.CharClass,
     group: FeatureSet.Group,
@@ -33,19 +37,24 @@ object FeatureSet:
 
     FeatureSet(
       unixLines = isJava && flagSet.hasIndices,
-      limitsCodePointTo0xFF = isPCRE && !isUnicode,
+      readsNewlineAsAlternation = isBoostRegex && flagSet.newlineAlternation,
+      limitsCodePointTo0xFF = (isBoostRegex && isByte) || (isPCRE && !isUnicode),
       readsAsUnicode = mode.isCodePoint,
       sourceEncoding =
         if !isByte then SourceEncoding.Text
         else if isPython || isPythonRegex then SourceEncoding.Latin1
         else SourceEncoding.UTF8,
+      numberSyntax =
+        if !isBoostRegex then NumberSyntax.Digits
+        else if isByte then NumberSyntax.Stream
+        else NumberSyntax.UnicodeDigits,
       escape = Escape.from(dialect, flagSet, mode),
       charClass = CharClass.from(dialect, flagSet, mode),
       group = Group.from(dialect, flagSet, mode),
       reference = Reference.from(prescan, dialect, flagSet, mode),
       inlineFlag = InlineFlag.from(dialect, flagSet, mode),
       quantifier = Quantifier.from(dialect, flagSet, mode),
-      comment = Comment.from(prescan, dialect, flagSet)
+      comment = Comment.from(prescan, dialect, flagSet, mode)
     )
 
   private def isByte(mode: UnitMode): Boolean = mode == UnitMode.Byte
@@ -55,7 +64,7 @@ object FeatureSet:
 
   /** The features of the escapes outside a class. */
   final case class Escape(
-      // ICU, JavaScript (without `uv`), Perl, Ruby
+      // Boost.Regex, ICU, JavaScript (without `uv`), Perl, Ruby
       allowsAlphabeticUnknownBackslash: Boolean,
       // Java, PCRE, Ruby
       allowsBackslashControlCurly: Boolean,
@@ -81,65 +90,79 @@ object FeatureSet:
       allowsNonOctalDigitBackslash: Boolean,
       // .NET, PCRE (with `u`), Perl, python-regex
       allowsOctalAbove0377: Boolean,
-      // .NET, ICU, Java, JavaScript, Perl, Python, python-regex
+      // .NET, Boost.Regex, ICU, Java, JavaScript, Perl, Python, python-regex
       allowsSurrogateEscape: Boolean,
-      // .NET, ICU, Java, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, ICU, Java, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
       allowsSymbolUnknownBackslash: Boolean,
       // PCRE
       allowsUnpairedQuoteEnd: Boolean,
-      // ICU
+      // Boost.Regex, ICU
       readsUnpairedQuoteEndAsLetter: Boolean,
       // ICU, JavaScript (without `uv`)
       allowsUnknownBackslashUpperC: Boolean,
-      // ICU, Java, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
+      // Boost.Regex, ICU, Java, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
       allowsWordUnknownBackslash: Boolean,
       // python-regex
       fallsBackBrokenBackslashToLiteral: Boolean,
       // ICU
       hasICUProperty: Boolean,
+      // Boost.Regex
+      hasBackslashAngleWordStartEnd: Boolean,
+      // Boost.Regex
+      hasBackslashBufferAnchor: Boolean,
+      // Boost.Regex
+      hasBackslashCaseClass: Boolean,
+      // Boost.Regex
+      hasClassNameProperty: Boolean,
+      // ICU
+      readsBackslashControlAtEndAsLetter: Boolean,
+      // Boost.Regex
+      readsThreeOctalDigitsAfterZero: Boolean,
+      // Boost.Regex (`char`)
+      readsCharAsSigned: Boolean,
       // ICU, Java, JavaScript (with `uv`)
       combinesSurrogatePairEscape: Boolean,
       // .NET, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
       hasBackslashBareOctal: Boolean,
       // JavaScript (with `uv`)
       hasBackslashNull: Boolean,
-      // ICU, Java
+      // Boost.Regex, ICU, Java
       hasBackslashZeroOctal: Boolean,
-      // .NET, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
       hasBackslashBegin: Boolean,
-      // .NET, JavaScript, PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, JavaScript, PCRE, Perl, Python, python-regex, Ruby
       hasBackslashBackspace: Boolean,
-      // .NET, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
       hasBackslashBell: Boolean,
       // python-regex
       hasBackslashBlank: Boolean,
-      // ICU, Java, Perl, Python (`str`), python-regex
+      // Boost.Regex, ICU, Java, Perl, Python (`str`), python-regex
       hasBackslashCharName: Boolean,
       // PCRE (with `u`), Perl
       hasBackslashCharNameHex: Boolean,
-      // PCRE (without `u`)
+      // Boost.Regex, PCRE (without `u`)
       hasBackslashCodeUnit: Boolean,
-      // .NET, ICU, Java, JavaScript, PCRE, Perl, Ruby
+      // .NET, Boost.Regex, ICU, Java, JavaScript, PCRE, Perl, Ruby
       hasBackslashControl: Boolean,
-      // ICU, Java
+      // Boost.Regex, ICU, Java
       hasBackslashControlAny: Boolean,
-      // ICU
+      // Boost.Regex, ICU
       readsBackslashControlLowBits: Boolean,
       // .NET, Java, PCRE, Perl, Ruby
       hasBackslashControlExtra: Boolean,
       // PCRE, Perl, Ruby
       hasBackslashControlPrintable: Boolean,
-      // PCRE, Perl, python-regex, Ruby
+      // Boost.Regex, PCRE, Perl, python-regex, Ruby
       hasBackslashCut: Boolean,
-      // .NET, ICU, Java, PCRE, Perl, Ruby
+      // .NET, Boost.Regex, ICU, Java, PCRE, Perl, Ruby
       hasBackslashEscape: Boolean,
-      // .NET, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
       hasBackslashEnd: Boolean,
-      // ICU, Java, PCRE, Perl, python-regex, Ruby
+      // Boost.Regex, ICU, Java, PCRE, Perl, python-regex, Ruby
       hasBackslashGeneralNewline: Boolean,
-      // ICU, Java, PCRE, Perl, python-regex, Ruby
+      // Boost.Regex, ICU, Java, PCRE, Perl, python-regex, Ruby
       hasBackslashGraphemeCluster: Boolean,
-      // ICU, Java, PCRE, Perl
+      // Boost.Regex, ICU, Java, PCRE, Perl
       hasBackslashHorizontalSpace: Boolean,
       // Ruby
       hasBackslashMetaControl: Boolean,
@@ -151,9 +174,9 @@ object FeatureSet:
       hasBackslashNonNewline: Boolean,
       // PCRE, Perl
       hasBackslashOctal: Boolean,
-      // ICU, Java, PCRE
+      // Boost.Regex, ICU, Java, PCRE
       hasBackslashQuoteCommand: Boolean,
-      // .NET, ICU, Java, PCRE, Perl, python-regex, Ruby
+      // .NET, Boost.Regex, ICU, Java, PCRE, Perl, python-regex, Ruby
       hasBackslashStickyAssert: Boolean,
       // JavaScript (with `uv`), Ruby
       hasBackslashUnicodeBracket: Boolean,
@@ -167,17 +190,17 @@ object FeatureSet:
       hasBackslashUnicodeProperty: Boolean,
       // Java, PCRE, Perl
       hasBackslashUnicodePropertyBare: Boolean,
-      // .NET, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
       hasBackslashUpperEnd: Boolean,
-      // ICU, Java, PCRE, Perl
+      // Boost.Regex, ICU, Java, PCRE, Perl
       hasBackslashVerticalSpace: Boolean,
       // .NET, JavaScript, Python, python-regex, Ruby
       hasBackslashVerticalTab: Boolean,
       // python-regex
       hasBackslashWordStartEnd: Boolean,
-      // ICU, Java, PCRE, Perl
+      // Boost.Regex, ICU, Java, PCRE, Perl
       hasBackslashXBracket: Boolean,
-      // ICU, PCRE, Perl, Ruby
+      // Boost.Regex, ICU, PCRE, Perl, Ruby
       hasBackslashXHex1: Boolean,
       // Java, Perl
       hasBoundaryGModifier: Boolean,
@@ -202,7 +225,7 @@ object FeatureSet:
       val isUnicode = FeatureSet.isUnicode(dialect, flagSet, mode)
 
       Escape(
-        allowsAlphabeticUnknownBackslash = isICU || (isJavaScript && !isUnicode) || isPerl || isRuby,
+        allowsAlphabeticUnknownBackslash = isBoostRegex || isICU || (isJavaScript && !isUnicode) || isPerl || isRuby,
         allowsBackslashControlCurly = isJava || isPCRE || isRuby,
         allowsBackslashXWithoutDigit = isPerl,
         allowsBrokenBackslashControl = isJavaScript && !isUnicode,
@@ -215,47 +238,61 @@ object FeatureSet:
         allowsNegatedRawPropertyName = isRuby,
         allowsNonOctalDigitBackslash = (isJavaScript && !isUnicode) || isPCRE || isPerl || isRuby,
         allowsOctalAbove0377 = isDotNet || (isPCRE && isUnicode) || isPerl || isPythonRegex,
-        allowsSurrogateEscape = isDotNet || isICU || isJava || isJavaScript || isPerl || isPython || isPythonRegex,
-        allowsSymbolUnknownBackslash =
-          isDotNet || isICU || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+        allowsSurrogateEscape =
+          isDotNet || isBoostRegex || isICU || isJava || isJavaScript || isPerl || isPython || isPythonRegex,
+        allowsSymbolUnknownBackslash = isDotNet || isBoostRegex || isICU || isJava || (isJavaScript && !isUnicode) ||
+          isPCRE || isPerl || isPython || isPythonRegex || isRuby,
         allowsUnpairedQuoteEnd = isPCRE,
-        readsUnpairedQuoteEndAsLetter = isICU,
+        readsUnpairedQuoteEndAsLetter = isBoostRegex || isICU,
         allowsUnknownBackslashUpperC = isICU || isJavaScript && !isUnicode,
         allowsWordUnknownBackslash =
-          isICU || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+          isBoostRegex || isICU || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl ||
+            isPython || isPythonRegex || isRuby,
         fallsBackBrokenBackslashToLiteral = isPythonRegex,
         hasICUProperty = isICU,
+        hasBackslashAngleWordStartEnd = isBoostRegex,
+        hasBackslashBufferAnchor = isBoostRegex,
+        hasBackslashCaseClass = isBoostRegex,
+        hasClassNameProperty = isBoostRegex,
+        readsBackslashControlAtEndAsLetter = isICU,
+        readsThreeOctalDigitsAfterZero = isBoostRegex,
+        readsCharAsSigned = isBoostRegex && isByte,
         combinesSurrogatePairEscape = isICU || isJava || (isJavaScript && isUnicode),
         hasBackslashBareOctal =
           isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
         hasBackslashNull = isJavaScript && isUnicode,
-        hasBackslashZeroOctal = isICU || isJava,
-        hasBackslashBegin = isDotNet || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
-        hasBackslashBackspace = isDotNet || isJavaScript || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
-        hasBackslashBell = isDotNet || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+        hasBackslashZeroOctal = isBoostRegex || isICU || isJava,
+        hasBackslashBegin =
+          isDotNet || isBoostRegex || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+        hasBackslashBackspace =
+          isDotNet || isBoostRegex || isJavaScript || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+        hasBackslashBell =
+          isDotNet || isBoostRegex || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
         hasBackslashBlank = isPythonRegex,
-        hasBackslashCharName = isICU || isJava || isPerl || (isPython && !isByte) || isPythonRegex,
+        hasBackslashCharName = isBoostRegex || isICU || isJava || isPerl || (isPython && !isByte) || isPythonRegex,
         hasBackslashCharNameHex = (isPCRE && isUnicode) || isPerl,
         // PHP rejects `\C` with `u`, but not with `(*UTF)`.
-        hasBackslashCodeUnit = isPCRE && !flagSet.unicode,
-        hasBackslashControl = isDotNet || isICU || isJava || isJavaScript || isPCRE || isPerl || isRuby,
-        hasBackslashControlAny = isICU || isJava,
-        readsBackslashControlLowBits = isICU,
+        hasBackslashCodeUnit = isBoostRegex || isPCRE && !flagSet.unicode,
+        hasBackslashControl = isDotNet || isBoostRegex || isICU || isJava || isJavaScript || isPCRE || isPerl || isRuby,
+        hasBackslashControlAny = isBoostRegex || isICU || isJava,
+        readsBackslashControlLowBits = isBoostRegex || isICU,
         hasBackslashControlExtra = isDotNet || isJava || isPCRE || isPerl || isRuby,
         hasBackslashControlPrintable = isPCRE || isPerl || isRuby,
-        hasBackslashCut = isPCRE || isPerl || isPythonRegex || isRuby,
-        hasBackslashEscape = isDotNet || isICU || isJava || isPCRE || isPerl || isRuby,
-        hasBackslashEnd = isDotNet || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
-        hasBackslashGeneralNewline = isICU || isJava || isPCRE || isPerl || isPythonRegex || isRuby,
-        hasBackslashGraphemeCluster = isICU || isJava || isPCRE || isPerl || isPythonRegex || isRuby,
-        hasBackslashHorizontalSpace = isICU || isJava || isPCRE || isPerl,
+        hasBackslashCut = isBoostRegex || isPCRE || isPerl || isPythonRegex || isRuby,
+        hasBackslashEscape = isDotNet || isBoostRegex || isICU || isJava || isPCRE || isPerl || isRuby,
+        hasBackslashEnd =
+          isDotNet || isBoostRegex || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+        hasBackslashGeneralNewline = isBoostRegex || isICU || isJava || isPCRE || isPerl || isPythonRegex || isRuby,
+        hasBackslashGraphemeCluster = isBoostRegex || isICU || isJava || isPCRE || isPerl || isPythonRegex || isRuby,
+        hasBackslashHorizontalSpace = isBoostRegex || isICU || isJava || isPCRE || isPerl,
         hasBackslashMetaControl = isRuby,
         hasBackslashHexDigit = isRuby,
         hasBackslashNamedList = isPythonRegex,
         hasBackslashNonNewline = isPCRE || isPerl,
         hasBackslashOctal = isPCRE || isPerl,
-        hasBackslashQuoteCommand = isICU || isJava || isPCRE,
-        hasBackslashStickyAssert = isDotNet || isICU || isJava || isPCRE || isPerl || isPythonRegex || isRuby,
+        hasBackslashQuoteCommand = isBoostRegex || isICU || isJava || isPCRE,
+        hasBackslashStickyAssert =
+          isDotNet || isBoostRegex || isICU || isJava || isPCRE || isPerl || isPythonRegex || isRuby,
         hasBackslashUnicodeBracket = (isJavaScript && isUnicode) || isRuby,
         hasBackslashUnicodeHex =
           isDotNet || isICU || isJava || isJavaScript || (isPython && !isByte) || isPythonRegex || isRuby,
@@ -264,12 +301,13 @@ object FeatureSet:
         hasBackslashUnicodeProperty =
           isDotNet || isICU || isJava || (isJavaScript && isUnicode) || isPCRE || isPerl || isRuby,
         hasBackslashUnicodePropertyBare = isJava || isPCRE || isPerl,
-        hasBackslashUpperEnd = isDotNet || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
-        hasBackslashVerticalSpace = isICU || isJava || isPCRE || isPerl,
+        hasBackslashUpperEnd =
+          isDotNet || isBoostRegex || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+        hasBackslashVerticalSpace = isBoostRegex || isICU || isJava || isPCRE || isPerl,
         hasBackslashVerticalTab = isDotNet || isJavaScript || isPython || isPythonRegex || isRuby,
         hasBackslashWordStartEnd = isPythonRegex,
-        hasBackslashXBracket = isICU || isJava || isPCRE || isPerl,
-        hasBackslashXHex1 = isICU || isPCRE || isPerl || isRuby,
+        hasBackslashXBracket = isBoostRegex || isICU || isJava || isPCRE || isPerl,
+        hasBackslashXHex1 = isBoostRegex || isICU || isPCRE || isPerl || isRuby,
         hasBoundaryGModifier = isJava || isPerl,
         hasBoundaryModifier = isPerl,
         hasPythonRegexProperty = isPythonRegex,
@@ -284,7 +322,7 @@ object FeatureSet:
       allowsBrokenClassRangeBegin: Boolean,
       // JavaScript (without `uv`), Perl
       allowsBrokenClassRangeEnd: Boolean,
-      // .NET, ICU, Java, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, ICU, Java, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
       allowsBrokenCloseBracket: Boolean,
       // JavaScript (with `v`)
       allowsClassDiff: Boolean,
@@ -294,12 +332,18 @@ object FeatureSet:
       allowsClassIntersection: Boolean,
       // Java, JavaScript (with `v`), Ruby
       allowsClassNest: Boolean,
-      // PCRE, Perl, Ruby
+      // Boost.Regex, PCRE, Perl, Ruby
       allowsClassPOSIX: Boolean,
       // Ruby
       allowsEmptyClassIntersection: Boolean,
       // ICU
       hasICUClass: Boolean,
+      // Boost.Regex
+      hasClassCollatingElement: Boolean,
+      // Boost.Regex
+      readsClassBackslashByLetter: Boolean,
+      // Boost.Regex
+      rejectsHyphenAfterClassRange: Boolean,
       // PCRE, Perl
       rejectsClassPOSIXCollating: Boolean,
       // PCRE
@@ -314,7 +358,7 @@ object FeatureSet:
       hasBackslashControlDigitInClass: Boolean,
       // JavaScript (with `v`)
       hasBackslashQuoteSet: Boolean,
-      // PCRE
+      // Boost.Regex, PCRE
       hasClassPOSIXWordBoundary: Boolean,
       // .NET
       hasClassSubtraction: Boolean,
@@ -343,14 +387,18 @@ object FeatureSet:
         allowsBrokenClassRangeBegin = isDotNet || isJava || (isJavaScript && !isUnicode) || isPerl,
         allowsBrokenClassRangeEnd = (isJavaScript && !isUnicode) || isPerl,
         allowsBrokenCloseBracket =
-          isDotNet || isICU || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+          isDotNet || isBoostRegex || isICU || isJava || (isJavaScript && !isUnicode) || isPCRE ||
+            isPerl || isPython || isPythonRegex || isRuby,
         allowsClassDiff = isJavaScript && flagSet.unicodeSets,
         allowsClassEmpty = isJavaScript,
         allowsClassIntersection = isJava || isJavaScript && flagSet.unicodeSets || isRuby,
         allowsClassNest = isJava || isJavaScript && flagSet.unicodeSets || isRuby,
-        allowsClassPOSIX = isPCRE || isPerl || isRuby,
+        allowsClassPOSIX = isBoostRegex || isPCRE || isPerl || isRuby,
         allowsEmptyClassIntersection = isRuby,
         hasICUClass = isICU,
+        hasClassCollatingElement = isBoostRegex,
+        readsClassBackslashByLetter = isBoostRegex,
+        rejectsHyphenAfterClassRange = isBoostRegex,
         rejectsClassPOSIXCollating = isPCRE || isPerl,
         rejectsClassPOSIXOutsideClass = isPCRE,
         validatesClassSetSyntax = isJavaScript && flagSet.unicodeSets,
@@ -358,7 +406,7 @@ object FeatureSet:
         hasBackslashClassSetReservedPunctuator = isJavaScript && flagSet.unicodeSets,
         hasBackslashControlDigitInClass = isJavaScript && !isUnicode,
         hasBackslashQuoteSet = isJavaScript && flagSet.unicodeSets,
-        hasClassPOSIXWordBoundary = isPCRE,
+        hasClassPOSIXWordBoundary = isBoostRegex || isPCRE,
         hasClassSubtraction = isDotNet,
         hasPythonRegexClass = isPythonRegex,
         hasClassSetOperator = isPythonRegex && flagSet.version1,
@@ -375,7 +423,7 @@ object FeatureSet:
   final case class Group(
       // JavaScript
       allowsDollarInGroupName: Boolean,
-      // .NET, PCRE (with `J`), Perl, python-regex, Ruby
+      // .NET, Boost.Regex, PCRE (with `J`), Perl, python-regex, Ruby
       allowsDuplicatedGroupName: Boolean,
       // JavaScript
       allowsDuplicatedGroupNameInAlternatives: Boolean,
@@ -403,6 +451,14 @@ object FeatureSet:
       allowsNonNameCaptureTest: Boolean,
       // python-regex
       allowsDefineAlternative: Boolean,
+      // Boost.Regex
+      allowsAnyGroupName: Boolean,
+      // Boost.Regex
+      allowsUnclosedCommentGroup: Boolean,
+      // Boost.Regex
+      hasBareVerbGroup: Boolean,
+      // Boost.Regex
+      rejectsEmptyLookAheadAndAtomicGroup: Boolean,
       // python-regex
       hasFuzzyConstraint: Boolean,
       // .NET (with `n`), PCRE (with `n`), Perl (with `n`)
@@ -411,9 +467,9 @@ object FeatureSet:
       hasAbsenceOperator: Boolean,
       // PCRE, Perl
       hasAlphabeticGroup: Boolean,
-      // .NET, ICU, Java, JavaScript, PCRE, Perl, python-regex, Ruby
+      // .NET, Boost.Regex, ICU, Java, JavaScript, PCRE, Perl, python-regex, Ruby
       hasAngleNamedCapture: Boolean,
-      // .NET, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
       hasAtomicGroup: Boolean,
       // .NET
       hasBalanceGroup: Boolean,
@@ -421,31 +477,31 @@ object FeatureSet:
       hasBareLookAroundTest: Boolean,
       // PCRE, Python, python-regex
       hasBareNamedCaptureTest: Boolean,
-      // PCRE, Perl, python-regex
+      // Boost.Regex, PCRE, Perl, python-regex
       hasBranchReset: Boolean,
       // PCRE
       hasCallout: Boolean,
-      // .NET, PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, PCRE, Perl, Python, python-regex, Ruby
       hasConditional: Boolean,
-      // PCRE, Perl, python-regex
+      // Boost.Regex, PCRE, Perl, python-regex
       hasDefineTest: Boolean,
       // Perl
       hasInlineCode: Boolean,
       // PCRE
       limitsGroupNameLength: Boolean,
-      // .NET, PCRE, Perl, python-regex
+      // .NET, Boost.Regex, PCRE, Perl, python-regex
       hasLookAroundTest: Boolean,
-      // PCRE, Perl, Ruby
+      // Boost.Regex, PCRE, Perl, Ruby
       hasNamedCaptureTest: Boolean,
       // PCRE
       hasNonAtomicLookAround: Boolean,
       // PCRE, Perl, Python, python-regex
       hasPGroup: Boolean,
-      // PCRE, Perl
+      // Boost.Regex, PCRE, Perl
       hasRecursionTest: Boolean,
       // PCRE
       hasRelativeIndexedCaptureTest: Boolean,
-      // .NET, PCRE, Perl, Ruby
+      // .NET, Boost.Regex, PCRE, Perl, Ruby
       hasQuoteNamedCapture: Boolean,
       // PCRE
       hasVersionTest: Boolean,
@@ -467,7 +523,8 @@ object FeatureSet:
 
       Group(
         allowsDollarInGroupName = isJavaScript,
-        allowsDuplicatedGroupName = isDotNet || (isPCRE && flagSet.dupNames) || isPerl || isPythonRegex || isRuby,
+        allowsDuplicatedGroupName =
+          isDotNet || isBoostRegex || (isPCRE && flagSet.dupNames) || isPerl || isPythonRegex || isRuby,
         allowsDuplicatedGroupNameInAlternatives = isJavaScript,
         allowsEscapeInGroupName = isJavaScript,
         allowsLeadingZeroInCaptureTest = isDotNet || isPCRE || isPython || isPythonRegex || isRuby,
@@ -482,29 +539,34 @@ object FeatureSet:
         allowsZeroIndexedCaptureTest = isDotNet,
         allowsNonNameCaptureTest = isRuby,
         allowsDefineAlternative = isPythonRegex,
+        allowsAnyGroupName = isBoostRegex,
+        allowsUnclosedCommentGroup = isBoostRegex,
+        hasBareVerbGroup = isBoostRegex,
+        rejectsEmptyLookAheadAndAtomicGroup = isBoostRegex,
         hasFuzzyConstraint = isPythonRegex,
         explicitCapture = (isDotNet || isPCRE || isPerl) && flagSet.explicitCapture,
         hasAbsenceOperator = isRuby,
         hasAlphabeticGroup = isPCRE || isPerl,
         hasAngleNamedCapture =
-          isDotNet || isICU || isJava || isJavaScript || isPCRE || isPerl || isPythonRegex || isRuby,
-        hasAtomicGroup = isDotNet || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+          isDotNet || isBoostRegex || isICU || isJava || isJavaScript || isPCRE || isPerl || isPythonRegex || isRuby,
+        hasAtomicGroup =
+          isDotNet || isBoostRegex || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
         hasBalanceGroup = isDotNet,
         hasBareLookAroundTest = isDotNet,
         hasBareNamedCaptureTest = isPCRE || isPython || isPythonRegex,
-        hasBranchReset = isPCRE || isPerl || isPythonRegex,
+        hasBranchReset = isBoostRegex || isPCRE || isPerl || isPythonRegex,
         hasCallout = isPCRE,
-        hasConditional = isDotNet || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
-        hasDefineTest = isPCRE || isPerl || isPythonRegex,
+        hasConditional = isDotNet || isBoostRegex || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+        hasDefineTest = isBoostRegex || isPCRE || isPerl || isPythonRegex,
         hasInlineCode = isPerl,
         limitsGroupNameLength = isPCRE,
-        hasLookAroundTest = isDotNet || isPCRE || isPerl || isPythonRegex,
-        hasNamedCaptureTest = isPCRE || isPerl || isRuby,
+        hasLookAroundTest = isDotNet || isBoostRegex || isPCRE || isPerl || isPythonRegex,
+        hasNamedCaptureTest = isBoostRegex || isPCRE || isPerl || isRuby,
         hasNonAtomicLookAround = isPCRE,
         hasPGroup = isPCRE || isPerl || isPython || isPythonRegex,
-        hasRecursionTest = isPCRE || isPerl,
+        hasRecursionTest = isBoostRegex || isPCRE || isPerl,
         hasRelativeIndexedCaptureTest = isPCRE,
-        hasQuoteNamedCapture = isDotNet || isPCRE || isPerl || isRuby,
+        hasQuoteNamedCapture = isDotNet || isBoostRegex || isPCRE || isPerl || isRuby,
         hasVersionTest = isPCRE,
         hasScanSubstring = isPCRE,
         hasStartOption = isPCRE,
@@ -541,15 +603,17 @@ object FeatureSet:
       hasBackslashKBackReferenceQuote: Boolean,
       // PCRE, Perl
       hasBackslashKBackReferenceCurly: Boolean,
-      // PCRE, Perl, python-regex
+      // Boost.Regex, PCRE, Perl, python-regex
       hasCallCommand: Boolean,
+      // Boost.Regex
+      hasBackslashGKBackReference: Boolean,
       // Ruby
       hasLeveledBackReference: Boolean,
       // python-regex
       hasPAmpersandCall: Boolean,
-      // PCRE, Perl, python-regex
+      // Boost.Regex, PCRE, Perl, python-regex
       hasPCall: Boolean,
-      // PCRE, Perl, python-regex
+      // Boost.Regex, PCRE, Perl, python-regex
       hasRCall: Boolean,
       // Java
       readsBackReferenceDigitsWhileGroupExists: Boolean,
@@ -557,6 +621,8 @@ object FeatureSet:
       readsBackReferenceDigitsByPreviousGroups: Boolean,
       // ICU
       readsBackReferenceDigitsBelowGroupCount: Boolean,
+      // Boost.Regex
+      readsBackReferenceSingleDigit: Boolean,
       // JavaScript (with `uv`)
       rejectsInvalidBackReference: Boolean,
       // Ruby
@@ -586,33 +652,35 @@ object FeatureSet:
           isDotNet || isICU || isJava || (isJavaScript && prescan.containsNamedCapture) || isPCRE || isPerl || isRuby,
         hasBackslashKBackReferenceQuote = isDotNet || isPCRE || isPerl || isRuby,
         hasBackslashKBackReferenceCurly = isPCRE || isPerl,
-        hasCallCommand = isPCRE || isPerl || isPythonRegex,
+        hasCallCommand = isBoostRegex || isPCRE || isPerl || isPythonRegex,
+        hasBackslashGKBackReference = isBoostRegex,
         hasLeveledBackReference = isRuby,
         hasPAmpersandCall = isPythonRegex,
-        hasPCall = isPCRE || isPerl || isPythonRegex,
-        hasRCall = isPCRE || isPerl || isPythonRegex,
+        hasPCall = isBoostRegex || isPCRE || isPerl || isPythonRegex,
+        hasRCall = isBoostRegex || isPCRE || isPerl || isPythonRegex,
         readsBackReferenceDigitsWhileGroupExists = isJava,
         readsBackReferenceDigitsByPreviousGroups = isICU || isJava || isPCRE || isPerl || isRuby,
         readsBackReferenceDigitsBelowGroupCount = isICU,
+        readsBackReferenceSingleDigit = isBoostRegex,
         rejectsInvalidBackReference = isJavaScript && isUnicode,
         rejectsNumberedReferenceWithNamedCapture = isRuby
       )
 
   /** The features of the inline flags. */
   final case class InlineFlag(
-      // .NET, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
       allowsDuplicatedInlineFlag: Boolean,
       // Java, PCRE, Perl, python-regex
       allowsEmptyInlineFlag: Boolean,
-      // .NET, ICU, Java, PCRE, Perl, Ruby
+      // .NET, Boost.Regex, ICU, Java, PCRE, Perl, Ruby
       allowsEmptyInlineFlagDiff: Boolean,
-      // .NET, ICU, Java, JavaScript, PCRE, Perl, Ruby
+      // .NET, Boost.Regex, ICU, Java, JavaScript, PCRE, Perl, Ruby
       allowsEmptyInlineFlagRemoval: Boolean,
       // .NET
       allowsInlineFlagSign: Boolean,
       // ICU, Ruby
       allowsRepeatedInlineFlagMinus: Boolean,
-      // .NET, ICU, Java, PCRE, Perl, Ruby
+      // .NET, Boost.Regex, ICU, Java, PCRE, Perl, Ruby
       allowsToggledInlineFlag: Boolean,
       // ICU
       readsInlineFlagsInOuterMode: Boolean,
@@ -654,13 +722,13 @@ object FeatureSet:
       hasFlagP: Boolean,
       // PCRE, python-regex
       hasFlagR: Boolean,
-      // .NET, ICU, Java, JavaScript, PCRE, Perl, Python, python-regex
+      // .NET, Boost.Regex, ICU, Java, JavaScript, PCRE, Perl, Python, python-regex
       hasFlagS: Boolean,
       // ICU, Java, Perl, Python (`str`), python-regex, Ruby
       hasFlagU: Boolean,
       // ICU, python-regex
       hasFlagW: Boolean,
-      // .NET, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
       hasFlagX: Boolean,
       // PCRE, Perl
       hasFlagXX: Boolean,
@@ -674,11 +742,11 @@ object FeatureSet:
       hasFlagUpperU: Boolean,
       // python-regex
       hasFlagUpperV: Boolean,
-      // .NET, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
       hasInlineFlag: Boolean,
       // .NET, Java, JavaScript, PCRE, Perl, Python, python-regex, Ruby
       hasInlineFlagGroup: Boolean,
-      // .NET, ICU, Java, PCRE, Perl, python-regex, Ruby
+      // .NET, Boost.Regex, ICU, Java, PCRE, Perl, python-regex, Ruby
       hasInlineFlagRemovalCommand: Boolean,
       // Ruby
       hasIncomprehensiveInlineFlag: Boolean,
@@ -701,13 +769,14 @@ object FeatureSet:
 
       InlineFlag(
         allowsDuplicatedInlineFlag =
-          isDotNet || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+          isDotNet || isBoostRegex || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
         allowsEmptyInlineFlag = isJava || isPCRE || isPerl || isPythonRegex,
-        allowsEmptyInlineFlagDiff = isDotNet || isICU || isJava || isPCRE || isPerl || isRuby,
-        allowsEmptyInlineFlagRemoval = isDotNet || isICU || isJava || isJavaScript || isPCRE || isPerl || isRuby,
+        allowsEmptyInlineFlagDiff = isDotNet || isBoostRegex || isICU || isJava || isPCRE || isPerl || isRuby,
+        allowsEmptyInlineFlagRemoval =
+          isDotNet || isBoostRegex || isICU || isJava || isJavaScript || isPCRE || isPerl || isRuby,
         allowsInlineFlagSign = isDotNet,
         allowsRepeatedInlineFlagMinus = isICU || isRuby,
-        allowsToggledInlineFlag = isDotNet || isICU || isJava || isPCRE || isPerl || isRuby,
+        allowsToggledInlineFlag = isDotNet || isBoostRegex || isICU || isJava || isPCRE || isPerl || isRuby,
         readsInlineFlagsInOuterMode = isICU,
         rejectsGlobalInlineFlagRemoval = isPythonRegex,
         restartsAtVersion1Flag = isPythonRegex && !flagSet.version1,
@@ -728,19 +797,23 @@ object FeatureSet:
         hasFlagO = isPerl,
         hasFlagP = isPerl || isPythonRegex,
         hasFlagR = isPCRE || isPythonRegex,
-        hasFlagS = isDotNet || isICU || isJava || isJavaScript || isPCRE || isPerl || isPython || isPythonRegex,
+        hasFlagS =
+          isDotNet || isBoostRegex || isICU || isJava || isJavaScript || isPCRE || isPerl || isPython || isPythonRegex,
         hasFlagU = isICU || isJava || isPerl || (isPython && !isByte) || isPythonRegex || isRuby,
         hasFlagW = isICU || isPythonRegex,
-        hasFlagX = isDotNet || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+        hasFlagX =
+          isDotNet || isBoostRegex || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
         hasFlagXX = isPCRE || isPerl,
         hasFlagUpperJ = isPCRE,
         hasFlagUpperL = (isPython && isByte) || isPythonRegex,
         hasUnixLinesFlag = isJava,
         hasFlagUpperU = isJava || isPCRE,
         hasFlagUpperV = isPythonRegex,
-        hasInlineFlag = isDotNet || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+        hasInlineFlag =
+          isDotNet || isBoostRegex || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
         hasInlineFlagGroup = true,
-        hasInlineFlagRemovalCommand = isDotNet || isICU || isJava || isPCRE || isPerl || isPythonRegex || isRuby,
+        hasInlineFlagRemovalCommand =
+          isDotNet || isBoostRegex || isICU || isJava || isPCRE || isPerl || isPythonRegex || isRuby,
         hasIncomprehensiveInlineFlag = isRuby,
         ignoresInlineFlagCase = isDotNet,
         overridesCharsetInlineFlag = isRuby,
@@ -752,17 +825,17 @@ object FeatureSet:
   final case class Quantifier(
       // Perl, python-regex
       allowsBacktrackControlRepeat: Boolean,
-      // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, Java, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
       allowsBrokenCloseCurly: Boolean,
-      // .NET, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
       allowsBrokenCurly: Boolean,
-      // .NET, JavaScript (without `uv`), PCRE, Python, python-regex, Ruby
+      // .NET, Boost.Regex, JavaScript (without `uv`), PCRE, Python, python-regex, Ruby
       allowsBrokenCurlyAfterAlphabeticBackslash: Boolean,
-      // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, Java, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
       allowsLookAheadRepeat: Boolean,
-      // .NET, Java, PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, Java, PCRE, Perl, Python, python-regex, Ruby
       allowsLookBehindRepeat: Boolean,
-      // .NET, ICU, Java, JavaScript, PCRE, Perl, Python, python-regex
+      // .NET, Boost.Regex, ICU, Java, JavaScript, PCRE, Perl, Python, python-regex
       allowsMeaninglessBacktrackStrategy: Boolean,
       // Ruby
       allowsNestedRepeat: Boolean,
@@ -772,21 +845,23 @@ object FeatureSet:
       allowsZeroWidthAssertRepeat: Boolean,
       // ICU
       allowsCaretDollarRepeat: Boolean,
+      // Boost.Regex
+      allowsInlineFlagRepeat: Boolean,
       // Python, python-regex
       allowsCurlyWithoutCount: Boolean,
       // python-regex
       repeatsAcrossInlineFlag: Boolean,
       // PCRE, Perl, Python, python-regex, Ruby
       hasMaxBounded: Boolean,
-      // ICU, Java, PCRE, Perl, Python, python-regex, Ruby
+      // Boost.Regex, ICU, Java, PCRE, Perl, Python, python-regex, Ruby
       hasPossessiveBacktrackStrategy: Boolean,
-      // ICU, Java, PCRE, Perl, Python, python-regex
+      // Boost.Regex, ICU, Java, PCRE, Perl, Python, python-regex
       hasPossessiveCurlyBacktrackStrategy: Boolean,
       // Java
       ignoresCurlyAfterRepeat: Boolean,
       // Perl
       readsLeadingCurlyAsLiteral: Boolean,
-      // .NET: 2147483647, ICU: 16777215, Java: 2147483647, JavaScript: unlimited, PCRE: 65535, Perl: 2147483646, Python and python-regex: 4294967294, Ruby: 100000
+      // .NET: 2147483647, ICU: 16777215, Java: 2147483647, Boost.Regex and JavaScript: unlimited, PCRE: 65535, Perl: 2147483646, Python and python-regex: 4294967294, Ruby: 100000
       maxRepeatCount: Long
   )
 
@@ -800,25 +875,31 @@ object FeatureSet:
       Quantifier(
         allowsBacktrackControlRepeat = isPerl || isPythonRegex,
         allowsBrokenCloseCurly =
-          isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+          isDotNet || isBoostRegex || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl ||
+            isPython || isPythonRegex || isRuby,
         allowsBrokenCurly =
-          isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+          isDotNet || isBoostRegex || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
         allowsBrokenCurlyAfterAlphabeticBackslash =
-          isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPython || isPythonRegex || isRuby,
+          isDotNet || isBoostRegex || (isJavaScript && !isUnicode) || isPCRE || isPython || isPythonRegex || isRuby,
         allowsLookAheadRepeat =
-          isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
-        allowsLookBehindRepeat = isDotNet || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+          isDotNet || isBoostRegex || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl ||
+            isPython || isPythonRegex || isRuby,
+        allowsLookBehindRepeat =
+          isDotNet || isBoostRegex || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
         allowsMeaninglessBacktrackStrategy =
-          isDotNet || isICU || isJava || isJavaScript || isPCRE || isPerl || isPython || isPythonRegex,
+          isDotNet || isBoostRegex || isICU || isJava || isJavaScript || isPCRE || isPerl || isPython || isPythonRegex,
         allowsNestedRepeat = isRuby,
         allowsReversedBoundedRepeat = isPerl,
         allowsZeroWidthAssertRepeat = isDotNet || isJava || isPerl || isPythonRegex || isRuby,
         allowsCaretDollarRepeat = isICU,
+        allowsInlineFlagRepeat = isBoostRegex,
         allowsCurlyWithoutCount = isPython || isPythonRegex,
         repeatsAcrossInlineFlag = isPythonRegex,
         hasMaxBounded = isPCRE || isPerl || isPython || isPythonRegex || isRuby,
-        hasPossessiveBacktrackStrategy = isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
-        hasPossessiveCurlyBacktrackStrategy = isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex,
+        hasPossessiveBacktrackStrategy =
+          isBoostRegex || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+        hasPossessiveCurlyBacktrackStrategy =
+          isBoostRegex || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex,
         ignoresCurlyAfterRepeat = isJava,
         readsLeadingCurlyAsLiteral = isPerl,
         maxRepeatCount = dialect match
@@ -826,6 +907,7 @@ object FeatureSet:
           case Dialect.Java           => 2147483647L
           case Dialect.ICU            => 16777215L
           case Dialect.JavaScript     => Long.MaxValue
+          case _: Dialect.BoostRegex  => Long.MaxValue
           case Dialect.PCRE           => 65535L
           case _: Dialect.Perl        => 2147483646L
           case _: Dialect.Python      => 4294967294L
@@ -837,7 +919,7 @@ object FeatureSet:
   final case class Comment(
       // Perl (with `xx`)
       verboseMore: Boolean,
-      // .NET, ICU, PCRE, Perl, Python, python-regex, Ruby
+      // .NET, Boost.Regex, ICU, PCRE, Perl, Python, python-regex, Ruby
       hasInlineComment: Boolean,
       // Python
       processBackslashInLineComment: Boolean,
@@ -849,6 +931,8 @@ object FeatureSet:
       skipsComment: Boolean,
       // .NET, ICU, Java, PCRE, Perl, python-regex
       skipsCommentBeforeBacktrackStrategy: Boolean,
+      // Boost.Regex
+      skipsSpaceBeforeBacktrackStrategy: Boolean,
       // .NET, PCRE, Perl
       skipsInlineCommentBeforeBacktrackStrategy: Boolean,
       // ICU, Java
@@ -861,46 +945,56 @@ object FeatureSet:
       skipsCommentInGroupOpening: Boolean,
       // ICU, python-regex
       skipsCommentInQuantifier: Boolean,
-      // ICU, Java, PCRE, Perl, Python, python-regex
+      // Boost.Regex
+      skipsSpaceInQuantifier: Boolean,
+      // Boost.Regex, ICU, Java, PCRE, Perl, Python, python-regex
       skipsVerticalTab: Boolean,
       // ICU, PCRE, Perl
       skipsPatternWhiteSpace: Boolean,
-      // python-regex
+      // Boost.Regex (`u32regex`), python-regex
       skipsPythonSpace: Boolean,
       // Java
       endsCommentAtNUL: Boolean,
       // Java
       keepsCommentEnd: Boolean,
-      // ICU: `\n`, `\r`, U+0085 and U+2028, Java: `\n`, `\r`, U+0085, U+2028 and U+2029, PCRE: its newline start option (`\n` by default), the others: `\n`
+      // Boost.Regex: `\n`, `\f`, `\r` (and U+0085, U+2028 and U+2029 for `u32regex`), ICU: `\n`, `\r`, U+0085 and U+2028, Java: `\n`, `\r`, U+0085, U+2028 and U+2029, PCRE: its newline start option (`\n` by default), the others: `\n`
       commentTerminators: LineTerminatorSet
   )
 
   object Comment:
 
-    def from(prescan: SourcePrescan, dialect: Dialect, flagSet: FlagSet): Comment =
+    def from(prescan: SourcePrescan, dialect: Dialect, flagSet: FlagSet, mode: UnitMode): Comment =
       import dialect.*
+
+      val isByte = FeatureSet.isByte(mode)
 
       Comment(
         verboseMore = flagSet.verboseMore,
-        hasInlineComment = isDotNet || isICU || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
+        hasInlineComment = isDotNet || isBoostRegex || isICU || isPCRE || isPerl || isPython || isPythonRegex || isRuby,
         processBackslashInLineComment = isPython,
         removesCommentGroup = isRuby,
         processBackslashInCommentGroup = isPython || isPythonRegex || isRuby,
         skipsComment = flagSet.verbose,
         skipsCommentBeforeBacktrackStrategy = isDotNet || isICU || isJava || isPCRE || isPerl || isPythonRegex,
+        skipsSpaceBeforeBacktrackStrategy = isBoostRegex,
         skipsInlineCommentBeforeBacktrackStrategy = isDotNet || isPCRE || isPerl,
         skipsCommentInClass = isICU || isJava,
         skipsCommentInConstruct = isICU || isJava || isPythonRegex,
         skipsCommentInEscape = isJava || isPythonRegex,
         skipsCommentInGroupOpening = isICU || isJava,
         skipsCommentInQuantifier = isICU || isPythonRegex,
-        skipsVerticalTab = isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex,
+        skipsSpaceInQuantifier = isBoostRegex,
+        skipsVerticalTab = isBoostRegex || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex,
         skipsPatternWhiteSpace = isICU || isPCRE || isPerl,
-        skipsPythonSpace = isPythonRegex,
+        skipsPythonSpace = (isBoostRegex && !isByte) || isPythonRegex,
         endsCommentAtNUL = isJava,
         keepsCommentEnd = isJava,
         commentTerminators =
-          if isICU then LineTerminatorSet.ICUComment
+          // Boost.Regex's `#` comment ends after one character of a line terminator, even of `\r\n`.
+          if isBoostRegex then
+            val terminators = if isByte then LineTerminatorSet.BoostRegexChar else LineTerminatorSet.BoostRegexU32
+            terminators.copy(crlf = LineTerminatorSet.CRLF.Ignored)
+          else if isICU then LineTerminatorSet.ICUComment
           else if isJava then LineTerminatorSet.Java
           else if isPCRE then
             LineTerminatorSet.fromPCREStartOptions(prescan.startOptions).getOrElse(LineTerminatorSet.LF)

@@ -676,3 +676,61 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
   error("[a", "", ICU)("Unclosed ']' at 2")
   checkPrinted("[a - c # comment\n]", "[a-c # comment\n]", "x", ICU):
     Class(false, ClassUnion(ClassRange(ClassLiteral('a'), ClassLiteral('c')), ClassBlank(" # comment\n")))
+
+  // Boost.Regex's escape in a class is a class of its letter or a character (Boost.Regex 1.92.0).
+  check("[\\d\\L\\V\\v\\b\\pL\\Q\\E\\R\\k]", "", BoostRegex()):
+    Class(
+      false,
+      ClassUnion(
+        ClassBackslashClass(Digit),
+        ClassBackslashClass(NonLower),
+        ClassBackslashClass(NonVertical),
+        ClassBackslashValue(Escape(Single('v'), 0x0b)),
+        ClassBackslashValue(Escape(Single('b'), 0x08)),
+        ClassBackslashValue(Unknown('p')),
+        ClassLiteral('L'),
+        ClassBackslashValue(Unknown('Q')),
+        ClassBackslashValue(Unknown('E')),
+        ClassBackslashValue(Unknown('R')),
+        ClassBackslashValue(Unknown('k'))
+      )
+    )
+  check("[\\x41\\0101\\cA\\N{x}]", "", BoostRegex()):
+    Class(
+      false,
+      ClassUnion(
+        ClassBackslashValue(Escape(Hex2, 'A')),
+        ClassBackslashValue(Escape(BareOctal, 'A')),
+        ClassBackslashValue(Escape(Control('A'), 0x01)),
+        ClassBackslashClass(CharName("x"))
+      )
+    )
+  error("[\\1]", "", BoostRegex())("Invalid backslash escape at 2")
+  error("[\\", "", BoostRegex())("Invalid backslash escape at 1")
+  // The end of a range is a letter even of a class (e.g. `[a-\d]` is `[a-d]`), and a `-` after a range ends the class.
+  check("[a-\\d]", "", BoostRegex())(Class(false, ClassRange(ClassLiteral('a'), ClassBackslashValue(Unknown('d')))))
+  check("[a-c-]", "", BoostRegex()):
+    Class(false, ClassUnion(ClassRange(ClassLiteral('a'), ClassLiteral('c')), ClassLiteral('-')))
+  error("[a-c-e]", "", BoostRegex())("Invalid class range at 5")
+  error("[\\d-z]", "", BoostRegex())("Invalid class range at 1")
+  // `[:name:]`, `[.name.]` and `[=name=]` have any name, and need their closing.
+  check("[[:alpha:][:^Lu:][.space.][=a=]]", "", BoostRegex()):
+    Class(
+      false,
+      ClassUnion(
+        ClassPOSIX(false, "alpha"),
+        ClassPOSIX(true, "Lu"),
+        ClassCollatingElement("space"),
+        ClassEquivalence("a")
+      )
+    )
+  error("[[:alpha]]", "", BoostRegex())("Unclosed ']' at 10")
+  error("[a[:]", "", BoostRegex())("Unclosed ']' at 5")
+  error("[[:", "", BoostRegex())("Unclosed ']' at 3")
+  error("[[.a]]", "", BoostRegex())("Unclosed ']' at 6")
+  check("[[.a.]-c]", "", BoostRegex()):
+    Class(false, ClassUnion(ClassCollatingElement("a"), ClassLiteral('-'), ClassLiteral('c')))
+  check("[a-[.c.]]", "", BoostRegex()):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassCollatingElement("c")))
+  check("[[a]", "", BoostRegex())(Class(false, ClassUnion(ClassLiteral('['), ClassLiteral('a'))))
+  check("[[:<:]]", "", BoostRegex())(Class(false, ClassPOSIX(false, "<")))

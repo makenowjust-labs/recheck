@@ -332,9 +332,11 @@ private[printer] final class Printer(featureSet: FeatureSet):
     case NameStyle.Bare  => name
 
   private def printReference(ref: Reference): String = ref match
-    case Reference.IndexedReference(index)       => index.toString
-    case Reference.NamedReference(name)          => name
-    case Reference.RelativeReference(n)          => printSigned(n)
+    case Reference.IndexedReference(index) => index.toString
+    case Reference.NamedReference(name)    => name
+    // Boost.Regex's `\g{-0}` refers to the next group.
+    case Reference.RelativeReference(1) if featureSet.reference.hasBackslashGKBackReference => "-0"
+    case Reference.RelativeReference(n)                                                     => printSigned(n)
     case Reference.LeveledReference(base, level) => s"${printReference(base)}${printSigned(level)}"
 
   private def printSigned(n: Int): String = if n < 0 then n.toString else s"+$n"
@@ -442,8 +444,11 @@ private[printer] final class Printer(featureSet: FeatureSet):
         case AssertKind.Begin                => write("\\A")
         case AssertKind.LowerEnd             => write("\\z")
         case AssertKind.UpperEnd             => write("\\Z")
-        case AssertKind.WordStart            => write("\\m")
-        case AssertKind.WordEnd              => write("\\M")
+        // Boost.Regex's start and end of a word are `\<` and `\>`, and python-regex's are `\m` and `\M`.
+        case AssertKind.WordStart =>
+          write(if featureSet.escape.hasBackslashAngleWordStartEnd then "\\<" else "\\m")
+        case AssertKind.WordEnd =>
+          write(if featureSet.escape.hasBackslashAngleWordStartEnd then "\\>" else "\\M")
     case BackslashKind.CaseCommand(kind) => write(printCaseCommand(kind))
 
   private def printBoundaryModifier(modifier: BoundaryModifier): String = modifier match
@@ -501,6 +506,10 @@ private[printer] final class Printer(featureSet: FeatureSet):
       case EscapeClassKind.POSIXBlank                                  => "h"
       case EscapeClassKind.Vertical                                    => "v"
       case EscapeClassKind.NonVertical                                 => "V"
+      case EscapeClassKind.Lower                                       => "l"
+      case EscapeClassKind.NonLower                                    => "L"
+      case EscapeClassKind.Upper                                       => "u"
+      case EscapeClassKind.NonUpper                                    => "U"
       case EscapeClassKind.NonNewline                                  => "N"
       case EscapeClassKind.GeneralNewline                              => "R"
       case EscapeClassKind.CharName(name)                              => s"N{$name}"
@@ -577,8 +586,10 @@ private[printer] final class Printer(featureSet: FeatureSet):
       write(if invert then "[^" else "[")
       writeClassItem(inner)
       write("]")
-    case ClassItemData.ClassPOSIX(invert, name) => write(s"[:${if invert then "^" else ""}$name:]")
-    case ClassItemData.ClassRange(begin, end)   =>
+    case ClassItemData.ClassPOSIX(invert, name)    => write(s"[:${if invert then "^" else ""}$name:]")
+    case ClassItemData.ClassCollatingElement(name) => write(s"[.$name.]")
+    case ClassItemData.ClassEquivalence(name)      => write(s"[=$name=]")
+    case ClassItemData.ClassRange(begin, end)      =>
       writeRangeEnd(begin)
       write("-")
       writeRangeEnd(end)

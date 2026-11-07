@@ -37,6 +37,18 @@ object EscapeClassKind:
   /** NonVertical is `\V` class. */
   case object NonVertical extends EscapeClassKind
 
+  /** Lower is Boost.Regex's `\l` class, which is `[[:lower:]]`. */
+  case object Lower extends EscapeClassKind
+
+  /** NonLower is Boost.Regex's `\L` class. */
+  case object NonLower extends EscapeClassKind
+
+  /** Upper is Boost.Regex's `\u` class, which is `[[:upper:]]`. */
+  case object Upper extends EscapeClassKind
+
+  /** NonUpper is Boost.Regex's `\U` class. */
+  case object NonUpper extends EscapeClassKind
+
   /** HexDigit is `\h` class. */
   case object HexDigit extends EscapeClassKind
 

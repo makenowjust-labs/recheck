@@ -51,6 +51,12 @@ object LineTerminatorSet:
   val ICU: LineTerminatorSet =
     LineTerminatorSet(Set(0x0a, 0x0b, 0x0c, 0x0d, 0x85, 0x2028, 0x2029), CRLF.Atomic)
 
+  /** BoostRegexChar is the line terminators of Boost.Regex over `char`, which have FF too. */
+  val BoostRegexChar: LineTerminatorSet = LineTerminatorSet(Set(0x0a, 0x0c, 0x0d), CRLF.Atomic)
+
+  /** BoostRegexU32 is the line terminators of Boost.Regex's `u32regex`. */
+  val BoostRegexU32: LineTerminatorSet = LineTerminatorSet(Set(0x0a, 0x0c, 0x0d, 0x85, 0x2028, 0x2029), CRLF.Atomic)
+
   /** ICUComment is the line terminators ending a `#` comment of ICU's `x`, which do not have U+2029. */
   val ICUComment: LineTerminatorSet = LineTerminatorSet(Set(0x0a, 0x0d, 0x85, 0x2028), CRLF.Ignored)
 

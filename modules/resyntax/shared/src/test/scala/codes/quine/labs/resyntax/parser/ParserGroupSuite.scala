@@ -139,3 +139,20 @@ class ParserGroupSuite extends munit.FunSuite with ParserHelper:
   error("(?<é>a)", "", PythonRegex(Python.Type.Bytes))("Invalid identifier at 3")
   check("(?|(a)|(b))", "", PythonRegex()):
     Command(BranchReset(Group(IndexedCapture, Literal('a')), Group(IndexedCapture, Literal('b'))))
+
+  // Boost.Regex's group name is any characters before its end, even none (Boost.Regex 1.92.0).
+  check("(?<1-a>x)(?'b c'y)(?<>z)", "", BoostRegex()):
+    Sequence(
+      Group(NamedCapture(Angle, "1-a"), Literal('x')),
+      Group(NamedCapture(Quote, "b c"), Literal('y')),
+      Group(NamedCapture(Angle, ""), Literal('z'))
+    )
+  check("(?P>n)", "", BoostRegex())(Command(PNamedCall("n")))
+  // A look-ahead or an atomic group that matches nothing is an error, but `(?!)` and a look-behind are not.
+  error("(?=)", "", BoostRegex())("Invalid or empty zero width assertion at 0")
+  error("(?>(?#c)\\Q\\E)", "", BoostRegex())("Invalid or empty zero width assertion at 0")
+  check("(?!)(?<=)", "", BoostRegex()):
+    Sequence(Group(NegativeLookAhead(Symbolic), Sequence()), Group(PositiveLookBehind(Symbolic), Sequence()))
+  error("(?P<n>x)", "", BoostRegex())("Invalid group at 3")
+  error("(?P=n)", "", BoostRegex())("Invalid group at 3")
+  error("(?<n", "", BoostRegex())("Invalid identifier at 4")
