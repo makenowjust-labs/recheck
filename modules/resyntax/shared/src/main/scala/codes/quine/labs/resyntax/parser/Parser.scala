@@ -1694,16 +1694,27 @@ private[parser] final class Parser(
   private def metaControlValue(value: Int): Int =
     if value == '?' then 0x7f else value & 0x9f
 
+  /** Parses the character after Ruby's `\c`, `\C-` or `\M-`, which Ruby reads before Onigmo.
+    *
+    * Ruby takes only a character or an escape of a byte there (`read_escaped_byte` in `re.c`), so not `\u` (e.g.
+    * `\C-\u{41}`).
+    */
   private def parseMetaControlTarget(): Int =
     assert(!isEnd, "Invalid backslash escape")
     if currentChar == '\\' then
       val save = offset
       next()
       parseBackslashKind() match
-        // Ruby rejects `\u` here (e.g. `\C-\u{41 42}`), and so does the parser for several code points.
-        case _ if pendingUnicodeList.isDefined  => fail("Invalid backslash escape", save)
-        case kind: BackslashKind.BackslashValue => kind.value
-        case _                                  => fail("Invalid backslash escape", save)
+        case kind @ BackslashKind.Escape(EscapeStyle.Single('\\' | 'n' | 't' | 'r' | 'f' | 'v' | 'a' | 'e'), _, _) =>
+          kind.value
+        case kind @ BackslashKind.Escape(
+              EscapeStyle.BareOctal | EscapeStyle.Hex2 | EscapeStyle.Hex1 | EscapeStyle.Control(_) |
+              EscapeStyle.ControlDash | EscapeStyle.Meta,
+              _,
+              _
+            ) =>
+          kind.value
+        case _ => fail("Invalid backslash escape", save)
     else
       assert(currentChar < 0x80, "Invalid backslash escape")
       val char = currentChar
@@ -2546,10 +2557,16 @@ private[parser] final class Parser(
   private def parseClassItemAtom(seq: mutable.Builder[ClassItem, Seq[ClassItem]], unionStart: Int): Unit =
     val start = offset
     val item = parseClassItemNonRange()
-    if isSkippableInClassRange(item) then
-      seq.addOne(item)
-      return
+    if isSkippableInClassRange(item) then seq.addOne(item)
+    else parseClassRange(seq, unionStart, start, item)
 
+  /** Parses a range from the item if `-` follows it, and adds the items to the union. */
+  private def parseClassRange(
+      seq: mutable.Builder[ClassItem, Seq[ClassItem]],
+      unionStart: Int,
+      start: Int,
+      item: ClassItem
+  ): Unit =
     val skippedBeforeHyphen = parseClassBlank().toSeq ++ parseClassItemsSkippableInRange(unionStart)
     if isClassItemStop(unionStart) || currentChar != '-' then
       seq.addOne(item).addAll(skippedBeforeHyphen)
@@ -2565,10 +2582,10 @@ private[parser] final class Parser(
       seq.addOne(item).addAll(skippedBeforeHyphen)
       return
 
-    val (beforeBegin, begin) = (quotedValue(item), classQuoteLiterals(item)) match
-      case (Some(value), _)                            => (Seq.empty, value)
-      case (None, Some(literals)) if literals.nonEmpty => (literals.init, literals.last)
-      case _                                           => (Seq.empty, item)
+    val (beforeBegin, begin) = (quotedValue(item), classRangeItems(item)) match
+      case (Some(value), _)                      => (Seq.empty, value)
+      case (None, Some(items)) if items.nonEmpty => (items.init, items.last)
+      case _                                     => (Seq.empty, item)
 
     skipClassComment()
     var endItem = parseClassItemNonRange()
@@ -2582,19 +2599,30 @@ private[parser] final class Parser(
       seq.addOne(item).addAll(skippedBeforeHyphen)
       return
 
-    val (end, afterEnd) = (quotedValue(endItem), classQuoteLiterals(endItem)) match
-      case (Some(value), _)                            => (value, Seq.empty)
-      case (None, Some(literals)) if literals.nonEmpty => (literals.head, literals.tail)
-      case _                                           => (endItem, Seq.empty)
+    val (end, afterEnd) = (quotedValue(endItem), classRangeItems(endItem)) match
+      case (Some(value), _)                      => (value, Seq.empty)
+      case (None, Some(items)) if items.nonEmpty => (items.head, items.tail)
+      case _                                     => (endItem, Seq.empty)
 
     (begin, end) match
       case (begin: ClassItem.Value, end: ClassItem.Value) =>
         assert(begin.data.value <= end.data.value, "Out of order class range", begin.loc.start)
-        seq.addAll(beforeBegin)
-        seq.addOne(ClassItem(ClassItemData.ClassRange(begin, end), SourceLocation(begin.loc.start, end.loc.end)))
-        // The `\E` inside a range is kept after it, and the blanks and the empty quotes are dropped.
-        seq.addAll((skippedBeforeHyphen ++ skippedAfterHyphen).filterNot(i => isClassBlank(i) || isEmptyClassQuote(i)))
-        seq.addAll(afterEnd)
+        val range = ClassItem(ClassItemData.ClassRange(begin, end), SourceLocation(begin.loc.start, end.loc.end))
+        (item.data, endItem.data) match
+          // The last escape of Ruby's `\u{...}` at the end of a range may begin another (e.g. `B-z` of `[0-\u{41 42}-z]`).
+          case (_, _: ClassItemData.ClassUnicodeList) =>
+            val list = joinClassUnicodeLists(item, beforeBegin ++ (range +: afterEnd), endItem)
+            parseClassRange(seq, unionStart, start, list)
+          case (_: ClassItemData.ClassUnicodeList, _) =>
+            seq.addOne(joinClassUnicodeLists(item, beforeBegin :+ range, endItem))
+          case _ =>
+            seq.addAll(beforeBegin)
+            seq.addOne(range)
+            // The `\E` inside a range is kept after it, and the blanks and the empty quotes are dropped.
+            seq.addAll(
+              (skippedBeforeHyphen ++ skippedAfterHyphen).filterNot(i => isClassBlank(i) || isEmptyClassQuote(i))
+            )
+            seq.addAll(afterEnd)
       case _ =>
         if !isValueClassItem(begin) then
           if !isClassNestItem(begin) then assert(featureSet.allowsBrokenClassRangeBegin, "Invalid class range", start)
@@ -2636,6 +2664,22 @@ private[parser] final class Parser(
     item.data match
       case ClassItemData.ClassCaseRegion(_, parts, _) => Some(parts.map(_.value))
       case _                                          => None
+
+  /** Returns the items that a range takes an end from: the literals of a quote, or the items of Ruby's `\u{...}`, which
+    * Ruby expands before reading the class (e.g. `[\u{41 42}-z]` is `[\x41\x42-z]`).
+    */
+  private def classRangeItems(item: ClassItem): Option[Seq[ClassItem]] = item.data match
+    case ClassItemData.ClassUnicodeList(items, _) => Some(items)
+    case _                                        => classQuoteLiterals(item)
+
+  /** Returns Ruby's `\u{...}` of the items made of a range between `left` and `right`, one of which is a list at least.
+    */
+  private def joinClassUnicodeLists(left: ClassItem, items: Seq[ClassItem], right: ClassItem): ClassItem =
+    val texts = Seq(left.data, right.data).collect:
+      case ClassItemData.ClassUnicodeList(items, written) => written.getOrElse(PlainText.classUnicodeList(items))
+    val text = texts.mkString("-\\u")
+    val written = Option.when(text != PlainText.classUnicodeList(items))(text)
+    ClassItem(ClassItemData.ClassUnicodeList(items, written), SourceLocation(items.head.loc.start, items.last.loc.end))
 
   /** Returns the value of a quote of one character, with the quote as its form at an end of a range (e.g. `\Qa\E`). */
   private def quotedValue(item: ClassItem): Option[ClassItem.Value] = item.data match

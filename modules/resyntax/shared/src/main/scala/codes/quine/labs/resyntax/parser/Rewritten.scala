@@ -224,7 +224,7 @@ private[parser] final class Rewritten(
     case ClassItemData.ClassIntersection(l, r) =>
       ClassItemData.ClassIntersection(relocateClassChild(l, scope), relocateClassChild(r, scope))
     case ClassItemData.ClassNest(invert, item) => ClassItemData.ClassNest(invert, relocateClassChild(item, scope))
-    case data: ClassItemData.ClassUnicodeList  => data.copy(items = data.items.map(relocateValue))
+    case data: ClassItemData.ClassUnicodeList  => data.copy(items = data.items.map(relocateClassChild(_, scope)))
     case data: ClassItemData.ClassCaseRegion   =>
       data.copy(parts = data.parts.map(part => part.copy(value = relocateClassChild(part.value, scope))))
     case data => data

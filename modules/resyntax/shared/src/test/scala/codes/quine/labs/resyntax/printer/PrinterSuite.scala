@@ -123,11 +123,12 @@ class PrinterSuite extends munit.FunSuite:
     checkPlain(Sequence(Backslash(Escape(BareOctal, 1)), Literal('1')), "", Java)("\\00011")
     val ruby = Sequence(
       Backslash(Escape(ControlDash, 0x7f)),
+      Backslash(Escape(Control('\\'), 0x7f)),
       Backslash(Escape(Control('\\'), 0x81)),
       Backslash(Escape(Meta, 0xe1)),
       Backslash(Escape(Meta, 0x81))
     )
-    checkPlain(ruby, "", Ruby())("\\C-\\?\\c\\x81\\M-\\x61\\M-\\x01")
+    checkPlain(ruby, "", Ruby())("\\C-\\x3F\\c\\x3F\\c\\x81\\M-\\x61\\M-\\x01")
     checkPlain(Repeat(Literal('a'), Bounded(1, 3, Lazy)), "", PCRE)("a{1,3}?")
     checkPlain(Repeat(Literal('a'), Unbounded(2, Possessive)), "", PCRE)("a{2,}+")
     val diff = FlagSetDiff(FlagSet(ignoreCase = true, multiline = true), Some(FlagSet(verbose = true)))
@@ -164,6 +165,18 @@ class PrinterSuite extends munit.FunSuite:
     checkPlain(Class(false, ClassUnicodeList(items)), "", Ruby())("[\\u{41 42}]")
     val message = "A Unicode list has a node other than an escape: Node(Dot,SourceLocation(-1,-1))"
     interceptMessage[IllegalArgumentException](message)(print(UnicodeList(Seq(Node(Dot), nodes.last)), "", Ruby()))
+
+  test("Printer.print: Ruby's `\\u{...}` in a class is written with the values of the ranges at its ends"):
+    val Seq(zero, one, a, b) =
+      Seq(0x30, 0x31, 0x41, 0x42).map(value => ClassItem.Value(ClassBackslashValue(Escape(UnicodeBracket, value))))
+    val (literalZero, z) = (ClassItem.Value(ClassLiteral('0')), ClassItem.Value(ClassLiteral('z')))
+    val ends = ClassUnicodeList(Seq(ClassItem(ClassRange(literalZero, a)), ClassItem(ClassRange(b, z))))
+    checkPlain(Class(false, ends), "", Ruby())("[0-\\u{41 42}-z]")
+    val joined = ClassUnicodeList(Seq(zero, ClassItem(ClassRange(one, a)), b))
+    checkPlain(Class(false, joined), "", Ruby())("[\\u{30 31}-\\u{41 42}]")
+    val message = "A Unicode list has an item other than a value or a range: NonValue(ClassBackslashClass(Digit),"
+    interceptMessage[IllegalArgumentException](s"${message}SourceLocation(-1,-1))"):
+      print(Class(false, ClassUnicodeList(Seq(a, ClassItem(ClassBackslashClass(Digit))))), "", Ruby())
 
   // The extended mode keeps its blanks, but not the ones in a construct.
   check(" a # b\n\tc", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(" a # b\n\tc")

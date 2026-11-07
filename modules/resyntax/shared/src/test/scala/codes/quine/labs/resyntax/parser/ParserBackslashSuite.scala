@@ -29,6 +29,12 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
 
   val escapeB: Node = Node(Backslash(Escape(UnicodeBracket, 0x42)))
 
+  /** Returns the item of an escape of Ruby's `\u{...}` in a class. */
+  def classEscape(value: Int): ClassItem.Value = ClassItem.Value(ClassBackslashValue(Escape(UnicodeBracket, value)))
+
+  /** Returns the range of the class items. */
+  def classRange(begin: ClassItem.Value, end: ClassItem.Value): ClassItem = ClassItem(ClassRange(begin, end))
+
   // Java skips whitespace and comments in an escape except right after the backslash (checked with Java 27.0.1).
   // They are kept in the escapes of values, but not in the others.
   checkPrinted("\\p {L}", "\\p{L}", "x", Java)(Backslash(EscapeClass(UnicodeProperty("L"))))
@@ -257,11 +263,45 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   // Ruby expands `\u{...}` of several code points into their escapes before reading the pattern.
   check("\\u{41 42}", "", Ruby())(UnicodeList(Seq(escapeA, escapeB)))
   check("\\u{ 41  42 }", "", Ruby())(UnicodeList(Seq(escapeA, escapeB), Some("{ 41  42 }")))
-  check("[\\u{41 42}]", "", Ruby()):
-    val items = Seq(0x41, 0x42).map(value => ClassItem.Value(ClassBackslashValue(Escape(UnicodeBracket, value))))
-    Class(false, ClassUnicodeList(items))
+  check("[\\u{41 42}]", "", Ruby())(Class(false, ClassUnicodeList(Seq(classEscape(0x41), classEscape(0x42)))))
   check("(\\u{41 42})", "", Ruby())(Group(IndexedCapture, UnicodeList(Seq(escapeA, escapeB))))
+  // Ruby reads `\c`, `\C-` and `\M-` before the expansion, and takes only the escapes of a byte after them.
   error("\\C-\\u{41 42}", "", Ruby())("Invalid backslash escape at 3")
+  error("\\C-\\u{41}", "", Ruby())("Invalid backslash escape at 3")
+  error("\\c\\u{41}", "", Ruby())("Invalid backslash escape at 2")
+  error("\\M-\\u{41}", "", Ruby())("Invalid backslash escape at 3")
+  error("[\\C-\\u{41}]", "", Ruby())("Invalid backslash escape at 4")
+  error("\\C-\\u0041", "", Ruby())("Invalid backslash escape at 3")
+  error("\\C-\\.", "", Ruby())("Invalid backslash escape at 3")
+  error("[\\C-\\b]", "", Ruby())("Invalid backslash escape at 4")
+  check("\\C-\\t\\M-\\101", "", Ruby()):
+    Sequence(Backslash(Escape(ControlDash, 0x09, Some("\\t"))), Backslash(Escape(Meta, 0xc1, Some("\\101"))))
+  // A range in a class takes the escape at an end of the list.
+  check("[\\u{41 42}-z]", "", Ruby()):
+    val z = ClassItem.Value(ClassLiteral('z'))
+    Class(false, ClassUnicodeList(Seq(classEscape(0x41), classRange(classEscape(0x42), z))))
+  check("[A-\\u{41 42}]", "", Ruby()):
+    val a = ClassItem.Value(ClassLiteral('A'))
+    Class(false, ClassUnicodeList(Seq(classRange(a, classEscape(0x41)), classEscape(0x42))))
+  check("[0-\\u{41 42}-z]", "", Ruby()):
+    val (zero, z) = (ClassItem.Value(ClassLiteral('0')), ClassItem.Value(ClassLiteral('z')))
+    Class(false, ClassUnicodeList(Seq(classRange(zero, classEscape(0x41)), classRange(classEscape(0x42), z))))
+  check("[\\u{30 31}-\\u{41  42}]", "", Ruby()):
+    val items = Seq(classEscape(0x30), classRange(classEscape(0x31), classEscape(0x41)), classEscape(0x42))
+    Class(false, ClassUnicodeList(items, Some("{30 31}-\\u{41  42}")))
+  check("[\\u{30 31}-\\u{41 42}-\\u{43 44}]", "", Ruby()):
+    val ranges = Seq(classRange(classEscape(0x31), classEscape(0x41)), classRange(classEscape(0x42), classEscape(0x43)))
+    Class(false, ClassUnicodeList(classEscape(0x30) +: ranges :+ classEscape(0x44)))
+  check("[[a]-\\u{41 42}-D]", "", Ruby()):
+    val list =
+      ClassUnicodeList(Seq(classEscape(0x41), classRange(classEscape(0x42), ClassItem.Value(ClassLiteral('D')))))
+    Class(false, ClassUnion(ClassNest(false, ClassLiteral('a')), ClassLiteral('-'), list))
+  check("[\\u{41 42}-[a]]", "", Ruby()):
+    val list = ClassUnicodeList(Seq(classEscape(0x41), classEscape(0x42)))
+    Class(false, ClassUnion(list, ClassLiteral('-'), ClassNest(false, ClassLiteral('a'))))
+  error("[a-\\u{41 42}]", "", Ruby())("Out of order class range at 1")
+  error("[\\u{41 42}-\\w]", "", Ruby())("Invalid class range at 1")
+  error("[\\w-\\u{41 42}]", "", Ruby())("Invalid class range at 1")
   // So a quantifier after it repeats the last code point.
   check("\\u{41 42}*", "", Ruby()):
     UnicodeList(Seq(escapeA, Node(Repeat(escapeB, Star(Greedy)))))

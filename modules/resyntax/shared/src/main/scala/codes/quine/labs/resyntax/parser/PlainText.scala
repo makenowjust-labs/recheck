@@ -1,5 +1,9 @@
 package codes.quine.labs.resyntax.parser
 
+import scala.collection.mutable
+
+import codes.quine.labs.resyntax.ast.ClassItem
+import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.EscapeStyle
 import codes.quine.labs.resyntax.ast.FlagSetDiff
 
@@ -11,6 +15,23 @@ private[resyntax] object PlainText:
 
   /** Returns the text of the code points after `\u` of Ruby's `\u{...}` (e.g. `{41 42}`). */
   def unicodeList(values: Seq[Int]): String = values.map(value => f"$value%X").mkString("{", " ", "}")
+
+  /** Returns the text of the lists after the first `\u` of Ruby's `\u{...}` in a class (e.g. `{30 31}-\u{41 42}`).
+    *
+    * The ranges at the ends of the items take a value beside the lists, and a range in the middle joins two lists (see
+    * [[ClassItemData.ClassUnicodeList]]).
+    */
+  def classUnicodeList(items: Seq[ClassItem]): String =
+    val lists = mutable.ListBuffer(mutable.ListBuffer.empty[Int])
+    for (item, i) <- items.zipWithIndex do
+      item match
+        case ClassItem.Value(data, _, _)                                 => lists.last += data.value
+        case ClassItem.NonValue(ClassItemData.ClassRange(begin, end), _) =>
+          if i > 0 then lists.last += begin.data.value
+          if i > 0 && i < items.size - 1 then lists += mutable.ListBuffer.empty
+          if i < items.size - 1 then lists.last += end.data.value
+        case _ => throw new IllegalArgumentException(s"A Unicode list has an item other than a value or a range: $item")
+    lists.map(list => unicodeList(list.toSeq)).mkString("-\\u")
 
   /** Returns the text of the value after the letters of an escape (e.g. `7F` after `\x`). */
   def escape(style: EscapeStyle, value: Int, featureSet: FeatureSet): String = style match

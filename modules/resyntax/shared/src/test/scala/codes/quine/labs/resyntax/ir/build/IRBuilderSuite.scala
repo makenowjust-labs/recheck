@@ -412,6 +412,10 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("x\\u{41 42}*", "", Ruby())(Sequence(char('x'), char('A'), Repeat(char('B'), Unbounded(0, Greedy))))
   check("(\\u{41 42})", "", Ruby())(Capture(1, None, Sequence(char('A'), char('B'))))
   check("[x\\u{41 42}]", "", Ruby())(Chars(CharSet.of('A', 'B', 'x')))
+  check("[\\u{41 42}-D]", "", Ruby())(Chars(CharSet.range('A', 'D')))
+  check("[\\u{30 31}-\\u{41 42}&&\\u{31 32}]", "", Ruby())(Chars(CharSet.of('1', '2')))
+  // The escapes of bytes make a character with the escapes of `\u{...}` beside them (e.g. `é-é` and `ê`).
+  check("[\\xC3\\xA9-\\u{E9 EA}]", "", Ruby())(Chars(CharSet.range(0xe9, 0xea)))
 
   // Quoting and case commands are their nodes, and a quantifier after `\E` repeats the last one.
   check("\\Qa\\E", "", Java, PCRE, Perl())(char('a'))

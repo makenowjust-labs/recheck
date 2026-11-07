@@ -6,8 +6,8 @@ sealed abstract class EscapeStyle extends Product with Serializable:
   def plainText(value: Int): String = this match
     case EscapeStyle.Single(_)     => ""
     case EscapeStyle.Control(char) => char.toString
-    // Ruby takes `?` after `\C-` as DEL, and the value of any other character without its bits 0x60.
-    case EscapeStyle.ControlDash => if value == 0x7f then "\\?" else f"\\x$value%02X"
+    // Ruby takes `?` after `\C-` as DEL, also as `\x3F`, and the value of any other character without its bits 0x60.
+    case EscapeStyle.ControlDash => if value == 0x7f then "\\x3F" else f"\\x$value%02X"
     case EscapeStyle.Meta        => f"\\x${value & 0x7f}%02X"
     case EscapeStyle.Octal       => s"{${Integer.toOctalString(value)}}"
     // Three digits keep a following digit apart.

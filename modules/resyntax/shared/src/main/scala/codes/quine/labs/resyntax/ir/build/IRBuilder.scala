@@ -145,9 +145,14 @@ object IRBuilder:
       ClassItem(ClassItemData.ClassNest(invert, stripClassSource(inner)), item.loc)
     case _ => item
 
-  /** Returns the items where a case region is its items, without the blanks. */
+  /** Returns the items where Ruby's `\u{...}` and a case region are their items, without the blanks.
+    *
+    * The escapes of Ruby's `\u{...}` are among the items beside it, with which Ruby's escapes of bytes make a character
+    * (e.g. `\xC3\xA9` of `[\xC3\xA9-\u{E9 EA}]`).
+    */
   private def expandClassItems(items: Seq[ClassItem]): Seq[ClassItem] = items.flatMap: item =>
     item.data match
+      case ClassItemData.ClassUnicodeList(items, _)   => items
       case ClassItemData.ClassCaseRegion(_, parts, _) => expandClassItems(parts.map(_.value))
       case ClassItemData.ClassBlank(_)                => Seq.empty
       case _                                          => Seq(item)

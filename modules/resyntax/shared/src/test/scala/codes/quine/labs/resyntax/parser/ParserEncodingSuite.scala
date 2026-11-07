@@ -129,11 +129,12 @@ class ParserEncodingSuite extends munit.FunSuite with ParserHelper:
     error("\\u{41 e9}", flags, dialect)("Incompatible character encoding at 6")
     check("\\u0041", flags, dialect)(Backslash(Escape(EscapeStyle.UnicodeHex4, 0x41)))
     check("\\xff", flags, dialect)(Backslash(Escape(EscapeStyle.Hex2, 0xff, Some("ff"))))
-    check("é\\u{41 42}[\\u{41 42}]", flags, dialect):
+    check("é\\u{41 42}[\\u{41 42}-z]", flags, dialect):
       val escapes = Seq(0x41, 0x42).map(value => Escape(EscapeStyle.UnicodeBracket, value))
       val list = UnicodeList(escapes.map(escape => Node(Backslash(escape))))
-      val items = escapes.map(escape => ClassItem.Value(ClassBackslashValue(escape)))
-      Sequence(Literal(0xc3), Literal(0xa9), list, Class(false, ClassUnicodeList(items)))
+      val Seq(a, b) = escapes.map(escape => ClassItem.Value(ClassBackslashValue(escape)))
+      val range = ClassItem(ClassRange(b, ClassItem.Value(ClassLiteral('z'))))
+      Sequence(Literal(0xc3), Literal(0xa9), list, Class(false, ClassUnicodeList(Seq(a, range))))
   check("a\u00e9", "", Ruby())(Sequence(Literal('a'), Literal(0xe9)))
   check("\\u00e9", "", Ruby())(Backslash(Escape(EscapeStyle.UnicodeHex4, 0xe9, Some("00e9"))))
 
@@ -168,3 +169,7 @@ class ParserEncodingSuite extends munit.FunSuite with ParserHelper:
     val ClassItem.NonValue(ClassNest(false, digit), nest) = right: @unchecked
     assertEquals(nest, SourceLocation(4, 8))
     assertEquals(digit.loc, SourceLocation(5, 7))
+    val Sequence(Seq(_, _, Node(Class(false, ClassItem.NonValue(ClassUnicodeList(Seq(_, range), _), list)), _))) =
+      parse("é[\\u{41 42}-z]", "", RubyBytes).data: @unchecked
+    assertEquals(list, SourceLocation(2, 13))
+    assertEquals(range.loc, SourceLocation(2, 13))

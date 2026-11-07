@@ -549,14 +549,27 @@ private[printer] final class Printer(featureSet: FeatureSet):
       writeRangeEnd(begin)
       write("-")
       writeRangeEnd(end)
-    case ClassItemData.ClassCaseCommand(kind)           => write(printCaseCommand(kind))
-    case ClassItemData.ClassBackslashClass(klass)       => writeEscapeClass(klass)
-    case ClassItemData.ClassBackslashValue(kind)        => writeBackslashValue(kind)
-    case ClassItemData.ClassLiteral(value)              => writeValue(value)
-    case ClassItemData.ClassBlank(text)                 => write(text)
-    case ClassItemData.ClassUnicodeList(items, written) =>
-      write(s"\\u${written.getOrElse(PlainText.unicodeList(items.map(_.data.value)))}")
+    case ClassItemData.ClassCaseCommand(kind)                  => write(printCaseCommand(kind))
+    case ClassItemData.ClassBackslashClass(klass)              => writeEscapeClass(klass)
+    case ClassItemData.ClassBackslashValue(kind)               => writeBackslashValue(kind)
+    case ClassItemData.ClassLiteral(value)                     => writeValue(value)
+    case ClassItemData.ClassBlank(text)                        => write(text)
+    case ClassItemData.ClassUnicodeList(items, written)        => writeClassUnicodeList(items, written)
     case ClassItemData.ClassCaseRegion(kind, parts, regionEnd) => writeClassCaseRegion(kind, parts, regionEnd)
+
+  /** Writes Ruby's `\u{...}` in a class, with the values of the ranges at its ends beside it. */
+  private def writeClassUnicodeList(items: Seq[ClassItem], written: Option[String]): Unit =
+    items.head match
+      case ClassItem.NonValue(ClassItemData.ClassRange(begin, _), _) =>
+        writeRangeEnd(begin)
+        write("-")
+      case _ => ()
+    write(s"\\u${written.getOrElse(PlainText.classUnicodeList(items))}")
+    items.last match
+      case ClassItem.NonValue(ClassItemData.ClassRange(_, end), _) =>
+        write("-")
+        writeRangeEnd(end)
+      case _ => ()
 
   /** Writes an end of a range, in the command of its form if it has one. */
   private def writeRangeEnd(item: ClassItem.Value): Unit = item.caseForm match
