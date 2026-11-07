@@ -9,7 +9,7 @@ import TabItem from "@theme/TabItem";
 Describes the regular expression dialects that `recheck` supports, and what is common to all of them.
 
 Each dialect has its own page on how it is checked:
-[JavaScript](dialects/javascript.mdx) / [Python](dialects/python.mdx) / [Python regex](dialects/python-regex.mdx) / [Ruby](dialects/ruby.mdx) / [Java](dialects/java.mdx) / [.NET](dialects/dotnet.mdx) / [Perl](dialects/perl.mdx) / [PCRE](dialects/pcre.mdx).
+[JavaScript](dialects/javascript.mdx) / [Python](dialects/python.mdx) / [Python regex](dialects/python-regex.mdx) / [Ruby](dialects/ruby.mdx) / [Java](dialects/java.mdx) / [.NET](dialects/dotnet.mdx) / [Perl](dialects/perl.mdx) / [PCRE](dialects/pcre.mdx) / [ICU](dialects/icu.mdx).
 
 ## Choosing a Dialect
 
@@ -71,6 +71,7 @@ The ESLint plugin (`eslint-plugin-redos`) checks JavaScript regular expressions 
 | [`dotnet`](dialects/dotnet.mdx)             | .NET 10 `System.Text.RegularExpressions.Regex` | `utf16`                                            |
 | [`perl`](dialects/perl.mdx)                 | Perl 5.44 regular expressions                  | `code-point` (`utf8`), or `byte` (no `utf8`)       |
 | [`pcre`](dialects/pcre.mdx)                 | PCRE2 10.49 as PHP's `preg_*` functions use it | `byte`, or `scalar-value` with `u` or `(*UTF)`     |
+| [`icu`](dialects/icu.mdx)                   | ICU4C 79.1 regular expressions                 | `utf16-code-point`                                 |
 
 ## Matching Units
 
@@ -125,7 +126,7 @@ Most engines have optimizations that make some vulnerable patterns fast, and `re
 
 The following is what we measured with `^(a|a)*$` against `'a'.repeat(n) + '!'`.
 
-- V8 (Node.js 26) and Python 3.15 take exponential time: about 2 seconds for `n = 24`.
+- V8 (Node.js 26), Python 3.15 and ICU 79.1 take exponential time: about 1 to 2 seconds for `n = 24`.
 - Ruby 4.0, Java 27, .NET 10 and Perl 5.44 finish in less than 1 ms even for `n = 28`.
 - PHP 8.5 (PCRE2 10.49 with the default `pcre.backtrack_limit`) gives up with the backtrack limit error for `n = 20`.
 
@@ -134,10 +135,10 @@ So `recheck` reports `^(a|a)*$` as vulnerable in every dialect, but the attack i
 
 The following approximations are common to the dialects.
 
-- The Unicode data (properties, case mappings) is of Unicode 18.0, while the engines other than the `regex` package of Python use Unicode 16 or 17.
+- The Unicode data (properties, case mappings) is of Unicode 18.0, while the engines other than ICU 79.1 and the `regex` package of Python use Unicode 16 or 17.
 - The automaton checker handles look-aheads, look-behinds, atomic groups, possessive quantifiers and conditionals on look-arounds.
   It handles back-references too, when the groups they refer to match at most `maxBackReferenceStrings` strings together, the pattern has no look-behind, and no look-around, atomic group or conditional has the groups (not in Perl; in Ruby, neither a reference to a name shared by groups nor a case-insensitive one; and in python-regex, no repetition that may match the empty string has the groups).
   The following are handled by the fuzz checker, which may show that the pattern is safe by an upper bound of its matching time without fuzzing:
   - non-atomic look-arounds, the other back-references, conditionals on groups, and the backtracking control verbs other than `(*FAIL)` and `(*MARK)`,
   - in a look-behind, an assertion that looks at more than the kinds of the characters next to it (e.g. Java's `\b`, and `$` in .NET and Python) and a look-ahead, and
-  - in a look-behind that the engine matches forward from its possible starts (Java, PCRE, Perl and Python), an atomic group, a possessive quantifier, and an unbounded repetition (only Java allows it, e.g. `(?<=a*b)`).
+  - in a look-behind that the engine matches forward from its possible starts (ICU, Java, PCRE, Perl and Python), an atomic group, a possessive quantifier, and an unbounded repetition (only Java allows it, e.g. `(?<=a*b)`).

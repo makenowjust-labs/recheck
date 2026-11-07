@@ -32,6 +32,7 @@ const sidebars = {
             "usage/dialects/dotnet",
             "usage/dialects/perl",
             "usage/dialects/pcre",
+            "usage/dialects/icu",
           ],
         },
         "usage/runtime-attack-verification",

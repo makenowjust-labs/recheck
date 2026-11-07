@@ -96,6 +96,7 @@ The `attack` field also has these fields.
   | `dotnet`       | C#         | `string.Concat(Enumerable.Repeat("a", 31)) + "あ"` (`System.Linq`)                |
   | `perl`         | Perl       | `"a" x 31 . "\x{3042}"`                                                           |
   | `pcre`         | PHP        | `str_repeat('a', 31) . '!'`                                                       |
+  | `icu`          | Java       | `"a".repeat(31) + "あ"`                                                           |
 
   The character that stands for a set of characters (here `あ` for the characters other than `a`) follows the [`alphabetRepresentative`](parameters.mdx#alphabetrepresentative) parameter.
 
