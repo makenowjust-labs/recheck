@@ -292,6 +292,7 @@ export type AttackPattern = {
    * - `perl`: `"a" x 31 . "\x{3042}"`
    * - `pcre`: `str_repeat('a', 31) . '!'` (PHP)
    * - `icu`: the same as `java`
+   * - `boost-regex`: the same as `python`, where `bytes` are for `char`
    */
   pattern: string;
 };

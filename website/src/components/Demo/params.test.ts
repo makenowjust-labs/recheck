@@ -127,6 +127,7 @@ describe("paramsOf", () => {
     expect(names("python")).toContain("dialectType");
     expect(names("python")).not.toContain("dialectEncoding");
     expect(names("python-regex")).toContain("dialectType");
+    expect(names("boost-regex")).toContain("dialectType");
     expect(names("ruby")).toContain("dialectEncoding");
     expect(names("perl")).toEqual(
       expect.arrayContaining(["dialectUtf8", "dialectSource"]),
@@ -148,6 +149,7 @@ describe("selectValues", () => {
       "ruby",
       "perl",
       "icu",
+      "boost-regex",
     ]);
     expect(selectValues(param("dialectEncoding"), "ruby")).toEqual([
       "UTF-8",
@@ -157,6 +159,10 @@ describe("selectValues", () => {
     expect(selectValues(param("dialectType"), "python")).toEqual([
       "str",
       "bytes",
+    ]);
+    expect(selectValues(param("dialectType"), "boost-regex")).toEqual([
+      "char",
+      "u32regex",
     ]);
     expect(selectValues(param("dialectSource"), "perl")).toEqual([
       "literal",
@@ -181,7 +187,10 @@ describe("titleOf", () => {
     expect(titleOf(param("dialectType"), "python-regex")).toBe(
       "Python regex Type",
     );
-    expect(titleOf(param("timeout"), "python-regex")).toBe("Timeout");
+    expect(titleOf(param("dialectType"), "boost-regex")).toBe(
+      "Boost.Regex Type",
+    );
+    expect(titleOf(param("timeout"), "boost-regex")).toBe("Timeout");
   });
 });
 

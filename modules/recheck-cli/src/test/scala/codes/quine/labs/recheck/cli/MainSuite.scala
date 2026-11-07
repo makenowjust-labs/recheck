@@ -116,6 +116,16 @@ class MainSuite extends munit.FunSuite:
       Right(Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.ICU), json = false))
     )
     assertEquals(
+      Main.command.parse(Seq("/foo/", "--dialect=boost-regex", "--boost-regex-type=u32regex")),
+      Right(
+        Main.CheckAction(
+          InputPattern("foo", ""),
+          Parameters(dialect = Dialect.BoostRegex(Dialect.BoostRegex.Type.U32Regex)),
+          json = false
+        )
+      )
+    )
+    assertEquals(
       Main.command.parse(Seq("/foo/", "--dialect=python")),
       Right(
         Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Python()), json = false)

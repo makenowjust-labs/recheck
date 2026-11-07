@@ -93,6 +93,7 @@ given encodeDialect: Encoder[Dialect] with
     val settings = d match
       case Dialect.Python(tpe)        => Seq("type" := tpe.name)
       case Dialect.PythonRegex(tpe)   => Seq("type" := tpe.name)
+      case Dialect.BoostRegex(tpe)    => Seq("type" := tpe.name)
       case Dialect.Ruby(encoding)     => Seq("encoding" := encoding.name)
       case Dialect.Perl(utf8, source) => Seq("utf8" := utf8, "source" := source.name)
       case _                          => Seq.empty
@@ -122,10 +123,10 @@ given decodeDialect: Decoder[Dialect] with
               case Some(dialect) =>
                 val keys = c.keys.toSeq.flatten.filter(_ != "name")
                 val allowed = dialect match
-                  case _: Dialect.Python | _: Dialect.PythonRegex => Seq("type")
-                  case _: Dialect.Ruby                            => Seq("encoding")
-                  case _: Dialect.Perl                            => Seq("utf8", "source")
-                  case _                                          => Seq.empty
+                  case _: Dialect.Python | _: Dialect.PythonRegex | _: Dialect.BoostRegex => Seq("type")
+                  case _: Dialect.Ruby                                                    => Seq("encoding")
+                  case _: Dialect.Perl                                                    => Seq("utf8", "source")
+                  case _                                                                  => Seq.empty
                 keys.find(!allowed.contains(_)) match
                   case Some(key) => fail(s"Unknown setting of $name: $key")
                   case None      =>
@@ -134,6 +135,8 @@ given decodeDialect: Decoder[Dialect] with
                         setting(python, "type", python.`type`)(Dialect.Python.Type.of).map(Dialect.Python(_))
                       case python: Dialect.PythonRegex =>
                         setting(python, "type", python.`type`)(Dialect.Python.Type.of).map(Dialect.PythonRegex(_))
+                      case boost: Dialect.BoostRegex =>
+                        setting(boost, "type", boost.`type`)(Dialect.BoostRegex.Type.of).map(Dialect.BoostRegex(_))
                       case ruby: Dialect.Ruby =>
                         setting(ruby, "encoding", ruby.encoding)(Dialect.Ruby.Encoding.of).map(Dialect.Ruby(_))
                       case perl: Dialect.Perl =>

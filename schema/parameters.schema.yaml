@@ -183,7 +183,7 @@ properties:
       See [Dialects](/docs/usage/dialects) for the dialects and their settings.
     oneOf:
       - type: string
-        enum: ["javascript", "java", "dotnet", "pcre", "python", "python-regex", "ruby", "perl", "icu"]
+        enum: ["javascript", "java", "dotnet", "pcre", "python", "python-regex", "ruby", "perl", "icu", "boost-regex"]
       - type: object
         title: "JavaScript"
         properties:
@@ -272,6 +272,19 @@ properties:
           name: { const: "icu" }
         required: ["name"]
         additionalProperties: false
+      - type: object
+        title: "Boost.Regex"
+        properties:
+          name: { const: "boost-regex" }
+          type:
+            title: "Boost.Regex Type"
+            enum: ["char", "u32regex"]
+            default: "char"
+            x-scala-type: "Dialect.BoostRegex.Type"
+            x-cli-help: "The character type."
+        required: ["name"]
+        additionalProperties: false
+        x-scala-type: "Dialect.BoostRegex"
     default: "javascript"
     x-scala-type: "Dialect"
     x-typescript-type: "DialectParameter"
