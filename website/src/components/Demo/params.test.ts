@@ -146,6 +146,7 @@ describe("selectValues", () => {
       "python-regex",
       "ruby",
       "perl",
+      "icu",
     ]);
     expect(selectValues(param("dialectEncoding"), "ruby")).toEqual([
       "UTF-8",

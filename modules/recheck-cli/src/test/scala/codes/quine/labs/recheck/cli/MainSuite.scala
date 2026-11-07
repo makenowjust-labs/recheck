@@ -112,6 +112,10 @@ class MainSuite extends munit.FunSuite:
       )
     )
     assertEquals(
+      Main.command.parse(Seq("/foo/", "--dialect=icu")),
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.ICU), json = false))
+    )
+    assertEquals(
       Main.command.parse(Seq("/foo/", "--dialect=python")),
       Right(
         Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Python()), json = false)

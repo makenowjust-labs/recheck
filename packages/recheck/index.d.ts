@@ -291,6 +291,7 @@ export type AttackPattern = {
    * - `dotnet`: `string.Concat(Enumerable.Repeat("a", 31)) + "あ"` (C#, `System.Linq`)
    * - `perl`: `"a" x 31 . "\x{3042}"`
    * - `pcre`: `str_repeat('a', 31) . '!'` (PHP)
+   * - `icu`: the same as `java`
    */
   pattern: string;
 };

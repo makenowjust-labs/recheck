@@ -183,7 +183,7 @@ properties:
       See [Dialects](/docs/usage/dialects) for the dialects and their settings.
     oneOf:
       - type: string
-        enum: ["javascript", "java", "dotnet", "pcre", "python", "python-regex", "ruby", "perl"]
+        enum: ["javascript", "java", "dotnet", "pcre", "python", "python-regex", "ruby", "perl", "icu"]
       - type: object
         title: "JavaScript"
         properties:
@@ -266,6 +266,12 @@ properties:
         required: ["name"]
         additionalProperties: false
         x-scala-type: "Dialect.Perl"
+      - type: object
+        title: "ICU"
+        properties:
+          name: { const: "icu" }
+        required: ["name"]
+        additionalProperties: false
     default: "javascript"
     x-scala-type: "Dialect"
     x-typescript-type: "DialectParameter"
