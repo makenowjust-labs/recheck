@@ -33,6 +33,7 @@ const sidebars = {
             "usage/dialects/perl",
             "usage/dialects/pcre",
             "usage/dialects/icu",
+            "usage/dialects/boost-regex",
           ],
         },
         "usage/runtime-attack-verification",
