@@ -73,7 +73,7 @@ private[recheck] object Repair:
     def compare(a: Pattern, aIndices: Seq[Int], b: Pattern, bIndices: Seq[Int]): Comparison =
       try
         Equivalence
-          .findCounterexample(a.ir, b.ir, aIndices.zip(bIndices), params.maxNFASize)
+          .findCounterexample(a.ir, b.ir, aIndices.zip(bIndices), params.maxNFASize, params.maxDFASize)
           .fold(Comparison.Equivalent)(Comparison.Different(_))
       catch case _: UnsupportedException => Comparison.Unknown
 

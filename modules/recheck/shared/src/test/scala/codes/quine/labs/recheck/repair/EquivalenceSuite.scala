@@ -35,7 +35,8 @@ class EquivalenceSuite extends munit.FunSuite:
   ): Option[String] =
     def differs(input: String): Boolean =
       a.extract(input, captures.map(_._1)) != b.extract(input, captures.map(_._2))
-    val result = Equivalence.findCounterexample(a.ir, b.ir, captures, Int.MaxValue).map(a.ir.mode.encode)
+    val result =
+      Equivalence.findCounterexample(a.ir, b.ir, captures, Int.MaxValue, Int.MaxValue).map(a.ir.mode.encode)
     val bound = result.fold(5)(_.length - 1)
     val shorter = (0 to bound).iterator.flatMap(n =>
       Iterator.fill(n)(chars).toSeq.foldLeft(Iterator(""))((ss, cs) => ss.flatMap(s => cs.iterator.map(s + _)))
@@ -178,4 +179,6 @@ class EquivalenceSuite extends munit.FunSuite:
     // Perl keeps the captures over the iterations, so a node may have any of them set.
     val ir = ReDoS.parse("^(?:(a)|(b)|(c)|(d)|(e)|(f)|(g)|(h))*$", "", Dialect.Perl())
     interceptMessage[UnsupportedException]("equivalence search is too large"):
-      Equivalence.findCounterexample(ir, ir, (1 to 8).map(i => (i, i)), 1000)
+      Equivalence.findCounterexample(ir, ir, (1 to 8).map(i => (i, i)), 1000, Int.MaxValue)
+    interceptMessage[UnsupportedException]("look-ahead DFA size is too large"):
+      Equivalence.findCounterexample(ir, ir, Seq((0, 0)), Int.MaxValue, 1)

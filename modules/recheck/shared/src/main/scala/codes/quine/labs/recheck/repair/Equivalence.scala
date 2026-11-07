@@ -28,12 +28,12 @@ object Equivalence:
     * where a pair has the capture indices of `a` and `b`, and `(0, 0)` is the whole match. A capture is the last one
     * set on the path of the match, or unset.
     */
-  def findCounterexample(a: IRPattern, b: IRPattern, captures: Seq[(Int, Int)], maxNFASize: Int)(using
+  def findCounterexample(a: IRPattern, b: IRPattern, captures: Seq[(Int, Int)], maxNFASize: Int, maxDFASize: Int)(using
       ctx: Context
   ): Option[UString] =
     ctx.interrupt:
-      val sideA = ComparedPattern(a, captures.map(_._1), maxNFASize)
-      val sideB = ComparedPattern(b, captures.map(_._2), maxNFASize)
+      val sideA = ComparedPattern(a, captures.map(_._1), maxNFASize, maxDFASize)
+      val sideB = ComparedPattern(b, captures.map(_._2), maxNFASize, maxDFASize)
       new Equivalence(sideA, sideB, maxNFASize).findCounterexample()
 
   /** The value of a begin or an end of a capture that is unset. */
@@ -71,13 +71,15 @@ object Equivalence:
 
   private[repair] object ComparedPattern:
 
-    def apply(pattern: IRPattern, captures: Seq[Int], maxNFASize: Int)(using ctx: Context): ComparedPattern =
+    def apply(pattern: IRPattern, captures: Seq[Int], maxNFASize: Int, maxDFASize: Int)(using
+        ctx: Context
+    ): ComparedPattern =
       val epsNFA =
         EpsNFABuilder.build(pattern, captures.toSet, maxNFASize, Parameters.DefaultMaxBackReferenceStrings)
-      val nfa = epsNFA.foldCaptureMarks.toOrderedNFA(false, maxNFASize, Int.MaxValue, Some(_._2)).rename
+      val nfa = epsNFA.foldCaptureMarks.toOrderedNFA(false, maxNFASize, maxDFASize, Some(_._2)).rename
       val lookBehindMarking = nfa.lookBehind.fold(Set.empty)(lb => markingStates(lb.inner, Set.empty))
       val marking = markingStates(nfa, lookBehindMarking)
-      ComparedPattern(epsNFA.alphabet, nfa, nfa.toLookAheadDFA(Int.MaxValue), captures, marking, lookBehindMarking)
+      ComparedPattern(epsNFA.alphabet, nfa, nfa.toLookAheadDFA(maxDFASize), captures, marking, lookBehindMarking)
 
     /** Returns the states from which a path may set a capture, where `setsByLookBehind` tells whether the inner
       * expression of a look-behind from the initial state may set one.
