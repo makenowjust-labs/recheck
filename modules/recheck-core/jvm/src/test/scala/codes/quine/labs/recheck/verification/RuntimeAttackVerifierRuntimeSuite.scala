@@ -86,6 +86,25 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
     val unicode = verify("^(\\w|\\w)*$", "", Dialect.Python(), attack("é", 31, "\u0000"), env = env)
     assertEquals(unicode.result, RuntimeAttackResult.Timeout)
 
+  // Checked with regex 2026.9.29 on Python 3.15.2.
+  runtimeTest("python-regex", "python3"):
+    val r = verify("^(a|a)*$", "", Dialect.PythonRegex(), attack("a", 31, "\u0000"))
+    assertEquals(r.result, RuntimeAttackResult.Timeout)
+    assert(clue(r.runtime).startsWith("python-regex 2026."))
+    // The guard of regex makes `(a+)+` fast, which refutes the attack.
+    assertFinish(verify("^(a+)+$", "", Dialect.PythonRegex(), attack("a", 31, "\u0000")))
+    val bytes = Dialect.PythonRegex(Dialect.Python.Type.Bytes)
+    assertEquals(
+      verify("^(?:é|é)*$", "", bytes, attack("é", 31, "\u0000")).result,
+      RuntimeAttackResult.Timeout
+    )
+
+  runtimeTest("python-regex: a Python without the package", "python3"):
+    // `-S` leaves out the site packages, and the program tells why the import fails on the standard error.
+    val env = Map("RECHECK_PYTHON_REGEX" -> "python3 -S")
+    val ex = intercept[UnexpectedException](verify("a", "", Dialect.PythonRegex(), attack("a", 3, ""), env = env))
+    assert(clue(ex.getMessage).startsWith("The `regex` package is not available for "))
+
   runtimeTest("Ruby", "ruby"):
     // Ruby 4.0's memoization makes it fast.
     val r = verify("^(a|a)*$", "", Dialect.Ruby(), attack("a", 31, "\u0000"))

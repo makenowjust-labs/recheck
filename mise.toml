@@ -7,3 +7,15 @@ python = "3.15.2"
 ruby = "4.0.9"
 dotnet = "10.0.403"
 perl = "5.44.0.0"
+
+[env]
+# The tests of python-regex need Python's regex package, which `mise run python-requirements` installs here.
+_.python.venv = { path = ".venv", create = true }
+
+[settings]
+# A virtual environment made by uv has no pip.
+python.venv_stdlib = true
+
+[tasks.python-requirements]
+description = "Install the Python packages of requirements.txt into the virtual environment"
+run = "python3 -m pip install --disable-pip-version-check --quiet -r requirements.txt"

@@ -9,6 +9,7 @@ import codes.quine.labs.recheck.exec.NodeExecutor
 import codes.quine.labs.recheck.exec.PHPExecutor
 import codes.quine.labs.recheck.exec.PerlExecutor
 import codes.quine.labs.recheck.exec.PythonExecutor
+import codes.quine.labs.recheck.exec.PythonRegexExecutor
 import codes.quine.labs.recheck.exec.RubyExecutor
 import codes.quine.labs.recheck.exec.SourceFile
 import codes.quine.labs.resyntax.charset.UString
@@ -95,6 +96,42 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     // A bytes pattern is the Latin-1 encoding of the source, and the input is bytes.
     val bytes = generate("éa", "", Dialect.Python(Dialect.Python.Type.Bytes), nonASCII)
     assertEquals(line(bytes, "regex"), "regex = re.compile(b'\\xe9a', 0)")
+    assertEquals(line(bytes, "string"), "string = b'\\xe9' * 3 + b'\\x00'")
+
+  test("RuntimeAttackProgram.generate: python-regex"):
+    val program = generate("f'o\\.", "iV1x", Dialect.PythonRegex())
+    assertEquals(program.executor, PythonRegexExecutor)
+    assertEquals(
+      program.script,
+      """|import locale, platform, sys, time
+         |locale.setlocale(locale.LC_ALL, 'C')
+         |try:
+         |    import regex
+         |except ImportError as e:
+         |    sys.stderr.write('The `regex` package is not available for ' + sys.executable + ' (' + str(e) + ')\n')
+         |    sys.exit(1)
+         |sys.stdout.write('recheck:runtime python-regex ' + regex.__version__ + ' (python ' + platform.python_version() + ')\n')
+         |pattern = regex.compile('f\'o\\.', regex.I | regex.V1 | regex.X)
+         |string = 'x' + 'y' * 2 + 'z'
+         |sys.stdout.write('recheck:start\n')
+         |sys.stdout.flush()
+         |start = time.perf_counter_ns()
+         |try:
+         |    pattern.search(string)
+         |except (RecursionError, MemoryError) as e:
+         |    sys.stdout.write('recheck:engine-error ' + type(e).__name__ + '\n')
+         |    sys.exit(0)
+         |sys.stdout.write('recheck:time ' + str((time.perf_counter_ns() - start) // 1000000) + '\n')
+         |""".stripMargin
+    )
+    assertEquals(
+      line(generate("a", "abefmprswV0", Dialect.PythonRegex()), "pattern"),
+      "pattern = regex.compile('a', regex.A | regex.B | regex.E | regex.F | regex.M | regex.P | regex.R | regex.S | " +
+        "regex.W | regex.V0)"
+    )
+    assertEquals(line(generate("a", "L", Dialect.PythonRegex()), "pattern"), "pattern = regex.compile('a', regex.L)")
+    val bytes = generate("éa", "", Dialect.PythonRegex(Dialect.Python.Type.Bytes), nonASCII)
+    assertEquals(line(bytes, "pattern"), "pattern = regex.compile(b'\\xe9a', 0)")
     assertEquals(line(bytes, "string"), "string = b'\\xe9' * 3 + b'\\x00'")
 
   test("RuntimeAttackProgram.generate: Ruby"):
@@ -305,6 +342,7 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     assertEquals(js.content, "// Run: node runtime-attack.cjs\n" + generate("foo", "", Dialect.JavaScript).script)
     assertEquals(script("foo", Dialect.Python()).command, "python3 -I runtime-attack.py")
     assert(script("foo", Dialect.Python()).content.startsWith("# Run: python3 -I runtime-attack.py\nimport "))
+    assertEquals(script("foo", Dialect.PythonRegex()).command, "python3 -I runtime-attack.py")
     assertEquals(script("foo", Dialect.Ruby()).command, "ruby --disable-gems runtime-attack.rb")
     assertEquals(script("foo", Dialect.Perl()).command, "perl runtime-attack.pl")
     assert(script("foo", Dialect.Perl()).content.startsWith("# Run: perl runtime-attack.pl\nuse utf8;\n"))
@@ -333,6 +371,7 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     val dialects = Seq(
       Dialect.JavaScript,
       Dialect.Python(Dialect.Python.Type.Bytes),
+      Dialect.PythonRegex(),
       Dialect.Ruby(),
       Dialect.Java,
       Dialect.DotNet,
@@ -341,7 +380,7 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     )
     assertEquals(
       dialects.map(d => generate("a", "", d).executor.variable),
-      Seq("NODE", "PYTHON", "RUBY", "JAVA", "DOTNET", "PERL", "PHP").map("RECHECK_" + _)
+      Seq("NODE", "PYTHON", "PYTHON_REGEX", "RUBY", "JAVA", "DOTNET", "PERL", "PHP").map("RECHECK_" + _)
     )
 
   test("RuntimeAttackProgram.generate: empty attack string"):

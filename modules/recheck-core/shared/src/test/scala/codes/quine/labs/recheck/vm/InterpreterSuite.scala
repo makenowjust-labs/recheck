@@ -486,6 +486,10 @@ class InterpreterSuite extends munit.FunSuite:
     check("^(a(?(1)b|c))+$", "acac", PCRE, Perl(), Python(), DotNet)(NoMatch)
     // A capture in a look-behind matched backward opens at its end.
     check("(?<=^(a|\\1b)+)$", "aba", DotNet)(Seq(g(3, 3), g(0, 2)))
+    // python-regex refers to an open capture only in V1.
+    check("(?V1)^(a|b\\1)+$", "aba", PythonRegex())(Seq(g(0, 3), g(1, 3)))
+    check("(?V1)^(a|b\\1)+$", "abab", PythonRegex())(NoMatch)
+    check("(?V1)(?<=^(a|\\1b)+)$", "aba", PythonRegex())(Seq(g(3, 3), g(0, 2)))
     // JavaScript resets the capture on each iteration, so it is unset and the reference matches the empty string.
     check("^(a|b\\1)+$", "abab", JavaScript)(Seq(g(0, 4), g(3, 4)))
     check("^(a\\1)", "a", JavaScript)(Seq(g(0, 1), g(0, 1)))

@@ -12,6 +12,7 @@ import codes.quine.labs.recheck.exec.NodeExecutor
 import codes.quine.labs.recheck.exec.PHPExecutor
 import codes.quine.labs.recheck.exec.PerlExecutor
 import codes.quine.labs.recheck.exec.PythonExecutor
+import codes.quine.labs.recheck.exec.PythonRegexExecutor
 import codes.quine.labs.recheck.exec.RubyExecutor
 import codes.quine.labs.recheck.exec.SourceFile
 import codes.quine.labs.recheck.verification.RuntimeAttackProgram
@@ -559,3 +560,214 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
           |${runs.mkString("\n")}
           |""".stripMargin
     assertEquals(cases(PythonExecutor, script), openCaptureModel(openCaptureTestCases, Dialect.Python()))
+
+  /** The cases of python-regex: a pattern, its flags and a subject, which the first match in it tells. */
+  val pythonRegexCases: Seq[(String, String, String)] = Seq(
+    // Quantifiers, inline flags and comments.
+    ("a{,}", "", "aa"),
+    ("a{}", "", "a{}"),
+    ("a(?i)*b", "", "aaB"),
+    ("a(?#x)*", "", "aa"),
+    ("a{2,1}", "", "a"),
+    ("a**", "", "a"),
+    ("\\b?x", "", "ax"),
+    ("(*FAIL)|a", "", "a"),
+    ("(*F)*a", "", "a"),
+    ("a{foo}", "", "a{foo}"),
+    ("a{e=0}", "", "a"),
+    ("(?i-i)a", "", "a"),
+    ("(?)a", "", "a"),
+    ("(?a)(?u)\\w", "", "\u00e9"),
+    ("(?a:(?u:\\w))", "", "\u00e9"),
+    ("(?L)\\w", "", "\u00e9"),
+    ("(?V0)(?V1)a", "", "a"),
+    // References and escapes.
+    ("(a)\\g<-1>", "", "aa"),
+    ("(a)\\g<0>", "", "ag<0>"),
+    ("(a)\\g<1>", "", "aa"),
+    ("(?<n>a)\\g<n>", "", "aa"),
+    ("(a)\\2", "", "a"),
+    ("\\1(a)", "", "a"),
+    ("(a)(?P=1)", "", "aa"),
+    ("(?P<1>a)", "", "a"),
+    ("(?<n>a)(?<n>b)\\g<n>", "", "abb"),
+    ("(?<n>a)|(?<n>b)", "", "b"),
+    ("(?|(?<x>a)|(?<y>b))", "", "b"),
+    ("(a\\1)", "", "aa"),
+    ("\\g", "", "g"),
+    ("\\e", "", "e"),
+    ("\\_", "", "_"),
+    ("\\N", "", "N"),
+    ("\\N{x", "", "N{x"),
+    ("\\777", "", "\u01ff"),
+    ("(?a)\\777", "", "\u00ff"),
+    ("\\08", "", "\u00008"),
+    ("\\8", "", "8"),
+    ("\\h", "", "\t"),
+    ("\\H", "", "H"),
+    ("\\R", "", "\r\n"),
+    ("\\R", "", "\u2028"),
+    ("\\X", "", "e\u0301"),
+    ("(?a)\\X", "", "e\u0301"),
+    ("a\\Kb", "", "ab"),
+    ("\\m\\w+\\M", "", " ab "),
+    // Classes.
+    ("[a-\\d]", "", "-"),
+    ("[\\d-z]", "", "-"),
+    ("[]a]", "", "]"),
+    ("[^]a]", "", "b"),
+    ("[]", "", "]"),
+    ("[\\b]", "", "\b"),
+    ("[\\A]", "", "A"),
+    ("[\\N]", "", "N"),
+    ("[[:alpha:]]", "", "\u00e9"),
+    ("[[:^alpha:]]", "", "1"),
+    ("[[:bogus:]]", "", "x"),
+    ("[:alpha:]", "", "a"),
+    ("[[:punct:]]", "", "\u00a1"),
+    ("[[:alpha]]", "", "a]"),
+    ("[[:sc=Latin:]]", "", "a"),
+    ("[a-z--aeiou]", "V1", "ab"),
+    ("[ab||cd]", "V1", "c"),
+    ("[a-c~~b-d]", "V1", "bd"),
+    ("[[a-z]&&[aeiou]]", "V1", "be"),
+    ("[\\w--\\d]", "V1", "1a"),
+    ("[--a]", "V1", ",a"),
+    ("[a--]", "V1", "a"),
+    ("[||a]", "V1", "a"),
+    ("[a[b]c]", "V1", "b"),
+    ("[a-[b]]", "V1", "-b"),
+    ("[a-c--e]", "V1", "c"),
+    ("[[a]](?V1)", "", "a"),
+    // Properties by the encodings.
+    ("\\pL", "", "1a"),
+    ("\\p{^L}", "", "a1"),
+    ("\\p{IsL}", "", "a"),
+    ("\\p{InBasicLatin}", "", "a"),
+    ("\\p{sc:latin}", "", "a"),
+    ("\\pX", "", "pX"),
+    ("\\p{L", "", "p{L"),
+    ("\\p{L&}", "", "1a"),
+    ("\\p{NV=0.5}", "", "1\u00bd"),
+    ("\\p{ccc=230}", "", "a\u0300"),
+    ("\\p{Script}", "", "a"),
+    ("\\p{gc=Assigned}", "", "a"),
+    ("(?a)\\p{Cn}", "", "\u00e9"),
+    ("(?a)\\p{InSupplementaryPrivateUseAreaB}", "", "\u00e9"),
+    ("(?L)\\p{Script=Unknown}", "", "\u0100"),
+    ("(?L)\\p{Latin}", "", "a"),
+    ("(?L)\\p{Alpha=No}", "", "\u0100"),
+    ("(?L)\\p{Any}", "", "\u0100"),
+    // The extended mode.
+    ("a{1, 2}", "x", "aa"),
+    ("(? i)a", "x", "A"),
+    ("\\ a", "x", " a"),
+    ("[a b]", "x", " "),
+    ("a\u2028\u3000b", "x", "ab"),
+    ("a#x\rb", "x", "ab"),
+    ("\\x 41", "x", "A"),
+    ("(?<n a>x)", "x", "x"),
+    ("( ?:a)", "x", "a"),
+    ("(?< =a)b", "x", "ab"),
+    ("a* ?", "x", "aa"),
+    ("\\p L", "x", "a"),
+    ("\\1 23", "x", "S"),
+    // Empty iterations and look-behinds.
+    ("^(?:()|a){0,2}\\1$", "", "a"),
+    ("^(?:()|a){2,}\\1$", "", "a"),
+    ("^(?:()|a)*?\\1$", "", "a"),
+    ("^(?:()|a){1,3}\\1$", "", "aa"),
+    ("^(?:(a?)|()(a?))+\\3c", "", "cc"),
+    ("(?<=(a|aa))b", "", "aab"),
+    ("(?<=\\1(a))b", "", "aab"),
+    ("(?<=a*)b", "", "aab"),
+    // Case-insensitivity.
+    ("I", "i", "\u0131"),
+    ("\u0130", "i", "I"),
+    ("[a-z]", "i", "\u0131\u0130"),
+    ("(I)\\1", "i", "I\u0131"),
+    ("(i)\\1", "i", "i\u0131"),
+    ("k", "i", "\u212a"),
+    ("\u00df", "i", "ss"),
+    ("\u00df", "iV1", "ss"),
+    ("\u00df", "iV0f", "ss"),
+    ("\u00df", "iaV1", "ss"),
+    ("[\u00df]", "iV1", "ss"),
+    ("\ufb00i", "iV1", "\ufb03"),
+    ("\\x73s", "iV1", "\u00df"),
+    ("\\p{Ll}", "iV1", "ss"),
+    ("[\\p{Ll}x]", "iV1", "ss"),
+    ("(\u00df)\\1", "iV1", "\u00dfss"),
+    ("(s)\\1", "iV1", "s\u00df"),
+    ("(?<=\u00df)x", "iV1", "ssx"),
+    ("\u0130", "iV1", "i\u0307"),
+    ("\\p{Lu}", "i", "\u0138"),
+    ("[\\p{Lu}x]", "i", "\u0138"),
+    ("\\p{ASCII}", "i", "\u212a"),
+    ("[\\p{ASCII}x]", "i", "\u212a")
+  )
+
+  /** The cases of python-regex's bytes patterns. */
+  val pythonRegexBytesCases: Seq[(String, String, String)] = Seq(
+    ("\\w", "", "\u00e9"),
+    ("(?u:\\w)", "", "\u00e9"),
+    ("(?L)\\w", "", "\u00e9"),
+    ("\\p{Cn}", "", "\u00e9"),
+    ("\\u00e9", "", "\u00e9"),
+    ("\\R", "", "\u0085"),
+    ("\\X", "", "\r\n"),
+    ("(?u)", "", "")
+  )
+
+  /** Returns recheck's results of python-regex's cases: the spans of the groups of the first match, `none` or `error`.
+    */
+  def pythonRegexModel(patterns: Seq[(String, String, String)], dialect: Dialect): Seq[String] =
+    patterns.map: (source, flags, subject) =>
+      try
+        val ir = ReDoS.parse(source, flags, dialect)
+        val result = Interpreter.run(ProgramBuilder.build(ir, false), ir.mode.decode(subject), Interpreter.Options())
+        result.captures.filter(_ => result.status == Interpreter.Status.Ok) match
+          case Some(captures) => captures.grouped(2).map(g => s"${g(0)},${g(1)}").mkString(" ")
+          case None           => "none"
+      catch case _: InvalidRegExpException => "error"
+
+  /** Returns the program running python-regex's cases. */
+  def pythonRegexScript(patterns: Seq[(String, String, String)], mode: UnitMode): String =
+    val style = AttackPatternStyle.Python(bytes = mode == UnitMode.Byte)
+    val runs = patterns.map: (source, flags, subject) =>
+      s"run(${style.literal(mode.decode(source))}, '$flags', ${style.literal(mode.decode(subject))})"
+    s"""|import locale, regex
+        |locale.setlocale(locale.LC_ALL, 'C')
+        |def run(p, f, s):
+        |    flags = 0
+        |    for c in f.replace('V0', '0').replace('V1', '1'):
+        |        flags |= {'0': regex.V0, '1': regex.V1}.get(c) or getattr(regex, c.upper())
+        |    try:
+        |        m = regex.compile(p, flags).search(s)
+        |    except (regex.error, ValueError, KeyError):
+        |        print('case:error')
+        |        return
+        |    print('case:' + ('none' if m is None else ' '.join('%d,%d' % m.span(i) for i in range(len(m.groups()) + 1))))
+        |${runs.mkString("\n")}
+        |""".stripMargin
+
+  // Checked with regex 2026.9.29 on Python 3.15.2.
+  runtimeTest("python-regex: the syntax and the matching", "python3"):
+    val script = pythonRegexScript(pythonRegexCases, UnitMode.CodePoint)
+    assertEquals(
+      cases(PythonRegexExecutor, script),
+      pythonRegexModel(pythonRegexCases, Dialect.PythonRegex())
+    )
+    val bytesScript = pythonRegexScript(pythonRegexBytesCases, UnitMode.Byte)
+    assertEquals(
+      cases(PythonRegexExecutor, bytesScript),
+      pythonRegexModel(pythonRegexBytesCases, Dialect.PythonRegex(Dialect.Python.Type.Bytes))
+    )
+
+  // Checked with regex 2026.9.29 on Python 3.15.2.
+  runtimeTest("python-regex: back-references in an open capture", "python3"):
+    // python-regex refers to an open capture only in V1, and matches a look-behind backward.
+    val all = openCaptureCases ++ openCaptureBacktrackCases ++ openCaptureLookBehindCases
+    val patterns = for (source, subjects) <- all; subject <- subjects yield (source, "V1", subject)
+    val script = pythonRegexScript(patterns, UnitMode.CodePoint)
+    assertEquals(cases(PythonRegexExecutor, script), pythonRegexModel(patterns, Dialect.PythonRegex()))

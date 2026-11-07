@@ -14,12 +14,12 @@ class ExecutorSuite extends munit.FunSuite:
   val dotnet: DotNetExecutor = DotNetExecutor(SourceFile("RecheckTest.cs", "// test"))
 
   val executors: Seq[Executor] =
-    Seq(NodeExecutor, PythonExecutor, RubyExecutor, java, dotnet, PerlExecutor, PHPExecutor)
+    Seq(NodeExecutor, PythonExecutor, PythonRegexExecutor, RubyExecutor, java, dotnet, PerlExecutor, PHPExecutor)
 
   test("Executor#variable"):
     assertEquals(
       executors.map(_.variable),
-      Seq("NODE", "PYTHON", "RUBY", "JAVA", "DOTNET", "PERL", "PHP").map("RECHECK_" + _)
+      Seq("NODE", "PYTHON", "PYTHON_REGEX", "RUBY", "JAVA", "DOTNET", "PERL", "PHP").map("RECHECK_" + _)
     )
 
   test("Executor#commandLine"):
@@ -27,6 +27,7 @@ class ExecutorSuite extends munit.FunSuite:
       executors.map(_.commandLine(Map.empty)),
       Seq(
         "node -",
+        "python3 -I -",
         "python3 -I -",
         "ruby --disable-gems -",
         "java --source 17 RecheckTest.java",
@@ -40,6 +41,10 @@ class ExecutorSuite extends munit.FunSuite:
     assertEquals(PythonExecutor.runtime(env), "env LC_ALL=C python3")
     assertEquals(PythonExecutor.commandLine(env), "env LC_ALL=C python3 -I -")
     assertEquals(RubyExecutor.runtime(env), "ruby")
+    assertEquals(
+      PythonRegexExecutor.commandLine(Map("RECHECK_PYTHON_REGEX" -> "venv/bin/python")),
+      "venv/bin/python -I -"
+    )
     assertEquals(java.commandLine(Map("RECHECK_JAVA" -> "my-java")), "my-java --source 17 RecheckTest.java")
 
   test("Executor#scriptCommandLine"):
@@ -47,6 +52,7 @@ class ExecutorSuite extends munit.FunSuite:
       executors.map(_.scriptCommandLine("script")),
       Seq(
         "node script",
+        "python3 -I script",
         "python3 -I script",
         "ruby --disable-gems script",
         "java --source 17 script",

@@ -9,6 +9,7 @@ import codes.quine.labs.recheck.exec.NodeExecutor
 import codes.quine.labs.recheck.exec.PHPExecutor
 import codes.quine.labs.recheck.exec.PerlExecutor
 import codes.quine.labs.recheck.exec.PythonExecutor
+import codes.quine.labs.recheck.exec.PythonRegexExecutor
 import codes.quine.labs.recheck.exec.RubyExecutor
 import codes.quine.labs.recheck.exec.SourceFile
 import codes.quine.labs.resyntax.charset.UString
@@ -56,6 +57,7 @@ object RuntimeAttackProgram:
     dialect match
       case Dialect.JavaScript        => Right(javascript(pattern, flags, mode, attack))
       case _: Dialect.Python         => Right(python(pattern, flags, mode, attack))
+      case _: Dialect.PythonRegex    => Right(pythonRegex(pattern, flags, mode, attack))
       case _: Dialect.Ruby           => Right(ruby(pattern, flags, mode, attack))
       case Dialect.Java              => Right(java(pattern, flags, mode, attack))
       case Dialect.DotNet            => Right(dotnet(pattern, flags, mode, attack))
@@ -67,7 +69,7 @@ object RuntimeAttackProgram:
     * A Python bytes pattern takes each character as a byte, and another pattern matching bytes takes the UTF-8 bytes.
     */
   private def encodeSource(source: String, dialect: Dialect, mode: UnitMode): UString = dialect match
-    case _: Dialect.Python if mode == UnitMode.Byte => UnitMode.Byte.decode(source)
+    case _: Dialect.Python | _: Dialect.PythonRegex if mode == UnitMode.Byte => UnitMode.Byte.decode(source)
     // A source may have a lone surrogate even in `ScalarValue` mode, so the code points stay as they are.
     case _ if mode.isCodePoint => UnitMode.UTF16CodePoint.decode(source)
     case _                     => mode.fromCodePoints(IArray.from(UnitMode.UTF16CodePoint.decode(source).iterator))
@@ -96,18 +98,20 @@ object RuntimeAttackProgram:
         case Dialect.DotNet     => s"// Run: $command\n" + dotnetProgram(quote(program.script))
         case Dialect.PCRE       => s"$php// Run: $command\n" + program.script.stripPrefix(php)
         case Dialect.JavaScript => s"// Run: $command\n" + program.script
-        case _: Dialect.Python | _: Dialect.Ruby | _: Dialect.Perl => s"# Run: $command\n" + program.script
+        case _: Dialect.Python | _: Dialect.PythonRegex | _: Dialect.Ruby | _: Dialect.Perl =>
+          s"# Run: $command\n" + program.script
       Script(name, command, content)
 
   /** Returns the file name of the standalone program of the dialect. */
   private def scriptName(dialect: Dialect): String = dialect match
-    case Dialect.JavaScript => "runtime-attack.cjs"
-    case _: Dialect.Python  => "runtime-attack.py"
-    case _: Dialect.Ruby    => "runtime-attack.rb"
-    case Dialect.Java       => "runtime-attack.java"
-    case Dialect.DotNet     => "runtime-attack.cs"
-    case _: Dialect.Perl    => "runtime-attack.pl"
-    case Dialect.PCRE       => "runtime-attack.php"
+    case Dialect.JavaScript     => "runtime-attack.cjs"
+    case _: Dialect.Python      => "runtime-attack.py"
+    case _: Dialect.PythonRegex => "runtime-attack.py"
+    case _: Dialect.Ruby        => "runtime-attack.rb"
+    case Dialect.Java           => "runtime-attack.java"
+    case Dialect.DotNet         => "runtime-attack.cs"
+    case _: Dialect.Perl        => "runtime-attack.pl"
+    case Dialect.PCRE           => "runtime-attack.php"
 
   /** Returns a Java expression of the data, which is a join of literals for a long data. */
   private def javaString(data: String): String =
@@ -168,6 +172,50 @@ object RuntimeAttackProgram:
           |sys.stdout.write('$TimeLine ' + str((time.perf_counter_ns() - start) // 1000000) + '\\n')
           |""".stripMargin
     RuntimeAttackProgram(PythonExecutor, script)
+
+  /** Returns the Python program using the `regex` package for `python3`, using `search` in the C locale.
+    *
+    * The program writes why to the standard error and exits with `1` when it cannot import the package.
+    */
+  private def pythonRegex(
+      pattern: UString,
+      flags: String,
+      mode: UnitMode,
+      attack: AttackPattern
+  ): RuntimeAttackProgram =
+    val style = AttackPatternStyle.Python(bytes = mode == UnitMode.Byte)
+    // The version flags `V0` and `V1` are the letter `V` and a digit.
+    val options = flags
+      .replace("V0", "0")
+      .replace("V1", "1")
+      .distinct
+      .collect:
+        case c @ ('a' | 'b' | 'e' | 'f' | 'i' | 'm' | 'p' | 'r' | 's' | 'u' | 'w' | 'x' | 'L') => s"regex.${c.toUpper}"
+        case '0'                                                                               => "regex.V0"
+        case '1'                                                                               => "regex.V1"
+    val input = attack.toString(style)
+    val script =
+      s"""|import locale, platform, sys, time
+          |locale.setlocale(locale.LC_ALL, 'C')
+          |try:
+          |    import regex
+          |except ImportError as e:
+          |    sys.stderr.write('The `regex` package is not available for ' + sys.executable + ' (' + str(e) + ')\\n')
+          |    sys.exit(1)
+          |sys.stdout.write('$RuntimeLine python-regex ' + regex.__version__ + ' (python ' + platform.python_version() + ')\\n')
+          |pattern = regex.compile(${style.literal(pattern)}, ${union(options, "0")})
+          |string = $input
+          |sys.stdout.write('$StartLine\\n')
+          |sys.stdout.flush()
+          |start = time.perf_counter_ns()
+          |try:
+          |    pattern.search(string)
+          |except (RecursionError, MemoryError) as e:
+          |    sys.stdout.write('$EngineErrorLine ' + type(e).__name__ + '\\n')
+          |    sys.exit(0)
+          |sys.stdout.write('$TimeLine ' + str((time.perf_counter_ns() - start) // 1000000) + '\\n')
+          |""".stripMargin
+    RuntimeAttackProgram(PythonRegexExecutor, script)
 
   /** Returns the Ruby program for `ruby`, using `Regexp#match?` without `Regexp.timeout`. */
   private def ruby(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
