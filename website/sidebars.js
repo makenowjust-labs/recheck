@@ -26,6 +26,7 @@ const sidebars = {
           items: [
             "usage/dialects/javascript",
             "usage/dialects/python",
+            "usage/dialects/python-regex",
             "usage/dialects/ruby",
             "usage/dialects/java",
             "usage/dialects/dotnet",
