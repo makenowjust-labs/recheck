@@ -36,6 +36,11 @@ enum Dialect:
     */
   case Perl(utf8: Boolean = true, source: PerlSource = PerlSource.Literal)
 
+  /** ICU specifies the dialect of ICU4C's regular expressions (`uregex` and `icu::RegexPattern`), which match UTF-16
+    * strings.
+    */
+  case ICU
+
   def name: String = this match
     case JavaScript     => "javascript"
     case Java           => "java"
@@ -45,6 +50,7 @@ enum Dialect:
     case _: PythonRegex => "python-regex"
     case _: Ruby        => "ruby"
     case _: Perl        => "perl"
+    case ICU            => "icu"
 
   def isJavaScript: Boolean = this == JavaScript
 
@@ -70,6 +76,8 @@ enum Dialect:
     case _: Perl => true
     case _       => false
 
+  def isICU: Boolean = this == ICU
+
 object Dialect:
 
   /** Returns the dialect with its default settings. */
@@ -82,6 +90,7 @@ object Dialect:
     case "python-regex" => Some(PythonRegex())
     case "ruby"         => Some(Ruby())
     case "perl"         => Some(Perl())
+    case "icu"          => Some(ICU)
     case _              => None
 
   object Python:

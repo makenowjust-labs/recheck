@@ -4,10 +4,13 @@ import codes.quine.labs.resyntax.dialect.Dialect.*
 
 class DialectSuite extends munit.FunSuite:
 
-  val All: Seq[Dialect] = Seq(JavaScript, Java, DotNet, PCRE, Python(), PythonRegex(), Ruby(), Perl())
+  val All: Seq[Dialect] = Seq(JavaScript, Java, DotNet, PCRE, Python(), PythonRegex(), Ruby(), Perl(), ICU)
 
   test("Dialect#name and Dialect.of"):
-    assertEquals(All.map(_.name), Seq("javascript", "java", "dotnet", "pcre", "python", "python-regex", "ruby", "perl"))
+    assertEquals(
+      All.map(_.name),
+      Seq("javascript", "java", "dotnet", "pcre", "python", "python-regex", "ruby", "perl", "icu")
+    )
     for dialect <- All do assertEquals(Dialect.of(dialect.name), Some(dialect))
     assertEquals(Dialect.of("perl5"), None)
 
@@ -20,7 +23,8 @@ class DialectSuite extends munit.FunSuite:
       _.isPython,
       _.isPythonRegex,
       _.isRuby,
-      _.isPerl
+      _.isPerl,
+      _.isICU
     )
     for (dialect, i) <- All.zipWithIndex; (check, j) <- checks.zipWithIndex do
       assertEquals(check(dialect), i == j, dialect)

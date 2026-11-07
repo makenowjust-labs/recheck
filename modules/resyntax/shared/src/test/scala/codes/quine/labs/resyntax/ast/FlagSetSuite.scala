@@ -91,3 +91,15 @@ class FlagSetSuite extends munit.FunSuite:
   error("au", PythonRegex())("Incompatible flags 'a' and 'u'")
   error("aL", PythonRegex())("Incompatible flags 'a' and 'L'")
   error("Lu", PythonRegex())("Incompatible flags 'L' and 'u'")
+
+  // ICU's flags are the inline letters, of which `d` is UNIX_LINES and `w` is UWORD.
+  check("dimswx", ICU): f =>
+    f == FlagSet(
+      hasIndices = true,
+      ignoreCase = true,
+      multiline = true,
+      dotAll = true,
+      word = true,
+      verbose = true
+    )
+  error("u", ICU)("Unknown flag 'u' at 0")

@@ -46,7 +46,7 @@ final case class FlagSet(
     bestMatch: Boolean = false,
     // `c` (Java, Perl)
     continue: Boolean = false,
-    // `d` (Java, JavaScript, Perl, Ruby)
+    // `d` (ICU, Java, JavaScript, Perl, Ruby)
     hasIndices: Boolean = false,
     // `e` (Perl, python-regex)
     evaluate: Boolean = false,
@@ -54,11 +54,11 @@ final case class FlagSet(
     fullCase: Boolean = false,
     // `g` (JavaScript, Perl)
     global: Boolean = false,
-    // `i` (.NET, Java, JavaScript, PCRE, Perl, Python, python-regex, Ruby)
+    // `i` (.NET, ICU, Java, JavaScript, PCRE, Perl, Python, python-regex, Ruby)
     ignoreCase: Boolean = false,
     // `l` (Perl)
     localeLower: Boolean = false,
-    // `m` (.NET, Java, JavaScript, PCRE, Perl, Python, python-regex, Ruby)
+    // `m` (.NET, ICU, Java, JavaScript, PCRE, Perl, Python, python-regex, Ruby)
     multiline: Boolean = false,
     // `n` (.NET, PCRE, Perl, Ruby)
     explicitCapture: Boolean = false,
@@ -68,15 +68,15 @@ final case class FlagSet(
     preserve: Boolean = false,
     // `r` (PCRE, Perl, python-regex)
     nonDestructive: Boolean = false,
-    // `s` (.NET, Java, JavaScript, PCRE, Perl, Python, python-regex)
+    // `s` (.NET, ICU, Java, JavaScript, PCRE, Perl, Python, python-regex)
     dotAll: Boolean = false,
     // `u` (Java, JavaScript, PCRE, Perl, Python, python-regex, Ruby)
     unicode: Boolean = false,
     // `v` (JavaScript)
     unicodeSets: Boolean = false,
-    // `w` (python-regex)
+    // `w` (ICU, python-regex)
     word: Boolean = false,
-    // `x` (.NET, Java, PCRE, Perl, Python, python-regex, Ruby)
+    // `x` (.NET, ICU, Java, PCRE, Perl, Python, python-regex, Ruby)
     verbose: Boolean = false,
     // `xx` (PCRE, Perl)
     verboseMore: Boolean = false,
@@ -155,6 +155,7 @@ object FlagSet:
   /** Returns the flag set with the flag `c` at the offset, whose `count`-th occurrence it is. */
   private def add(flagSet: FlagSet, c: Char, count: Int, offset: Int, dialect: Dialect): FlagSet =
     val isPythonRegex = dialect.isPythonRegex
+    val isICU = dialect.isICU
     def validateFlag(accepted: Boolean): Unit =
       if !accepted then throw new FlagSetException(s"Unknown flag '$c'", Some(offset))
 
@@ -197,7 +198,7 @@ object FlagSet:
         validateFlag(dialect.isJava || dialect.isPerl)
         flagSet.copy(continue = true)
       case 'd' =>
-        validateFlag(dialect.isJava || dialect.isJavaScript || dialect.isPerl || dialect.isRuby)
+        validateFlag(isICU || dialect.isJava || dialect.isJavaScript || dialect.isPerl || dialect.isRuby)
         rubyCharset(flagSet).copy(hasIndices = true)
       case 'e' =>
         validateFlag(dialect.isPerl || isPythonRegex)
@@ -229,7 +230,7 @@ object FlagSet:
         flagSet.copy(nonDestructive = true)
       case 's' =>
         validateFlag(
-          dialect.isDotNet || dialect.isJava || dialect.isJavaScript || dialect.isPCRE || dialect.isPerl ||
+          dialect.isDotNet || isICU || dialect.isJava || dialect.isJavaScript || dialect.isPCRE || dialect.isPerl ||
             dialect.isPython || isPythonRegex
         )
         flagSet.copy(dotAll = true)
@@ -243,11 +244,11 @@ object FlagSet:
         validateFlag(dialect.isJavaScript)
         flagSet.copy(unicodeSets = true)
       case 'w' =>
-        validateFlag(isPythonRegex)
+        validateFlag(isICU || isPythonRegex)
         flagSet.copy(word = true)
       case 'x' =>
         validateFlag(
-          dialect.isDotNet || dialect.isJava || dialect.isPCRE || dialect.isPerl || dialect.isPython ||
+          dialect.isDotNet || isICU || dialect.isJava || dialect.isPCRE || dialect.isPerl || dialect.isPython ||
             isPythonRegex || dialect.isRuby
         )
         flagSet.copy(verbose = true, verboseMore = flagSet.verboseMore || count >= 2 && dialect.isPerl)
