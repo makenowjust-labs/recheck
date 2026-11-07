@@ -69,7 +69,8 @@ object IRBuilder:
         resetsEachIteration = featureSet.resetsCapturesEachIteration,
         keptOnBacktracking = featureSet.keepsCapturesOnBacktracking,
         heldAfterAtomicMatch = featureSet.holdsCapturesAfterAtomicMatch,
-        restoredByNegativeCondition = featureSet.restoresCapturesByNegativeCondition
+        restoredByNegativeCondition = featureSet.restoresCapturesByNegativeCondition,
+        unsetWhileOpen = featureSet.unsetsCapturesWhileOpen
       ),
       IREmptyIterationSemantics(featureSet.unboundedEmptyIteration, featureSet.boundedEmptyIteration),
       IRBacktrackControlSemantics(featureSet.thenPassesAssertions, featureSet.acceptEndsAtomic),

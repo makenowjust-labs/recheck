@@ -454,6 +454,7 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
     assert(patternOf(Perl()).captures.keptOnBacktracking)
     assert(patternOf(Java).captures.heldAfterAtomicMatch)
     assert(patternOf(DotNet).captures.restoredByNegativeCondition)
+    assert(patternOf(Ruby()).captures.unsetWhileOpen)
     assertEquals(
       patternOf(PCRE).emptyIteration,
       IREmptyIterationSemantics(IREmptyIteration.ExitFromMin, IREmptyIteration.Ignore)

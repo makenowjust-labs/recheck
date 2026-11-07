@@ -268,7 +268,13 @@ final case class IRCaptureSemantics(
       */
     heldAfterAtomicMatch: Boolean,
     /** Whether a negative look-around condition restores the captures in it, as a negative look-around does (.NET). */
-    restoredByNegativeCondition: Boolean
+    restoredByNegativeCondition: Boolean,
+    /** Whether a capture is unset from where it opens until it closes, which back-references and capture tests in it
+      * see (Ruby).
+      *
+      * Otherwise, they see the value of the capture before it opens.
+      */
+    unsetWhileOpen: Boolean
 )
 
 /** IREmptyIterationSemantics is how repetitions handle an iteration matching the empty string, which differs among

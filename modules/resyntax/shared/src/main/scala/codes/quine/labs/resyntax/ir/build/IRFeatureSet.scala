@@ -92,6 +92,8 @@ final case class IRFeatureSet(
     holdsCapturesAfterAtomicMatch: Boolean,
     // .NET
     restoresCapturesByNegativeCondition: Boolean,
+    // Ruby
+    unsetsCapturesWhileOpen: Boolean,
     // JavaScript: Reject, Java: ExitAll, Python, Ruby: ExitOptional, the others: ExitFromMin
     unboundedEmptyIteration: IREmptyIteration,
     // JavaScript: Reject, Java: ExitAll, PCRE: Ignore, Python, Ruby: ExitOptional, .NET, Perl: ExitFromMin
@@ -358,6 +360,7 @@ object IRFeatureSet:
       keepsCapturesOnBacktracking = isPerl,
       holdsCapturesAfterAtomicMatch = isJava,
       restoresCapturesByNegativeCondition = isDotNet,
+      unsetsCapturesWhileOpen = isRuby,
       unboundedEmptyIteration =
         if isJavaScript then IREmptyIteration.Reject
         else if isJava then IREmptyIteration.ExitAll

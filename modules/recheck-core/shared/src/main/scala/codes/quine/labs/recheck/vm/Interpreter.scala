@@ -120,6 +120,7 @@ object Interpreter:
     *   4, 2,        // the block ID and the position
     *   1,           // the counters
     *   0, -1, 0, 1, // the begin and the end of each capture, or -1 (only when the program reads the captures)
+    *   0, 1,        // the position where each capture opens, or -1 (likewise)
     *   1,           // the largest index of the closed captures (likewise)
     *   1, 0         // 1 if the canary register holds the position, or 0
     * )
@@ -161,6 +162,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       var label: Label,
       var pos: Int,
       var captures: Vector[Int],
+      /** The position where each capture opens, which `cap_end` (or `cap_begin`) closes it from. */
+      var opens: Vector[Int],
       var counters: Vector[Int],
       var canaries: Vector[Int],
       var rollback: Option[Rollback],
@@ -189,13 +192,20 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     /** Gets a current character. */
     def currentChar: Option[UChar] = input.getAt(pos)
 
-    /** Captures a beginning position of the index. */
-    def capBegin(index: Int): Unit =
-      captures = captures.updated(index * 2, pos)
+    /** Opens a capture of the index at the current position. */
+    def capOpen(index: Int): Unit =
+      opens = opens.updated(index, pos)
 
-    /** Captures an ending position of the index. */
+    /** Closes a capture of the index, which spans from the current position to the position where it opens. */
+    def capBegin(index: Int): Unit =
+      setCapture(index, pos, opens(index))
+
+    /** Closes a capture of the index, which spans from the position where it opens to the current position. */
     def capEnd(index: Int): Unit =
-      captures = captures.updated(index * 2 + 1, pos)
+      setCapture(index, opens(index), pos)
+
+    private def setCapture(index: Int, begin: Int, end: Int): Unit =
+      captures = captures.updated(index * 2, begin).updated(index * 2 + 1, end)
       lastParen = Math.max(lastParen, index)
 
     /** Resets captures between `from` and `to`. */
@@ -212,7 +222,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
     /** Converts this frame into a corresponding state. */
     def toState: MatchState =
-      val capturesSize = if program.meta.hasRef then captures.size + 1 else 0
+      val capturesSize = if program.meta.hasRef then captures.size + opens.size + 1 else 0
       val values = new Array[Int](2 + counters.size + capturesSize + canaries.size)
       var size = 0
 
@@ -225,12 +235,13 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       counters.foreach(add)
       if program.meta.hasRef then
         captures.foreach(add)
+        opens.foreach(add)
         add(lastParen)
       for canary <- canaries do add(if canary == pos then 1 else 0)
       MatchState(values)
 
     override def clone(): Frame =
-      val frame = new Frame(label, pos, captures, counters, canaries, rollback, fallback, junctions)
+      val frame = new Frame(label, pos, captures, opens, counters, canaries, rollback, fallback, junctions)
       frame.lastParen = lastParen
       frame.time = tick()
       frame
@@ -305,6 +316,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       program.blocks.head._1,
       0,
       Vector.fill((program.meta.capturesSize + 1) * 2)(-1),
+      Vector.fill(program.meta.capturesSize + 1)(-1),
       Vector.fill(program.meta.countersSize)(0),
       Vector.fill(program.meta.canariesSize)(0),
       None,
@@ -615,8 +627,11 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             !(0 < frame.pos && frame.pos < input.length && input(frame.pos - 1) == 0x0d && input(frame.pos) == 0x0a)
         if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         ok
-      case read: Inst.Read      => instRead(frame, read)
-      case read: Inst.ReadBack  => instReadBack(frame, read)
+      case read: Inst.Read     => instRead(frame, read)
+      case read: Inst.ReadBack => instReadBack(frame, read)
+      case Inst.CapOpen(index) =>
+        frame.capOpen(index)
+        true
       case Inst.CapBegin(index) =>
         frame.capBegin(index)
         true
@@ -636,7 +651,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         frame.fallback = Some(verbFrame)
         true
       case Inst.RejectEmpty(atStart) =>
-        frame.captures(0) != frame.pos || atStart && frame.pos != 0
+        frame.opens(0) != frame.pos || atStart && frame.pos != 0
       case Inst.TxDrop =>
         frame.rollback = frame.rollback.get match
           case Rollback.HasSuccessor(_, _, rollback, _, _) => rollback
@@ -646,13 +661,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         true
       case Inst.CapKeep =>
         val captures = if failedCaptures.isEmpty then frame.captures else failedCaptures
-        frame.captures = Vector.tabulate(captures.size): i =>
-          val index = i / 2
-          // A capture above the last closed index is unset, but the beginning of an open capture remains.
-          // The whole match keeps its start, which `\K` sets.
-          if index == 0 then frame.captures(i)
-          else if index > frame.lastParen then if i % 2 == 0 then frame.captures(i) else -1
-          else captures(i)
+        // A capture above the last closed index is unset.
+        frame.captures = Vector.tabulate(captures.size)(i => if i / 2 > frame.lastParen then -1 else captures(i))
         true
 
   /** Returns the starts of a look-behind at the position in the order that the engine tries them. */

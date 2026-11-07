@@ -91,6 +91,8 @@ The encodings EUC-JP (`/e`) and Windows-31J (`/s`) are not supported, and their 
   So `/[[:alpha:]]/i` matches `ss` only after matching a non-ASCII string, and `/(?<=a[[:lower:]])y/i` raises `RegexpError` on a non-ASCII string.
   `recheck` takes such a pattern in `UTF-8` (e.g. it reports `(?<=a[[:lower:]])y` with `i` as invalid).
 - An iteration matching the empty string is not handled as Ruby does: Onigmo repeats copies of the node for a bounded repetition depending on the size of its compiled code, and it checks the captures in an empty iteration.
+- Onigmo does not restore the end of a group on backtracking inside the group, so a back-reference in the group can see the end of a failed attempt, and `recheck` does not reproduce it.
+  For example, `^(a|ab\1)*$` matches `"aba"` in Ruby 4.0, but not in `recheck`.
 
 ## Runtime-Attack Verification
 
