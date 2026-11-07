@@ -374,10 +374,12 @@ private[build] final class IRCharResolver(
     case EscapeClassKind.NonNewline if featureSet.nonNewlineExcludesLineTerminators => dot(flags.copy(dotAll = false))
     case EscapeClassKind.GraphemeCluster                                            =>
       if featureSet.hasPCREGraphemeCluster then pcreGraphemeCluster
+      else if featureSet.hasBoostRegexGraphemeCluster then boostRegexGraphemeCluster
       // python-regex's encodings other than Unicode have a boundary at every position.
       else if featureSet.hasCharsetGraphemeCluster && !isUnicodeCharset(flags) then chars(universe)
       else graphemeCluster
-    case _ => output(escapeClassSet(kind, flags, loc, inClass = false), flags)
+    case EscapeClassKind.CodeUnit if featureSet.readsCodeUnitAsDot => dot(flags)
+    case _ => output(foldInput(escapeClassSet(kind, flags, loc, inClass = false), flags), flags)
 
   /** Whether the flags read characters by Unicode, not by ASCII or a locale (python-regex). */
   private def isUnicodeCharset(flags: IRCharFlagSet): Boolean =
@@ -446,6 +448,18 @@ private[build] final class IRCharResolver(
     )
     IRNodeData.Atomic(IRCharResolver.prune(cluster).getOrElse(IRNode(IRNodeData.Chars(CharSet.empty))))
 
+  /** boostRegexGraphemeCluster is the IR of Boost.Regex's `\X`, which matches a character other than a combining
+    * character and the combining characters after it, and does not backtrack into them.
+    *
+    * The combining characters are Boost.Regex's old table (e.g. U+0300 to U+0361), and no byte is one.
+    */
+  private lazy val boostRegexGraphemeCluster: IRNodeData =
+    import Grammar.*
+    if mode == UnitMode.Byte then chars(universe)
+    else
+      val combining = IRClassLookup.boostRegexCombining
+      IRNodeData.Atomic(seq(c(combining.complement(universe)), star(c(combining))))
+
   private def gcb(names: String*): CharSet =
     CharSet.union(names.map(PropertyTable.GraphemeClusterBreak.value(_).get.set)).intersect(universe)
 
@@ -478,8 +492,13 @@ private[build] final class IRCharResolver(
       case EscapeClassKind.NonVertical   => not(classes.vertical)
       case EscapeClassKind.HexDigit      => set(classes.hexDigit)
       case EscapeClassKind.NonHexDigit   => not(classes.hexDigit)
-      case EscapeClassKind.NonNewline    => not(CharSet.single(0x0a))
-      case EscapeClassKind.CodeUnit      =>
+      // Boost.Regex's `\l` and `\u` are its class names `l` and `u`.
+      case EscapeClassKind.Lower      => property("l", None, false, flags, loc, inClass)
+      case EscapeClassKind.NonLower   => property("l", None, true, flags, loc, inClass)
+      case EscapeClassKind.Upper      => property("u", None, false, flags, loc, inClass)
+      case EscapeClassKind.NonUpper   => property("u", None, true, flags, loc, inClass)
+      case EscapeClassKind.NonNewline => not(CharSet.single(0x0a))
+      case EscapeClassKind.CodeUnit   =>
         if mode == UnitMode.Byte then set(universe) else throw new NotModeledException
       // Java and Python look up a Unicode name, which starts with a letter and has letters, digits, spaces and hyphens.
       case EscapeClassKind.CharName(name) if featureSet.validatesCharName && !isUnicodeNameLike(name) =>
@@ -559,7 +578,10 @@ private[build] final class IRCharResolver(
   private def klass(invert: Boolean, item: ClassItem, flags: IRCharFlagSet, loc: SourceLocation): IRNodeData =
     item.data match
       // PCRE's `[[:<:]]` and `[[:>:]]` are the start and the end of a word (`\b(?=\w)` and `\b(?<=\w)`).
-      case ClassItemData.ClassPOSIX(false, name @ ("<" | ">")) if featureSet.hasClassPOSIXWordBoundary && !invert =>
+      // Boost.Regex ignores their negations (e.g. `[^[:<:]]` and `[[:^<:]]` are `[[:<:]]`).
+      case ClassItemData.ClassPOSIX(negated, name @ ("<" | ">"))
+          if featureSet.hasClassPOSIXWordBoundary &&
+            (featureSet.ignoresClassPOSIXWordBoundaryNegation || !invert && !negated) =>
         val word = classes.word(flags).intersect(universe)
         val boundary = IRNodeData.Assert(IRAssertKind.WordBoundary(wordSet(flags)))
         val look =
@@ -709,15 +731,18 @@ private[build] final class IRCharResolver(
         if invert && flags.unicodeSets && mayContainStrings(inner) then
           throw new IRBuildingException("Negated character class may contain strings", item.loc)
         if invert then negate(inner, flags) else classItem(inner, flags)
-      // ICU's `[:name:]` is a property, the same as `\p{name}`.
+      // ICU's and Boost.Regex's `[:name:]` is a property, the same as `\p{name}`.
       case ClassItemData.ClassPOSIX(invert, name) if featureSet.hasPropertyClassPOSIX =>
-        property(name, None, invert, flags, item.loc, inClass = true)
+        foldInput(property(name, None, invert, flags, item.loc, inClass = true), flags)
       case ClassItemData.ClassPOSIX(invert, name) =>
         val set = posix(name, flags, item.loc)
         if invert then ClassSet(set.complement(universe)) else ClassSet(set)
       case ClassItemData.ClassRange(begin, end)    => range(begin.data, end.data, flags, item.loc)
       case ClassItemData.ClassCaseCommand(_)       => ClassSet.empty
-      case ClassItemData.ClassBackslashClass(kind) => escapeClassSet(kind, flags, item.loc, inClass = true)
+      case ClassItemData.ClassBackslashClass(kind) =>
+        foldInput(escapeClassSet(kind, flags, item.loc, inClass = true), flags)
+      // POSIX's collating elements and equivalence classes depend on the locale's collation.
+      case ClassItemData.ClassCollatingElement(_) | ClassItemData.ClassEquivalence(_) => throw new NotModeledException
       case value: ClassItemData.ClassValue if readsByteEscapesAsUTF8 && isRubyByteValue(value) =>
         throw new IRBuildingException("Invalid multibyte escape", item.loc)
       case value: ClassItemData.ClassValue => ClassSet(closeChars(valueUnits(value, flags, item.loc), flags))
@@ -811,12 +836,20 @@ private[build] final class IRCharResolver(
       flags: IRCharFlagSet,
       loc: SourceLocation
   ): ClassSet =
+    // Boost.Regex's `c` (`collate`) compares the characters of a range by the locale's collation.
+    if featureSet.collatesClassRange then throw new NotModeledException
     val b = valueUnits(begin, flags, loc)
     val e = valueUnits(end, flags, loc)
     // Perl's range with an endpoint above `0xFF` is between code points, and a byte string has only its bytes.
     if b.isEmpty || e.isEmpty then
       if begin.value > end.value then throw new IRBuildingException("Range out of order in character class", loc)
       return ClassSet(equivalence(flags).closeRange(CharSet.range(begin.value, end.value).intersect(universe)))
+    // Boost.Regex's range under `i` is between the case foldings of its ends (e.g. `(?i)[@-Z]` is `(?i)[@-z]`).
+    if featureSet.matchesClassByFoldedInput && flags.ignoreCase then
+      val folding = boostRegexFolding(mode)
+      val (first, last) = (folding(b.head), folding(e.head))
+      if first > last then throw new IRBuildingException("Range out of order in character class", loc)
+      return foldInput(ClassSet(CharSet.range(first, last)), flags)
     // A range alone in a class has no neighbors to make a multibyte character with its byte escape.
     if readsByteEscapesAsUTF8 && Seq(begin, end).exists(isRubyByteValue) then
       throw new IRBuildingException("Invalid multibyte escape", loc)
@@ -827,6 +860,14 @@ private[build] final class IRCharResolver(
   private def isRubyByteValue(value: ClassItemData.ClassValue): Boolean = value match
     case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v, _)) => isRubyByte(style, v)
     case _                                                                    => false
+
+  /** Returns the characters that Boost.Regex's class item of the set matches under the flags, which tests the case
+    * folding of the input against it (e.g. `(?i)\p{Lt}` matches nothing, since an `Lt` character folds to an `Ll` one).
+    */
+  private def foldInput(set: ClassSet, flags: IRCharFlagSet): ClassSet =
+    if featureSet.matchesClassByFoldedInput && flags.ignoreCase then
+      ClassSet(boostRegexFolding(mode).preimage(set.chars).intersect(universe))
+    else set
 
   private def posix(name: String, flags: IRCharFlagSet, loc: SourceLocation): CharSet =
     val set = classes.posix(name, flags).getOrElse(throw new IRBuildingException("Unknown POSIX class name", loc))
@@ -964,6 +1005,12 @@ private[build] object IRCharResolver:
     */
   lazy val dotNetKey: CaseMapping = CaseMapping.SimpleLower.updated(Seq(0x130 -> 0x130))
 
+  /** Returns the case folding of Boost.Regex in the unit mode: ASCII's over `char` (the C locale), and the simple case
+    * folding in `u32regex`.
+    */
+  def boostRegexFolding(mode: UnitMode): CaseMapping =
+    if mode == UnitMode.Byte then IRCaseEquivalence.asciiFold else CaseMapping.SimpleFold
+
   /** Determines the equivalence that a back-reference with the flags compares by.
     *
     * Perl's `/d` rules there are the rules of a native string, since the builder gives a reference `/u` instead when
@@ -1009,6 +1056,7 @@ private[build] object IRCharResolver:
         case IRCaseEquivalenceKind.PythonRegex                                       => PythonRegex(mode)
         case IRCaseEquivalenceKind.Ruby if mode == UnitMode.Byte                     => Keyed(asciiFold, mode)
         case IRCaseEquivalenceKind.Ruby | IRCaseEquivalenceKind.ICU          => Keyed(CaseMapping.SimpleFold, mode)
+        case IRCaseEquivalenceKind.BoostRegex                                => Keyed(boostRegexFolding(mode), mode)
         case IRCaseEquivalenceKind.Perl if flags.charset == IRCharset.Locale => PerlLocale(mode)
         case IRCaseEquivalenceKind.Perl if perlNative                        => PerlNative(mode)
         case IRCaseEquivalenceKind.Perl if flags.caselessRestrict => PCRERestrict(CaseMapping.SimpleFold, mode)

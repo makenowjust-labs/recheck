@@ -582,3 +582,60 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
       build("a", "", ICU).emptyIteration,
       IREmptyIterationSemantics(IREmptyIteration.ExitFromMin, IREmptyIteration.Ignore, false)
     )
+
+  // Boost.Regex's verbs but `(*FAIL)` and its conditionals are unsupported (Boost.Regex 1.92.0).
+  check("(*FAIL)(*F)", "", BoostRegex())(Sequence(Chars(CharSet.empty), Chars(CharSet.empty)))
+  check("(*ACCEPT)", "", BoostRegex())(
+    Unsupported(NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Accept), None)))
+  )
+  check("(a)(?(1)b)", "", BoostRegex())(
+    Sequence(
+      Capture(1, None, char('a')),
+      Unsupported(NodeData.Command(CommandKind.Conditional(ConditionalTest.Indexed(1), NodeData.Literal('b'))))
+    )
+  )
+  // `\<` and `\>` are the start and the end of a word, `` \` `` and `\'` the begin and the end of the input, and `\C`
+  // is `.`.
+  check("\\<\\>\\`\\'", "", BoostRegex())(
+    Sequence(
+      Sequence(Assert(IRAssertKind.WordBoundary(ASCIIWord)), LookAhead(false, Chars(ASCIIWord))),
+      Sequence(Assert(IRAssertKind.WordBoundary(ASCIIWord)), LookBehind(false, Chars(ASCIIWord))),
+      Assert(IRAssertKind.TextBegin),
+      Assert(IRAssertKind.TextEnd)
+    )
+  )
+  check("[[:<:]]", "", BoostRegex())(
+    Sequence(Assert(IRAssertKind.WordBoundary(ASCIIWord)), LookAhead(false, Chars(ASCIIWord)))
+  )
+  // The negations of `[[:<:]]` and `[[:>:]]` are ignored.
+  check("[^[:<:]][[:^>:]]", "", BoostRegex())(
+    Sequence(
+      Sequence(Assert(IRAssertKind.WordBoundary(ASCIIWord)), LookAhead(false, Chars(ASCIIWord))),
+      Sequence(Assert(IRAssertKind.WordBoundary(ASCIIWord)), LookBehind(false, Chars(ASCIIWord)))
+    )
+  )
+  // A quantifier repeats `(?i)` as an empty group, whose flag reaches the rest.
+  check("a(?i)+b", "", BoostRegex())(
+    Sequence(char('a'), Repeat(Empty, Unbounded(1, Greedy)), Chars(CharSet.of('b', 'B')))
+  )
+  check("\\C", "S", BoostRegex())(Chars(UnitMode.Byte.universe.diff(CharSet.of('\n', '\f', '\r'))))
+  // `\X` is a character but a combining one and the combining ones after it, of the old table of Boost.Regex.
+  check("\\X", "", BoostRegex())(Chars(UnitMode.Byte.universe))
+  locally:
+    val combining = IRClassLookup.boostRegexCombining
+    check("\\X", "", BoostRegex(BoostRegex.Type.U32Regex))(
+      Atomic(
+        Sequence(Chars(combining.complement(UnitMode.ScalarValue)), Repeat(Chars(combining), Unbounded(0, Greedy)))
+      )
+    )
+    test("IRBuilder.build: Boost.Regex's combining characters"):
+      assert(combining.contains(0x0300) && combining.contains(0xfe23) && !combining.contains(0x0362))
+  // Boost.Regex ends a repetition after an empty iteration, as `check_null_repeat` sets its count to the maximum.
+  test("IRBuilder.build: Boost.Regex's empty iterations"):
+    assertEquals(
+      build("a", "", BoostRegex()).emptyIteration,
+      IREmptyIterationSemantics(IREmptyIteration.ExitAll, IREmptyIteration.ExitAll, false)
+    )
+  check("(?<=ab)", "", BoostRegex())(
+    LookBehind(false, Sequence(char('a'), char('b')), Forward(Seq(IRLookBehindStartRange(2, 2))))
+  )

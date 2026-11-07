@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.ir
 package build
 
+import codes.quine.labs.resyntax.ast.BacktrackStrategy.Greedy
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
@@ -47,6 +48,27 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
   // ICU's `d` changes `$`, but not `\Z`: `(?d)a\Z` matches `a\f`.
   check("$\\Z", "d", ICU)(Sequence(Assert(ChompTextEnd(LT.LF)), Assert(ChompTextEnd(LT.ICU))))
 
+  // Boost.Regex's `^` and `$` are multi-line, and its `.` matches line terminators, unless `M` (`no_mod_m`) and `S`
+  // (`no_mod_s`) turn them off; the line terminators are `\n`, `\f` and `\r`, and U+0085, U+2028 and U+2029 in
+  // `u32regex`, where `\r\n` is atomic (Boost.Regex 1.92.0).
+  val U32Regex: BoostRegex = BoostRegex(BoostRegex.Type.U32Regex)
+  check("^$", "", BoostRegex()):
+    Sequence(Assert(LineBegin(LT.BoostRegexChar, AfterTerminator)), Assert(LineEnd(LT.BoostRegexChar)))
+  check("^$", "", U32Regex)(
+    Sequence(Assert(LineBegin(LT.BoostRegexU32, AfterTerminator)), Assert(LineEnd(LT.BoostRegexU32)))
+  )
+  check("^$", "M", BoostRegex())(Sequence(Assert(TextBegin), Assert(TextEnd)))
+  check("(?-m)^(?m)^", "", BoostRegex()):
+    Sequence(Empty, Assert(TextBegin), Empty, Assert(LineBegin(LT.BoostRegexChar, AfterTerminator)))
+  check("\\Z", "", BoostRegex()):
+    val terminators = IRNodeData.Repeat(IRNode(Chars(CharSet.of('\n', '\f', '\r'))), IRQuantifier.Unbounded(0, Greedy))
+    IRNodeData.LookAhead(false, Sequence(terminators, Assert(TextEnd)))
+  checkChars(".", "", BoostRegex(), U32Regex)(d => Seq(any(".", "", d)))
+  checkChars(".(?s).", "S", BoostRegex()): _ =>
+    Seq(Chars(UnitMode.Byte.universe.diff(CharSet.of('\n', '\f', '\r'))), Chars(UnitMode.Byte.universe))
+  checkChars(".", "S", U32Regex): _ =>
+    Seq(Chars(UnitMode.ScalarValue.universe.diff(CharSet.of(0x0a, 0x0c, 0x0d, 0x85, 0x2028, 0x2029))))
+
   // Java's `d` (UNIX_LINES): `(?d)a$` does not match `a\r`.
   check("$", "d", Java)(Assert(ChompTextEnd(LT.LF)))
   check("(?d)^(?-d)^", "m", Java)(
@@ -65,14 +87,15 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
   check("(*LF)(*CR)$", "", PCRE)(Sequence(Empty, Empty, Assert(ChompTextEnd(LT.CR))))
 
   // Inline flags apply to the rest of the enclosing group, including the following alternatives.
-  checkWith("(?m:^)^", "", All*)(d =>
+  checkWith("(?m:^)^", "", (All :+ BoostRegex())*)(d =>
     val begin = d match
       case JavaScript                          => LineBegin(LT.JavaScript, AfterTerminator)
       case DotNet | _: Python | _: PythonRegex => LineBegin(LT.LF, AfterTerminator)
       case Java                                => LineBegin(LT.Java, Never)
       case PCRE | _: Perl | _: Ruby            => LineBegin(LT.LF, InputBegin)
       case ICU                                 => LineBegin(LT.ICU, InputBegin)
-    Sequence(Assert(begin), Assert(if d == Ruby() then begin else TextBegin))
+      case _: BoostRegex                       => LineBegin(LT.BoostRegexChar, AfterTerminator)
+    Sequence(Assert(begin), Assert(if d == Ruby() || d.isBoostRegex then begin else TextBegin))
   )
   // `(?:(?m))^a` does not match `b\na`, but `(?:(?m)x|^)a` matches it.
   check("(?:(?m))^", "", DotNet, PCRE, Perl())(Sequence(Empty, Assert(TextBegin)))

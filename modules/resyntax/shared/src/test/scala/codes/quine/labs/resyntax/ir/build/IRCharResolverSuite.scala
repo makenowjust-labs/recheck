@@ -3,6 +3,7 @@ package build
 
 import codes.quine.labs.resyntax.ast.BackslashKind.EscapeClass
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
+import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.EscapeClassKind.CharName
 import codes.quine.labs.resyntax.ast.EscapeClassKind.NamedList
 import codes.quine.labs.resyntax.ast.FlagSet
@@ -929,3 +930,43 @@ class IRCharResolverSuite extends munit.FunSuite:
   chars("\\d", "", ICU)(gc("Nd"))
   chars("\\s", "", ICU)(PropertyTable.binary("White_Space").get.set)
   chars("\\h", "", ICU)(gc("Zs").union(of("\t")))
+
+  // Boost.Regex's classes are of the C locale over `char`, and of ICU in `u32regex` (Boost.Regex 1.92.0).
+  val BoostU32: Dialect = BoostRegex(BoostRegex.Type.U32Regex)
+  val Bytes: CharSet = UnitMode.Byte.universe
+  chars("\\w", "", BoostRegex())(IRClassLookup.ASCIIWord)
+  chars("\\s", "", BoostRegex())(of("\t\n\u000b\f\r "))
+  chars("\\h", "", BoostRegex())(of("\t "))
+  chars("\\v", "", BoostRegex())(CharSet.range(0x0a, 0x0d))
+  chars("[\\v]", "", BoostRegex())(of("\u000b"))
+  chars("\\l", "", BoostRegex())(CharSet.range('a', 'z'))
+  chars("\\u", "", BoostRegex())(CharSet.range('A', 'Z'))
+  chars("\\U", "", BoostRegex())(CharSet.range('A', 'Z').complement(UnitMode.Byte))
+  chars("[[:unicode:]]", "", BoostRegex())(CharSet.empty)
+  chars("\\w", "", BoostU32)(gc("L").union(gc("Nd")).union(gc("Mn")).union(of("_")))
+  chars("\\s", "", BoostU32)(
+    gc("Z").union(CharSet.range(0x09, 0x0d)).union(CharSet.range(0x1c, 0x1f)).union(of("\u0085"))
+  )
+  chars("\\v", "", BoostU32)(CharSet.range(0x0a, 0x0d).union(CharSet.of(0x85, 0x2028, 0x2029)))
+  chars("[[:cntrl:]]", "", BoostU32)(gc("Cc").union(gc("Cf")).union(gc("Zl")).union(gc("Zp")))
+  // Under `i`, the class matches a character whose case folding the class has, and the lower or the upper case letters
+  // are all the letters (e.g. `(?i)[@-Z]` matches `[`, and `(?i)\p{Lt}` matches no `Lt` character).
+  chars("\\l", "i", BoostRegex())(of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"))
+  chars("\\L", "i", BoostRegex())(of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz").complement(UnitMode.Byte))
+  chars("[@-Z]", "i", BoostRegex())(CharSet.range('@', 'z'))
+  chars("[^a]", "i", BoostRegex())(of("aA").complement(UnitMode.Byte))
+  error("[Z-a]", "i", BoostRegex())("Range out of order in character class at 1")
+  chars("k", "i", BoostU32)(CharSet.of('k', 'K', 0x212a))
+  chars("[a-z]", "i", BoostU32)(CaseMapping.SimpleFold.preimage(CharSet.range('a', 'z')))
+  chars("\\p{Lt}", "i", BoostU32)(CaseMapping.SimpleFold.preimage(gc("Lt")))
+  chars("\\p{Lu}", "i", BoostU32)(CaseMapping.SimpleFold.preimage(gc("L")).intersect(Scalars))
+  // Collation is unsupported: the collating elements, the equivalence classes, and the ranges with `c` (`collate`).
+  check("[[.a.]]", "", BoostRegex())(Unsupported(NodeData.Class(false, ClassItemData.ClassCollatingElement("a"))))
+  check("[[=a=]]", "", BoostRegex())(Unsupported(NodeData.Class(false, ClassItemData.ClassEquivalence("a"))))
+  check("[a-c]", "c", BoostRegex())(
+    Unsupported(
+      NodeData.Class(false, ClassItemData.ClassRange(ClassItemData.ClassLiteral('a'), ClassItemData.ClassLiteral('c')))
+    )
+  )
+  chars("[ac]", "c", BoostRegex())(of("ac"))
+  check("\\N{space}", "", BoostRegex())(Unsupported(NodeData.Backslash(EscapeClass(CharName("space")))))

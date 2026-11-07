@@ -19,10 +19,14 @@ final case class IRFeatureSet(
     upperEndIsTextEnd: Boolean,
     // ICU
     upperEndIgnoresUnixLines: Boolean,
-    // .NET, JavaScript, Python, python-regex: AfterTerminator, Java: Never, the others: InputBegin
+    // Boost.Regex
+    upperEndSkipsLineTerminators: Boolean,
+    // .NET, Boost.Regex, JavaScript, Python, python-regex: AfterTerminator, Java: Never, the others: InputBegin
     lineBeginAtEnd: IRLineBeginAtEnd,
-    // ICU: eight characters with atomic `\r\n`, JavaScript: LineTerminator, Java: six characters with atomic `\r\n`, PCRE: `(*CR)` and so on, the others: `\n`
+    // Boost.Regex: three or six characters with atomic `\r\n`, ICU: eight characters with atomic `\r\n`, JavaScript: LineTerminator, Java: six characters with atomic `\r\n`, PCRE: `(*CR)` and so on, the others: `\n`
     lineTerminators: LineTerminatorSet,
+    // Boost.Regex
+    multilineAndDotAllByDefault: Boolean,
     // ICU, Java
     hasUnixLinesFlag: Boolean,
     // PCRE
@@ -83,7 +87,7 @@ final case class IRFeatureSet(
     requiresClosedGroupReference: Boolean,
     // python-regex (without `V1`)
     rejectsOpenGroupReference: Boolean,
-    // ICU, Java, Python, Ruby
+    // Boost.Regex, ICU, Java, Python, Ruby
     requiresNameDefinedBefore: Boolean,
     // .NET, PCRE, Python, python-regex, Ruby
     validatesIndexedCaptureTest: Boolean,
@@ -109,9 +113,9 @@ final case class IRFeatureSet(
     restoresCapturesByNegativeCondition: Boolean,
     // Ruby
     unsetsCapturesWhileOpen: Boolean,
-    // JavaScript: Reject, Java, python-regex: ExitAll, Python, Ruby: ExitOptional, the others: ExitFromMin
+    // JavaScript: Reject, Boost.Regex, Java, python-regex: ExitAll, Python, Ruby: ExitOptional, the others: ExitFromMin
     unboundedEmptyIteration: IREmptyIteration,
-    // JavaScript: Reject, Java, python-regex: ExitAll, ICU, PCRE: Ignore, Python, Ruby: ExitOptional, .NET, Perl: ExitFromMin
+    // JavaScript: Reject, Boost.Regex, Java, python-regex: ExitAll, ICU, PCRE: Ignore, Python, Ruby: ExitOptional, .NET, Perl: ExitFromMin
     boundedEmptyIteration: IREmptyIteration,
     // python-regex
     countsReferencedCaptures: Boolean,
@@ -119,11 +123,11 @@ final case class IRFeatureSet(
     thenPassesAssertions: Boolean,
     // Perl
     acceptEndsAtomic: Boolean,
-    // python-regex
+    // Boost.Regex, python-regex
     buildsBacktrackControlAsUnsupported: Boolean,
-    // python-regex
+    // Boost.Regex, python-regex
     buildsConditionalAsUnsupported: Boolean,
-    // .NET, JavaScript, python-regex: Unrestricted, ICU: ICU, Java: Java, PCRE: PCRE, Perl: Perl, Python: Python, Ruby: Ruby
+    // .NET, JavaScript, python-regex: Unrestricted, Boost.Regex: BoostRegex, ICU: ICU, Java: Java, PCRE: PCRE, Perl: Perl, Python: Python, Ruby: Ruby
     lookBehindRule: IRLookBehindRule,
     // Perl
     hasNativeString: Boolean,
@@ -131,7 +135,7 @@ final case class IRFeatureSet(
     matchesUTF8String: Boolean,
     // Perl (`String` source with `utf8`)
     hasUTF8Source: Boolean,
-    // .NET: DotNet, ICU: ICU, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, Python: Python, python-regex: PythonRegex, Ruby: Ruby
+    // .NET: DotNet, Boost.Regex: BoostRegex, ICU: ICU, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, Python: Python, python-regex: PythonRegex, Ruby: Ruby
     caseEquivalenceKind: IRCaseEquivalenceKind,
     // ICU: ICU, Perl: Perl, python-regex: PythonRegex, Ruby: Ruby, the others: OneToOne
     multiCharFoldingKind: IRMultiCharFoldingKind,
@@ -139,18 +143,24 @@ final case class IRFeatureSet(
     joinsLiteralsAsUTF16: Boolean,
     // Ruby
     readsByteEscapesAsUTF8: Boolean,
-    // .NET: DotNet, ICU: ICU, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, Python: Python, python-regex: PythonRegex, Ruby: Ruby
+    // .NET: DotNet, Boost.Regex: BoostRegex, ICU: ICU, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, Python: Python, python-regex: PythonRegex, Ruby: Ruby
     classLookupKind: IRClassLookupKind,
-    // .NET: DotNet, ICU: ICU, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, python-regex: PythonRegex, Ruby: Ruby, Python: none
+    // .NET: DotNet, Boost.Regex: BoostRegex, ICU: ICU, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, python-regex: PythonRegex, Ruby: Ruby, Python: none
     propertyLookupKind: Option[IRPropertyLookupKind],
     // .NET, PCRE: CasedLetter, JavaScript: Canonicalized, Perl: CasedLetterAndCased, python-regex: ClosedInClass, ICU, Ruby: ClosedBeforeNegation, the others: Unchanged
     caselessPropertyKind: IRCaselessPropertyKind,
     // python-regex, Ruby
     closesCaselessClassPOSIX: Boolean,
-    // ICU
+    // Boost.Regex, ICU
     hasPropertyClassPOSIX: Boolean,
-    // PCRE
+    // Boost.Regex
+    matchesClassByFoldedInput: Boolean,
+    // Boost.Regex (with `c`)
+    collatesClassRange: Boolean,
+    // Boost.Regex, PCRE
     hasClassPOSIXWordBoundary: Boolean,
+    // Boost.Regex
+    ignoresClassPOSIXWordBoundaryNegation: Boolean,
     // .NET
     negatesClassBeforeSubtraction: Boolean,
     // Java
@@ -163,6 +173,10 @@ final case class IRFeatureSet(
     hasPCREGraphemeCluster: Boolean,
     // python-regex
     hasCharsetGraphemeCluster: Boolean,
+    // Boost.Regex
+    hasBoostRegexGraphemeCluster: Boolean,
+    // Boost.Regex
+    readsCodeUnitAsDot: Boolean,
     // python-regex
     masksOctalEscapeByCharset: Boolean,
     // python-regex
@@ -215,6 +229,11 @@ object IRLookBehindRule:
     */
   case object ICU extends IRLookBehindRule
 
+  /** BoostRegex requires a fixed length, where only a character repeats an exact number of times, and forbids a
+    * back-reference.
+    */
+  case object BoostRegex extends IRLookBehindRule
+
 /** IRCaseEquivalenceKind is the family of a dialect's case-insensitive matching of single code values.
   *
   * `IRCharResolver.determineCaseEquivalence` selects the [[IRCaseEquivalence]] of the family by the flags and the unit
@@ -255,6 +274,9 @@ enum IRCaseEquivalenceKind:
 
   /** ICU matches by the simple case folding. */
   case ICU
+
+  /** BoostRegex matches by the simple case folding in `u32regex`, and only ASCII letters over `char`. */
+  case BoostRegex
 
 /** IRMultiCharFoldingKind is how a dialect matches a character case-insensitively with the characters of its full case
   * folding (e.g. `ß` with `ss`).
@@ -374,6 +396,11 @@ enum IRClassLookupKind:
   /** ICU has classes of Unicode, whose `\b` skips `Grapheme_Extend` and `Cf` characters. */
   case ICU
 
+  /** BoostRegex has the classes of its class names (e.g. `\w` is `[[:w:]]`), of the C locale over `char` and of ICU's
+    * general categories in `u32regex`.
+    */
+  case BoostRegex
+
 /** IRPropertyLookupKind is the family of a dialect's table of Unicode properties (`\p{...}`).
   *
   * `IRPropertyLookup.lookup` looks up a property in the table of the family at the flags in the unit mode.
@@ -403,6 +430,9 @@ enum IRPropertyLookupKind:
 
   /** ICU has the properties of ICU's `UnicodeSet` with its loose names, and the names of `java.util.regex`. */
   case ICU
+
+  /** BoostRegex has Boost.Regex's class names, and the general categories of ICU too in `u32regex`. */
+  case BoostRegex
 
 /** IRCaselessPropertyKind is how a Unicode property (`\p{...}` or `\P{...}`) matches case-insensitively. */
 enum IRCaselessPropertyKind:
@@ -443,6 +473,8 @@ object IRFeatureSet:
     val isPythonRegex = dialect.isPythonRegex
     val isRuby = dialect.isRuby
     val isICU = dialect.isICU
+    val isBoostRegex = dialect.isBoostRegex
+    val isBoostRegexChar = dialect == Dialect.BoostRegex(Dialect.BoostRegex.Type.Char)
 
     val bsr = startOptions.reverseIterator.collectFirst:
       case "BSR_ANYCRLF" => true
@@ -455,16 +487,20 @@ object IRFeatureSet:
         isPythonRegex || isRuby,
       upperEndIsTextEnd = isPython || isPythonRegex,
       upperEndIgnoresUnixLines = isICU,
+      upperEndSkipsLineTerminators = isBoostRegex,
       lineBeginAtEnd =
-        if isDotNet || isJavaScript || isPython || isPythonRegex then IRLineBeginAtEnd.AfterTerminator
+        if isDotNet || isBoostRegex || isJavaScript || isPython || isPythonRegex then IRLineBeginAtEnd.AfterTerminator
         else if isJava then IRLineBeginAtEnd.Never
         else IRLineBeginAtEnd.InputBegin,
       lineTerminators =
-        if isICU then LineTerminatorSet.ICU
+        if isBoostRegexChar then LineTerminatorSet.BoostRegexChar
+        else if isBoostRegex then LineTerminatorSet.BoostRegexU32
+        else if isICU then LineTerminatorSet.ICU
         else if isJavaScript then LineTerminatorSet.JavaScript
         else if isJava then LineTerminatorSet.Java
         else if isPCRE then LineTerminatorSet.fromPCREStartOptions(startOptions).getOrElse(LineTerminatorSet.LF)
         else LineTerminatorSet.LF,
+      multilineAndDotAllByDefault = isBoostRegex,
       hasUnixLinesFlag = isICU || isJava,
       hasUngreedyFlag = isPCRE,
       hasExplicitCaptureFlag = isDotNet || isPCRE || isPerl,
@@ -495,7 +531,7 @@ object IRFeatureSet:
       allowsBackReferenceToMissingGroup = isJava,
       requiresClosedGroupReference = isPython,
       rejectsOpenGroupReference = isPythonRegex && !flagSet.version1,
-      requiresNameDefinedBefore = isICU || isJava || isPython || isRuby,
+      requiresNameDefinedBefore = isBoostRegex || isICU || isJava || isPython || isRuby,
       validatesIndexedCaptureTest = isDotNet || isPCRE || isPython || isPythonRegex || isRuby,
       validatesIndexedRecursionTest = isPCRE,
       readsRecursionTestAsCaptureTest = isPCRE,
@@ -510,12 +546,13 @@ object IRFeatureSet:
       unsetsCapturesWhileOpen = isRuby,
       unboundedEmptyIteration =
         if isJavaScript then IREmptyIteration.Reject
-        else if isJava || isPythonRegex then IREmptyIteration.ExitAll
+        // Boost.Regex ends a repetition after an empty iteration, as `check_null_repeat` sets the count to the maximum.
+        else if isBoostRegex || isJava || isPythonRegex then IREmptyIteration.ExitAll
         else if isPython || isRuby then IREmptyIteration.ExitOptional
         else IREmptyIteration.ExitFromMin,
       boundedEmptyIteration =
         if isJavaScript then IREmptyIteration.Reject
-        else if isJava || isPythonRegex then IREmptyIteration.ExitAll
+        else if isBoostRegex || isJava || isPythonRegex then IREmptyIteration.ExitAll
         // PCRE repeats copies of the node for a bounded repetition, and ICU does not check whether its iteration advances.
         else if isICU || isPCRE then IREmptyIteration.Ignore
         else if isPython || isRuby then IREmptyIteration.ExitOptional
@@ -523,8 +560,8 @@ object IRFeatureSet:
       countsReferencedCaptures = isPythonRegex,
       thenPassesAssertions = isPerl,
       acceptEndsAtomic = isPerl,
-      buildsBacktrackControlAsUnsupported = isPythonRegex,
-      buildsConditionalAsUnsupported = isPythonRegex,
+      buildsBacktrackControlAsUnsupported = isBoostRegex || isPythonRegex,
+      buildsConditionalAsUnsupported = isBoostRegex || isPythonRegex,
       lookBehindRule = dialect match
         case Dialect.DotNet | Dialect.JavaScript | _: Dialect.PythonRegex => IRLookBehindRule.Unrestricted
         case Dialect.Java                                                 => IRLookBehindRule.Java
@@ -532,7 +569,8 @@ object IRFeatureSet:
         case _: Dialect.Perl                                              => IRLookBehindRule.Perl
         case _: Dialect.Python                                            => IRLookBehindRule.Python
         case _: Dialect.Ruby                                              => IRLookBehindRule.Ruby
-        case Dialect.ICU                                                  => IRLookBehindRule.ICU,
+        case Dialect.ICU                                                  => IRLookBehindRule.ICU
+        case _: Dialect.BoostRegex                                        => IRLookBehindRule.BoostRegex,
       hasNativeString = isPerl,
       matchesUTF8String = dialect match
         case Dialect.Perl(utf8, _) => utf8
@@ -547,7 +585,8 @@ object IRFeatureSet:
         case _: Dialect.Python      => IRCaseEquivalenceKind.Python
         case _: Dialect.PythonRegex => IRCaseEquivalenceKind.PythonRegex
         case _: Dialect.Ruby        => IRCaseEquivalenceKind.Ruby
-        case Dialect.ICU            => IRCaseEquivalenceKind.ICU,
+        case Dialect.ICU            => IRCaseEquivalenceKind.ICU
+        case _: Dialect.BoostRegex  => IRCaseEquivalenceKind.BoostRegex,
       multiCharFoldingKind =
         if isPerl then IRMultiCharFoldingKind.Perl
         else if isPythonRegex then IRMultiCharFoldingKind.PythonRegex
@@ -565,7 +604,8 @@ object IRFeatureSet:
         case _: Dialect.Python      => IRClassLookupKind.Python
         case _: Dialect.PythonRegex => IRClassLookupKind.PythonRegex
         case _: Dialect.Ruby        => IRClassLookupKind.Ruby
-        case Dialect.ICU            => IRClassLookupKind.ICU,
+        case Dialect.ICU            => IRClassLookupKind.ICU
+        case _: Dialect.BoostRegex  => IRClassLookupKind.BoostRegex,
       propertyLookupKind = dialect match
         case Dialect.DotNet         => Some(IRPropertyLookupKind.DotNet)
         case Dialect.Java           => Some(IRPropertyLookupKind.Java)
@@ -575,7 +615,8 @@ object IRFeatureSet:
         case _: Dialect.Python      => None
         case _: Dialect.PythonRegex => Some(IRPropertyLookupKind.PythonRegex)
         case _: Dialect.Ruby        => Some(IRPropertyLookupKind.Ruby)
-        case Dialect.ICU            => Some(IRPropertyLookupKind.ICU),
+        case Dialect.ICU            => Some(IRPropertyLookupKind.ICU)
+        case _: Dialect.BoostRegex  => Some(IRPropertyLookupKind.BoostRegex),
       caselessPropertyKind =
         if isDotNet || isPCRE then IRCaselessPropertyKind.CasedLetter
         else if isJavaScript then IRCaselessPropertyKind.Canonicalized
@@ -584,14 +625,19 @@ object IRFeatureSet:
         else if isICU || isRuby then IRCaselessPropertyKind.ClosedBeforeNegation
         else IRCaselessPropertyKind.Unchanged,
       closesCaselessClassPOSIX = isPythonRegex || isRuby,
-      hasPropertyClassPOSIX = isICU,
-      hasClassPOSIXWordBoundary = isPCRE,
+      hasPropertyClassPOSIX = isBoostRegex || isICU,
+      matchesClassByFoldedInput = isBoostRegex,
+      collatesClassRange = isBoostRegex && flagSet.continue,
+      hasClassPOSIXWordBoundary = isBoostRegex || isPCRE,
+      ignoresClassPOSIXWordBoundaryNegation = isBoostRegex,
       negatesClassBeforeSubtraction = isDotNet,
       backtracksIntoGeneralNewline = isJava,
       hasASCIIGeneralNewline = dialect == Dialect.PythonRegex(Dialect.Python.Type.Bytes),
       nonNewlineExcludesLineTerminators = isPCRE,
       hasPCREGraphemeCluster = isPCRE,
       hasCharsetGraphemeCluster = isPythonRegex,
+      hasBoostRegexGraphemeCluster = isBoostRegex,
+      readsCodeUnitAsDot = isBoostRegex,
       masksOctalEscapeByCharset = isPythonRegex,
       allowsWideEscapeInByteMode = isPythonRegex,
       hasUnsupportedWordFlag = isPythonRegex,

@@ -73,6 +73,7 @@ object IRClassLookup:
       case IRClassLookupKind.PythonRegex => PythonRegex(mode)
       case IRClassLookupKind.Ruby        => Ruby(mode)
       case IRClassLookupKind.ICU         => ICU
+      case IRClassLookupKind.BoostRegex  => BoostRegex(mode)
 
   private enum Rule:
 
@@ -287,6 +288,68 @@ object IRClassLookup:
     override def wordMarks(flags: IRCharFlagSet): Option[IRWordMarkSet] = Some(icuWordMarks)
 
     override def horizontal: CharSet = gc("Zs").union(of("\t"))
+
+  /** BoostRegex is the table of Boost.Regex, whose escape classes are its class names (e.g. `\w` is `[[:w:]]`). */
+  private[build] final case class BoostRegex(mode: UnitMode) extends IRClassLookup:
+
+    private def lookup(name: String, ignoreCase: Boolean): CharSet =
+      val PropertyResult.Found(set, _) = IRPropertyLookup.boostRegex(name, ignoreCase, mode): @unchecked
+      set.chars
+
+    def digit(flags: IRCharFlagSet): CharSet = lookup("d", flags.ignoreCase)
+
+    def space(flags: IRCharFlagSet): CharSet = lookup("s", flags.ignoreCase)
+
+    def word(flags: IRCharFlagSet): CharSet = lookup("w", flags.ignoreCase)
+
+    override def horizontal: CharSet = lookup("h", ignoreCase = false)
+
+    override def vertical: CharSet = lookup("v", ignoreCase = false)
+
+  /** The combining characters of Boost.Regex's `\X` in `u32regex`, which are the fixed table of
+    * `is_combining_implementation` of `regex_traits_defaults.hpp`.
+    */
+  lazy val boostRegexCombining: CharSet =
+    val ranges = Seq(
+      0x0300 -> 0x0361,
+      0x0483 -> 0x0486,
+      0x0903 -> 0x0903,
+      0x093e -> 0x0940,
+      0x0949 -> 0x094c,
+      0x0982 -> 0x0983,
+      0x09be -> 0x09c0,
+      0x09c7 -> 0x09cc,
+      0x09d7 -> 0x09d7,
+      0x0a3e -> 0x0a40,
+      0x0a83 -> 0x0a83,
+      0x0abe -> 0x0ac0,
+      0x0ac9 -> 0x0acc,
+      0x0b02 -> 0x0b03,
+      0x0b3e -> 0x0b3e,
+      0x0b40 -> 0x0b40,
+      0x0b47 -> 0x0b4c,
+      0x0b57 -> 0x0b57,
+      0x0b83 -> 0x0b83,
+      0x0bbe -> 0x0bbf,
+      0x0bc1 -> 0x0bcc,
+      0x0bd7 -> 0x0bd7,
+      0x0c01 -> 0x0c03,
+      0x0c41 -> 0x0c44,
+      0x0c82 -> 0x0c83,
+      0x0cbe -> 0x0cbe,
+      0x0cc0 -> 0x0cc4,
+      0x0cc7 -> 0x0ccb,
+      0x0cd5 -> 0x0cd6,
+      0x0d02 -> 0x0d03,
+      0x0d3e -> 0x0d40,
+      0x0d46 -> 0x0d4c,
+      0x0d57 -> 0x0d57,
+      0x0f7f -> 0x0f7f,
+      0x20d0 -> 0x20e1,
+      0x3099 -> 0x309a,
+      0xfe20 -> 0xfe23
+    )
+    CharSet.union(ranges.map((start, end) => CharSet.range(start, end)))
 
   /** The characters that ICU's `\b` skips: `Grapheme_Extend` and `Cf`. */
   private lazy val icuWordExtenders: CharSet = binary("Grapheme_Extend").union(gc("Cf"))

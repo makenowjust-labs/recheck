@@ -200,6 +200,8 @@ private[build] object IRPropertyLookup:
         case None        => pythonRegex(None, name, posix = false, flags, mode)
     // ICU's parser keeps the whole expression of `\p{...}` as the name.
     case IRPropertyLookupKind.ICU => icu(name)
+    // Boost.Regex's parser keeps the whole name of `\p{...}`.
+    case IRPropertyLookupKind.BoostRegex => boostRegex(name, flags.ignoreCase, mode)
 
   def isJavaScriptStringProperty(name: String): Boolean = JavaScriptStringProperties.contains(name)
 
@@ -1535,3 +1537,136 @@ private[build] object IRPropertyLookup:
       case "javaWhitespace"             =>
         found(gc("Z").diff(of("\u00A0\u2007\u202F")).union(CharSet.range(0x09, 0x0d)).union(CharSet.range(0x1c, 0x1f)))
       case _ => Unknown
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // Boost.Regex
+
+  /** Looks up a class name of Boost.Regex in the unit mode, as `lookup_classname` of its traits does, where a class of
+    * the lower or the upper case letters has all the letters under `i` (e.g. `\l` matches `A`).
+    *
+    * Over `char` (byte mode), the names are the class names of the C locale in any ASCII case (e.g. `\p{Alpha}`). In
+    * `u32regex`, the names of ICU's general categories follow them, ignoring spaces, `-` and `_` (e.g. `\p{L u}`). A
+    * class name comes first (e.g. `\pL` is `\p{l}`, the lower case letters).
+    */
+  def boostRegex(name: String, ignoreCase: Boolean, mode: UnitMode): PropertyResult =
+    val (key, classes) =
+      if mode == UnitMode.Byte then (lowerASCII(name), BoostRegexCharClasses)
+      else
+        (lowerASCII(name.filterNot(c => c == '-' || c == '_' || BoostRegexU32Space.contains(c))), BoostRegexU32Classes)
+    classes.get(key) match
+      case Some((set, cased)) =>
+        val letters = if mode == UnitMode.Byte then ASCII_POSIX("alpha") else gc("L")
+        found(if ignoreCase && cased then set.union(letters) else set)
+      case None => Unknown
+
+  /** The characters of Boost.Regex's `\s` in `u32regex`, ICU's `u_isspace`: `Z`, `\t` to `\r`, U+001C to U+001F and
+    * U+0085.
+    */
+  private lazy val BoostRegexU32Space: CharSet =
+    gc("Z").union(CharSet.range(0x09, 0x0d)).union(CharSet.range(0x1c, 0x1f)).union(CharSet.single(0x85))
+
+  /** The class names of Boost.Regex over `char` with their characters in the C locale, and whether they are of a case.
+    */
+  private lazy val BoostRegexCharClasses: Map[String, (CharSet, Boolean)] =
+    val space = ASCII_POSIX("space")
+    val vertical = CharSet.range(0x0a, 0x0d)
+    Map(
+      "alnum" -> (ASCII_POSIX("alnum"), false),
+      "alpha" -> (ASCII_POSIX("alpha"), false),
+      // A blank is a space but a line terminator (`\n`, `\f` and `\r`), so VT is one.
+      "blank" -> (space.diff(of("\n\f\r")), false),
+      "cntrl" -> (ASCII_POSIX("cntrl"), false),
+      "d" -> (ASCII_POSIX("digit"), false),
+      "digit" -> (ASCII_POSIX("digit"), false),
+      "graph" -> (ASCII_POSIX("graph"), false),
+      "h" -> (space.diff(vertical), false),
+      "l" -> (ASCII_POSIX("lower"), true),
+      "lower" -> (ASCII_POSIX("lower"), true),
+      "print" -> (ASCII_POSIX("print"), false),
+      "punct" -> (ASCII_POSIX("punct"), false),
+      "s" -> (space, false),
+      "space" -> (space, false),
+      "u" -> (ASCII_POSIX("upper"), true),
+      "unicode" -> (CharSet.range(0x100, 0x10ffff), false),
+      "upper" -> (ASCII_POSIX("upper"), true),
+      "v" -> (vertical, false),
+      "w" -> (ASCII_POSIX("word"), false),
+      "word" -> (ASCII_POSIX("word"), false),
+      "xdigit" -> (ASCII_POSIX("xdigit"), false)
+    )
+
+  /** The class names of Boost.Regex's `u32regex` with their characters by ICU, and whether they are of a case: the
+    * class names of `icu.hpp`, and the names of the general categories of `lookup_icu_mask`.
+    */
+  private lazy val BoostRegexU32Classes: Map[String, (CharSet, Boolean)] =
+    val vertical = CharSet.range(0x0a, 0x0d).union(CharSet.of(0x85, 0x2028, 0x2029))
+    val word = gc("L", "Nd", "Mn").union(of("_"))
+    val classes = Map(
+      "alnum" -> gc("L", "Nd"),
+      "alpha" -> gc("L"),
+      "blank" -> gc("Zs").union(of("\t")),
+      "cntrl" -> gc("Cc", "Cf", "Zl", "Zp"),
+      "d" -> gc("Nd"),
+      "digit" -> gc("Nd"),
+      "graph" -> gc("L", "M", "N", "P", "S", "Co"),
+      "h" -> BoostRegexU32Space.diff(vertical),
+      "print" -> gc("L", "M", "N", "P", "S", "Z"),
+      "punct" -> gc("P"),
+      "s" -> BoostRegexU32Space,
+      "space" -> BoostRegexU32Space,
+      "unicode" -> CharSet.range(0x100, 0x10ffff),
+      "v" -> vertical,
+      "w" -> word,
+      "word" -> word,
+      "xdigit" -> gc("Nd")
+        .union(ASCII_POSIX("xdigit"))
+        .union(CharSet.range(0xff21, 0xff26))
+        .union(CharSet.range(0xff41, 0xff46)),
+      "any" -> unicodeUniverse.universe,
+      "ascii" -> CharSet.range(0, 0x7f),
+      "assigned" -> gc("Cn").complement(unicodeUniverse)
+    )
+    val categories = Seq(
+      "C" -> Seq("c*", "other"),
+      "Cc" -> Seq("cc", "control"),
+      "Cf" -> Seq("cf", "format"),
+      "Cn" -> Seq("cn", "notassigned"),
+      "Co" -> Seq("co", "privateuse"),
+      "Cs" -> Seq("cs", "surrogate"),
+      "L" -> Seq("l*", "letter"),
+      "Lm" -> Seq("lm", "modifierletter"),
+      "Lo" -> Seq("lo", "otherletter"),
+      "Lt" -> Seq("lt", "titlecase", "titlecaseletter"),
+      "M" -> Seq("m*", "mark"),
+      "Mc" -> Seq("mc", "spacingcombiningmark"),
+      "Me" -> Seq("me", "enclosingmark"),
+      "Mn" -> Seq("mn", "nonspacingmark"),
+      "N" -> Seq("n*", "number"),
+      "Nd" -> Seq("nd", "decimaldigitnumber"),
+      "Nl" -> Seq("nl", "letternumber"),
+      "No" -> Seq("no", "othernumber"),
+      "P" -> Seq("p*", "punctuation"),
+      "Pc" -> Seq("pc", "connectorpunctuation"),
+      "Pd" -> Seq("pd", "dashpunctuation"),
+      "Pe" -> Seq("pe", "closepunctuation"),
+      "Pf" -> Seq("pf", "finalpunctuation"),
+      "Pi" -> Seq("pi", "initialpunctuation"),
+      "Po" -> Seq("po", "otherpunctuation"),
+      "Ps" -> Seq("ps", "openpunctuation"),
+      "S" -> Seq("s*", "symbol"),
+      "Sc" -> Seq("sc", "currencysymbol"),
+      "Sk" -> Seq("sk", "modifiersymbol"),
+      "Sm" -> Seq("sm", "mathsymbol"),
+      "So" -> Seq("so", "othersymbol"),
+      "Z" -> Seq("z*", "separator"),
+      "Zl" -> Seq("zl", "lineseparator"),
+      "Zp" -> Seq("zp", "paragraphseparator"),
+      "Zs" -> Seq("zs", "spaceseparator")
+    )
+    val cased = Seq(
+      gc("Ll") -> Seq("l", "lower", "ll", "lowercaseletter"),
+      gc("Lu") -> Seq("u", "upper", "lu", "uppercaseletter")
+    )
+    classes.map((name, set) => name -> (set, false)) ++
+      categories.flatMap((category, names) => names.map(_ -> (gc(category), false))) ++
+      cased.flatMap((set, names) => names.map(_ -> (set, true)))

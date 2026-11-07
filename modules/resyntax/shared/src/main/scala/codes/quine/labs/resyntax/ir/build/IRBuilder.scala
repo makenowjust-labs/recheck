@@ -49,7 +49,12 @@ object IRBuilder:
         throw new IRBuildingException("Cannot use UNICODE flag with a bytes pattern", SourceLocation.Invalid)
       validatePythonGlobalFlags(node, flagSet)
     if featureSet.validatesPythonRegexFlags then validatePythonRegexFlags(node, globalFlagSet, mode)
-    val initialFlagSet = if featureSet.fullCaseByDefault then globalFlagSet.copy(fullCase = true) else globalFlagSet
+    val initialFlagSet =
+      if featureSet.fullCaseByDefault then globalFlagSet.copy(fullCase = true)
+      // Boost.Regex's `M` (`no_mod_m`) and `S` (`no_mod_s`) turn off `m` and `s`, which are on by default.
+      else if featureSet.multilineAndDotAllByDefault then
+        globalFlagSet.copy(multiline = !globalFlagSet.noMultiline, dotAll = !globalFlagSet.analyze)
+      else globalFlagSet
     val context = BuildingContext(initialFlagSet, featureSet)
     val table = CaptureAnalyzer.analyze(node, context)
     val resolver = new ReferenceResolver(table, featureSet)
@@ -563,8 +568,9 @@ private[build] class IRBuilder(
     case CommandKind.Conditional(_, _, _) if featureSet.buildsConditionalAsUnsupported =>
       Left(IRNodeData.Unsupported(node.data))
     case CommandKind.Conditional(test, yes, no) => buildConditional(node, test, yes, no)
-    case CommandKind.BacktrackControl(Some(BacktrackControlKind.Prune | BacktrackControlKind.Skip), _)
-        if featureSet.buildsBacktrackControlAsUnsupported =>
+    case CommandKind.BacktrackControl(kind, _)
+        if featureSet.buildsBacktrackControlAsUnsupported &&
+          !kind.exists(k => k == BacktrackControlKind.Fail || k == BacktrackControlKind.F) =>
       Left(IRNodeData.Unsupported(node.data))
     case CommandKind.BacktrackControl(kind, name) => Left(buildBacktrackControl(kind, name))
     case CommandKind.Fuzzy(_, _)                  => Left(IRNodeData.Unsupported(node.data))
@@ -731,6 +737,11 @@ private[build] class IRBuilder(
       // ICU's `d` (UNIX_LINES) changes `.`, `^` and `$`, but not `\Z`.
       else if featureSet.upperEndIgnoresUnixLines then
         IRNodeData.Assert(IRAssertKind.ChompTextEnd(featureSet.lineTerminators))
+      // Boost.Regex's `\Z` matches before any line terminators at the end (e.g. `a\Z` matches `a\n\r`).
+      else if featureSet.upperEndSkipsLineTerminators then
+        val terminators = IRNodeData.Chars(CharSet.of(featureSet.lineTerminators.chars.toSeq*))
+        val rest = IRNodeData.Repeat(IRNode(terminators), IRQuantifier.Unbounded(0, BacktrackStrategy.Greedy))
+        IRNodeData.LookAhead(false, IRNodeData.Sequence(rest, IRNodeData.Assert(IRAssertKind.TextEnd)))
       else IRNodeData.Assert(IRAssertKind.ChompTextEnd(context.lineTerminators))
     // `\G` is the start of the search, and the checkers search from the start of the input.
     case AssertKind.Sticky                                              => IRNodeData.Assert(IRAssertKind.TextBegin)

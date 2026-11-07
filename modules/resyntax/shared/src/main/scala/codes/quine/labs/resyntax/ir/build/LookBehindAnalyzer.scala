@@ -68,6 +68,9 @@ private[build] final class LookBehindAnalyzer(
       case IRLookBehindRule.ICU =>
         if icuMaxLength(body) >= ICUMaxLength then
           fail("Look-behind does not have a bounded maximum length", lookBehind)
+      case IRLookBehindRule.BoostRegex =>
+        val fixed = width(body, Set.empty).exists(w => w.min == w.max && w.max != Inf)
+        if isBoostRegexForbidden(body) || !fixed then fail("Look-behind requires fixed-length pattern", lookBehind)
 
   /** Determines how the engine matches the body of a valid look-behind.
     *
@@ -92,7 +95,8 @@ private[build] final class LookBehindAnalyzer(
         val starts = startRange(body)
         val min = perlAcceptMin(body).fold(starts.min)(n => starts.min.min(toLength(n)))
         IRLookBehindMatch.Forward(Seq(starts.copy(min = min)))
-      case IRLookBehindRule.Python | IRLookBehindRule.ICU => IRLookBehindMatch.Forward(Seq(startRange(body)))
+      case IRLookBehindRule.Python | IRLookBehindRule.ICU | IRLookBehindRule.BoostRegex =>
+        IRLookBehindMatch.Forward(Seq(startRange(body)))
       // Each top-level alternative of Ruby's look-behind has a fixed width, so matching it backward is the same.
       case IRLookBehindRule.Ruby => IRLookBehindMatch.Backward
 
@@ -289,6 +293,27 @@ private[build] final class LookBehindAnalyzer(
     case NodeData.Literal(value)                                 => Some(value)
     case NodeData.Backslash(value: BackslashKind.BackslashValue) => Some(value.value)
     case _                                                       => None
+
+  /** Checks whether Boost.Regex's look-behind has a node that `calculate_backstep` rejects: a back-reference, or a
+    * repeat of other than a character or of a varying count (e.g. `(?:ab){2}` and `a{1,2}`).
+    *
+    * A look-around inside is not checked, which has its own rule.
+    */
+  private def isBoostRegexForbidden(node: Node): Boolean = node.data match
+    case NodeData.Group(_: GroupKind.LookAround, _)               => false
+    case NodeData.Backslash(_: BackslashKind.EscapeBackReference) => true
+    case NodeData.Repeat(child, quantifier, _)                    =>
+      val (min, max) = bounds(quantifier)
+      min != max || !isBoostRegexCharacter(child)
+    case _ => NodeKey.children(node).exists(isBoostRegexForbidden)
+
+  /** Checks whether the node matches one character, which Boost.Regex's look-behind can repeat. */
+  private def isBoostRegexCharacter(node: Node): Boolean = node.data match
+    case NodeData.Literal(_) | NodeData.Dot | NodeData.Class(_, _) => true
+    case NodeData.Backslash(_: BackslashKind.BackslashValue)       => true
+    case NodeData.Backslash(BackslashKind.EscapeClass(kind))       =>
+      kind != EscapeClassKind.GeneralNewline && kind != EscapeClassKind.GraphemeCluster
+    case _ => false
 
   /** Checks Onigmo's restriction: each top-level alternative has a fixed length, and some nodes are forbidden. */
   private def isValidRubyLookBehind(body: Node, negative: Boolean): Boolean =

@@ -474,3 +474,31 @@ class IRPropertyLookupSuite extends munit.FunSuite with IRHelper:
     for name <- Seq("javaJavaIdentifierPart", "javaUnicodeIdentifierPart", "javaWhitespace") do
       val Chars(set) = build(s"\\p{$name}", "", ICU).node.data: @unchecked
       assert(set.contains('_') == (name != "javaWhitespace"), name)
+
+  // Boost.Regex's names are its class names, and in `u32regex` the general categories of ICU (Boost.Regex 1.92.0).
+  val BoostChar: Dialect = BoostRegex()
+  val BoostU32: Dialect = BoostRegex(BoostRegex.Type.U32Regex)
+  val SV: UnitMode = UnitMode.ScalarValue
+  chars("\\pL", "", BoostChar)(CharSet.range('a', 'z'))
+  chars("\\p{Alpha}", "", BoostChar)(IRClassLookup.ASCII_POSIX("alpha"))
+  chars("\\p{WORD}", "", BoostChar)(IRClassLookup.ASCIIWord)
+  chars("\\p{blank}", "", BoostChar)(CharSet.of('\t', '\u000b', ' '))
+  chars("\\p{unicode}", "", BoostChar)(CharSet.empty)
+  chars("\\pL", "", BoostU32)(IRPropertyLookup.gc("Ll"))
+  chars("\\p{L*}", "", BoostU32)(IRPropertyLookup.gc("L"))
+  chars("\\p{Uppercase-Letter}", "", BoostU32)(IRPropertyLookup.gc("Lu"))
+  chars("\\p{ t i t l e c a s e }", "", BoostU32)(IRPropertyLookup.gc("Lt"))
+  chars("\\p{Other}", "", BoostU32)(IRPropertyLookup.gc("C").intersect(SV.universe))
+  chars("\\p{assigned}", "", BoostU32)(IRPropertyLookup.gc("Cn").complement(SV))
+  chars("\\p{print}", "", BoostU32)(IRPropertyLookup.gc("L", "M", "N", "P", "S", "Z"))
+  chars("\\p{xdigit}", "", BoostU32):
+    IRPropertyLookup
+      .gc("Nd")
+      .union(IRClassLookup.ASCII_POSIX("xdigit"))
+      .union(CharSet.range(0xff21, 0xff26))
+      .union(CharSet.range(0xff41, 0xff46))
+  chars("\\p{h}", "", BoostU32)(IRPropertyLookup.gc("Zs").union(CharSet.of('\t')).union(CharSet.range(0x1c, 0x1f)))
+  for name <- Seq("Lu", "Greek", "Alphabetic", "L&", "^alpha", " alpha ", "any") do
+    error(s"\\p{$name}", "", BoostChar)("Unknown Unicode property name at 0")
+  for name <- Seq("Greek", "Alphabetic", "L&", "gc=Lu", "White_Space") do
+    error(s"\\p{$name}", "", BoostU32)("Unknown Unicode property name at 0")
