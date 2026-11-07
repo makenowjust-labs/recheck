@@ -37,6 +37,8 @@ private[repair] final case class Candidate(
   *   - a possessive quantifier or an atomic group of a repetition, if the dialect has it, or else, as a fallback, a
   *     negative look-ahead of the atom after a repetition of it, which reads the most as a possessive one does (e.g.
   *     `[a-z]+` to `[a-z]+(?![a-z])`),
+  *   - a lazy repetition of an atom read greedily without the characters of the next item after its minimum, where it
+  *     stops (e.g. `<(.*?)>` to `<([^>]*)>`, and `\[(.+?)\]` to `\[(.[^\]]*)\]` with `s`),
   *   - a repetition read at most once or exactly its minimum (e.g. `(a+)+` to `(a+)`, and `(\s*)*` to `(\s*)?`),
   *   - the characters of the earlier alternatives removed from a later one, or a later alternative removed if an
   *     earlier one is the same or covers it (e.g. `(?:\w|\d)` to `(?:\w)`),
@@ -204,20 +206,33 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
   /** Lists the candidates around the atoms at the spots. */
   def find(spots: Set[SourceLocation]): Seq[Candidate] =
     val hot = mutable.LinkedHashSet.empty[Node]
+    val parents = new java.util.IdentityHashMap[Node, Node]
 
     def overlaps(loc: SourceLocation): Boolean = spots.exists(s => s.start < loc.end && loc.start < s.end)
 
     def walk(n: Node, ancestors: List[Node]): Unit =
       if isAtom(n) && overlaps(n.loc) then hot ++= ancestors
+      ancestors.headOption.foreach(parents.put(n, _))
       children(n).foreach(walk(_, n :: ancestors))
 
     walk(node, Nil)
+
+    // The item that the matching reads right after the node, out of the groups and the alternatives that end with it.
+    def following(n: Node): Option[Node] =
+      Option(parents.get(n)).flatMap: parent =>
+        parent.data match
+          case NodeData.Sequence(ns) => items(ns).dropWhile(_ ne n).drop(1).headOption.orElse(following(parent))
+          case NodeData.Disjunction(_) | NodeData.Group(GroupKind.NonCapture, _) => following(parent)
+          case NodeData.Group(GroupKind.IndexedCapture | _: GroupKind.NamedCapture | _: GroupKind.PNamedCapture, _) =>
+            following(parent)
+          case _ => None
 
     val candidates = Vector.newBuilder[Candidate]
     for n <- hot if n.loc != SourceLocation.Invalid do
       n.data match
         case NodeData.Repeat(child, q, _) if min(q).nonEmpty =>
           candidates ++= makePossessive(n, child, q)
+          candidates ++= delimitLazyLoop(n, child, q, following(n)).map(Candidate(_))
           candidates ++= reduceRepetition(n, child, q).map(Candidate(_))
           candidates ++= unrollRepetition(n, child, q)
         case NodeData.Disjunction(alternatives) => candidates ++= trimAlternatives(n, alternatives).map(Candidate(_))
@@ -232,7 +247,8 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
       val hasPossessive = q match
         case Quantifier.Star(_) | Quantifier.Plus(_) => features.hasPossessiveBacktrackStrategy
         case _                                       => features.hasPossessiveCurlyBacktrackStrategy
-      if hasPossessive then Some(Candidate(edit(n -> Seq(repeat(child, possessive(q))))))
+      if hasPossessive then
+        Some(Candidate(edit(n -> Seq(repeat(child, withStrategy(q, BacktrackStrategy.Possessive))))))
       else if features.hasAtomicGroup then
         Some(Candidate(edit(n -> Seq(Node(NodeData.Group(GroupKind.Atomic(AssertNameStyle.Symbolic), n))))))
       // A repetition of an atom followed by a negative look-ahead of it reads the most, as a possessive one does.
@@ -241,14 +257,39 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
           val lookAhead = Node(NodeData.Group(GroupKind.NegativeLookAhead(AssertNameStyle.Symbolic), loop.atom))
           Candidate(edit(n -> Seq(n, lookAhead)), isFallback = true)
 
-  private def possessive(q: Quantifier): Quantifier = q match
-    case Quantifier.Star(_)         => Quantifier.Star(BacktrackStrategy.Possessive)
-    case Quantifier.Plus(_)         => Quantifier.Plus(BacktrackStrategy.Possessive)
-    case Quantifier.Unbounded(m, _) => Quantifier.Unbounded(m, BacktrackStrategy.Possessive)
+  private def withStrategy(q: Quantifier, strategy: BacktrackStrategy): Quantifier = q match
+    case Quantifier.Star(_)         => Quantifier.Star(strategy)
+    case Quantifier.Plus(_)         => Quantifier.Plus(strategy)
+    case Quantifier.Unbounded(m, _) => Quantifier.Unbounded(m, strategy)
     // Only a repetition without a maximum has candidates.
     // $COVERAGE-OFF$
     case q => throw new IllegalArgumentException(s"a repetition with a maximum: $q")
     // $COVERAGE-ON$
+
+  /** A lazy repetition of an atom read greedily without the characters of the next item after its minimum, since it
+    * stops at them only after its minimum (e.g. `<(.*?)>` to `<([^>]*)>`, and `\[(.+?)\]` to `\[(.[^\]]*)\]` with `s`).
+    */
+  private def delimitLazyLoop(n: Node, child: Node, q: Quantifier, next: Option[Node]): Option[Node] =
+    // The characters that the next item reads first, if it reads one.
+    val nextSet = next.flatMap: next =>
+      next.data match
+        case NodeData.Repeat(atom, q, _) if minimumCount(q) >= 1 => setOf(atom)
+        case _                                                   => setOf(next)
+    for
+      set <- setOf(child)
+      stop <- nextSet
+      m <- min(q)
+      if q.strategy == BacktrackStrategy.Lazy && set.intersect(stop).nonEmpty && set.diff(stop).nonEmpty
+    yield
+      val head = if m == 0 then Seq.empty else Seq(minimum(AtomLoop(set, m, child)))
+      edit(n -> (head :+ repeat(without(child, set, stop), Quantifier.Star(BacktrackStrategy.Greedy))))
+
+  private def minimumCount(q: Quantifier): Int = q match
+    case Quantifier.Star(_) | Quantifier.Question(_) | Quantifier.MaxBounded(_, _) => 0
+    case Quantifier.Plus(_)                                                        => 1
+    case Quantifier.Exact(n, _)                                                    => n
+    case Quantifier.Bounded(min, _, _)                                             => min
+    case Quantifier.Unbounded(min, _)                                              => min
 
   /** The repetition read at most once, or exactly its minimum (e.g. `(a+)+` to `(a+)`, and `(.*,)+` to `(.*,)`). */
   private def reduceRepetition(n: Node, child: Node, q: Quantifier): Seq[Node] =
