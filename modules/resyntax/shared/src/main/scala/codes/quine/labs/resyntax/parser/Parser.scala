@@ -78,11 +78,11 @@ object Parser:
 
     def from(featureSet: FeatureSet): ParsingContext = ParsingContext(
       inClass = false,
-      skipsComment = featureSet.skipsComment,
-      verboseMore = featureSet.verboseMore,
+      skipsComment = featureSet.comment.skipsComment,
+      verboseMore = featureSet.comment.verboseMore,
       unixLines = featureSet.unixLines,
-      allowsDuplicatedGroupName = featureSet.allowsDuplicatedGroupName,
-      explicitCapture = featureSet.explicitCapture
+      allowsDuplicatedGroupName = featureSet.group.allowsDuplicatedGroupName,
+      explicitCapture = featureSet.group.explicitCapture
     )
 
   /** Parses the source in the dialect, whose unit mode is `mode` (see [[determineUnitMode]]).
@@ -180,7 +180,7 @@ private[parser] final class Parser(
 
   /** The `(?#...)` ranges that Ruby removes from the source before parsing, as maps from start to end and back. */
   private val removedCommentEnds: Map[Int, Int] =
-    if featureSet.removesCommentGroup then scanRemovedComments().toMap else Map.empty
+    if featureSet.comment.removesCommentGroup then scanRemovedComments().toMap else Map.empty
 
   private val removedCommentStarts: Map[Int, Int] = removedCommentEnds.map(_.swap)
 
@@ -197,7 +197,7 @@ private[parser] final class Parser(
     if !isEnd then
       assert(currentChar == ')', "Unexpected")
       fail("Unmatched ')'")
-    if featureSet.rejectsNumberedReferenceWithNamedCapture && groupNames.nonEmpty then
+    if featureSet.reference.rejectsNumberedReferenceWithNamedCapture && groupNames.nonEmpty then
       for pos <- numberedReferenceOffset do fail("Numbered reference with named capture", pos)
     node
 
@@ -293,7 +293,7 @@ private[parser] final class Parser(
   private def parseCurlyQuantifier(stack: mutable.Stack[Node]): Unit =
     val save = offset
     val textStart = quantifierTextStart(stack)
-    if stack.forall(isComment) && featureSet.readsLeadingCurlyAsLiteral then
+    if stack.forall(isComment) && featureSet.quantifier.readsLeadingCurlyAsLiteral then
       resetBracket(stack, save)
       return
 
@@ -308,7 +308,7 @@ private[parser] final class Parser(
       pushCurlyRepeat(stack, Quantifier.Exact(minOption.get, strategy), textStart)
       return
 
-    if isEnd || currentChar != ',' || minOption.isEmpty && !featureSet.hasMaxBounded then
+    if isEnd || currentChar != ',' || minOption.isEmpty && !featureSet.quantifier.hasMaxBounded then
       resetBracket(stack, save)
       return
 
@@ -318,7 +318,8 @@ private[parser] final class Parser(
     val maxOption = parseRepeatCountOption()
     skipBraceBlank()
 
-    if isEnd || currentChar != '}' || minOption.isEmpty && maxOption.isEmpty && !featureSet.allowsCurlyWithoutCount then
+    if isEnd || currentChar != '}' || minOption.isEmpty && maxOption.isEmpty && !featureSet.quantifier.allowsCurlyWithoutCount
+    then
       resetBracket(stack, save)
       return
 
@@ -326,7 +327,8 @@ private[parser] final class Parser(
     val strategy = parseBacktrackStrategy(exact = false, curly = true)
     val quantifier = (minOption, maxOption) match
       case (Some(min), Some(max)) =>
-        if max < min && !featureSet.allowsReversedBoundedRepeat then fail("Numbers out of order in {} quantifier", save)
+        if max < min && !featureSet.quantifier.allowsReversedBoundedRepeat then
+          fail("Numbers out of order in {} quantifier", save)
         Quantifier.Bounded(min, max, strategy)
       case (Some(min), None) => Quantifier.Unbounded(min, strategy)
       case (None, Some(max)) => Quantifier.MaxBounded(max, strategy)
@@ -336,7 +338,7 @@ private[parser] final class Parser(
   private def pushCurlyRepeat(stack: mutable.Stack[Node], quantifier: Quantifier, textStart: Int): Unit =
     stack.find(!isComment(_)) match
       // Java ignores a curly quantifier following another quantifier or nothing: `a{2}{3}` matches `aa`.
-      case Some(node @ Node(repeat: NodeData.Repeat, _)) if featureSet.ignoresCurlyAfterRepeat =>
+      case Some(node @ Node(repeat: NodeData.Repeat, _)) if featureSet.quantifier.ignoresCurlyAfterRepeat =>
         while stack.headOption.exists(isComment) do stack.pop()
         stack.pop()
         stack.push(Node(withIgnoredCurly(node, repeat), node.loc.copy(end = offset)))
@@ -345,13 +347,13 @@ private[parser] final class Parser(
               region @ NodeData.CaseRegion(_, init :+ CasePart(last @ Node(repeat: NodeData.Repeat, _), text), _),
               _
             )
-          ) if featureSet.ignoresCurlyAfterRepeat =>
+          ) if featureSet.quantifier.ignoresCurlyAfterRepeat =>
         while stack.headOption.exists(isComment) do stack.pop()
         stack.pop()
         val part = CasePart(Node(withIgnoredCurly(last, repeat), last.loc.copy(end = offset)), text)
         stack.push(Node(region.copy(parts = init :+ part), node.loc.copy(end = offset)))
       // The blank before an ignored curly quantifier keeps its text (e.g. ` {2}` of the extended mode).
-      case None if featureSet.ignoresCurlyAfterRepeat =>
+      case None if featureSet.quantifier.ignoresCurlyAfterRepeat =>
         stack.headOption match
           case Some(Node(NodeData.Blank(text), loc)) =>
             stack.pop()
@@ -365,10 +367,10 @@ private[parser] final class Parser(
     repeat.copy(written = Some(repeat.written.getOrElse(repeat.quantifier.plainText) + writtenText(node.loc.end)))
 
   private def parseRepeatCountOption(): Option[Int] =
-    parseSaturatedIntOption(featureSet.maxRepeatCount, "Number too big in {} quantifier", offset)
+    parseSaturatedIntOption(featureSet.quantifier.maxRepeatCount, "Number too big in {} quantifier", offset)
 
   private def skipBraceBlank(force: Boolean = false): Unit =
-    if force || featureSet.allowsBlankInBrace then skipBlank()
+    if force || featureSet.escape.allowsBlankInBrace then skipBlank()
 
   private def skipBlank(): Unit =
     while !isEnd && (currentChar == ' ' || currentChar == '\t') do next()
@@ -391,13 +393,13 @@ private[parser] final class Parser(
   private def validateRepeatable(node: Node): Unit =
     node.data match
       case NodeData.Group(_: GroupKind.PositiveLookAhead | _: GroupKind.NegativeLookAhead, _) =>
-        assert(featureSet.allowsLookAheadRepeat, "Nothing to repeat")
+        assert(featureSet.quantifier.allowsLookAheadRepeat, "Nothing to repeat")
       case NodeData.Group(_: GroupKind.PositiveLookBehind | _: GroupKind.NegativeLookBehind, _) =>
-        assert(featureSet.allowsLookBehindRepeat, "Nothing to repeat")
+        assert(featureSet.quantifier.allowsLookBehindRepeat, "Nothing to repeat")
       case NodeData.Caret | NodeData.Dollar | NodeData.Backslash(_: BackslashKind.Assert) =>
-        assert(featureSet.allowsZeroWidthAssertRepeat, "Nothing to repeat")
+        assert(featureSet.quantifier.allowsZeroWidthAssertRepeat, "Nothing to repeat")
       case NodeData.Repeat(_, _, _) =>
-        assert(featureSet.allowsNestedRepeat, "Nested quantifier")
+        assert(featureSet.quantifier.allowsNestedRepeat, "Nested quantifier")
       case NodeData.Command(
             _: CommandKind.InlineFlag | _: CommandKind.ResetFlag | _: CommandKind.StartOption | CommandKind.Callout |
             _: CommandKind.CalloutInt | _: CommandKind.CalloutString
@@ -405,7 +407,7 @@ private[parser] final class Parser(
         fail("Nothing to repeat")
       case NodeData.Command(CommandKind.BacktrackControl(kind, _)) =>
         assert(
-          featureSet.allowsBacktrackControlRepeat || kind == Some(BacktrackControlKind.Accept),
+          featureSet.quantifier.allowsBacktrackControlRepeat || kind == Some(BacktrackControlKind.Accept),
           "Nothing to repeat"
         )
       case _ =>
@@ -428,10 +430,10 @@ private[parser] final class Parser(
     Node(NodeData.Repeat(node, quantifier, written), node.loc.copy(end = offset))
 
   private def parseBacktrackStrategy(exact: Boolean, curly: Boolean = false): BacktrackStrategy =
-    if isEnd || exact && !featureSet.allowsMeaninglessBacktrackStrategy then return BacktrackStrategy.Greedy
+    if isEnd || exact && !featureSet.quantifier.allowsMeaninglessBacktrackStrategy then return BacktrackStrategy.Greedy
 
     val save = offset
-    if featureSet.skipsCommentBeforeBacktrackStrategy then skipCommentBeforeBacktrackStrategy()
+    if featureSet.comment.skipsCommentBeforeBacktrackStrategy then skipCommentBeforeBacktrackStrategy()
 
     if !isEnd && currentChar == '?' then
       next()
@@ -439,7 +441,8 @@ private[parser] final class Parser(
 
     // Ruby reads `+` after `{n,m}` as another repeat, so `a{2,3}+` is `(?:a{2,3})+`.
     val hasPossessive =
-      if curly then featureSet.hasPossessiveCurlyBacktrackStrategy else featureSet.hasPossessiveBacktrackStrategy
+      if curly then featureSet.quantifier.hasPossessiveCurlyBacktrackStrategy
+      else featureSet.quantifier.hasPossessiveBacktrackStrategy
     if hasPossessive && !isEnd && currentChar == '+' then
       next()
       return BacktrackStrategy.Possessive
@@ -452,7 +455,7 @@ private[parser] final class Parser(
     var continue = true
     while continue do
       continue = context.skipsComment && skipComment()
-      if featureSet.hasInlineComment && source.startsWith("(?#", offset) then
+      if featureSet.comment.hasInlineComment && source.startsWith("(?#", offset) then
         val start = offset
         reset(offset + 2)
         parseCommentGroup(mutable.Stack.empty, start)
@@ -477,8 +480,8 @@ private[parser] final class Parser(
       case _                                                                             => false
 
   private def resetBracket(stack: mutable.Stack[Node], save: Int): Unit =
-    if !featureSet.allowsBrokenCurly then fail("Incomplete quantifier", save)
-    if !featureSet.allowsBrokenCurlyAfterAlphabeticBackslash && isAfterAlphabeticBackslash(stack, save) then
+    if !featureSet.quantifier.allowsBrokenCurly then fail("Incomplete quantifier", save)
+    if !featureSet.quantifier.allowsBrokenCurlyAfterAlphabeticBackslash && isAfterAlphabeticBackslash(stack, save) then
       fail("Unescaped left brace", save)
     reset(save)
     stack.push(Node(NodeData.Literal('{'), SourceLocation(save, save + 1)))
@@ -539,14 +542,15 @@ private[parser] final class Parser(
       case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
         parseIndexedCallGroup(stack, start)
       case '+' | '-' =>
-        if featureSet.allowsInlineFlagSign then parseSignedInlineFlagGroup(stack, start)
+        if featureSet.inlineFlag.allowsInlineFlagSign then parseSignedInlineFlagGroup(stack, start)
         else if currentChar == '+' then parsePlusGroup(stack, start)
         else parseMinusGroup(stack, start)
       case '^' =>
         parseResetFlagGroup(stack, start)
       // Java has no `(?#...)`, and reads flags after `(?` and a comment in the extended mode (e.g. `(?#c\n:a)`).
       case '#' =>
-        if featureSet.hasInlineComment then parseCommentGroup(stack, start) else parseInlineFlagGroup(stack, start)
+        if featureSet.comment.hasInlineComment then parseCommentGroup(stack, start)
+        else parseInlineFlagGroup(stack, start)
       case '{' =>
         parseInlineCodeGroup(stack, start)
       case '?' =>
@@ -554,7 +558,7 @@ private[parser] final class Parser(
       case 'C' =>
         parseCalloutGroup(stack, start)
       case _ =>
-        if featureSet.allowsInlineFlagSign then parseSignedInlineFlagGroup(stack, start)
+        if featureSet.inlineFlag.allowsInlineFlagSign then parseSignedInlineFlagGroup(stack, start)
         else parseInlineFlagGroup(stack, start)
 
   private def parseNonCaptureGroup(stack: mutable.Stack[Node], start: Int): Unit =
@@ -562,7 +566,7 @@ private[parser] final class Parser(
     parseGroupBody(stack, GroupKind.NonCapture, start)
 
   private def parseBranchResetGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasBranchReset, "Invalid group")
+    assert(featureSet.group.hasBranchReset, "Invalid group")
     next()
     protectContext:
       val node = nest(start)(parseDisjunction(isBranchReset = true))
@@ -602,22 +606,22 @@ private[parser] final class Parser(
     parseGroupBody(stack, GroupKind.NegativeLookBehind(AssertNameStyle.Symbolic), start)
 
   private def parseNonAtomicPositiveLookBehindGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasNonAtomicLookAround, "Invalid group")
+    assert(featureSet.group.hasNonAtomicLookAround, "Invalid group")
     next()
     parseGroupBody(stack, GroupKind.NonAtomicPositiveLookBehind(AssertNameStyle.Symbolic), start)
 
   private def parseAtomicGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasAtomicGroup, "Invalid group")
+    assert(featureSet.group.hasAtomicGroup, "Invalid group")
     next()
     parseGroupBody(stack, GroupKind.Atomic(AssertNameStyle.Symbolic), start)
 
   private def parseNonAtomicPositiveLookAheadGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasNonAtomicLookAround, "Invalid group")
+    assert(featureSet.group.hasNonAtomicLookAround, "Invalid group")
     next()
     parseGroupBody(stack, GroupKind.NonAtomicPositiveLookAhead(AssertNameStyle.Symbolic), start)
 
   private def parseAbsenceGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasAbsenceOperator, "Invalid group")
+    assert(featureSet.group.hasAbsenceOperator, "Invalid group")
     next()
     if isEnd || currentChar != '|' then
       parseGroupBody(stack, GroupKind.Absence, start)
@@ -644,7 +648,7 @@ private[parser] final class Parser(
   )
 
   private def parseConditionalGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasConditional, "Invalid group")
+    assert(featureSet.group.hasConditional, "Invalid group")
     next()
     nest(start)(parseConditionalGroupTest(stack, start))
 
@@ -652,10 +656,10 @@ private[parser] final class Parser(
     boundary:
       val indexStart = offset
       for n <- parseIntOption() do
-        assert(n != 0 || featureSet.allowsZeroIndexedCaptureTest, "Invalid condition", indexStart)
+        assert(n != 0 || featureSet.group.allowsZeroIndexedCaptureTest, "Invalid condition", indexStart)
         markNumberedReference(indexStart)
         assert(
-          source.charAt(indexStart) != '0' || featureSet.allowsLeadingZeroInCaptureTest,
+          source.charAt(indexStart) != '0' || featureSet.group.allowsLeadingZeroInCaptureTest,
           "Invalid condition",
           indexStart
         )
@@ -663,27 +667,27 @@ private[parser] final class Parser(
         parseConditionalGroupBody(stack, ConditionalTest.Indexed(n), start)
         boundary.break()
 
-      if featureSet.hasNamedCaptureTest && currentChar == '<' then
+      if featureSet.group.hasNamedCaptureTest && currentChar == '<' then
         next()
         val test = parseNamedCaptureTest(NameStyle.Angle, '>')
         closeCondition()
         parseConditionalGroupBody(stack, test, start)
         boundary.break()
 
-      if featureSet.hasNamedCaptureTest && currentChar == '\'' then
+      if featureSet.group.hasNamedCaptureTest && currentChar == '\'' then
         next()
         val test = parseNamedCaptureTest(NameStyle.Quote, '\'')
         closeCondition()
         parseConditionalGroupBody(stack, test, start)
         boundary.break()
 
-      if featureSet.hasDefineTest && startWith("DEFINE)") then
+      if featureSet.group.hasDefineTest && startWith("DEFINE)") then
         reset(offset - 1)
         closeCondition()
         parseConditionalGroupBody(stack, ConditionalTest.Define, start)
         boundary.break()
 
-      if featureSet.hasVersionTest && startWith("VERSION") then
+      if featureSet.group.hasVersionTest && startWith("VERSION") then
         val lt = !isEnd && currentChar == '>'
         if lt then next()
         expect('=', "Invalid condition")
@@ -701,7 +705,7 @@ private[parser] final class Parser(
         currentChar == 'R' && offset + 1 < source.length && (source.charAt(offset + 1) match
           case ')' | '&' => true
           case c         => isDigit(c))
-      if featureSet.hasRecursionTest && isRecursionTest then
+      if featureSet.group.hasRecursionTest && isRecursionTest then
         next()
         (currentChar: @switch) match
           case ')' =>
@@ -718,14 +722,14 @@ private[parser] final class Parser(
             parseConditionalGroupBody(stack, ConditionalTest.IndexedRecursion(n), start)
         boundary.break()
 
-      if featureSet.hasBareNamedCaptureTest && isGroupNameStart then
+      if featureSet.group.hasBareNamedCaptureTest && isGroupNameStart then
         val name = parseGroupNameBody()
         closeCondition()
         parseConditionalGroupBody(stack, ConditionalTest.Named(NameStyle.Bare, name), start)
         boundary.break()
 
       val isRelative = !isEnd && (currentChar == '+' || currentChar == '-')
-      if featureSet.hasRelativeIndexedCaptureTest && isRelative then
+      if featureSet.group.hasRelativeIndexedCaptureTest && isRelative then
         val minus = currentChar == '-'
         next()
         parseIntOption() match
@@ -736,7 +740,7 @@ private[parser] final class Parser(
           case None =>
             fail("Invalid condition")
 
-      if featureSet.hasCallout && startWith("?C") then
+      if featureSet.group.hasCallout && startWith("?C") then
         val callout = parseCallout()
         closeCondition()
         if context.skipsComment then skipComment()
@@ -745,11 +749,11 @@ private[parser] final class Parser(
           if parseLookAroundTest(stack, start, symbolic, alphabetic, abbrev, la, Some(callout)) then boundary.break()
         fail("Invalid condition")
 
-      if featureSet.hasLookAroundTest then
+      if featureSet.group.hasLookAroundTest then
         for (symbolic, alphabetic, abbrev, la) <- LookAroundTests do
           if parseLookAroundTest(stack, start, symbolic, alphabetic, abbrev, la) then boundary.break()
 
-      if featureSet.hasBareLookAroundTest then
+      if featureSet.group.hasBareLookAroundTest then
         val testStart = offset - 1
         // .NET reads `(?(?:x)...)` and `(?(?>x)...)` as `(?(x)...)` because the condition is a look-ahead.
         if !startWith("?:") then startWith("?>")
@@ -759,7 +763,7 @@ private[parser] final class Parser(
       fail("Invalid condition")
 
   private def parseNamedCaptureTest(style: NameStyle, end: Char): ConditionalTest =
-    if !featureSet.allowsNonNameCaptureTest then return ConditionalTest.Named(style, parseGroupName(end))
+    if !featureSet.group.allowsNonNameCaptureTest then return ConditionalTest.Named(style, parseGroupName(end))
 
     // Ruby accepts `(?(<1>)...)` even in a pattern with named captures.
     val savedNumberedReferenceOffset = numberedReferenceOffset
@@ -798,11 +802,11 @@ private[parser] final class Parser(
       parseLookAroundConditional(stack, Some(la(AssertNameStyle.Symbolic)), start, testStart, callout)
       return true
 
-    if featureSet.hasAlphabeticGroup && startWith(alphabetic) then
+    if featureSet.group.hasAlphabeticGroup && startWith(alphabetic) then
       parseLookAroundConditional(stack, Some(la(AssertNameStyle.Alphabetic)), start, testStart, callout)
       return true
 
-    if featureSet.hasAlphabeticGroup && startWith(abbrev) then
+    if featureSet.group.hasAlphabeticGroup && startWith(abbrev) then
       parseLookAroundConditional(stack, Some(la(AssertNameStyle.Abbrev)), start, testStart, callout)
       return true
 
@@ -821,16 +825,16 @@ private[parser] final class Parser(
     parseConditionalGroupBody(stack, callout.fold(test)(ConditionalTest.CalloutLookAround(_, test)), start)
 
   private def parseAngleNamedCaptureGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasAngleNamedCapture, "Invalid group")
+    assert(featureSet.group.hasAngleNamedCapture, "Invalid group")
     parseNamedCaptureGroup(stack, '>', NameStyle.Angle, start)
 
   private def parseQuoteNamedCaptureGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasQuoteNamedCapture, "Invalid group")
+    assert(featureSet.group.hasQuoteNamedCapture, "Invalid group")
     next()
     parseNamedCaptureGroup(stack, '\'', NameStyle.Quote, start)
 
   private def parseNamedCaptureGroup(stack: mutable.Stack[Node], end: Char, style: NameStyle, start: Int): Unit =
-    if featureSet.hasBalanceGroup then
+    if featureSet.group.hasBalanceGroup then
       parseBalanceGroup(stack, end, style, start)
       return
 
@@ -860,7 +864,7 @@ private[parser] final class Parser(
     fail("Invalid identifier")
 
   private def parsePGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasPGroup, "Invalid group")
+    assert(featureSet.group.hasPGroup, "Invalid group")
     next()
     (currentChar: @switch) match
       case '<' =>
@@ -873,7 +877,7 @@ private[parser] final class Parser(
         val name = parseGroupNameBody()
         pushCommand(stack, CommandKind.PBackReference(name), start)
       case '>' =>
-        assert(featureSet.hasPCall, "Invalid group")
+        assert(featureSet.reference.hasPCall, "Invalid group")
         next()
         val name = parseGroupNameBody()
         pushCommand(stack, CommandKind.PNamedCall(name), start)
@@ -885,29 +889,29 @@ private[parser] final class Parser(
     if !context.allowsDuplicatedGroupName then
       for path <- paths do
         val exclusive = path.exists: (id, index, isBranchReset) =>
-          (isBranchReset || featureSet.allowsDuplicatedGroupNameInAlternatives) &&
+          (isBranchReset || featureSet.group.allowsDuplicatedGroupNameInAlternatives) &&
             alternativePath.exists((id2, index2, _) => id == id2 && index != index2)
         assert(exclusive, "Duplicated group name", start)
     groupNames(name) = paths :+ alternativePath
 
   private def parseRGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasRCall, "Invalid group")
+    assert(featureSet.reference.hasRCall, "Invalid group")
     next()
     pushCommand(stack, CommandKind.RCall, start)
 
   private def parseNamedCallGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasCallCommand, "Invalid group")
+    assert(featureSet.reference.hasCallCommand, "Invalid group")
     next()
     val name = parseGroupNameBody()
     pushCommand(stack, CommandKind.NamedCall(name), start)
 
   private def parseIndexedCallGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasCallCommand, "Invalid group")
+    assert(featureSet.reference.hasCallCommand, "Invalid group")
     val n = parseIntOption().getOrElse(fail("Invalid group"))
     pushCommand(stack, CommandKind.IndexedCall(n), start)
 
   private def parsePlusGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasCallCommand, "Invalid group")
+    assert(featureSet.reference.hasCallCommand, "Invalid group")
     next()
     val n = parseIntOption().getOrElse(fail("Invalid group"))
     pushCommand(stack, CommandKind.RelativeCall(n), start)
@@ -917,10 +921,10 @@ private[parser] final class Parser(
     next()
     parseIntOption() match
       case Some(n) =>
-        assert(featureSet.hasCallCommand, "Invalid group")
+        assert(featureSet.reference.hasCallCommand, "Invalid group")
         pushCommand(stack, CommandKind.RelativeCall(-n), start)
       case None =>
-        assert(featureSet.hasInlineFlagGroup, "Invalid group")
+        assert(featureSet.inlineFlag.hasInlineFlagGroup, "Invalid group")
         val removedStart = offset
         val (removed, removedFlags) = parseRemovedFlagSet(context.skipsComment)
         validateInlineFlagRemoval("", removedFlags, removedStart)
@@ -936,7 +940,7 @@ private[parser] final class Parser(
             fail("Invalid group")
 
   private def parseResetFlagGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasResetFlag, "Invalid group")
+    assert(featureSet.inlineFlag.hasResetFlag, "Invalid group")
     next()
     val flagsStart = offset
     val (flagSet, _) = parseFlagSet(resetting = true)
@@ -953,11 +957,11 @@ private[parser] final class Parser(
         fail("Invalid group")
 
   private def parseCommentGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasInlineComment, "Invalid group")
+    assert(featureSet.comment.hasInlineComment, "Invalid group")
     next()
     val textStart = offset
     while !isEnd && currentChar != ')' do
-      if featureSet.processBackslashInCommentGroup && currentChar == '\\' then
+      if featureSet.comment.processBackslashInCommentGroup && currentChar == '\\' then
         next()
         if !isEnd then next()
       else next()
@@ -1065,24 +1069,24 @@ private[parser] final class Parser(
           case _ => ()
       i
 
-    scan(0, featureSet.skipsComment, recurse = false)
+    scan(0, featureSet.comment.skipsComment, recurse = false)
     ranges.result()
 
   private def parseInlineCodeGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasInlineCode, "Invalid group")
+    assert(featureSet.group.hasInlineCode, "Invalid group")
     next()
     val code = parseCode(end = '}')
     pushCommand(stack, CommandKind.InlineCode(code), start)
 
   private def parseEmbedCodeGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasInlineCode, "Invalid group")
+    assert(featureSet.group.hasInlineCode, "Invalid group")
     next()
     expect('{', "Invalid group")
     val code = parseCode(end = '}')
     pushCommand(stack, CommandKind.EmbedCode(code), start)
 
   private def parseCalloutGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasCallout, "Invalid group")
+    assert(featureSet.group.hasCallout, "Invalid group")
     next()
     pushCommand(stack, parseCallout(), start)
 
@@ -1118,7 +1122,7 @@ private[parser] final class Parser(
     code
 
   private def parseInlineFlagGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasInlineFlagGroup, "Invalid group")
+    assert(featureSet.inlineFlag.hasInlineFlagGroup, "Invalid group")
 
     val flagsStart = offset
     val (added, addedFlags) = parseFlagSet()
@@ -1145,7 +1149,7 @@ private[parser] final class Parser(
         applyFlagSetDiffWith(diff):
           parseGroupBody(stack, GroupKind.InlineFlag(diff), start)
       case ')' =>
-        assert(addedFlags.nonEmpty || featureSet.allowsEmptyInlineFlag, "Invalid flag")
+        assert(addedFlags.nonEmpty || featureSet.inlineFlag.allowsEmptyInlineFlag, "Invalid flag")
         val diff = flagSetDiff(added, None, flagsStart)
         pushInlineFlagCommand(stack, diff, start)
       case _ =>
@@ -1170,7 +1174,7 @@ private[parser] final class Parser(
           val (flagSet, flags) = parseFlagSet(removing = removing, initial = if removing then removed.get else added)
           if removing then removed = Some(flagSet) else added = flagSet
           if flags.isEmpty then boundary.break()
-    assert(offset > flagsStart || featureSet.allowsEmptyInlineFlag, "Invalid flag")
+    assert(offset > flagsStart || featureSet.inlineFlag.allowsEmptyInlineFlag, "Invalid flag")
 
     val diff = flagSetDiff(added, removed, flagsStart)
     (currentChar: @switch) match
@@ -1195,7 +1199,7 @@ private[parser] final class Parser(
     */
   private def parseRemovedFlagSet(skipping: Boolean): (FlagSet, String) =
     var (removed, removedFlags) = parseFlagSet(removing = true, skipping = skipping)
-    while featureSet.allowsRepeatedInlineFlagMinus && !isEnd && currentChar == '-' do
+    while featureSet.inlineFlag.allowsRepeatedInlineFlagMinus && !isEnd && currentChar == '-' do
       next()
       val (flagSet, flags) = parseFlagSet(removing = true, initial = removed, skipping = skipping)
       removed = flagSet
@@ -1204,21 +1208,21 @@ private[parser] final class Parser(
 
   private def validateInlineFlagRemoval(addedFlags: String, removedFlags: String, removedStart: Int): Unit =
     if removedFlags.isEmpty then
-      if addedFlags.isEmpty then assert(featureSet.allowsEmptyInlineFlagDiff, "Invalid flag")
-      else assert(featureSet.allowsEmptyInlineFlagRemoval, "Invalid flag")
-    if !featureSet.allowsToggledInlineFlag then
+      if addedFlags.isEmpty then assert(featureSet.inlineFlag.allowsEmptyInlineFlagDiff, "Invalid flag")
+      else assert(featureSet.inlineFlag.allowsEmptyInlineFlagRemoval, "Invalid flag")
+    if !featureSet.inlineFlag.allowsToggledInlineFlag then
       for (c, i) <- removedFlags.zipWithIndex do if addedFlags.contains(c) then fail("Invalid flag", removedStart + i)
 
   private def pushInlineFlagCommand(stack: mutable.Stack[Node], diff: FlagSetDiff, start: Int): Unit =
-    assert(featureSet.hasInlineFlag, "Invalid group", start)
-    if diff.removed.isDefined then assert(featureSet.hasInlineFlagRemovalCommand, "Invalid group", start)
-    if featureSet.requiresInlineFlagAtStart then
+    assert(featureSet.inlineFlag.hasInlineFlag, "Invalid group", start)
+    if diff.removed.isDefined then assert(featureSet.inlineFlag.hasInlineFlagRemovalCommand, "Invalid group", start)
+    if featureSet.inlineFlag.requiresInlineFlagAtStart then
       val atStart = sequenceStart == 0 && stack.forall:
         case Node(NodeData.Command(_: CommandKind.InlineFlag), _) => true
         case node                                                 => isComment(node)
       assert(atStart, "Inline flag not at the start", start)
     pushCommand(stack, CommandKind.InlineFlag(diff), start)
-    if featureSet.hasIncomprehensiveInlineFlag then parseOpaqueDisjunction(stack, diff, start)
+    if featureSet.inlineFlag.hasIncomprehensiveInlineFlag then parseOpaqueDisjunction(stack, diff, start)
     else applyFlagSetDiff(diff)
 
   private def parseOpaqueDisjunction(stack: mutable.Stack[Node], diff: FlagSetDiff, start: Int): Unit =
@@ -1251,7 +1255,7 @@ private[parser] final class Parser(
     ("script_run:", "sr:", GroupKind.ScriptRun(_)),
     ("atomic_script_run:", "asr:", GroupKind.AtomicScriptRun(_))
   ) ++ {
-    if featureSet.hasNonAtomicLookAround then
+    if featureSet.group.hasNonAtomicLookAround then
       Seq(
         ("non_atomic_positive_lookahead:", "napla:", GroupKind.NonAtomicPositiveLookAhead(_)),
         ("non_atomic_positive_lookbehind:", "naplb:", GroupKind.NonAtomicPositiveLookBehind(_))
@@ -1260,12 +1264,12 @@ private[parser] final class Parser(
   }
 
   private def parseAlphabeticGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasAlphabeticGroup, "Invalid group")
+    assert(featureSet.group.hasAlphabeticGroup, "Invalid group")
 
     next()
 
     boundary:
-      if featureSet.hasStartOption && start == startOptionEnd && parseStartOption(stack, start) then
+      if featureSet.group.hasStartOption && start == startOptionEnd && parseStartOption(stack, start) then
         startOptionEnd = offset
         boundary.break()
 
@@ -1275,7 +1279,7 @@ private[parser] final class Parser(
       for (alphabetic, abbrev, kind) <- AlphabeticGroups do
         if parseAlphabetic(stack, start, alphabetic, abbrev, kind) then boundary.break()
 
-      if featureSet.hasScanSubstring then
+      if featureSet.group.hasScanSubstring then
         if startWith("scan_substring:") then
           parseScanSubstringGroup(stack, AssertNameStyle.Alphabetic, start)
           boundary.break()
@@ -1433,40 +1437,42 @@ private[parser] final class Parser(
 
     def skipFlagComment(): Unit =
       val verbose = if removing then skipping && !flagSet.verbose else skipping || flagSet.verbose
-      if verbose && featureSet.skipsCommentInConstruct then skipComment()
+      if verbose && featureSet.comment.skipsCommentInConstruct then skipComment()
 
     // Ruby's last character set flag wins (e.g. `(?au)` is `(?u)`).
     def charset(flagSet: FlagSet): FlagSet =
-      if featureSet.overridesCharsetInlineFlag then flagSet.copy(ascii = false, hasIndices = false, unicode = false)
+      if featureSet.inlineFlag.overridesCharsetInlineFlag then
+        flagSet.copy(ascii = false, hasIndices = false, unicode = false)
       else flagSet
 
     skipFlagComment()
     while !isEnd do
       val flagStart = offset
-      val c = if featureSet.ignoresInlineFlagCase then currentChar.toLower else currentChar
+      val c = if featureSet.inlineFlag.ignoresInlineFlagCase then currentChar.toLower else currentChar
       (c: @switch) match
         case 'i' =>
           flagSet = flagSet.copy(ignoreCase = true)
         case 'm' =>
           flagSet = flagSet.copy(multiline = true)
         case 'x' =>
-          if !featureSet.hasFlagX then return result
+          if !featureSet.inlineFlag.hasFlagX then return result
           flagSet = flagSet.copy(verbose = true)
-          if featureSet.hasFlagXX && sliceSource(start, offset).contains('x') then
+          if featureSet.inlineFlag.hasFlagXX && sliceSource(start, offset).contains('x') then
             flagSet = flagSet.copy(verboseMore = true)
         case 'J' =>
-          if !featureSet.hasFlagUpperJ then return result
+          if !featureSet.inlineFlag.hasFlagUpperJ then return result
           flagSet = flagSet.copy(dupNames = true)
         case 'L' =>
-          if !featureSet.hasFlagUpperL then return result
+          if !featureSet.inlineFlag.hasFlagUpperL then return result
           flagSet = flagSet.copy(localeUpper = true)
         case 'U' =>
-          if !featureSet.hasFlagUpperU then return result
+          if !featureSet.inlineFlag.hasFlagUpperU then return result
           flagSet = flagSet.copy(ungreedy = true)
         case 'a' =>
-          if !featureSet.hasFlagA then return result
+          if !featureSet.inlineFlag.hasFlagA then return result
           val subOption =
-            if featureSet.hasFlagASubOption then source.lift(offset + 1).filter("DPSTW".contains(_)) else None
+            if featureSet.inlineFlag.hasFlagASubOption then source.lift(offset + 1).filter("DPSTW".contains(_))
+            else None
           flagSet = subOption match
             case Some('D') => flagSet.copy(asciiDigit = true)
             case Some('P') => flagSet.copy(asciiPOSIX = true)
@@ -1475,37 +1481,37 @@ private[parser] final class Parser(
             case Some('W') => flagSet.copy(asciiWord = true)
             case _         => charset(flagSet).copy(ascii = true)
           if subOption.isDefined then next()
-          else if featureSet.hasFlagAA && sliceSource(start, offset).contains('a') then
+          else if featureSet.inlineFlag.hasFlagAA && sliceSource(start, offset).contains('a') then
             flagSet = flagSet.copy(asciiRestrict = true)
         case 'c' =>
-          if !featureSet.hasFlagC then return result
+          if !featureSet.inlineFlag.hasFlagC then return result
           flagSet = flagSet.copy(continue = true)
         case 'd' =>
-          if !featureSet.hasFlagD then return result
+          if !featureSet.inlineFlag.hasFlagD then return result
           flagSet = charset(flagSet).copy(hasIndices = true)
         case 'g' =>
-          if !featureSet.hasFlagG then return result
+          if !featureSet.inlineFlag.hasFlagG then return result
           flagSet = flagSet.copy(global = true)
         case 'l' =>
-          if !featureSet.hasFlagL then return result
+          if !featureSet.inlineFlag.hasFlagL then return result
           flagSet = flagSet.copy(localeLower = true)
         case 'n' =>
-          if !featureSet.hasFlagN then return result
+          if !featureSet.inlineFlag.hasFlagN then return result
           flagSet = flagSet.copy(explicitCapture = true)
         case 'o' =>
-          if !featureSet.hasFlagO then return result
+          if !featureSet.inlineFlag.hasFlagO then return result
           flagSet = flagSet.copy(once = true)
         case 'p' =>
-          if !featureSet.hasFlagP then return result
+          if !featureSet.inlineFlag.hasFlagP then return result
           flagSet = flagSet.copy(preserve = true)
         case 'r' =>
-          if !featureSet.hasFlagR then return result
+          if !featureSet.inlineFlag.hasFlagR then return result
           flagSet = flagSet.copy(nonDestructive = true)
         case 's' =>
-          if !featureSet.hasFlagS then return result
+          if !featureSet.inlineFlag.hasFlagS then return result
           flagSet = flagSet.copy(dotAll = true)
         case 'u' =>
-          if !featureSet.hasFlagU then return result
+          if !featureSet.inlineFlag.hasFlagU then return result
           flagSet = charset(flagSet).copy(unicode = true)
         case _ =>
           return result
@@ -1517,15 +1523,17 @@ private[parser] final class Parser(
   private val CharsetFlags = "adluL"
 
   private def validateFlag(c: Char, previous: String, removing: Boolean, resetting: Boolean): Unit =
-    if !featureSet.allowsDuplicatedInlineFlag && previous.contains(c) then fail("Duplicated flag")
+    if !featureSet.inlineFlag.allowsDuplicatedInlineFlag && previous.contains(c) then fail("Duplicated flag")
     if !CharsetFlags.contains(c) then return
-    if removing && featureSet.rejectsCharsetInlineFlagRemoval then fail("Invalid flag")
+    if removing && featureSet.inlineFlag.rejectsCharsetInlineFlagRemoval then fail("Invalid flag")
     // Perl rejects `(?^d)` because `d` is the default character set.
     if resetting && c == 'd' then fail("Invalid flag")
-    if featureSet.rejectsConflictingCharsetInlineFlag && previous.exists(p => CharsetFlags.contains(p) && p != c) then
-      fail("Invalid flag")
+    if featureSet.inlineFlag.rejectsConflictingCharsetInlineFlag && previous.exists(p =>
+        CharsetFlags.contains(p) && p != c
+      )
+    then fail("Invalid flag")
     // Perl accepts `a` up to twice (`aa`), and the other character set flags only once.
-    if featureSet.limitsCharsetInlineFlagCount && previous.count(_ == c) >= (if c == 'a' then 2 else 1) then
+    if featureSet.inlineFlag.limitsCharsetInlineFlagCount && previous.count(_ == c) >= (if c == 'a' then 2 else 1) then
       fail("Duplicated flag")
 
   private def parseCaret(stack: mutable.Stack[Node]): Unit =
@@ -1621,14 +1629,14 @@ private[parser] final class Parser(
       case _ => parseBackslashUnknown()
 
   private def parseBackslashLowerA(): BackslashKind =
-    if !featureSet.hasBackslashBell then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashBell then return parseBackslashUnknown()
 
     next()
     BackslashKind.Escape(EscapeStyle.Single('a'), 0x0007)
 
   private def parseBackslashLowerB(): BackslashKind =
     if context.inClass then
-      assert(featureSet.hasBackslashBackspace, "Invalid backslash escape")
+      assert(featureSet.escape.hasBackslashBackspace, "Invalid backslash escape")
       return parseBackslashBackspace()
 
     parseBackslashBoundary()
@@ -1648,10 +1656,10 @@ private[parser] final class Parser(
     next()
 
     boundary:
-      if featureSet.hasBoundaryGModifier && startWithBoundaryGModifier() then
+      if featureSet.escape.hasBoundaryGModifier && startWithBoundaryGModifier() then
         boundary.break(BackslashKind.Assert(AssertKind.Boundary(Some(BoundaryModifier.GModifier))))
 
-      if featureSet.hasBoundaryModifier then
+      if featureSet.escape.hasBoundaryModifier then
         for (name, modifier) <- BoundaryModifiers do
           if startWith(name) then boundary.break(BackslashKind.Assert(AssertKind.Boundary(Some(modifier))))
 
@@ -1668,26 +1676,26 @@ private[parser] final class Parser(
     false
 
   private def parseBackslashLowerC(): BackslashKind =
-    if !featureSet.hasBackslashControl then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashControl then return parseBackslashUnknown()
 
     next()
     val textStart = offset
     skipConstructComment()
-    if featureSet.hasBackslashMetaControl && !isEnd && currentChar == '\\' then
+    if featureSet.escape.hasBackslashMetaControl && !isEnd && currentChar == '\\' then
       val value = parseMetaControlTarget()
       return escape(EscapeStyle.Control('\\'), metaControlValue(value), textStart)
 
     if !isControl then
-      assert(featureSet.allowsBrokenBackslashControl, "Invalid backslash escape")
+      assert(featureSet.escape.allowsBrokenBackslashControl, "Invalid backslash escape")
       return BackslashKind.Unknown('c')
 
     val char = currentChar
     next()
 
     val value =
-      if featureSet.hasBackslashControlAny then char ^ 0x40
-      else if featureSet.hasBackslashMetaControl then metaControlValue(char)
-      else if isAlphabetic(char) || featureSet.hasBackslashControlDigitInClass then char % 32
+      if featureSet.escape.hasBackslashControlAny then char ^ 0x40
+      else if featureSet.escape.hasBackslashMetaControl then metaControlValue(char)
+      else if isAlphabetic(char) || featureSet.charClass.hasBackslashControlDigitInClass then char % 32
       else char ^ 0x40
     escape(EscapeStyle.Control(char), value, textStart)
 
@@ -1726,7 +1734,7 @@ private[parser] final class Parser(
     BackslashKind.EscapeClass(EscapeClassKind.Digit)
 
   private def parseBackslashLowerE(): BackslashKind =
-    if !featureSet.hasBackslashEscape then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashEscape then return parseBackslashUnknown()
 
     next()
     BackslashKind.Escape(EscapeStyle.Single('e'), 0x1b)
@@ -1736,24 +1744,25 @@ private[parser] final class Parser(
     BackslashKind.Escape(EscapeStyle.Single('f'), 0x0c)
 
   private def parseBackslashLowerG(): BackslashKind =
-    if !(featureSet.hasBackslashGBackReference || featureSet.hasBackslashGCall) then return parseBackslashUnknown()
-    if featureSet.allowsNamelessBackslashKG && !source.lift(offset + 1).exists(c => c == '<' || c == '\'') then
+    if !(featureSet.reference.hasBackslashGBackReference || featureSet.reference.hasBackslashGCall) then
       return parseBackslashUnknown()
+    if featureSet.reference.allowsNamelessBackslashKG && !source.lift(offset + 1).exists(c => c == '<' || c == '\'')
+    then return parseBackslashUnknown()
 
     next()
     (currentChar: @switch) match
       case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
-        assert(featureSet.hasBackslashGBackReference, "Invalid backslash escape")
+        assert(featureSet.reference.hasBackslashGBackReference, "Invalid backslash escape")
         val index = parseIntOption().getOrElse(fail("Invalid backslash escape"))
         BackslashKind.EscapeBackReference(
           BackReferenceStyle.GBackReference(NameStyle.Bare),
           Reference.IndexedReference(index)
         )
       case '+' | '-' =>
-        assert(featureSet.hasBackslashGBackReference, "Invalid backslash escape")
+        assert(featureSet.reference.hasBackslashGBackReference, "Invalid backslash escape")
         BackslashKind.EscapeBackReference(BackReferenceStyle.GBackReference(NameStyle.Bare), parseRelativeReference())
       case '{' =>
-        assert(featureSet.hasBackslashGBackReference, "Invalid backslash escape")
+        assert(featureSet.reference.hasBackslashGBackReference, "Invalid backslash escape")
         next()
         skipBraceBlank()
         val ref = parseBaseRef('}')
@@ -1761,7 +1770,7 @@ private[parser] final class Parser(
         expect('}', "Invalid backslash escape")
         BackslashKind.EscapeBackReference(BackReferenceStyle.GBackReference(NameStyle.Curly), ref)
       case '<' | '\'' =>
-        assert(featureSet.hasBackslashGCall, "Invalid backslash escape")
+        assert(featureSet.reference.hasBackslashGCall, "Invalid backslash escape")
         val style = if currentChar == '<' then NameStyle.Angle else NameStyle.Quote
         val end = if style == NameStyle.Angle then '>' else '\''
         next()
@@ -1772,16 +1781,18 @@ private[parser] final class Parser(
         fail("Invalid backslash escape")
 
   private def parseBackslashLowerH(): BackslashKind =
-    if !(featureSet.hasBackslashHorizontalSpace || featureSet.hasBackslashHexDigit) then return parseBackslashUnknown()
+    if !(featureSet.escape.hasBackslashHorizontalSpace || featureSet.escape.hasBackslashHexDigit) then
+      return parseBackslashUnknown()
 
     next()
-    val klass = if featureSet.hasBackslashHorizontalSpace then EscapeClassKind.Horizontal else EscapeClassKind.HexDigit
+    val klass =
+      if featureSet.escape.hasBackslashHorizontalSpace then EscapeClassKind.Horizontal else EscapeClassKind.HexDigit
     BackslashKind.EscapeClass(klass)
 
   private def parseBackslashLowerK(): BackslashKind =
-    if !featureSet.hasBackslashKBackReference || context.inClass then return parseBackslashUnknown()
-    if featureSet.allowsNamelessBackslashKG && !source.lift(offset + 1).exists(c => c == '<' || c == '\'') then
-      return parseBackslashUnknown()
+    if !featureSet.reference.hasBackslashKBackReference || context.inClass then return parseBackslashUnknown()
+    if featureSet.reference.allowsNamelessBackslashKG && !source.lift(offset + 1).exists(c => c == '<' || c == '\'')
+    then return parseBackslashUnknown()
 
     next()
     skipConstructComment()
@@ -1792,13 +1803,13 @@ private[parser] final class Parser(
         expect('>', "Invalid backslash escape")
         BackslashKind.EscapeBackReference(BackReferenceStyle.KBackReference(NameStyle.Angle), ref)
       case '\'' =>
-        assert(featureSet.hasBackslashKBackReferenceQuote, "Invalid backslash escape")
+        assert(featureSet.reference.hasBackslashKBackReferenceQuote, "Invalid backslash escape")
         next()
         val ref = parseKRef('\'')
         expect('\'', "Invalid backslash escape")
         BackslashKind.EscapeBackReference(BackReferenceStyle.KBackReference(NameStyle.Quote), ref)
       case '{' =>
-        assert(featureSet.hasBackslashKBackReferenceCurly, "Invalid backslash escape")
+        assert(featureSet.reference.hasBackslashKBackReferenceCurly, "Invalid backslash escape")
         next()
         skipBraceBlank()
         val ref = parseKRef('}')
@@ -1809,9 +1820,9 @@ private[parser] final class Parser(
         fail("Invalid backslash escape")
 
   private def parseKRef(end: Char): Reference =
-    if featureSet.allowsNonNameKBackReference then return parseRef(end)
+    if featureSet.reference.allowsNonNameKBackReference then return parseRef(end)
     // .NET accepts `\k<0>`, though it rejects `(?<0>...)`.
-    if featureSet.allowsNumberGroupName && isDigit then
+    if featureSet.group.allowsNumberGroupName && isDigit then
       val start = offset
       parseIntOption()
       return Reference.NamedReference(sliceSource(start, offset))
@@ -1833,7 +1844,7 @@ private[parser] final class Parser(
       case _ =>
         Reference.NamedReference(parseGroupNameBody(end, levelable = true))
 
-    if !featureSet.hasLeveledBackReference then return ref
+    if !featureSet.reference.hasLeveledBackReference then return ref
 
     (currentChar: @switch) match
       case '+' | '-' =>
@@ -1844,7 +1855,7 @@ private[parser] final class Parser(
       case _ => ref
 
   private def parseBaseRef(end: Char): Reference.BaseReference =
-    if !featureSet.allowsNonNameBaseRef then return Reference.NamedReference(parseGroupNameBody(end))
+    if !featureSet.reference.allowsNonNameBaseRef then return Reference.NamedReference(parseGroupNameBody(end))
 
     (currentChar: @switch) match
       case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
@@ -1853,7 +1864,7 @@ private[parser] final class Parser(
         if index != 0 then markNumberedReference(start)
         Reference.IndexedReference(index)
       case '+' =>
-        if featureSet.allowsForwardRelativeReference then parseRelativeReference()
+        if featureSet.reference.allowsForwardRelativeReference then parseRelativeReference()
         else Reference.NamedReference(parseGroupNameBody(end))
       case '-' =>
         parseRelativeReference()
@@ -1864,7 +1875,7 @@ private[parser] final class Parser(
     if numberedReferenceOffset.isEmpty then numberedReferenceOffset = Some(pos)
 
   private def parseRelativeReference(): Reference.RelativeReference =
-    assert(currentChar == '-' || featureSet.allowsForwardRelativeReference, "Invalid backslash escape")
+    assert(currentChar == '-' || featureSet.reference.allowsForwardRelativeReference, "Invalid backslash escape")
     markNumberedReference(offset)
     val sign = if currentChar == '-' then -1 else 1
     next()
@@ -1878,7 +1889,7 @@ private[parser] final class Parser(
     BackslashKind.Escape(EscapeStyle.Single('n'), 0x0a)
 
   private def parseBackslashLowerO(): BackslashKind =
-    if !featureSet.hasBackslashOctal then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashOctal then return parseBackslashUnknown()
 
     next()
     val textStart = offset
@@ -1889,16 +1900,16 @@ private[parser] final class Parser(
   private def parseBackslashLowerP(): BackslashKind = parseBackslashProperty(invert = false)
 
   private def parseBackslashProperty(invert: Boolean): BackslashKind =
-    if !featureSet.hasBackslashUnicodeProperty then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashUnicodeProperty then return parseBackslashUnknown()
 
-    if source.lift(offset + 1).forall(_ != '{') && !featureSet.hasBackslashUnicodePropertyBare &&
-      featureSet.allowsAlphabeticUnknownBackslash
+    if source.lift(offset + 1).forall(_ != '{') && !featureSet.escape.hasBackslashUnicodePropertyBare &&
+      featureSet.escape.allowsAlphabeticUnknownBackslash
     then return parseBackslashUnknown()
 
     next()
     skipConstructComment()
     if isEnd || currentChar != '{' then
-      assert(featureSet.hasBackslashUnicodePropertyBare, "Invalid backslash escape")
+      assert(featureSet.escape.hasBackslashUnicodePropertyBare, "Invalid backslash escape")
       assert(!isEnd, "Invalid backslash escape")
       val name = currentChar.toString
       next()
@@ -1909,7 +1920,7 @@ private[parser] final class Parser(
     next()
     skipConstructComment()
     val (negated, name, value) =
-      if featureSet.allowsLoosePropertyName then parseLooseProperty() else parseStrictProperty()
+      if featureSet.escape.allowsLoosePropertyName then parseLooseProperty() else parseStrictProperty()
     expect('}', "Invalid backslash escape")
 
     val klass = (invert != negated, value) match
@@ -1921,7 +1932,7 @@ private[parser] final class Parser(
 
   // Ruby (Onigmo) looks up the whole name with `=` and the value, ignoring only spaces, hyphens, underscores and cases.
   private def parseStrictProperty(): (Boolean, String, Option[String]) =
-    val negated = featureSet.allowsNegatedRawPropertyName && !isEnd && currentChar == '^'
+    val negated = featureSet.escape.allowsNegatedRawPropertyName && !isEnd && currentChar == '^'
     if negated then next()
     val name = parsePropertyName()
     val value = Option.when(!isEnd && currentChar == '='):
@@ -1930,7 +1941,7 @@ private[parser] final class Parser(
     (negated, name, value)
 
   private def parsePropertyName(): String =
-    if !featureSet.allowsRawPropertyName then return parsePropertyID()
+    if !featureSet.escape.allowsRawPropertyName then return parsePropertyID()
     val start = offset
     while !isEnd && currentChar != '}' && currentChar != '=' do next()
     assert(start < offset, "Invalid backslash escape")
@@ -1952,7 +1963,7 @@ private[parser] final class Parser(
     (negated, name, value)
 
   private def parseBackslashLowerQ(): BackslashKind =
-    if !(featureSet.hasBackslashQuoteSet && context.inClass) then return parseBackslashUnknown()
+    if !(featureSet.charClass.hasBackslashQuoteSet && context.inClass) then return parseBackslashUnknown()
 
     next()
     expect('{', "Invalid backslash escape")
@@ -2015,27 +2026,27 @@ private[parser] final class Parser(
     kind
 
   private def parseBackslashLowerU(): BackslashKind =
-    if !featureSet.hasBackslashUnicodeHex then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashUnicodeHex then return parseBackslashUnknown()
 
     val save = offset
     next()
     val textStart = offset
     skipConstructComment()
 
-    if featureSet.hasBackslashUnicodeBracket && currentChar == '{' then
+    if featureSet.escape.hasBackslashUnicodeBracket && currentChar == '{' then
       next()
-      if featureSet.hasBackslashUnicodeList then return parseUnicodeList(textStart)
+      if featureSet.escape.hasBackslashUnicodeList then return parseUnicodeList(textStart)
       val value = parseBracedCodePoint(16)
       return escape(EscapeStyle.UnicodeBracket, value, textStart)
 
     if !hasHexDigitsAhead(4) then
-      assert(featureSet.allowsBrokenBackslashHex, "Invalid backslash escape")
+      assert(featureSet.escape.allowsBrokenBackslashHex, "Invalid backslash escape")
       reset(save)
       return parseBackslashUnknown()
 
     val value = validateCodePoint(parseHexDigits(4), save)
 
-    if featureSet.combinesSurrogatePairEscape && UTF16Encoding.isHighSurrogate(value) then
+    if featureSet.escape.combinesSurrogatePairEscape && UTF16Encoding.isHighSurrogate(value) then
       val lowStart = offset
       if startWith("\\u") then
         skipConstructComment()
@@ -2072,11 +2083,12 @@ private[parser] final class Parser(
         BackslashKind.Escape(EscapeStyle.UnicodeBracket, values.head)
 
   private def parseBackslashLowerV(): BackslashKind =
-    if !(featureSet.hasBackslashVerticalSpace || featureSet.hasBackslashVerticalTab) then return parseBackslashUnknown()
+    if !(featureSet.escape.hasBackslashVerticalSpace || featureSet.escape.hasBackslashVerticalTab) then
+      return parseBackslashUnknown()
 
     next()
 
-    if featureSet.hasBackslashVerticalSpace then return BackslashKind.EscapeClass(EscapeClassKind.Vertical)
+    if featureSet.escape.hasBackslashVerticalSpace then return BackslashKind.EscapeClass(EscapeClassKind.Vertical)
 
     BackslashKind.Escape(EscapeStyle.Single('v'), 0x0b)
 
@@ -2090,33 +2102,33 @@ private[parser] final class Parser(
     val textStart = offset
     skipConstructComment()
 
-    if featureSet.hasBackslashXBracket && currentChar == '{' then
+    if featureSet.escape.hasBackslashXBracket && currentChar == '{' then
       next()
       val value = parseBracedCodePoint(16)
       return escape(EscapeStyle.HexBracket, value, textStart)
 
     if !isHexDigit then
-      if featureSet.allowsBackslashXWithoutDigit then return BackslashKind.Escape(EscapeStyle.Hex0, 0x00)
-      assert(featureSet.allowsBrokenBackslashHex, "Invalid backslash escape")
+      if featureSet.escape.allowsBackslashXWithoutDigit then return BackslashKind.Escape(EscapeStyle.Hex0, 0x00)
+      assert(featureSet.escape.allowsBrokenBackslashHex, "Invalid backslash escape")
       reset(save)
       return parseBackslashUnknown()
 
     if hasHexDigitsAhead(2) then return escape(EscapeStyle.Hex2, parseHexDigits(2).toInt, textStart)
 
-    if featureSet.hasBackslashXHex1 then return escape(EscapeStyle.Hex1, parseHexDigits(1).toInt, textStart)
+    if featureSet.escape.hasBackslashXHex1 then return escape(EscapeStyle.Hex1, parseHexDigits(1).toInt, textStart)
 
-    assert(featureSet.allowsBrokenBackslashHex, "Invalid backslash escape")
+    assert(featureSet.escape.allowsBrokenBackslashHex, "Invalid backslash escape")
     reset(save)
     parseBackslashUnknown()
 
   private def parseBackslashLowerZ(): BackslashKind =
-    if !featureSet.hasBackslashEnd then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashEnd then return parseBackslashUnknown()
 
     next()
     BackslashKind.Assert(AssertKind.LowerEnd)
 
   private def parseBackslashUpperA(): BackslashKind =
-    if !featureSet.hasBackslashBegin then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashBegin then return parseBackslashUnknown()
 
     next()
     BackslashKind.Assert(AssertKind.Begin)
@@ -2127,7 +2139,7 @@ private[parser] final class Parser(
     next()
 
     boundary:
-      if featureSet.hasBoundaryModifier then
+      if featureSet.escape.hasBoundaryModifier then
         if startWith("{g}") then
           boundary.break(BackslashKind.Assert(AssertKind.NonBoundary(Some(BoundaryModifier.GModifier))))
 
@@ -2137,12 +2149,12 @@ private[parser] final class Parser(
       BackslashKind.Assert(AssertKind.NonBoundary(None))
 
   private def parseBackslashUpperC(): BackslashKind =
-    if featureSet.hasBackslashCodeUnit && !context.inClass then
+    if featureSet.escape.hasBackslashCodeUnit && !context.inClass then
       next()
       return BackslashKind.EscapeClass(EscapeClassKind.CodeUnit)
 
-    if !featureSet.hasBackslashMetaControl then
-      assert(featureSet.allowsUnknownBackslashUpperC, "Invalid backslash escape")
+    if !featureSet.escape.hasBackslashMetaControl then
+      assert(featureSet.escape.allowsUnknownBackslashUpperC, "Invalid backslash escape")
       return parseBackslashUnknown()
 
     next()
@@ -2156,34 +2168,36 @@ private[parser] final class Parser(
     BackslashKind.EscapeClass(EscapeClassKind.NonDigit)
 
   private def parseBackslashUpperE(): BackslashKind =
-    if !featureSet.hasBackslashQuoteCommand then return parseBackslashUnknown()
-    assert(featureSet.allowsUnpairedQuoteEnd, "Invalid backslash escape")
+    if !featureSet.escape.hasBackslashQuoteCommand then return parseBackslashUnknown()
+    assert(featureSet.escape.allowsUnpairedQuoteEnd, "Invalid backslash escape")
 
     next()
     BackslashKind.CaseCommand(CaseCommandKind.EndCaseCommand)
 
   private def parseBackslashUpperG(): BackslashKind =
-    if !featureSet.hasBackslashStickyAssert then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashStickyAssert then return parseBackslashUnknown()
 
     next()
     BackslashKind.Assert(AssertKind.Sticky)
 
   private def parseBackslashUpperH(): BackslashKind =
-    if !(featureSet.hasBackslashHorizontalSpace || featureSet.hasBackslashHexDigit) then return parseBackslashUnknown()
+    if !(featureSet.escape.hasBackslashHorizontalSpace || featureSet.escape.hasBackslashHexDigit) then
+      return parseBackslashUnknown()
 
     next()
     val klass =
-      if featureSet.hasBackslashHorizontalSpace then EscapeClassKind.NonHorizontal else EscapeClassKind.NonHexDigit
+      if featureSet.escape.hasBackslashHorizontalSpace then EscapeClassKind.NonHorizontal
+      else EscapeClassKind.NonHexDigit
     BackslashKind.EscapeClass(klass)
 
   private def parseBackslashUpperK(): BackslashKind =
-    if !featureSet.hasBackslashCut then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashCut then return parseBackslashUnknown()
 
     next()
     BackslashKind.Assert(AssertKind.Cut)
 
   private def parseBackslashUpperM(): BackslashKind =
-    if !featureSet.hasBackslashMetaControl then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashMetaControl then return parseBackslashUnknown()
 
     next()
     expect('-', "Invalid backslash escape")
@@ -2192,27 +2206,28 @@ private[parser] final class Parser(
     escape(EscapeStyle.Meta, value | 0x80, textStart)
 
   private def parseBackslashUpperN(): BackslashKind =
-    if !(featureSet.hasBackslashNonNewline || featureSet.hasBackslashCharName || featureSet.hasBackslashCharNameHex)
+    if !(featureSet.escape.hasBackslashNonNewline || featureSet.escape.hasBackslashCharName || featureSet.escape.hasBackslashCharNameHex)
     then return parseBackslashUnknown()
 
     next()
     val textStart = offset
     skipConstructComment()
 
-    val isCharName = !isEnd && currentChar == '{' && !(featureSet.hasBackslashNonNewline && isCurlyQuantifierAhead)
+    val isCharName =
+      !isEnd && currentChar == '{' && !(featureSet.escape.hasBackslashNonNewline && isCurlyQuantifierAhead)
     if !isCharName then
-      assert(featureSet.hasBackslashNonNewline, "Invalid backslash escape")
+      assert(featureSet.escape.hasBackslashNonNewline, "Invalid backslash escape")
       return BackslashKind.EscapeClass(EscapeClassKind.NonNewline)
 
     next()
-    if featureSet.hasBackslashCharNameHex && startWith("U+") then
+    if featureSet.escape.hasBackslashCharNameHex && startWith("U+") then
       val start = offset
       assert(isHexDigit, "Invalid backslash escape")
       val value = validateCodePoint(parseHexDigits(Int.MaxValue), start)
       expect('}', "Invalid backslash escape")
       return escape(EscapeStyle.NamedHex, value, textStart)
 
-    assert(featureSet.hasBackslashCharName, "Invalid backslash escape")
+    assert(featureSet.escape.hasBackslashCharName, "Invalid backslash escape")
     val start = offset
     while !isEnd && currentChar != '}' do next()
     val name = sliceSource(start, offset)
@@ -2230,13 +2245,13 @@ private[parser] final class Parser(
   private def parseBackslashUpperP(): BackslashKind = parseBackslashProperty(invert = true)
 
   private def parseBackslashUpperQ(): BackslashKind =
-    if !featureSet.hasBackslashQuoteCommand then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashQuoteCommand then return parseBackslashUnknown()
 
     next()
     BackslashKind.CaseCommand(CaseCommandKind.QuoteCommand)
 
   private def parseBackslashUpperR(): BackslashKind =
-    if !featureSet.hasBackslashGeneralNewline then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashGeneralNewline then return parseBackslashUnknown()
 
     next()
     BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)
@@ -2246,7 +2261,7 @@ private[parser] final class Parser(
     BackslashKind.EscapeClass(EscapeClassKind.NonSpace)
 
   private def parseBackslashUpperU(): BackslashKind =
-    if !featureSet.hasBackslashUnicodeHex8 then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashUnicodeHex8 then return parseBackslashUnknown()
 
     val save = offset
     next()
@@ -2257,7 +2272,7 @@ private[parser] final class Parser(
     escape(EscapeStyle.UnicodeHex8, validateCodePoint(parseHexDigits(8), save), textStart)
 
   private def parseBackslashUpperV(): BackslashKind =
-    if !featureSet.hasBackslashVerticalSpace then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashVerticalSpace then return parseBackslashUnknown()
 
     next()
     BackslashKind.EscapeClass(EscapeClassKind.NonVertical)
@@ -2267,33 +2282,33 @@ private[parser] final class Parser(
     BackslashKind.EscapeClass(EscapeClassKind.NonWord)
 
   private def parseBackslashUpperX(): BackslashKind =
-    if !featureSet.hasBackslashGraphemeCluster then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashGraphemeCluster then return parseBackslashUnknown()
 
     next()
     BackslashKind.EscapeClass(EscapeClassKind.GraphemeCluster)
 
   private def parseBackslashUpperZ(): BackslashKind =
-    if !featureSet.hasBackslashUpperEnd then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashUpperEnd then return parseBackslashUnknown()
 
     next()
     BackslashKind.Assert(AssertKind.UpperEnd)
 
   private def parseBackslashOctal(): BackslashKind =
-    if !featureSet.hasBackslashBareOctal then
-      if featureSet.hasBackslashZeroOctal && currentChar == '0' then return parseBackslashZeroOctal()
-      if featureSet.hasBackslashNull && currentChar == '0' && !source.lift(offset + 1).exists(_.isDigit) then
+    if !featureSet.escape.hasBackslashBareOctal then
+      if featureSet.escape.hasBackslashZeroOctal && currentChar == '0' then return parseBackslashZeroOctal()
+      if featureSet.escape.hasBackslashNull && currentChar == '0' && !source.lift(offset + 1).exists(_.isDigit) then
         next()
         return BackslashKind.Escape(EscapeStyle.Single('0'), 0x00)
       fail("Invalid backslash escape")
 
     if !isOctalDigit then
-      assert(featureSet.allowsNonOctalDigitBackslash, "Invalid backslash escape")
+      assert(featureSet.escape.allowsNonOctalDigitBackslash, "Invalid backslash escape")
       return parseBackslashUnknown()
 
-    val size = if currentChar <= '3' || !featureSet.limitsOctalTo0377ByDigits then 3 else 2
+    val size = if currentChar <= '3' || !featureSet.escape.limitsOctalTo0377ByDigits then 3 else 2
     val start = offset
     val value = parseOctalDigits(size)
-    if value > 0xff && !featureSet.allowsOctalAbove0377 then fail("Octal escape value too large", start)
+    if value > 0xff && !featureSet.escape.allowsOctalAbove0377 then fail("Octal escape value too large", start)
     escape(EscapeStyle.BareOctal, value, start)
 
   private def parseBackslashZeroOctal(): BackslashKind =
@@ -2317,35 +2332,37 @@ private[parser] final class Parser(
 
     val save = offset
 
-    if featureSet.readsThreeOctalDigitsAsOctal && source
+    if featureSet.escape.readsThreeOctalDigitsAsOctal && source
         .slice(offset, offset + 3)
         .count(isOctalDigit(_)) == 3
     then return parseBackslashOctal()
 
     val groupCount =
-      if featureSet.readsBackReferenceDigitsByPreviousGroups then previousCaptureCount else prescan.captureSize
+      if featureSet.reference.readsBackReferenceDigitsByPreviousGroups then previousCaptureCount
+      else prescan.captureSize
     val n =
-      if featureSet.readsThreeOctalDigitsAsOctal then parseBoundedDigits(_ < 100)
-      else if featureSet.readsBackReferenceDigitsWhileGroupExists then parseBoundedDigits(_ <= groupCount)
+      if featureSet.escape.readsThreeOctalDigitsAsOctal then parseBoundedDigits(_ < 100)
+      else if featureSet.reference.readsBackReferenceDigitsWhileGroupExists then parseBoundedDigits(_ <= groupCount)
       else parseSaturatedIntOption(Long.MaxValue, "Invalid backslash escape", save).get
 
-    if featureSet.fallsBackInvalidBackReferenceToEscape && !(0 < n && n <= prescan.captureSize) then
+    if featureSet.reference.fallsBackInvalidBackReferenceToEscape && !(0 < n && n <= prescan.captureSize) then
       reset(save)
       if isOctalDigit then return parseBackslashOctal()
 
       return parseBackslashUnknown()
 
     val isOctalStart = isOctalDigit(source.charAt(save))
-    if featureSet.fallsBackMultiDigitBackReferenceToOctal && n >= 10 && n > groupCount && isOctalStart then
+    if featureSet.reference.fallsBackMultiDigitBackReferenceToOctal && n >= 10 && n > groupCount && isOctalStart then
       reset(save)
       return parseBackslashOctal()
 
     // Ruby reads `\8` or `\9` followed by digits as a literal character when no such group exists.
-    if featureSet.fallsBackMultiDigitBackReferenceToLiteral && n >= 10 && n > groupCount then
+    if featureSet.reference.fallsBackMultiDigitBackReferenceToLiteral && n >= 10 && n > groupCount then
       reset(save)
       return parseBackslashUnknown()
 
-    if featureSet.rejectsInvalidBackReference && n > prescan.captureSize then fail("Invalid back-reference", save)
+    if featureSet.reference.rejectsInvalidBackReference && n > prescan.captureSize then
+      fail("Invalid back-reference", save)
 
     markNumberedReference(save)
     BackslashKind.EscapeBackReference(BackReferenceStyle.BareBackReference, Reference.IndexedReference(n))
@@ -2376,17 +2393,19 @@ private[parser] final class Parser(
     assert(!isEnd, "Invalid backslash escape")
     val value = currentCodePoint
 
-    if isAlphabetic then assert(featureSet.allowsAlphabeticUnknownBackslash, "Invalid backslash escape")
-    else if isDotNetWord(value) then assert(featureSet.allowsWordUnknownBackslash, "Invalid backslash escape")
+    if isAlphabetic then assert(featureSet.escape.allowsAlphabeticUnknownBackslash, "Invalid backslash escape")
+    else if isDotNetWord(value) then assert(featureSet.escape.allowsWordUnknownBackslash, "Invalid backslash escape")
     else validateSymbolUnknownBackslash()
 
     nextCodePoint(value)
     BackslashKind.Unknown(value)
 
   private def validateSymbolUnknownBackslash(): Unit =
-    if featureSet.allowsSymbolUnknownBackslash then return
+    if featureSet.escape.allowsSymbolUnknownBackslash then return
     if context.inClass && currentChar == '-' then return
-    if featureSet.hasBackslashClassSetReservedPunctuator && context.inClass && "&-!#%,:;<=>@`~".contains(currentChar)
+    if featureSet.charClass.hasBackslashClassSetReservedPunctuator && context.inClass && "&-!#%,:;<=>@`~".contains(
+        currentChar
+      )
     then return
     fail("Invalid backslash escape")
 
@@ -2396,7 +2415,7 @@ private[parser] final class Parser(
 
       val start = offset
 
-      if featureSet.hasClassPOSIXWordBoundary && (startWith("[[:<:]]") || startWith("[[:>:]]")) then
+      if featureSet.charClass.hasClassPOSIXWordBoundary && (startWith("[[:<:]]") || startWith("[[:>:]]")) then
         val name = source.slice(start + 3, start + 4)
         val end = offset
         val item = ClassItem(ClassItemData.ClassPOSIX(false, name), SourceLocation(start + 1, end - 1))
@@ -2405,7 +2424,7 @@ private[parser] final class Parser(
 
       next()
 
-      if featureSet.rejectsClassPOSIXOutsideClass then
+      if featureSet.charClass.rejectsClassPOSIXOutsideClass then
         findClassPOSIXEnd(start).foreach: _ =>
           if currentChar == ':' then fail("POSIX class outside class", start)
           fail("Unsupported POSIX collating element", start)
@@ -2416,7 +2435,7 @@ private[parser] final class Parser(
       val invert = currentChar == '^'
       if invert then next() else reset(save)
 
-      val item = nest(start)(parseClassItem(!featureSet.allowsClassEmpty))
+      val item = nest(start)(parseClassItem(!featureSet.charClass.allowsClassEmpty))
       expect(']', "Unclosed ']'")
       validateNegatedClassSet(invert, item, start)
 
@@ -2438,16 +2457,17 @@ private[parser] final class Parser(
       if startWithClassIntersection() then
         continue = true
         enter(offset - 2)
-        if featureSet.validatesClassSetSyntax then assert(isEnd || currentChar != '&', "Invalid class set character")
+        if featureSet.charClass.validatesClassSetSyntax then
+          assert(isEnd || currentChar != '&', "Invalid class set character")
         val right = parseClassItemUnion(false)
         val end = offset
-        if !featureSet.allowsEmptyClassIntersection then
+        if !featureSet.charClass.allowsEmptyClassIntersection then
           assert(!(isEmptyClassItem(item) && isEmptyClassItem(right)), "Invalid class set operation", start)
         operands.addOne(item).addOne(right)
         operators.add("&&")
         item = ClassItem(ClassItemData.ClassIntersection(item, right), SourceLocation(start, end))
 
-      if featureSet.allowsClassDiff && startWith("--") then
+      if featureSet.charClass.allowsClassDiff && startWith("--") then
         continue = true
         enter(offset - 2)
         val right = parseClassItemUnion(false)
@@ -2456,7 +2476,7 @@ private[parser] final class Parser(
         operators.add("--")
         item = ClassItem(ClassItemData.ClassDiff(item, right), SourceLocation(start, end))
 
-      if featureSet.hasClassSubtraction && startWith("-[") then
+      if featureSet.charClass.hasClassSubtraction && startWith("-[") then
         val nestStart = offset - 1
         val invert = currentChar == '^'
         if invert then next()
@@ -2468,7 +2488,7 @@ private[parser] final class Parser(
 
     depth = savedDepth
 
-    if featureSet.validatesClassSetSyntax && operators.nonEmpty then
+    if featureSet.charClass.validatesClassSetSyntax && operators.nonEmpty then
       assert(operators.size == 1, "Invalid class set operation", start)
       assert(operands.result().forall(isClassSetOperand), "Invalid class set operation", start)
 
@@ -2476,7 +2496,7 @@ private[parser] final class Parser(
 
   /** Skips Java's whitespace and comments in a class, or the blanks (U+0009 and U+0020) of PCRE's and Perl's `xx`. */
   private def skipClassComment(): Unit =
-    if context.skipsComment && featureSet.skipsCommentInClass then skipComment()
+    if context.skipsComment && featureSet.comment.skipsCommentInClass then skipComment()
     else if context.verboseMore then skipBlank()
 
   /** Parses the text that [[skipClassComment]] skips as a blank item, if any. */
@@ -2488,7 +2508,7 @@ private[parser] final class Parser(
 
   /** Reads `&&`, between which Java skips whitespace and comments (e.g. `[a& &b]`). */
   private def startWithClassIntersection(): Boolean =
-    if !featureSet.allowsClassIntersection || isEnd || currentChar != '&' then return false
+    if !featureSet.charClass.allowsClassIntersection || isEnd || currentChar != '&' then return false
     val save = offset
     next()
     skipConstructComment()
@@ -2526,7 +2546,7 @@ private[parser] final class Parser(
       case _                                                                    => false
 
   private def validateNegatedClassSet(invert: Boolean, item: ClassItem, start: Int): Unit =
-    if featureSet.validatesClassSetSyntax && invert then
+    if featureSet.charClass.validatesClassSetSyntax && invert then
       assert(!mayContainStrings(item), "Negated class may contain strings", start)
 
   private def parseClassItemUnion(first: Boolean): ClassItem =
@@ -2551,8 +2571,8 @@ private[parser] final class Parser(
     isEnd ||
       currentChar == ']' ||
       isClassIntersectionAhead ||
-      featureSet.allowsClassDiff && source.startsWith("--", offset) ||
-      featureSet.hasClassSubtraction && start != offset && source.startsWith("-[", offset)
+      featureSet.charClass.allowsClassDiff && source.startsWith("--", offset) ||
+      featureSet.charClass.hasClassSubtraction && start != offset && source.startsWith("-[", offset)
 
   private def parseClassItemAtom(seq: mutable.Builder[ClassItem, Seq[ClassItem]], unionStart: Int): Unit =
     val start = offset
@@ -2625,11 +2645,13 @@ private[parser] final class Parser(
             seq.addAll(afterEnd)
       case _ =>
         if !isValueClassItem(begin) then
-          if !isClassNestItem(begin) then assert(featureSet.allowsBrokenClassRangeBegin, "Invalid class range", start)
-        else if !isClassNestItem(end) then assert(featureSet.allowsBrokenClassRangeEnd, "Invalid class range", start)
+          if !isClassNestItem(begin) then
+            assert(featureSet.charClass.allowsBrokenClassRangeBegin, "Invalid class range", start)
+        else if !isClassNestItem(end) then
+          assert(featureSet.charClass.allowsBrokenClassRangeEnd, "Invalid class range", start)
 
         seq.addOne(item).addAll(skippedBeforeHyphen)
-        if featureSet.consumesBrokenClassRange then
+        if featureSet.charClass.consumesBrokenClassRange then
           seq.addOne(ClassItem.Value(ClassItemData.ClassLiteral('-'), SourceLocation(save, save + 1)))
           seq.addAll(skippedAfterHyphen)
           seq.addOne(endItem)
@@ -2638,7 +2660,7 @@ private[parser] final class Parser(
   /** Parses the empty quotes, `\E` and blanks between a range begin and its `-`, which do not break the range. */
   private def parseClassItemsSkippableInRange(unionStart: Int): Seq[ClassItem] =
     val items = mutable.ListBuffer.empty[ClassItem]
-    if !featureSet.hasBackslashQuoteCommand then return items.toSeq
+    if !featureSet.escape.hasBackslashQuoteCommand then return items.toSeq
     boundary:
       while !isClassItemStop(unionStart) && currentChar == '\\' do
         val save = offset
@@ -2693,16 +2715,16 @@ private[parser] final class Parser(
   private def parseClassItemNonRange(): ClassItem =
     val start = offset
 
-    if featureSet.allowsClassPOSIX && currentChar == '[' then
+    if featureSet.charClass.allowsClassPOSIX && currentChar == '[' then
       parseClassPOSIXOption() match
         case Some(item) => return item
         case None       => ()
 
-    if featureSet.allowsClassNest && currentChar == '[' then
+    if featureSet.charClass.allowsClassNest && currentChar == '[' then
       next()
       val invert = currentChar == '^'
       if invert then next()
-      val item = nest(start)(parseClassItem(!featureSet.allowsClassEmpty))
+      val item = nest(start)(parseClassItem(!featureSet.charClass.allowsClassEmpty))
       expect(']', "Unclosed ']'")
       validateNegatedClassSet(invert, item, start)
       val end = offset
@@ -2781,15 +2803,16 @@ private[parser] final class Parser(
       reset(bodyEnd + 2)
       return Some(ClassItem(ClassItemData.ClassPOSIX(invert, name), SourceLocation(start, offset)))
 
-    if !featureSet.classPOSIXNameRule.looksLikeName(name, ClassPOSIXNames) then return Some(parseClassItemLiteral())
+    if !featureSet.charClass.classPOSIXNameRule.looksLikeName(name, ClassPOSIXNames) then
+      return Some(parseClassItemLiteral())
 
     fail("Unknown POSIX class", start)
 
   private def findClassPOSIXEnd(start: Int): Option[Int] =
     if start + 1 >= source.length then return None
     val terminator = source.charAt(start + 1)
-    if !(terminator == ':' || featureSet.rejectsClassPOSIXCollating && (terminator == '.' || terminator == '=')) then
-      return None
+    if !(terminator == ':' || featureSet.charClass.rejectsClassPOSIXCollating && (terminator == '.' || terminator == '='))
+    then return None
 
     var i = start + 2
     while i + 1 < source.length do
@@ -2807,9 +2830,9 @@ private[parser] final class Parser(
 
   private def isLiteralBackslashInClass: Boolean =
     !isEnd && ((currentChar: @switch) match
-      case 'A' | 'z' | 'Z' | 'G' | 'K' | 'R' | 'X' => featureSet.treatsNonClassBackslashInClassAsLiteral
-      case 'g' | 'k'                               => featureSet.treatsBackReferenceBackslashInClassAsLiteral
-      case 'C'                                     => featureSet.treatsBackslashUpperCInClassAsLiteral
+      case 'A' | 'z' | 'Z' | 'G' | 'K' | 'R' | 'X' => featureSet.charClass.treatsNonClassBackslashInClassAsLiteral
+      case 'g' | 'k'                               => featureSet.charClass.treatsBackReferenceBackslashInClassAsLiteral
+      case 'C'                                     => featureSet.charClass.treatsBackslashUpperCInClassAsLiteral
       case _                                       => false)
 
   private def parseClassQuote(start: Int): ClassItem =
@@ -2822,7 +2845,7 @@ private[parser] final class Parser(
     ClassItem(region, SourceLocation(start, offset))
 
   private def parseClassItemLiteral(): ClassItem =
-    if featureSet.validatesClassSetSyntax then
+    if featureSet.charClass.validatesClassSetSyntax then
       assert(!ClassSetSyntaxCharacters.contains(currentChar), "Invalid class set character")
       assert(
         !(ClassSetReservedDoublePunctuators
@@ -2843,14 +2866,14 @@ private[parser] final class Parser(
     item.data.isInstanceOf[ClassItemData.ClassNest]
 
   private def parseCloseCurly(stack: mutable.Stack[Node]): Unit =
-    assert(featureSet.allowsBrokenCloseCurly, "Incomplete quantifier")
+    assert(featureSet.quantifier.allowsBrokenCloseCurly, "Incomplete quantifier")
     val start = offset
     next()
     val end = offset
     stack.push(Node(NodeData.Literal('}'), SourceLocation(start, end)))
 
   private def parseCloseBracket(stack: mutable.Stack[Node]): Unit =
-    assert(featureSet.allowsBrokenCloseBracket, "Unclosed ']'")
+    assert(featureSet.charClass.allowsBrokenCloseBracket, "Unclosed ']'")
     val start = offset
     next()
     val end = offset
@@ -2897,8 +2920,9 @@ private[parser] final class Parser(
     // A single `x` turns `xx` off, and `-x` turns both off (Perl 5.44.0, PCRE2 10.49).
     if diff.added.verbose then context = context.copy(skipsComment = true, verboseMore = diff.added.verboseMore)
     if diff.removed.exists(_.verbose) then context = context.copy(skipsComment = false, verboseMore = false)
-    if featureSet.hasUnixLinesFlag && diff.added.hasIndices then context = context.copy(unixLines = true)
-    if featureSet.hasUnixLinesFlag && diff.removed.exists(_.hasIndices) then context = context.copy(unixLines = false)
+    if featureSet.inlineFlag.hasUnixLinesFlag && diff.added.hasIndices then context = context.copy(unixLines = true)
+    if featureSet.inlineFlag.hasUnixLinesFlag && diff.removed.exists(_.hasIndices) then
+      context = context.copy(unixLines = false)
     if diff.added.dupNames then context = context.copy(allowsDuplicatedGroupName = true)
     if diff.removed.exists(_.dupNames) then context = context.copy(allowsDuplicatedGroupName = false)
     if diff.added.explicitCapture then context = context.copy(explicitCapture = true)
@@ -2932,7 +2956,7 @@ private[parser] final class Parser(
   private def parseGroupNameBody(end: Char = ')', levelable: Boolean = false): String =
     val start = offset
 
-    if featureSet.allowsLooseGroupName then
+    if featureSet.group.allowsLooseGroupName then
       assert(
         !isEnd && currentChar != end && currentChar != '-' && !Character.isDigit(currentCodePoint),
         "Invalid identifier"
@@ -2943,7 +2967,7 @@ private[parser] final class Parser(
         next()
       return sliceSource(start, offset)
 
-    if featureSet.allowsNumberGroupName && isDigit then
+    if featureSet.group.allowsNumberGroupName && isDigit then
       val n = parseIntOption().get
       assert(n != 0, "Invalid identifier", start)
       return sliceSource(start, offset)
@@ -2954,7 +2978,7 @@ private[parser] final class Parser(
         skipConstructComment()
         val save = offset
         val c =
-          if featureSet.allowsEscapeInGroupName && currentChar == '\\' then parseGroupNameEscape()
+          if featureSet.group.allowsEscapeInGroupName && currentChar == '\\' then parseGroupNameEscape()
           else
             val c = currentCodePoint
             nextCodePoint(c)
@@ -2965,7 +2989,7 @@ private[parser] final class Parser(
         name.appendCodePoint(c)
 
     assert(name.length > 0, "Invalid identifier", start)
-    if featureSet.limitsGroupNameLength then assert(offset - start <= 128, "Invalid identifier", start)
+    if featureSet.group.limitsGroupNameLength then assert(offset - start <= 128, "Invalid identifier", start)
     name.toString
 
   /** Parses a `\\u` escape sequence in a group name, and returns its code point or `-1` if it is invalid. */
@@ -3018,23 +3042,23 @@ private[parser] final class Parser(
 
   private def isGroupNameStart(c: Int): Boolean =
     if 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' then true
-    else if c == '_' then featureSet.allowsUnderscoreInGroupName
-    else if c == '$' then featureSet.allowsDollarInGroupName
+    else if c == '_' then featureSet.group.allowsUnderscoreInGroupName
+    else if c == '$' then featureSet.group.allowsDollarInGroupName
     else if c < 0x80 then false
-    else if featureSet.allowsUnicodeIdentifierGroupName then Character.isUnicodeIdentifierStart(c)
-    else if featureSet.allowsUnicodeWordGroupName then
+    else if featureSet.group.allowsUnicodeIdentifierGroupName then Character.isUnicodeIdentifierStart(c)
+    else if featureSet.group.allowsUnicodeWordGroupName then
       (c < 0x10000 || featureSet.readsAsUnicode) && Character.isLetter(c)
-    else if featureSet.allowsWordClassGroupName then isDotNetWord(c)
-    else if featureSet.allowsWordIdentifierGroupName then Parser.PerlGroupNameStart.contains(c)
+    else if featureSet.group.allowsWordClassGroupName then isDotNetWord(c)
+    else if featureSet.group.allowsWordIdentifierGroupName then Parser.PerlGroupNameStart.contains(c)
     else false
 
   private def isGroupNameContinue(c: Int): Boolean =
     if c < 0x80 then isDigit(c) || isGroupNameStart(c)
-    else if featureSet.allowsUnicodeIdentifierGroupName then Character.isUnicodeIdentifierPart(c)
-    else if featureSet.allowsUnicodeWordGroupName then
+    else if featureSet.group.allowsUnicodeIdentifierGroupName then Character.isUnicodeIdentifierPart(c)
+    else if featureSet.group.allowsUnicodeWordGroupName then
       (c < 0x10000 || featureSet.readsAsUnicode) && Character.isLetterOrDigit(c)
-    else if featureSet.allowsWordClassGroupName then isDotNetWord(c)
-    else if featureSet.allowsWordIdentifierGroupName then Parser.PerlGroupNameContinue.contains(c)
+    else if featureSet.group.allowsWordClassGroupName then isDotNetWord(c)
+    else if featureSet.group.allowsWordIdentifierGroupName then Parser.PerlGroupNameContinue.contains(c)
     else false
 
   /** Parses a name or a value of JavaScript's `\\p{...}`, which is an ASCII letter or `_` followed by them and digits.
@@ -3097,7 +3121,7 @@ private[parser] final class Parser(
       skipConstructComment()
 
     // Perl reads `\x{}` as `\x{0}`, but rejects `\o{}`.
-    if featureSet.allowsLooseBraceEscape && (count > 0 || radix == 16 || currentChar != '}') then
+    if featureSet.escape.allowsLooseBraceEscape && (count > 0 || radix == 16 || currentChar != '}') then
       while !isEnd && currentChar != '}' do next()
     else
       assert(count > 0, "Invalid backslash escape")
@@ -3107,13 +3131,13 @@ private[parser] final class Parser(
 
   private def validateCodePoint(value: Long, pos: Int): Int =
     val max: Long =
-      if featureSet.allowsCodePointAbove10FFFF then Long.MaxValue
+      if featureSet.escape.allowsCodePointAbove10FFFF then Long.MaxValue
       else if featureSet.limitsCodePointTo0xFF then 0xff
       else 0x10ffff
     if value > max then fail("Code point too large", pos)
     // Ruby's `\u` escapes are Unicode, which an ASCII-8BIT regexp cannot have except ASCII.
-    if featureSet.rejectsNonASCIIUnicodeEscape && value >= 0x80 then fail("Incompatible character encoding", pos)
-    if !featureSet.allowsSurrogateEscape && value.isValidInt && UTF16Encoding.isSurrogate(value.toInt) then
+    if featureSet.escape.rejectsNonASCIIUnicodeEscape && value >= 0x80 then fail("Incompatible character encoding", pos)
+    if !featureSet.escape.allowsSurrogateEscape && value.isValidInt && UTF16Encoding.isSurrogate(value.toInt) then
       fail("Invalid Unicode escape", pos)
     value.min(Int.MaxValue).toInt
 
@@ -3139,28 +3163,30 @@ private[parser] final class Parser(
 
   /** Skips a `#` comment up to its line terminator, which Java keeps (e.g. U+2028 after it is a literal). */
   private def skipLineComment(): Unit =
-    val terminators = if context.unixLines then LineTerminatorSet.LF else featureSet.commentTerminators
+    val terminators = if context.unixLines then LineTerminatorSet.LF else featureSet.comment.commentTerminators
     val hasCRLF = terminators.crlf != LineTerminatorSet.CRLF.Ignored
     def isCRLF: Boolean = hasCRLF && source.startsWith("\r\n", offset)
     // Java's pattern buffer ends with NUL, so a NUL also ends a comment.
     def isTerminator: Boolean =
-      terminators.chars.contains(currentChar.toInt) || isCRLF || featureSet.endsCommentAtNUL && currentChar == '\u0000'
+      terminators.chars.contains(
+        currentChar.toInt
+      ) || isCRLF || featureSet.comment.endsCommentAtNUL && currentChar == '\u0000'
 
     while !isEnd && !isTerminator do
-      if featureSet.processBackslashInLineComment && currentChar == '\\' then
+      if featureSet.comment.processBackslashInLineComment && currentChar == '\\' then
         val start = offset
         next()
         assert(!isEnd, "Invalid backslash escape", start)
         next()
       else next()
-    if !isEnd && !featureSet.keepsCommentEnd then reset(offset + (if isCRLF then 2 else 1))
+    if !isEnd && !featureSet.comment.keepsCommentEnd then reset(offset + (if isCRLF then 2 else 1))
 
   /** Skips the whitespace and comments that Java also skips inside a construct (e.g. `(?<n a>x)` and `a{1 ,2}`). */
   private def skipConstructComment(): Unit =
     if isSkippingConstructComment then skipComment()
 
   private def isSkippingConstructComment: Boolean =
-    context.skipsComment && featureSet.skipsCommentInConstruct
+    context.skipsComment && featureSet.comment.skipsCommentInConstruct
 
   /** Returns the source text in the given range without the comments Ruby removes. */
   private def sliceSource(start: Int, end: Int): String =
@@ -3230,8 +3256,8 @@ private[parser] final class Parser(
   private def isSpace: Boolean =
     !isEnd && ((currentChar: @switch) match
       case '\t' | '\n' | '\f' | '\r' | ' '                      => true
-      case '\u000b'                                             => featureSet.skipsVerticalTab
-      case '\u0085' | '\u200e' | '\u200f' | '\u2028' | '\u2029' => featureSet.skipsPatternWhiteSpace
+      case '\u000b'                                             => featureSet.comment.skipsVerticalTab
+      case '\u0085' | '\u200e' | '\u200f' | '\u2028' | '\u2029' => featureSet.comment.skipsPatternWhiteSpace
       case _                                                    => false)
 
   private def isDigit: Boolean =
@@ -3254,13 +3280,13 @@ private[parser] final class Parser(
 
   private def isControl: Boolean =
     if isEnd then false
-    else if featureSet.hasBackslashControlAny then true
-    else if featureSet.hasBackslashControlPrintable then
-      0x20 <= currentChar && currentChar <= 0x7e && (currentChar != '{' || featureSet.allowsBackslashControlCurly)
+    else if featureSet.escape.hasBackslashControlAny then true
+    else if featureSet.escape.hasBackslashControlPrintable then
+      0x20 <= currentChar && currentChar <= 0x7e && (currentChar != '{' || featureSet.escape.allowsBackslashControlCurly)
     else
       isAlphabetic(currentChar) ||
-      featureSet.hasBackslashControlExtra && '@' <= currentChar && currentChar <= '_' ||
-      featureSet.hasBackslashControlDigitInClass && context.inClass && (isDigit || currentChar == '_')
+      featureSet.escape.hasBackslashControlExtra && '@' <= currentChar && currentChar <= '_' ||
+      featureSet.charClass.hasBackslashControlDigitInClass && context.inClass && (isDigit || currentChar == '_')
 
   private def isAlphabetic: Boolean =
     !isEnd && isAlphabetic(currentChar)

@@ -68,9 +68,9 @@ private[printer] final class Printer(featureSet: FeatureSet):
   private val out = new java.lang.StringBuilder
 
   /** Whether the extended mode is on, as the parser's `skipsComment`. */
-  private var verbose: Boolean = featureSet.skipsComment
+  private var verbose: Boolean = featureSet.comment.skipsComment
 
-  private var verboseMore: Boolean = featureSet.verboseMore
+  private var verboseMore: Boolean = featureSet.comment.verboseMore
 
   private var inClass: Boolean = false
 
@@ -150,10 +150,10 @@ private[printer] final class Printer(featureSet: FeatureSet):
     */
   private def strategyContinuation(quantifier: Quantifier): Char => Boolean = quantifier match
     case _ if quantifier.strategy != BacktrackStrategy.Greedy                                   => NotContinued
-    case Quantifier.Exact(_, _) if !featureSet.allowsMeaninglessBacktrackStrategy               => NotContinued
+    case Quantifier.Exact(_, _) if !featureSet.quantifier.allowsMeaninglessBacktrackStrategy    => NotContinued
     case Quantifier.Bounded(_, _, _) | Quantifier.Unbounded(_, _) | Quantifier.MaxBounded(_, _) =>
-      c => c == '?' || c == '+' && featureSet.hasPossessiveCurlyBacktrackStrategy
-    case _ => c => c == '?' || c == '+' && featureSet.hasPossessiveBacktrackStrategy
+      c => c == '?' || c == '+' && featureSet.quantifier.hasPossessiveCurlyBacktrackStrategy
+    case _ => c => c == '?' || c == '+' && featureSet.quantifier.hasPossessiveBacktrackStrategy
 
   /** Writes a case region, where a part with a text is in the command, and a part without one is out of all the
     * commands, which are written again before the next part with a text.
@@ -244,7 +244,7 @@ private[printer] final class Printer(featureSet: FeatureSet):
 
   /** Tests whether the parser skips a space here, as the extended mode does between tokens. */
   private def isSeparable: Boolean =
-    if inClass then verbose && featureSet.skipsCommentInClass || verboseMore else verbose
+    if inClass then verbose && featureSet.comment.skipsCommentInClass || verboseMore else verbose
 
   /** Writes in a scope, whose inline flags do not reach after it as in the parser's `protectContext`. */
   private def scoped(body: => Unit): Unit =
@@ -476,7 +476,7 @@ private[printer] final class Printer(featureSet: FeatureSet):
         case EscapeStyle.Meta         => "M-"
         case EscapeStyle.Octal        => "o"
         // Java's bare octal escape starts with `\0`.
-        case EscapeStyle.BareOctal => if featureSet.hasBackslashZeroOctal then "0" else ""
+        case EscapeStyle.BareOctal => if featureSet.escape.hasBackslashZeroOctal then "0" else ""
         case EscapeStyle.UnicodeHex4 | EscapeStyle.UnicodeHex4Pair | EscapeStyle.UnicodeBracket => "u"
         case EscapeStyle.UnicodeHex8                                                            => "U"
         case EscapeStyle.NamedHex                                                               => "N"
@@ -538,7 +538,7 @@ private[printer] final class Printer(featureSet: FeatureSet):
     case ClassItemData.ClassDiff(left, right) =>
       writeClassItem(left)
       // .NET's subtraction is `-` before a nested class (e.g. `[a-z-[aeiou]]`).
-      write(if featureSet.hasClassSubtraction then "-" else "--")
+      write(if featureSet.charClass.hasClassSubtraction then "-" else "--")
       writeClassItem(right)
     case ClassItemData.ClassNest(invert, inner) =>
       write(if invert then "[^" else "[")
