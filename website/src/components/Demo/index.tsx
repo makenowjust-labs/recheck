@@ -47,7 +47,7 @@ const Demo: React.FC = () => {
     const params = parseParams(values, build);
     const extracted = extract(input);
 
-    if (recorded !== null && !sameRequest(recorded, input, params)) {
+    if (recorded !== null && !sameRequest(recorded, input, params, build)) {
       setRecorded(null);
     }
 

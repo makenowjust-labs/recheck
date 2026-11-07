@@ -3,6 +3,8 @@ import {
   decompressFromEncodedURIComponent,
 } from "lz-string";
 
+import { parseParams } from "./params";
+
 import type { Diagnostics, Hotspot } from "recheck";
 import type { Build } from "./builds";
 import type { CheckParams } from "./params";
@@ -116,14 +118,28 @@ export const makeSnapshot = ({
   date,
 });
 
-/** Whether the snapshot was recorded for the given input and parameters. */
+/** Whether the snapshot was recorded for the given input and the parameters of the build.
+ *
+ * A parameter that the snapshot lacks, because its build was older, counts as recorded with the default of the build.
+ */
 export const sameRequest = (
   snapshot: Snapshot,
   input: string,
   params: CheckParams,
-): boolean =>
-  snapshot.input === input &&
-  JSON.stringify(snapshot.params) === JSON.stringify(params);
+  build: Build,
+): boolean => {
+  const recorded: Record<string, unknown> = snapshot.params;
+  const defaults: Record<string, unknown> = parseParams({}, build);
+  return (
+    snapshot.input === input &&
+    Object.keys(recorded).every((name) => name in params) &&
+    Object.entries(params).every(
+      ([name, value]) =>
+        JSON.stringify(name in recorded ? recorded[name] : defaults[name]) ===
+        JSON.stringify(value),
+    )
+  );
+};
 
 export const summarize = (result: DiagnosticsSnapshot): string =>
   result.status === "vulnerable"

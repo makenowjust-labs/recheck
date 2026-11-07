@@ -158,11 +158,47 @@ describe("encode and decode", () => {
 
 describe("sameRequest", () => {
   test("requires the same input and parameters", () => {
-    expect(sameRequest(safe, safe.input, params)).toBe(true);
-    expect(sameRequest(safe, "/b/", params)).toBe(false);
+    expect(sameRequest(safe, safe.input, params, build)).toBe(true);
+    expect(sameRequest(safe, "/b/", params, build)).toBe(false);
     expect(
-      sameRequest(safe, safe.input, parseParams({ checker: "fuzz" }, build)),
+      sameRequest(
+        safe,
+        safe.input,
+        parseParams({ checker: "fuzz" }, build),
+        build,
+      ),
     ).toBe(false);
+  });
+
+  test("counts a parameter of a newer build as recorded with its default", () => {
+    const newer: Build = { type: "release", version: "5.0.0-beta.1" };
+    expect(sameRequest(safe, safe.input, parseParams({}, newer), newer)).toBe(
+      true,
+    );
+    expect(
+      sameRequest(
+        safe,
+        safe.input,
+        parseParams({ dialect: "ruby" }, newer),
+        newer,
+      ),
+    ).toBe(false);
+    expect(
+      sameRequest(
+        safe,
+        safe.input,
+        parseParams({ logger: "on" }, build),
+        build,
+      ),
+    ).toBe(false);
+  });
+
+  test("rejects a parameter that the build does not have", () => {
+    const recorded: Snapshot = {
+      ...safe,
+      params: { ...params, ...parseParams({}, { type: "dev" }) },
+    };
+    expect(sameRequest(recorded, safe.input, params, build)).toBe(false);
   });
 });
 
