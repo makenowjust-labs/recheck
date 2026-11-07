@@ -92,6 +92,7 @@ given encodeDialect: Encoder[Dialect] with
   def apply(d: Dialect): Json =
     val settings = d match
       case Dialect.Python(tpe)        => Seq("type" := tpe.name)
+      case Dialect.PythonRegex(tpe)   => Seq("type" := tpe.name)
       case Dialect.Ruby(encoding)     => Seq("encoding" := encoding.name)
       case Dialect.Perl(utf8, source) => Seq("utf8" := utf8, "source" := source.name)
       case _                          => Seq.empty
@@ -121,16 +122,18 @@ given decodeDialect: Decoder[Dialect] with
               case Some(dialect) =>
                 val keys = c.keys.toSeq.flatten.filter(_ != "name")
                 val allowed = dialect match
-                  case _: Dialect.Python => Seq("type")
-                  case _: Dialect.Ruby   => Seq("encoding")
-                  case _: Dialect.Perl   => Seq("utf8", "source")
-                  case _                 => Seq.empty
+                  case _: Dialect.Python | _: Dialect.PythonRegex => Seq("type")
+                  case _: Dialect.Ruby                            => Seq("encoding")
+                  case _: Dialect.Perl                            => Seq("utf8", "source")
+                  case _                                          => Seq.empty
                 keys.find(!allowed.contains(_)) match
                   case Some(key) => fail(s"Unknown setting of $name: $key")
                   case None      =>
                     dialect match
                       case python: Dialect.Python =>
                         setting(python, "type", python.`type`)(Dialect.Python.Type.of).map(Dialect.Python(_))
+                      case python: Dialect.PythonRegex =>
+                        setting(python, "type", python.`type`)(Dialect.Python.Type.of).map(Dialect.PythonRegex(_))
                       case ruby: Dialect.Ruby =>
                         setting(ruby, "encoding", ruby.encoding)(Dialect.Ruby.Encoding.of).map(Dialect.Ruby(_))
                       case perl: Dialect.Perl =>

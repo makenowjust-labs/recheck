@@ -125,6 +125,7 @@ describe("paramsOf", () => {
     expect(names()).not.toContain("dialectSource");
     expect(names("python")).toContain("dialectType");
     expect(names("python")).not.toContain("dialectEncoding");
+    expect(names("python-regex")).toContain("dialectType");
     expect(names("ruby")).toContain("dialectEncoding");
     expect(names("perl")).toEqual(
       expect.arrayContaining(["dialectUtf8", "dialectSource"]),
@@ -142,6 +143,7 @@ describe("selectValues", () => {
       "dotnet",
       "pcre",
       "python",
+      "python-regex",
       "ruby",
       "perl",
     ]);

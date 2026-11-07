@@ -183,7 +183,7 @@ properties:
       See [Dialects](/docs/usage/dialects) for the dialects and their settings.
     oneOf:
       - type: string
-        enum: ["javascript", "java", "dotnet", "pcre", "python", "ruby", "perl"]
+        enum: ["javascript", "java", "dotnet", "pcre", "python", "python-regex", "ruby", "perl"]
       - type: object
         title: "JavaScript"
         properties:
@@ -221,6 +221,19 @@ properties:
         required: ["name"]
         additionalProperties: false
         x-scala-type: "Dialect.Python"
+      - type: object
+        title: "Python regex"
+        properties:
+          name: { const: "python-regex" }
+          type:
+            title: "Python regex Type"
+            enum: ["str", "bytes"]
+            default: "str"
+            x-scala-type: "Dialect.Python.Type"
+            x-cli-help: "The string type."
+        required: ["name"]
+        additionalProperties: false
+        x-scala-type: "Dialect.PythonRegex"
       - type: object
         title: "Ruby"
         properties:

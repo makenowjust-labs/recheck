@@ -585,6 +585,7 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(decodeDialect.decodeJson("dotnet".asJson), Right(Dialect.DotNet))
     assertEquals(decodeDialect.decodeJson("pcre".asJson), Right(Dialect.PCRE))
     assertEquals(decodeDialect.decodeJson("python".asJson), Right(Dialect.Python()))
+    assertEquals(decodeDialect.decodeJson("python-regex".asJson), Right(Dialect.PythonRegex()))
     assertEquals(decodeDialect.decodeJson("ruby".asJson), Right(Dialect.Ruby()))
     assertEquals(decodeDialect.decodeJson("perl".asJson), Right(Dialect.Perl()))
     assertEquals(decodeDialect.decodeJson("xxx".asJson), Left(DecodingFailure("Unknown dialect: xxx", List.empty)))
@@ -592,6 +593,10 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(
       decodeDialect.decodeJson(Json.obj("name" := "python", "type" := "bytes")),
       Right(Dialect.Python(Dialect.Python.Type.Bytes))
+    )
+    assertEquals(
+      decodeDialect.decodeJson(Json.obj("name" := "python-regex", "type" := "bytes")),
+      Right(Dialect.PythonRegex(Dialect.Python.Type.Bytes))
     )
     assertEquals(
       decodeDialect.decodeJson(Json.obj("name" := "ruby", "encoding" := "ASCII-8BIT")),
@@ -636,6 +641,7 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(encodeDialect(Dialect.JavaScript), Json.obj("name" := "javascript"))
     assertEquals(encodeDialect(Dialect.DotNet), Json.obj("name" := "dotnet"))
     assertEquals(encodeDialect(Dialect.Python()), Json.obj("name" := "python", "type" := "str"))
+    assertEquals(encodeDialect(Dialect.PythonRegex()), Json.obj("name" := "python-regex", "type" := "str"))
     assertEquals(
       encodeDialect(Dialect.Ruby(Dialect.Ruby.Encoding.ASCII8Bit)),
       Json.obj("name" := "ruby", "encoding" := "ASCII-8BIT")

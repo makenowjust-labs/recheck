@@ -70,7 +70,7 @@ object ParametersGen:
       if isBoolean && default == true then s"no-$name" else name
 
     /** The name of the local value of the option. */
-    def valueName(variant: Variant): String = s"${variant.name}${key.capitalize}"
+    def valueName(variant: Variant): String = s"${camelCase(variant.name)}${key.capitalize}"
 
   private val typeImports: Map[String, String] = Map(
     "AccelerationMode" -> "codes.quine.labs.recheck.common.AccelerationMode",
@@ -129,6 +129,11 @@ object ParametersGen:
 
   /** Returns the identifier, which is quoted by backticks if it is a keyword. */
   private def identifier(name: String): String = if scalaKeywords(name) then s"`$name`" else name
+
+  /** Returns the camel case of a hyphenated name (e.g. `pythonRegex` of `python-regex`). */
+  private def camelCase(name: String): String =
+    val parts = name.split('-')
+    parts.head + parts.tail.map(_.capitalize).mkString
 
   private def readVariant(v: java.util.Map[String, Any]): Option[Variant] =
     Option(v.get("x-scala-type")).map: scalaType =>
@@ -399,7 +404,7 @@ object ParametersGen:
     val misplaced = pairs.map: (variant, setting) =>
       s"          (${literal(setting.cliOption(variant))}, ${setting.valueName(variant)}.isDefined, ${literal(variant.name)})"
     val cases = p.variants.map: variant =>
-      val bound = identifier(variant.name)
+      val bound = identifier(camelCase(variant.name))
       val values = variant.settings.map: setting =>
         val name = setting.valueName(variant)
         val default = s"$bound.${identifier(setting.key)}"

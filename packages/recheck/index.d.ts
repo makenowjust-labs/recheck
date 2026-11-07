@@ -285,6 +285,7 @@ export type AttackPattern = {
    *
    * - `javascript`: `'a'.repeat(31) + 'あ'`
    * - `python`: `'a' * 31 + 'あ'`, or `b'a' * 31 + b'!'` for `bytes`
+   * - `python-regex`: the same as `python`
    * - `ruby`: `"a" + "a" * 31 + "あ\n\n"`, or `"a".b + "a".b * 31 + "!\n\n".b` for `ASCII-8BIT`
    * - `java`: `"a".repeat(31) + "あ"`
    * - `dotnet`: `string.Concat(Enumerable.Repeat("a", 31)) + "あ"` (C#, `System.Linq`)

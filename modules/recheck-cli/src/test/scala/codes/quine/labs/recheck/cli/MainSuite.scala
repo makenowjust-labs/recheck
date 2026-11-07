@@ -92,6 +92,16 @@ class MainSuite extends munit.FunSuite:
       )
     )
     assertEquals(
+      Main.command.parse(Seq("/foo/", "--dialect=python-regex", "--python-regex-type=bytes")),
+      Right(
+        Main.CheckAction(
+          InputPattern("foo", ""),
+          Parameters(dialect = Dialect.PythonRegex(Dialect.Python.Type.Bytes)),
+          json = false
+        )
+      )
+    )
+    assertEquals(
       Main.command.parse(Seq("/foo/", "--dialect=ruby", "--ruby-encoding=ASCII-8BIT")),
       Right(
         Main.CheckAction(
@@ -113,7 +123,8 @@ class MainSuite extends munit.FunSuite:
         Seq("--dialect=python", "--perl-source=string") -> "--perl-source is not an option of python",
         Seq("--dialect=ruby", "--no-perl-utf8") -> "--no-perl-utf8 is not an option of ruby",
         Seq("--dialect=ruby", "--ruby-encoding=str") -> "unknown value of --ruby-encoding: str",
-        Seq("--dialect=python", "--python-type=bytez") -> "unknown value of --python-type: bytez"
+        Seq("--dialect=python", "--python-type=bytez") -> "unknown value of --python-type: bytez",
+        Seq("--dialect=python", "--python-regex-type=str") -> "--python-regex-type is not an option of python"
       )
     do
       val result = Main.command.parse("/foo/" +: args)
