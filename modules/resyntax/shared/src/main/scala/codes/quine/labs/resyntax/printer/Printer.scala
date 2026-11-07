@@ -530,11 +530,20 @@ private[printer] final class Printer(featureSet: FeatureSet):
     if featureSet.sourceEncoding == SourceEncoding.Text then String(Character.toChars(value)) else value.toChar.toString
 
   private def writeClass(invert: Boolean, item: ClassItem): Unit =
-    write(if invert then "[^" else "[")
-    inClass = true
-    writeClassItem(item)
-    inClass = false
-    write("]")
+    if isICUPropertyClass(invert, item) then
+      inClass = true
+      writeClassItem(item)
+      inClass = false
+    else
+      write(if invert then "[^" else "[")
+      inClass = true
+      writeClassItem(item)
+      inClass = false
+      write("]")
+
+  /** Tests whether the class is ICU's `[:name:]` alone, which is written without the brackets of the class. */
+  private def isICUPropertyClass(invert: Boolean, item: ClassItem): Boolean =
+    featureSet.charClass.hasICUClass && !invert && item.data.isInstanceOf[ClassItemData.ClassPOSIX]
 
   private def writeClassItem(item: ClassItem): Unit = item.data match
     case ClassItemData.ClassUnion(items)              => items.foreach(writeClassItem)
@@ -547,6 +556,14 @@ private[printer] final class Printer(featureSet: FeatureSet):
       // .NET's subtraction is `-` before a nested class (e.g. `[a-z-[aeiou]]`).
       write(if featureSet.charClass.hasClassSubtraction then "-" else "--")
       writeClassItem(right)
+    case ClassItemData.ClassNestIntersection(left, right) =>
+      writeClassItem(left)
+      write("&")
+      writeClassItem(right)
+    case ClassItemData.ClassNestDiff(left, right) =>
+      writeClassItem(left)
+      write("-")
+      writeClassItem(right)
     case ClassItemData.ClassSymmetricDiff(left, right) =>
       writeClassItem(left)
       write("~~")
@@ -555,7 +572,8 @@ private[printer] final class Printer(featureSet: FeatureSet):
       writeClassItem(left)
       write("||")
       writeClassItem(right)
-    case ClassItemData.ClassNest(invert, inner) =>
+    case ClassItemData.ClassNest(invert, inner) if isICUPropertyClass(invert, inner) => writeClassItem(inner)
+    case ClassItemData.ClassNest(invert, inner)                                      =>
       write(if invert then "[^" else "[")
       writeClassItem(inner)
       write("]")

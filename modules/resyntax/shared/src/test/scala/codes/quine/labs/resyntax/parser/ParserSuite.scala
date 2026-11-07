@@ -297,3 +297,12 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   check("\\1 23", "x", PythonRegex())(Backslash(Escape(BareOctal, 0x53, Some("1 23"))))
   checkPrinted("\\1 2", "\\12", "x", PythonRegex()):
     Backslash(EscapeBackReference(BareBackReference, IndexedReference(12)))
+
+  // ICU repeats `^` and `$`, but not the other zero-width assertions, and repeats a literal across `\Q\E`.
+  check("^*$?", "", ICU)(Sequence(Repeat(Caret, Star(Greedy)), Repeat(Dollar, Question(Greedy))))
+  error("\\b*", "", ICU)("Nothing to repeat at 2")
+  check("a\\Q\\E*", "", ICU)(Repeat(Node(Literal('a')), Star(Greedy), Some("\\Q\\E*")))
+  error("a{16777216}", "", ICU)("Number too big in {} quantifier at 2")
+  error("a}", "", ICU)("Incomplete quantifier at 1")
+  error("a{2}{3}", "", ICU)("Nested quantifier at 7")
+  error("a{,2}", "", ICU)("Incomplete quantifier at 1")

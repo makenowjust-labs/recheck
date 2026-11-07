@@ -252,3 +252,29 @@ class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
   error("(?i-i)", "", PythonRegex())("Invalid flag at 4")
   error("(?-)", "", PythonRegex())("Invalid flag at 3")
   error("(?i-:a)", "", PythonRegex())("Invalid flag at 4")
+
+  // ICU's inline flags are `dimswx` and `u`, which skip whitespace only when `x` is on before them (ICU 79.1).
+  check("(?dimswux)", "", ICU):
+    Command(
+      InlineFlag(
+        FlagSetDiff(
+          FlagSet(
+            hasIndices = true,
+            ignoreCase = true,
+            multiline = true,
+            dotAll = true,
+            word = true,
+            unicode = true,
+            verbose = true
+          ),
+          None,
+          Some("dimswux")
+        )
+      )
+    )
+  check("(?i x)", "x", ICU):
+    Command(InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, verbose = true), None, Some("i x"))))
+  error("(?x i)", "", ICU)("Invalid flag at 3")
+  error("(?)", "", ICU)("Invalid flag at 2")
+  check("(?-i-i)", "", ICU):
+    Command(InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(ignoreCase = true)), Some("-i-i"))))

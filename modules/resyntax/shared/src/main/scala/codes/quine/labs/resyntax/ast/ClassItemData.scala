@@ -10,6 +10,10 @@ sealed abstract class ClassItemData extends Product with Serializable:
         ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
       case (ClassItemData.ClassDiff(ll, lr), ClassItemData.ClassDiff(rl, rr)) =>
         ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
+      case (ClassItemData.ClassNestIntersection(ll, lr), ClassItemData.ClassNestIntersection(rl, rr)) =>
+        ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
+      case (ClassItemData.ClassNestDiff(ll, lr), ClassItemData.ClassNestDiff(rl, rr)) =>
+        ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
       case (ClassItemData.ClassSymmetricDiff(ll, lr), ClassItemData.ClassSymmetricDiff(rl, rr)) =>
         ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
       case (ClassItemData.ClassExplicitUnion(ll, lr), ClassItemData.ClassExplicitUnion(rl, rr)) =>
@@ -45,6 +49,28 @@ object ClassItemData:
   object ClassDiff:
 
     def apply(left: ClassItemData, right: ClassItemData): ClassDiff = ClassDiff(ClassItem(left), ClassItem(right))
+
+  /** ClassNestIntersection is ICU's intersection `&` with a nested class (e.g. `[[a-z]&[aeiou]]`).
+    *
+    * Its left is the items before it in the union, as it binds as tightly as a union, unlike `&&`.
+    */
+  final case class ClassNestIntersection(left: ClassItem, right: ClassItem) extends ClassItemData
+
+  object ClassNestIntersection:
+
+    def apply(left: ClassItemData, right: ClassItemData): ClassNestIntersection =
+      ClassNestIntersection(ClassItem(left), ClassItem(right))
+
+  /** ClassNestDiff is ICU's difference `-` with a nested class (e.g. `[[a-z]-[aeiou]]`).
+    *
+    * Its left is the items before it in the union, as it binds as tightly as a union, unlike `--`.
+    */
+  final case class ClassNestDiff(left: ClassItem, right: ClassItem) extends ClassItemData
+
+  object ClassNestDiff:
+
+    def apply(left: ClassItemData, right: ClassItemData): ClassNestDiff =
+      ClassNestDiff(ClassItem(left), ClassItem(right))
 
   /** ClassSymmetricDiff is python-regex's symmetric difference (e.g. `[a-c~~b-d]`). */
   final case class ClassSymmetricDiff(left: ClassItem, right: ClassItem) extends ClassItemData

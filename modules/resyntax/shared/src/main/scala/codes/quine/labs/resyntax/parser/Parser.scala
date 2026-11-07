@@ -41,6 +41,8 @@ import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.DotNetCharClass
 import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 import codes.quine.labs.resyntax.dialect.PerlSource
+import codes.quine.labs.resyntax.parser.Parser.ICUClassState
+import codes.quine.labs.resyntax.parser.Parser.ICUClassToken
 import codes.quine.labs.resyntax.parser.Parser.ParsingContext
 
 object Parser:
@@ -116,9 +118,9 @@ object Parser:
     dialect match
       case Dialect.JavaScript =>
         if flagSet.unicode || flagSet.unicodeSets then UnitMode.UTF16CodePoint else UnitMode.UTF16
-      case Dialect.Java        => UnitMode.UTF16CodePoint
-      case Dialect.DotNet      => UnitMode.UTF16
-      case Dialect.Python(tpe) =>
+      case Dialect.Java | Dialect.ICU => UnitMode.UTF16CodePoint
+      case Dialect.DotNet             => UnitMode.UTF16
+      case Dialect.Python(tpe)        =>
         if tpe == Dialect.Python.Type.Bytes then UnitMode.Byte else UnitMode.CodePoint
       case Dialect.PythonRegex(tpe) =>
         if tpe == Dialect.Python.Type.Bytes then UnitMode.Byte else UnitMode.CodePoint
@@ -146,6 +148,38 @@ object Parser:
 
   /** Version1Restart is thrown at a `V1` inline flag of a python-regex pattern parsed in `V0`. */
   private[parser] final class Version1Restart extends Exception("V1 inline flag")
+
+  /** ICUClassToken is a token of ICU's class as ICU's scanner reads it. */
+  private[parser] enum ICUClassToken:
+
+    /** Character is a character, which is `quoted` if an escape makes it a literal for sure (e.g. `\x41`). */
+    case Character(item: ClassItem.Value, quoted: Boolean)
+
+    /** Quote is `\Q...\E` of characters, whose region has the literals for sure. */
+    case Quote(item: ClassItem)
+
+    /** Escape is a backslash and a character that the set states read (e.g. `w` of `\w`), which is not consumed yet. */
+    case Escape(letter: Char)
+
+    case End
+
+  /** ICUClassState is what ICU's class has read last, which decides how a `-` or `&` after it reads. */
+  private[parser] enum ICUClassState:
+
+    /** Start is the start of the class, where `--` and `&&` are errors. */
+    case Start
+
+    /** Literal is a character or a quote, whose last character can begin a range. */
+    case Literal(item: ClassItem)
+
+    /** Set is a nested class or a property, which a `-` or `&` and another nested class follow as an operator. */
+    case Set
+
+    /** Range is a range or an escape class, which a `-` or `&` follows as a character. */
+    case Range
+
+    /** Operator is right after `--` or `&&`, where a `-` or `&` is a character. */
+    case Operator
 
 private[parser] final class Parser(
     private val source: String,
@@ -416,7 +450,12 @@ private[parser] final class Parser(
         assert(featureSet.quantifier.allowsLookAheadRepeat, "Nothing to repeat")
       case NodeData.Group(_: GroupKind.PositiveLookBehind | _: GroupKind.NegativeLookBehind, _) =>
         assert(featureSet.quantifier.allowsLookBehindRepeat, "Nothing to repeat")
-      case NodeData.Caret | NodeData.Dollar | NodeData.Backslash(_: BackslashKind.Assert) =>
+      case NodeData.Caret | NodeData.Dollar =>
+        assert(
+          featureSet.quantifier.allowsZeroWidthAssertRepeat || featureSet.quantifier.allowsCaretDollarRepeat,
+          "Nothing to repeat"
+        )
+      case NodeData.Backslash(_: BackslashKind.Assert) =>
         assert(featureSet.quantifier.allowsZeroWidthAssertRepeat, "Nothing to repeat")
       case NodeData.Repeat(_, _, _) =>
         assert(featureSet.quantifier.allowsNestedRepeat, "Nested quantifier")
@@ -1634,8 +1673,8 @@ private[parser] final class Parser(
     def result: (FlagSet, String) = (flagSet, sliceSource(start, offset))
 
     def skipFlagComment(): Unit =
-      val verbose = if removing then skipping && !flagSet.verbose else skipping || flagSet.verbose
-      if verbose && featureSet.comment.skipsCommentInConstruct then skipComment()
+      if isSkippingFlagComment(skipping, removing, flagSet) && featureSet.comment.skipsCommentInConstruct then
+        skipComment()
 
     // Ruby's last character set flag wins (e.g. `(?au)` is `(?u)`).
     def charset(flagSet: FlagSet): FlagSet =
@@ -1739,6 +1778,14 @@ private[parser] final class Parser(
       next()
       skipFlagComment()
     result
+
+  /** Checks whether the extended mode is on among inline flag letters, which Java's `x` among them turns on or off at
+    * once (e.g. `(?x i)`), but ICU's does not.
+    */
+  private def isSkippingFlagComment(skipping: Boolean, removing: Boolean, flagSet: FlagSet): Boolean =
+    if featureSet.inlineFlag.readsInlineFlagsInOuterMode then skipping
+    else if removing then skipping && !flagSet.verbose
+    else skipping || flagSet.verbose
 
   private val CharsetFlags = "adluL"
 
@@ -1902,7 +1949,9 @@ private[parser] final class Parser(
 
     next()
     val textStart = offset
-    skipConstructComment()
+    skipEscapeComment()
+    // ICU reads `\c` at the end of the pattern as the letter.
+    if featureSet.escape.readsBackslashControlLowBits && isEnd then return BackslashKind.Unknown('c')
     if featureSet.escape.hasBackslashMetaControl && !isEnd && currentChar == '\\' then
       val value = parseMetaControlTarget()
       return escape(EscapeStyle.Control('\\'), metaControlValue(value), textStart)
@@ -1915,7 +1964,8 @@ private[parser] final class Parser(
     next()
 
     val value =
-      if featureSet.escape.hasBackslashControlAny then char ^ 0x40
+      if featureSet.escape.readsBackslashControlLowBits then char & 0x1f
+      else if featureSet.escape.hasBackslashControlAny then char ^ 0x40
       else if featureSet.escape.hasBackslashMetaControl then metaControlValue(char)
       else if isAlphabetic(char) || featureSet.charClass.hasBackslashControlDigitInClass then char % 32
       else char ^ 0x40
@@ -2154,6 +2204,7 @@ private[parser] final class Parser(
 
   private def parseBackslashProperty(invert: Boolean): BackslashKind =
     if featureSet.escape.hasPythonRegexProperty then return parsePythonRegexProperty(invert)
+    if featureSet.escape.hasICUProperty then return parseICUProperty(invert)
     if !featureSet.escape.hasBackslashUnicodeProperty then return parseBackslashUnknown()
 
     if source.lift(offset + 1).forall(_ != '{') && !featureSet.escape.hasBackslashUnicodePropertyBare &&
@@ -2339,7 +2390,7 @@ private[parser] final class Parser(
     val save = offset
     next()
     val textStart = offset
-    skipConstructComment()
+    skipEscapeComment()
 
     if featureSet.escape.hasBackslashUnicodeBracket && currentChar == '{' then
       next()
@@ -2357,7 +2408,7 @@ private[parser] final class Parser(
     if featureSet.escape.combinesSurrogatePairEscape && UTF16Encoding.isHighSurrogate(value) then
       val lowStart = offset
       if startWith("\\u") then
-        skipConstructComment()
+        skipEscapeComment()
         if hasHexDigitsAhead(4) then
           val lowValue = parseHexDigits(4).toInt
           if UTF16Encoding.isLowSurrogate(lowValue) then
@@ -2408,7 +2459,7 @@ private[parser] final class Parser(
     val save = offset
     next()
     val textStart = offset
-    skipConstructComment()
+    skipEscapeComment()
 
     if featureSet.escape.hasBackslashXBracket && currentChar == '{' then
       next()
@@ -2476,7 +2527,8 @@ private[parser] final class Parser(
     BackslashKind.EscapeClass(EscapeClassKind.NonDigit)
 
   private def parseBackslashUpperE(): BackslashKind =
-    if !featureSet.escape.hasBackslashQuoteCommand then return parseBackslashUnknown()
+    if !featureSet.escape.hasBackslashQuoteCommand || featureSet.escape.readsUnpairedQuoteEndAsLetter then
+      return parseBackslashUnknown()
     assert(featureSet.escape.allowsUnpairedQuoteEnd, "Invalid backslash escape")
 
     next()
@@ -2658,7 +2710,7 @@ private[parser] final class Parser(
   private def parseBackslashZeroOctal(): BackslashKind =
     next()
     val textStart = offset
-    skipConstructComment()
+    skipEscapeComment()
     assert(isOctalDigit, "Invalid octal escape")
     val size = if currentChar <= '3' then 3 else 2
     escape(EscapeStyle.BareOctal, parseOctalDigits(size), textStart)
@@ -2668,7 +2720,7 @@ private[parser] final class Parser(
     for _ <- 1 to size; if isOctalDigit do
       value = value * 8 + (currentChar - '0')
       next()
-      skipConstructComment()
+      skipEscapeComment()
     value
 
   private def parseBackslashBackReference(): BackslashKind =
@@ -2685,6 +2737,7 @@ private[parser] final class Parser(
     val n =
       if featureSet.escape.readsThreeOctalDigitsAsOctal then parseBoundedDigits(_ < 100)
       else if featureSet.reference.readsBackReferenceDigitsWhileGroupExists then parseBoundedDigits(_ <= groupCount)
+      else if featureSet.reference.readsBackReferenceDigitsBelowGroupCount then parseDigitsBelow(groupCount)
       else parseSaturatedIntOption(Long.MaxValue, "Invalid backslash escape", save).get
 
     if featureSet.reference.fallsBackInvalidBackReferenceToEscape && !(0 < n && n <= prescan.captureSize) then
@@ -2721,6 +2774,17 @@ private[parser] final class Parser(
       skipConstructComment()
     reset(save)
     builder.result()
+
+  /** Parses the digits of ICU's back-reference, which takes the next digit while the number is below `groupCount` (e.g.
+    * `\\11` after ten groups is the eleventh group).
+    */
+  private def parseDigitsBelow(groupCount: Int): Int =
+    var value = currentChar - '0'
+    next()
+    while value < groupCount && isDigit do
+      value = value * 10 + (currentChar - '0')
+      next()
+    value
 
   /** Parses the digits while they make a number that continues, where Java skips whitespace and comments only between
     * them (e.g. `\1 2`), so the ones after the number are kept.
@@ -2775,6 +2839,12 @@ private[parser] final class Parser(
         val end = offset
         val item = ClassItem(ClassItemData.ClassPOSIX(false, name), SourceLocation(start + 1, end - 1))
         stack.push(Node(NodeData.Class(false, item), SourceLocation(start, end)))
+        boundary.break()
+
+      if featureSet.charClass.hasICUClass then
+        next()
+        val (invert, item) = nest(start)(parseICUClassBody())
+        stack.push(Node(NodeData.Class(invert, item), SourceLocation(start, offset)))
         boundary.break()
 
       next()
@@ -3229,6 +3299,304 @@ private[parser] final class Parser(
     assert(!isEnd, "Unclosed ']'")
     parseClassItemLiteral()
 
+  /** Parses ICU's `\\p{...}` or `\\P{...}`, whose body is a property expression of ICU's `UnicodeSet` (e.g. `gc=L`),
+    * which the IR builder resolves.
+    */
+  private def parseICUProperty(invert: Boolean): BackslashKind =
+    BackslashKind.EscapeClass(parseICUPropertyClass(invert))
+
+  private def parseICUPropertyClass(invert: Boolean): EscapeClassKind =
+    next()
+    skipConstructComment()
+    expect('{', "Invalid backslash escape")
+    val start = offset
+    while !isEnd && currentChar != '}' do next()
+    val name = sliceSource(start, offset)
+    expect('}', "Invalid backslash escape")
+    if invert then EscapeClassKind.NonUnicodeProperty(name) else EscapeClassKind.UnicodeProperty(name)
+
+  /** Parses the items of ICU's class after `[` up to its `]`, following the set states of ICU4C's `regexcst.txt`, and
+    * returns whether it is negated and the items.
+    *
+    * `[:name:]` is a property. The operators `--` and `&&` bind looser than an implicit union and a `-` or `&` between
+    * classes (e.g. `[[a-z]-[aeiou]]`), and the ones of the same precedence go from left to right.
+    */
+  private def parseICUClassBody(): (Boolean, ClassItem) =
+    val property = peekICUClassToken(':').flatMap: start =>
+      reset(start)
+      parseICUClassProperty()
+    property match
+      case Some(item) =>
+        expect(']', "Unclosed ']'")
+        (false, item)
+      case None =>
+        val invert = peekICUClassToken('^').isDefined
+        // A `]` right after `[` or `[^` is a character.
+        val first = peekICUClassToken(']').map(start =>
+          ClassItem.Value(ClassItemData.ClassLiteral(']'), SourceLocation(start, offset))
+        )
+        val item = parseICUClassOperation(first)
+        expect(']', "Unclosed ']'")
+        (invert, item)
+
+  /** Reads the next token of ICU's class if it is the character `c` out of a quote, and returns its offset, or reads
+    * nothing.
+    */
+  private def peekICUClassToken(c: Char): Option[Int] =
+    val save = offset
+    readICUClassToken() match
+      case ICUClassToken.Character(item, false) if item.data.value == c => Some(item.loc.start)
+      case _                                                            =>
+        reset(save)
+        None
+
+  /** Parses ICU's `[:name:]` at its first `:` up to its last `:`, or returns `None` for another class starting with `:`
+    * (e.g. `[:a]`).
+    */
+  private def parseICUClassProperty(): Option[ClassItem] =
+    val start = offset
+    next()
+    skipClassComment()
+    val invert = !isEnd && currentChar == '^'
+    if invert then next()
+    val name = new java.lang.StringBuilder
+    boundary:
+      while !isEnd && currentChar != '\\' do
+        name.append(currentChar)
+        next()
+        skipClassComment()
+        if !isEnd && currentChar == ':' then
+          next()
+          if isEnd || currentChar != ']' then boundary.break()
+          return Some(ClassItem(ClassItemData.ClassPOSIX(invert, name.toString), SourceLocation(start, offset)))
+    reset(start)
+    None
+
+  /** Parses the terms of ICU's class between `--` and `&&`, where `first` is the `]` right after `[`. */
+  private def parseICUClassOperation(first: Option[ClassItem.Value]): ClassItem =
+    val start = first.fold(offset)(_.loc.start)
+    val savedDepth = depth
+    var (item, operator) = parseICUClassTerm(first, ICUClassState.Start)
+    while operator.isDefined do
+      enter(offset - 2)
+      val (right, next) = parseICUClassTerm(None, ICUClassState.Operator)
+      val data =
+        if operator.contains("--") then ClassItemData.ClassDiff(item, right)
+        else ClassItemData.ClassIntersection(item, right)
+      item = ClassItem(data, SourceLocation(start, offset))
+      operator = next
+    depth = savedDepth
+    item
+
+  /** Parses a term of ICU's class up to `]` or an operator `--` or `&&`, and returns it with the operator.
+    *
+    * A term is items in a row, where a `-` or `&` between a class or a property and a nested class is the difference or
+    * the intersection of the items before it and the nested class. The blanks of the extended mode between the items
+    * are items, but the ones in a range are dropped.
+    */
+  private def parseICUClassTerm(first: Option[ClassItem.Value], initial: ICUClassState): (ClassItem, Option[String]) =
+    val start = first.fold(offset)(_.loc.start)
+    val items = mutable.ListBuffer.empty[ClassItem]
+    items ++= first
+    var state = first.fold(initial)(ICUClassState.Literal(_))
+    var operator: Option[String] = None
+    var continues = true
+    val savedDepth = depth
+
+    def add(item: ClassItem, after: ICUClassState): Unit =
+      items += item
+      state = after
+
+    def addClass(kind: EscapeClassKind, itemStart: Int, after: ICUClassState): Unit =
+      add(ClassItem(ClassItemData.ClassBackslashClass(kind), SourceLocation(itemStart, offset)), after)
+
+    def union: ClassItem =
+      if items.size == 1 then items.head
+      else ClassItem(ClassItemData.ClassUnion(items.toSeq), SourceLocation(start, offset))
+
+    def addNested(nestStart: Int, operation: Option[(ClassItem, ClassItem) => ClassItemData]): Unit =
+      val (invert, item) = nest(nestStart)(parseICUClassBody())
+      val nested = ClassItem(ClassItemData.ClassNest(invert, item), SourceLocation(nestStart, offset))
+      operation match
+        case Some(build) =>
+          enter(nestStart - 1)
+          val left = union
+          items.clear()
+          add(ClassItem(build(left, nested), SourceLocation(left.loc.start, offset)), ICUClassState.Set)
+        case None => add(nested, ICUClassState.Set)
+
+    while continues do
+      items ++= parseClassBlank()
+      val tokenStart = offset
+      readICUClassToken() match
+        case ICUClassToken.End         => fail("Unclosed ']'")
+        case ICUClassToken.Quote(item) =>
+          add(item, ICUClassState.Literal(item))
+        case ICUClassToken.Character(item, quoted) if quoted || !isICUClassSyntax(item) =>
+          add(item, ICUClassState.Literal(item))
+        case ICUClassToken.Character(item, _) if item.data.value == ']' =>
+          assert(state != ICUClassState.Operator, "Invalid class set operation", item.loc.start)
+          reset(item.loc.start)
+          continues = false
+        case ICUClassToken.Character(item, _) if item.data.value == '[' => addNested(tokenStart, None)
+        case ICUClassToken.Character(item, _)                           =>
+          val c = item.data.value.toChar
+          val save = offset
+          val next = readICUClassToken()
+          def isNext(d: Char): Boolean = next match
+            case ICUClassToken.Character(nextItem, false) => nextItem.data.value == d
+            case _                                        => false
+
+          def addCharacter(): Unit =
+            reset(save)
+            add(item, ICUClassState.Literal(item))
+
+          state match
+            case ICUClassState.Start if isNext(c)             => fail("Invalid class set operation", tokenStart)
+            case ICUClassState.Start | ICUClassState.Operator => addCharacter()
+            case _ if isNext(c)                               =>
+              operator = Some(s"$c$c")
+              continues = false
+            case ICUClassState.Set if isNext('[') =>
+              val build: (ClassItem, ClassItem) => ClassItemData =
+                if c == '-' then ClassItemData.ClassNestDiff(_, _) else ClassItemData.ClassNestIntersection(_, _)
+              addNested(offset - 1, Some(build))
+            case ICUClassState.Literal(beginItem) if c == '-' && !isNext('[') && !isNext(']') =>
+              items.dropRightInPlace(items.reverseIterator.takeWhile(isClassBlank).size + 1)
+              val (beforeBegin, begin) = icuClassRangeEnd(beginItem, last = true)
+              items ++= beforeBegin
+              items ++= parseICUClassRange(begin, next, save)
+              state = ICUClassState.Range
+            case _ => addCharacter()
+        case ICUClassToken.Escape(letter) =>
+          letter match
+            case 'p' | 'P' => addClass(parseICUPropertyClass(letter == 'P'), tokenStart, ICUClassState.Set)
+            case 'N'       =>
+              val BackslashKind.EscapeClass(kind) = parseBackslashUpperN(): @unchecked
+              addClass(kind, tokenStart, ICUClassState.Range)
+            case _ if ICUClassEscapes.contains(letter) =>
+              next()
+              addClass(ICUClassEscapes(letter), tokenStart, ICUClassState.Range)
+            case _ =>
+              val item = parseICUClassLetter(tokenStart)
+              add(item, ICUClassState.Literal(item))
+    depth = savedDepth
+    (union, operator)
+
+  /** Parses the range of ICU's class from `begin` to the token, whose escape starts at `start`, and returns the items
+    * of the range.
+    *
+    * A range to an escape class or a property is an error (e.g. `[a-\w]`), and a range to `\N{...}` is `begin` and the
+    * character of `\N{...}`, which recheck does not model.
+    */
+  private def parseICUClassRange(begin: ClassItem.Value, token: ICUClassToken, start: Int): Seq[ClassItem] =
+    def range(last: ClassItem.Value): ClassItem =
+      assert(begin.data.value <= last.data.value, "Out of order class range", begin.loc.start)
+      ClassItem(ClassItemData.ClassRange(begin, last), SourceLocation(begin.loc.start, last.loc.end))
+
+    token match
+      case ICUClassToken.Character(item, _) => Seq(range(item))
+      case ICUClassToken.Quote(item)        =>
+        val (afterEnd, end) = icuClassRangeEnd(item, last = false)
+        range(end) +: afterEnd
+      case ICUClassToken.End         => fail("Unclosed ']'")
+      case ICUClassToken.Escape('N') =>
+        val BackslashKind.EscapeClass(kind) = parseBackslashUpperN(): @unchecked
+        Seq(begin, ClassItem(ClassItemData.ClassBackslashClass(kind), SourceLocation(start, offset)))
+      case ICUClassToken.Escape(letter) =>
+        assert(!ICUClassEscapes.contains(letter) && letter != 'p' && letter != 'P', "Invalid class range", start)
+        Seq(range(parseICUClassLetter(start)))
+
+  /** Returns the value of a character or a quote of ICU's class at an end of a range, and the other characters of the
+    * quote, which are before the value at the begin (`last`) and after it at the end.
+    *
+    * A quote of one character is the value with the quote as its form (e.g. `\Qc\E` of `[a-\Qc\E]`), and the other
+    * characters of a longer quote are out of it (e.g. `[\Qab\E-c]` is `[ab-c]`), as in [[parseClassRange]].
+    */
+  private def icuClassRangeEnd(item: ClassItem, last: Boolean): (Seq[ClassItem], ClassItem.Value) =
+    quotedValue(item) match
+      case Some(value) => (Seq.empty, value)
+      case None        =>
+        val literals = classQuoteLiterals(item).getOrElse(Seq(item))
+        val (others, endItem) = if last then (literals.init, literals.last) else (literals.tail, literals.head)
+        endItem match
+          case value: ClassItem.Value => (others, value)
+          // $COVERAGE-OFF$
+          case _ => throw new IllegalStateException(s"Not a character: $endItem")
+          // $COVERAGE-ON$
+
+  /** Parses the character of an escape in ICU's class that is the character itself (e.g. `\b`), whose backslash is at
+    * `start`.
+    */
+  private def parseICUClassLetter(start: Int): ClassItem.Value =
+    val value = currentCodePoint
+    nextCodePoint(value)
+    ClassItem.Value(ClassItemData.ClassBackslashValue(BackslashKind.Unknown(value)), SourceLocation(start, offset))
+
+  /** The escape classes of ICU's class, which are the escapes that a `-` after them reads as a character. */
+  private val ICUClassEscapes: Map[Char, EscapeClassKind] = Map(
+    'd' -> EscapeClassKind.Digit,
+    'D' -> EscapeClassKind.NonDigit,
+    'h' -> EscapeClassKind.Horizontal,
+    'H' -> EscapeClassKind.NonHorizontal,
+    's' -> EscapeClassKind.Space,
+    'S' -> EscapeClassKind.NonSpace,
+    'v' -> EscapeClassKind.Vertical,
+    'V' -> EscapeClassKind.NonVertical,
+    'w' -> EscapeClassKind.Word,
+    'W' -> EscapeClassKind.NonWord
+  )
+
+  /** Checks whether the character of ICU's class is its syntax, unless an escape or `\Q...\E` quotes it. */
+  private def isICUClassSyntax(item: ClassItem.Value): Boolean =
+    val c = item.data.value
+    c == '[' || c == ']' || c == '-' || c == '&'
+
+  /** Reads a token of ICU's class, where the escapes of characters that ICU's scanner reads are characters (e.g.
+    * `\x41`), and `\Q...\E` quotes the characters in it.
+    *
+    * An empty `\Q\E` is skipped as the blanks before a token are, which the token does not keep.
+    */
+  private def readICUClassToken(): ICUClassToken =
+    var token: Option[ICUClassToken] = None
+    while token.isEmpty do
+      skipClassComment()
+      if isEnd then token = Some(ICUClassToken.End)
+      else if currentChar != '\\' then token = Some(ICUClassToken.Character(parseICUClassLiteral(), quoted = false))
+      else
+        val start = offset
+        next()
+        assert(!isEnd, "Invalid backslash escape", start)
+        if currentChar == 'Q' then
+          next()
+          token = parseICUClassQuote(start)
+        else if "acefnrtuUx0".contains(currentChar) then
+          val (kind: BackslashKind.BackslashValue) = parseBackslashKind(): @unchecked
+          val item = ClassItem.Value(ClassItemData.ClassBackslashValue(kind), SourceLocation(start, offset))
+          token = Some(ICUClassToken.Character(item, quoted = true))
+        else token = Some(ICUClassToken.Escape(currentChar))
+    token.get
+
+  /** Parses the characters of ICU's `\Q...\E` in a class after `\Q`, whose backslash is at `start`, and returns its
+    * token, or `None` for an empty one.
+    */
+  private def parseICUClassQuote(start: Int): Option[ICUClassToken] =
+    val parts = Seq.newBuilder[CasePart[ClassItem]]
+    while !isEnd && !source.startsWith("\\E", offset) do
+      val item = parseICUClassLiteral()
+      parts.addOne(CasePart(item, Some(source.slice(item.loc.start, item.loc.end))))
+    if isEnd then return Some(ICUClassToken.End)
+    next()
+    next()
+    val region = ClassItemData.ClassCaseRegion(CaseCommandKind.QuoteCommand, parts.result(), CaseRegionEnd.Closed)
+    Option.when(region.parts.nonEmpty)(ICUClassToken.Quote(ClassItem(region, SourceLocation(start, offset))))
+
+  private def parseICUClassLiteral(): ClassItem.Value =
+    val start = offset
+    val value = currentCodePoint
+    nextCodePoint(value)
+    ClassItem.Value(ClassItemData.ClassLiteral(value), SourceLocation(start, offset))
+
   private val ClassPOSIXNames: Set[String] = Set(
     "alnum",
     "alpha",
@@ -3490,7 +3858,7 @@ private[parser] final class Parser(
   /** Tests whether `count` hex digits follow, between which Java skips whitespace and comments (e.g. `\\u00 41`). */
   private def hasHexDigitsAhead(count: Int): Boolean =
     // `next` skips the comments that Ruby removes, but Ruby reads `\x` and `\u` before removing them.
-    if !isSkippingConstructComment then
+    if !isSkippingEscapeComment then
       return offset + count <= source.length && source.slice(offset, offset + count).forall(isHexDigit(_))
     val save = offset
     var found = 0
@@ -3578,12 +3946,12 @@ private[parser] final class Parser(
       value = (value * 16 + Character.digit(currentChar, 16)).min(Long.MaxValue / 16)
       count += 1
       next()
-      skipConstructComment()
+      skipEscapeComment()
     value
 
   private def parseBracedCodePoint(radix: Int): Int =
     skipBraceBlank()
-    skipConstructComment()
+    skipEscapeComment()
     val start = offset
     var value = 0L
     var count = 0
@@ -3591,7 +3959,7 @@ private[parser] final class Parser(
       value = (value * radix + Character.digit(currentChar, radix)).min(Long.MaxValue / 16)
       count += 1
       next()
-      skipConstructComment()
+      skipEscapeComment()
 
     // Perl reads `\x{}` as `\x{0}`, but rejects `\o{}`.
     if featureSet.escape.allowsLooseBraceEscape && (count > 0 || radix == 16 || currentChar != '}') then
@@ -3660,6 +4028,13 @@ private[parser] final class Parser(
 
   private def isSkippingConstructComment: Boolean =
     context.skipsComment && featureSet.comment.skipsCommentInConstruct
+
+  /** Skips the whitespace and comments that Java also skips inside an escape (e.g. `\\x4 1`), unlike ICU. */
+  private def skipEscapeComment(): Unit =
+    if isSkippingEscapeComment then skipComment()
+
+  private def isSkippingEscapeComment: Boolean =
+    context.skipsComment && featureSet.comment.skipsCommentInEscape
 
   /** Returns the source text in the given range without the comments Ruby removes. */
   private def sliceSource(start: Int, end: Int): String =

@@ -661,3 +661,28 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   check("\\u0100", "", PythonRegex(Python.Type.Bytes))(Backslash(Escape(UnicodeHex4, 0x100)))
   error("\\e", "", PythonRegex())("Invalid backslash escape at 1")
   check("\\_", "", PythonRegex())(Backslash(Unknown('_')))
+
+  // ICU's escapes (ICU 79.1): an unknown letter is the letter, and `\cX` is the low five bits of `X`.
+  check("\\y\\K\\g\\E", "", ICU)(Sequence("yKgE".map(c => Backslash(Unknown(c)))*))
+  check("\\ca\\c?", "", ICU)(Sequence(Backslash(Escape(Control('a'), 0x01)), Backslash(Escape(Control('?'), 0x1f))))
+  check("a\\c", "", ICU)(Sequence(Literal('a'), Backslash(Unknown('c'))))
+  check("\\x4g", "", ICU)(Sequence(Backslash(Escape(Hex1, 0x04)), Literal('g')))
+  check("\\x4 1", "x", ICU)(Sequence(Backslash(Escape(Hex1, 0x04)), Blank(" "), Literal('1')))
+  check("\\U0001F600", "", ICU)(Backslash(Escape(UnicodeHex8, 0x1f600)))
+  check("\\p{gc=L}", "", ICU)(Backslash(EscapeClass(UnicodeProperty("gc=L"))))
+  checkPrinted("\\P { L }", "\\P{ L }", "x", ICU)(Backslash(EscapeClass(NonUnicodeProperty(" L "))))
+  error("\\pL", "", ICU)("Invalid backslash escape at 2")
+  error("\\p{L", "", ICU)("Invalid backslash escape at 4")
+  error("\\0", "", ICU)("Invalid octal escape at 2")
+  // ICU reads the digits of a back-reference while the number is below the groups so far.
+  check("(a)\\10", "", ICU):
+    Sequence(
+      Group(IndexedCapture, Literal('a')),
+      Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))),
+      Literal('0')
+    )
+  check(s"${"(a)" * 10}\\11", "", ICU):
+    Sequence(
+      (Seq.fill(10)(Group(IndexedCapture, Literal('a'))) :+
+        Backslash(EscapeBackReference(BareBackReference, IndexedReference(11))))*
+    )

@@ -540,3 +540,139 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
       Class(false, ClassDiff(ClassLiteral('a'), ClassLiteral('b')))
     )
   error("[z-a](?V1)", "", PythonRegex())("Out of order class range at 1")
+
+  // ICU's classes, whose operators `--` and `&&` bind looser than a union and a `-` or `&` between classes (ICU 79.1).
+  check("[a-c]", "", ICU)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('c'))))
+  check("[^a]", "", ICU)(Class(true, ClassLiteral('a')))
+  check("[]a]", "", ICU)(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  check("[^]a]", "", ICU)(Class(true, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  // The AST does not keep an empty `\Q\E`, as the blanks before `]` and `^`.
+  checkPrinted("[\\Q\\E]]", "[]]", "", ICU)(Class(false, ClassLiteral(']')))
+  error("[]", "", ICU)("Unclosed ']' at 2")
+  check("[a-]", "", ICU)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'))))
+  check("[-a]", "", ICU)(Class(false, ClassUnion(ClassLiteral('-'), ClassLiteral('a'))))
+  check("[&a]", "", ICU)(Class(false, ClassUnion(ClassLiteral('&'), ClassLiteral('a'))))
+  error("[--a]", "", ICU)("Invalid class set operation at 1")
+  error("[&&a]", "", ICU)("Invalid class set operation at 1")
+  check("[a-c-e]", "", ICU):
+    Class(false, ClassUnion(ClassRange(ClassLiteral('a'), ClassLiteral('c')), ClassLiteral('-'), ClassLiteral('e')))
+  check("[\\w-a]", "", ICU)(Class(false, ClassUnion(ClassBackslashClass(Word), ClassLiteral('-'), ClassLiteral('a'))))
+  check("[a&b]", "", ICU)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('&'), ClassLiteral('b'))))
+  check("[a-[b]]", "", ICU):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassNest(false, ClassLiteral('b'))))
+  check("[a-c--b]", "", ICU):
+    Class(false, ClassDiff(ClassRange(ClassLiteral('a'), ClassLiteral('c')), ClassLiteral('b')))
+  check("[a&&b--c]", "", ICU):
+    Class(false, ClassDiff(ClassIntersection(ClassLiteral('a'), ClassLiteral('b')), ClassLiteral('c')))
+  check("[\\w&&\\d]", "", ICU)(Class(false, ClassIntersection(ClassBackslashClass(Word), ClassBackslashClass(Digit))))
+  check("[a----b]", "", ICU):
+    Class(false, ClassDiff(ClassLiteral('a'), ClassRange(ClassLiteral('-'), ClassLiteral('b'))))
+  check("[a&&&b]", "", ICU):
+    Class(false, ClassIntersection(ClassLiteral('a'), ClassUnion(ClassLiteral('&'), ClassLiteral('b'))))
+  error("[a--]", "", ICU)("Invalid class set operation at 4")
+  // A `-` or `&` between a class or a property and a nested class is an operator of the precedence of a union.
+  check("[[a]-[b]]", "", ICU):
+    Class(false, ClassNestDiff(ClassNest(false, ClassLiteral('a')), ClassNest(false, ClassLiteral('b'))))
+  check("[[a]--[b]]", "", ICU):
+    Class(false, ClassDiff(ClassNest(false, ClassLiteral('a')), ClassNest(false, ClassLiteral('b'))))
+  check("[[a]&[b]]", "", ICU):
+    Class(false, ClassNestIntersection(ClassNest(false, ClassLiteral('a')), ClassNest(false, ClassLiteral('b'))))
+  check("[[a]&&[b]]", "", ICU):
+    Class(false, ClassIntersection(ClassNest(false, ClassLiteral('a')), ClassNest(false, ClassLiteral('b'))))
+  check("[\\p{L}&[a]c]", "", ICU):
+    Class(
+      false,
+      ClassUnion(
+        ClassNestIntersection(ClassBackslashClass(UnicodeProperty("L")), ClassNest(false, ClassLiteral('a'))),
+        ClassLiteral('c')
+      )
+    )
+  check("[x[a]-[b]&&[c]]", "", ICU):
+    Class(
+      false,
+      ClassIntersection(
+        ClassNestDiff(
+          ClassUnion(ClassLiteral('x'), ClassNest(false, ClassLiteral('a'))),
+          ClassNest(false, ClassLiteral('b'))
+        ),
+        ClassNest(false, ClassLiteral('c'))
+      )
+    )
+  check("[[a]-b]", "", ICU)(
+    Class(false, ClassUnion(ClassNest(false, ClassLiteral('a')), ClassLiteral('-'), ClassLiteral('b')))
+  )
+  check("[[a]&]", "", ICU)(Class(false, ClassUnion(ClassNest(false, ClassLiteral('a')), ClassLiteral('&'))))
+  check("[[a]--b]", "", ICU)(Class(false, ClassDiff(ClassNest(false, ClassLiteral('a')), ClassLiteral('b'))))
+  check("[\\w&&b]", "", ICU)(Class(false, ClassIntersection(ClassBackslashClass(Word), ClassLiteral('b'))))
+  check("[^[a]]", "", ICU)(Class(true, ClassNest(false, ClassLiteral('a'))))
+  check("[[^a]]", "", ICU)(Class(false, ClassNest(true, ClassLiteral('a'))))
+  // ICU's `[:name:]` is a property, also out of a class.
+  check("[:Letter:]", "", ICU)(Class(false, ClassPOSIX(false, "Letter")))
+  check("[[:^gc=L:]]", "", ICU)(Class(false, ClassNest(false, ClassPOSIX(true, "gc=L"))))
+  checkPrinted("[ :L :]", "[:L:]", "x", ICU)(Class(false, ClassPOSIX(false, "L")))
+  check("[:a]", "", ICU)(Class(false, ClassUnion(ClassLiteral(':'), ClassLiteral('a'))))
+  check("[:a:b]", "", ICU):
+    Class(false, ClassUnion(ClassLiteral(':'), ClassLiteral('a'), ClassLiteral(':'), ClassLiteral('b')))
+  check("[:\\x41:]", "", ICU):
+    Class(false, ClassUnion(ClassLiteral(':'), ClassBackslashValue(Escape(Hex2, 'A')), ClassLiteral(':')))
+  error("[:a", "", ICU)("Unclosed ']' at 3")
+  // The escapes in ICU's class.
+  check("[\\b\\R\\X\\1\\-]", "", ICU):
+    Class(false, ClassUnion("bRX1-".map(c => ClassBackslashValue(Unknown(c)))*))
+  check("[\\x41\\cA\\0101\\t]", "", ICU):
+    Class(
+      false,
+      ClassUnion(
+        ClassBackslashValue(Escape(Hex2, 'A')),
+        ClassBackslashValue(Escape(Control('A'), 0x01)),
+        ClassBackslashValue(Escape(BareOctal, 'A')),
+        ClassBackslashValue(Escape(Single('t'), '\t'))
+      )
+    )
+  check("[\\h\\V\\N{x}\\P{L}]", "", ICU):
+    Class(
+      false,
+      ClassUnion(
+        ClassBackslashClass(Horizontal),
+        ClassBackslashClass(NonVertical),
+        ClassBackslashClass(CharName("x")),
+        ClassBackslashClass(NonUnicodeProperty("L"))
+      )
+    )
+  check("[\\N{x}-z]", "", ICU):
+    Class(false, ClassUnion(ClassBackslashClass(CharName("x")), ClassLiteral('-'), ClassLiteral('z')))
+  check("[\\Qa-c\\E]", "", ICU):
+    val parts = "a-c".map(c => classPart(ClassLiteral(c), c.toString))
+    Class(false, ClassCaseRegion(CaseCommandKind.QuoteCommand, parts, Closed))
+  check("[\\Q]\\E]", "", ICU):
+    Class(false, ClassCaseRegion(CaseCommandKind.QuoteCommand, Seq(classPart(ClassLiteral(']'), "]")), Closed))
+  // A quote of more than one character at an end of a range is the characters.
+  checkPrinted("[\\Qab\\E-c]", "[ab-c]", "", ICU):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassRange(ClassLiteral('b'), ClassLiteral('c'))))
+  error("[\\Qa", "", ICU)("Unclosed ']' at 4")
+  error("[\\", "", ICU)("Invalid backslash escape at 1")
+  error("[\\pL]", "", ICU)("Invalid backslash escape at 3")
+  // A range ends at a character, an escape of a character or another escape's letter, but not at a class.
+  check("[a-\\x{63}]", "", ICU):
+    Class(false, ClassRange(ClassLiteral('a'), ClassBackslashValue(Escape(HexBracket, 'c'))))
+  check("[a-\\y]", "", ICU)(Class(false, ClassRange(ClassLiteral('a'), ClassBackslashValue(Unknown('y')))))
+  check("[a-\\Qc\\E]", "", ICU):
+    Class(
+      false,
+      ClassRange(
+        ClassItem.Value(ClassLiteral('a')),
+        formValue(CaseCommandKind.QuoteCommand, ClassLiteral('c'), "c", Closed)
+      )
+    )
+  checkPrinted("[a-\\N{x}]", "[a\\N{x}]", "", ICU):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassBackslashClass(CharName("x"))))
+  check("[a&-c]", "", ICU)(
+    Class(false, ClassUnion(ClassLiteral('a'), ClassRange(ClassLiteral('&'), ClassLiteral('c'))))
+  )
+  error("[a-\\w]", "", ICU)("Invalid class range at 3")
+  error("[a-\\p{L}]", "", ICU)("Invalid class range at 3")
+  error("[c-a]", "", ICU)("Out of order class range at 1")
+  error("[a-", "", ICU)("Unclosed ']' at 3")
+  error("[a", "", ICU)("Unclosed ']' at 2")
+  checkPrinted("[a - c # comment\n]", "[a-c # comment\n]", "x", ICU):
+    Class(false, ClassUnion(ClassRange(ClassLiteral('a'), ClassLiteral('c')), ClassBlank(" # comment\n")))

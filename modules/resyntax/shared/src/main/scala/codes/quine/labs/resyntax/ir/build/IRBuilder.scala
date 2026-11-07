@@ -152,6 +152,10 @@ object IRBuilder:
       ClassItem(ClassItemData.ClassIntersection(stripClassSource(left), stripClassSource(right)), item.loc)
     case ClassItemData.ClassDiff(left, right) =>
       ClassItem(ClassItemData.ClassDiff(stripClassSource(left), stripClassSource(right)), item.loc)
+    case ClassItemData.ClassNestIntersection(left, right) =>
+      ClassItem(ClassItemData.ClassIntersection(stripClassSource(left), stripClassSource(right)), item.loc)
+    case ClassItemData.ClassNestDiff(left, right) =>
+      ClassItem(ClassItemData.ClassDiff(stripClassSource(left), stripClassSource(right)), item.loc)
     case ClassItemData.ClassSymmetricDiff(left, right) =>
       ClassItem(ClassItemData.ClassSymmetricDiff(stripClassSource(left), stripClassSource(right)), item.loc)
     case ClassItemData.ClassExplicitUnion(left, right) =>

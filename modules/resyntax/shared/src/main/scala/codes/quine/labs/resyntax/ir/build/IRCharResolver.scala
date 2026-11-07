@@ -689,10 +689,12 @@ private[build] final class IRCharResolver(
       case value: ClassItemData.ClassValue if readsByteEscapesAsUTF8 && isRubyByteValue(value) =>
         throw new IRBuildingException("Invalid multibyte escape", item.loc)
       case value: ClassItemData.ClassValue => ClassSet(closeChars(valueUnits(value, flags, item.loc), flags))
-      // `IRBuilder.build` removes the blanks, expands Ruby's `\u{...}` and the case regions, and makes `||` a union.
+      // `IRBuilder.build` removes the blanks, expands Ruby's `\u{...}` and the case regions, makes `||` a union, and
+      // makes ICU's `&` and `-` before a nested class an intersection and a difference.
       // $COVERAGE-OFF$
       case ClassItemData.ClassBlank(_) | ClassItemData.ClassUnicodeList(_, _) | ClassItemData.ClassCaseRegion(_, _, _) |
-          ClassItemData.ClassExplicitUnion(_, _) =>
+          ClassItemData.ClassExplicitUnion(_, _) | ClassItemData.ClassNestIntersection(_, _) |
+          ClassItemData.ClassNestDiff(_, _) =>
         throw new IllegalStateException(s"Unexpected source item: $item")
       // $COVERAGE-ON$
 
