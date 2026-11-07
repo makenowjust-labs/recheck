@@ -10,6 +10,7 @@ import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
+import codes.quine.labs.resyntax.charset.CompatibilityPropertyTable
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UTF16Encoding
@@ -893,3 +894,38 @@ class IRCharResolverSuite extends munit.FunSuite:
     Unsupported(NodeData.Backslash(EscapeClass(CharName("LATIN SMALL LETTER A"))))
   )
   check("\\L<x>", "", PR)(Unsupported(NodeData.Backslash(EscapeClass(NamedList("x")))))
+
+  // ICU folds literals and back-references to several characters, but not classes (ICU 79.1).
+  check("ß", "i", ICU)(sharpS)
+  check("\\x73s", "i", ICU)(sharpS)
+  check("s\\Qs\\E", "i", ICU)(sharpS)
+  chars("[ß]", "i", ICU)(sharpSs)
+  chars("İ", "", ICU)(of("İ"))
+  check("İ", "i", ICU)(Disjunction(Sequence(Chars(of("iI")), Chars(of("\u0307"))), Chars(of("İ"))))
+  chars("k", "i", ICU)(of("kK\u212a"))
+  chars("i", "i", ICU)(of("iI"))
+  chars("\\p{Ll}", "i", ICU)(CaseMapping.SimpleFold.closure(gc("Ll")))
+  chars("\\P{Lu}", "i", ICU)(CaseMapping.SimpleFold.closure(gc("Lu")).complement(UnitMode.CodePoint))
+  chars("[:Lu:]", "", ICU)(gc("Lu"))
+  chars("[[:^Lu:]a]", "", ICU)(gc("Lu").complement(UnitMode.CodePoint))
+  chars("[[a-c]-[b]]", "", ICU)(of("ac"))
+  chars("[[a-c]&[bx]]", "", ICU)(of("b"))
+  chars("[[a-c]-[b]&[ab]]", "", ICU)(of("a"))
+  // ICU's literals in a row are a UTF-16 string, where a high and a low surrogate make a pair.
+  chars("\\x{D83D}\\x{DE00}", "", ICU)(CharSet.single(0x1f600))
+  check("\\x{D83D}a", "", ICU)(Sequence(Chars(CharSet.single(0xd83d)), Chars(of("a"))))
+  check("\\Q\\E", "", ICU)(Empty)
+  // ICU's `.` with `s` reads `\r\n` as one character.
+  check(".", "s", ICU)(
+    Disjunction(
+      Sequence(Chars(of("\r")), Chars(of("\n"))),
+      Sequence(Chars(UnitMode.CodePoint.universe), Assert(IRAssertKind.NotBetweenCRLF))
+    )
+  )
+  chars(".", "", ICU)(of("\n\u000b\u000c\r\u0085\u2028\u2029").complement(UnitMode.CodePoint))
+  chars(".", "d", ICU)(of("\n").complement(UnitMode.CodePoint))
+  // ICU's classes are of Unicode, and `\h` is `[\t\p{Zs}]`.
+  chars("\\w", "", ICU)(CompatibilityPropertyTable.Word)
+  chars("\\d", "", ICU)(gc("Nd"))
+  chars("\\s", "", ICU)(PropertyTable.binary("White_Space").get.set)
+  chars("\\h", "", ICU)(gc("Zs").union(of("\t")))

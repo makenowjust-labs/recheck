@@ -6,6 +6,8 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
 import codes.quine.labs.resyntax.charset.CompatibilityPropertyTable
 import codes.quine.labs.resyntax.charset.EnumeratedProperty
+import codes.quine.labs.resyntax.charset.NumericProperty
+import codes.quine.labs.resyntax.charset.Property
 import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.PropertyValue
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -196,6 +198,8 @@ private[build] object IRPropertyLookup:
       value match
         case Some(value) => pythonRegex(Some(name), value, posix = false, flags, mode)
         case None        => pythonRegex(None, name, posix = false, flags, mode)
+    // ICU's parser keeps the whole expression of `\p{...}` as the name.
+    case IRPropertyLookupKind.ICU => icu(name)
 
   def isJavaScriptStringProperty(name: String): Boolean = JavaScriptStringProperties.contains(name)
 
@@ -1369,3 +1373,165 @@ private[build] object IRPropertyLookup:
       case _: IRCharset.ASCII                     => asASCII
       case IRCharset.Default if !mode.isCodePoint => asASCII
       case _                                      => v.set
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // ICU
+
+  /** Returns ICU's loose key of a name (`uprv_comparePropertyNames`), which ignores ASCII case, `-`, `_` and ASCII
+    * whitespace, but not a leading "is" (e.g. `\p{isgreek}` is an error).
+    */
+  private def icuKey(name: String): String =
+    lowerASCII(name.filterNot(c => c == '-' || c == '_' || c == ' ' || '\t' <= c && c <= '\r'))
+
+  /** The properties of ICU by their names, where `General_Category_Mask` (`gcm`) is `General_Category`. */
+  private lazy val icuProperties: Map[String, Property] =
+    index(PropertyTable.all.map(p => (p.names, p)), icuKey) ++
+      Seq("gcm", "generalcategorymask").map(_ -> PropertyTable.GeneralCategory)
+
+  private lazy val icuValues: Map[EnumeratedProperty, Map[String, PropertyValue]] =
+    PropertyTable.enumeratedProperties.map(p => p -> enumIndex(p, icuKey)).toMap
+
+  /** The keys of ICU's properties with a value that recheck has no data for: `Name` and the combining classes of the
+    * first and the last characters of the decompositions.
+    */
+  private val ICUNotModeled: Set[String] =
+    Set("name", "na", "leadcanonicalcombiningclass", "lccc", "trailcanonicalcombiningclass", "tccc")
+
+  /** ICUNumber is a number of a property value that `uprv_strtod` reads (e.g. `0.5` of `\p{nv=0.5}`). */
+  private val ICUNumber = """\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?""".r
+
+  /** ICUVersionPart is a part of a version that `u_versionFromString` reads (e.g. `3` of `\p{Age=3.0}`). */
+  private val ICUVersionPart = """^\s*\+?(\d+)""".r
+
+  /** Looks up a property expression of ICU's `\p{...}` and `[:...:]`, as `RegexCompile::createSetForProperty` does: a
+    * property of `UnicodeSet` (e.g. `gc=L`), `word`, `all`, a block with `In`, a property with `Is`, or a `java` name.
+    *
+    * The properties of strings have only their characters.
+    */
+  def icu(expression: String): PropertyResult =
+    icuUnicodeSet(expression).orElse:
+      if lowerASCII(expression) == "word" then found(CompatibilityPropertyTable.Word)
+      else if expression == "all" then found(unicodeUniverse.universe)
+      else if expression.startsWith("In") && expression.length >= 3 then
+        fromOption(icuValues(PropertyTable.Block).get(icuKey(expression.drop(2))).map(foundValue))
+      else if expression.startsWith("Is") && expression.length >= 3 then
+        val name = expression.drop(2)
+        if name.contains('=') then Unknown
+        else if lowerASCII(name) == "assigned" then found(gc("Cn").complement(unicodeUniverse))
+        else if lowerASCII(name) == "titlecase" then foundValue(gcValue("Lt"))
+        else icuUnicodeSet(name)
+      else icuJava(expression)
+
+  /** Looks up a property expression of ICU's `UnicodeSet`, where `≠` negates the property of the value (e.g. `gc≠L`).
+    */
+  private def icuUnicodeSet(expression: String): PropertyResult =
+    expression.indexWhere(c => c == '=' || c == '≠') match
+      case -1                              => icuAlias(expression, None)
+      case i if i + 1 == expression.length => Unknown
+      case i if expression(i) == '='       => icuAlias(expression.take(i), Some(expression.drop(i + 1)))
+      case i                               =>
+        icuAlias(expression.take(i), Some(expression.drop(i + 1))) match
+          case Found(set, _) => found(set.chars.complement(unicodeUniverse))
+          case result        => result
+
+  /** Looks up a property and its value as `UnicodeSet::applyPropertyAlias` does.
+    *
+    * A name without a value is a general category, a script or a binary property in this order.
+    */
+  private def icuAlias(name: String, value: Option[String]): PropertyResult =
+    if !(name ++ value.getOrElse("")).forall(_ < 0x80) then return Unknown
+    def binaryOf(p: Property): Option[BinaryProperty] = p match
+      case p: BinaryProperty => Some(p)
+      case _                 => None
+
+    value match
+      case None =>
+        icuValue(PropertyTable.GeneralCategory, name)
+          .orElse(icuValue(PropertyTable.Script, name))
+          .orElse(fromOption(icuProperties.get(icuKey(name)).flatMap(binaryOf).map(p => found(p.set))))
+      case Some(value) if ICUNotModeled.contains(icuKey(name)) => NotModeled
+      case Some(value)                                         =>
+        icuProperties.get(icuKey(name)) match
+          case Some(p: BinaryProperty) =>
+            icuKey(value) match
+              case "y" | "yes" | "t" | "true" => found(p.set)
+              case "n" | "no" | "f" | "false" => found(p.set.complement(unicodeUniverse))
+              case _                          => Unknown
+          case Some(p: EnumeratedProperty) if p eq PropertyTable.Age                     => found(icuAge(value))
+          case Some(p: EnumeratedProperty) if p eq PropertyTable.CanonicalCombiningClass =>
+            icuValue(p, value).orElse(icuCombiningClass(value))
+          case Some(p: EnumeratedProperty) => icuValue(p, value)
+          case Some(p: NumericProperty)    =>
+            fromOption(
+              Option
+                .when(ICUNumber.matches(value))(value.trim.toDouble)
+                .map(d => found(CharSet.union(p.values.filter(v => !v.isNaN && v.toDouble == d).map(_.set))))
+            )
+          case None => Unknown
+
+  private def icuValue(property: EnumeratedProperty, name: String): PropertyResult =
+    fromOption(icuValues(property).get(icuKey(name)).map(v => found(v.set)))
+
+  /** Returns the characters of a combining class written as a number, which is any integer from 0 to 255. */
+  private def icuCombiningClass(value: String): PropertyResult =
+    fromOption(
+      Option
+        .when(ICUNumber.matches(value))(value.trim.toDouble)
+        .filter(d => 0 <= d && d <= 255 && d == d.toInt)
+        .map: d =>
+          val values = PropertyTable.CanonicalCombiningClass.values.filter(_.names.contains(d.toInt.toString))
+          found(CharSet.union(values.map(_.set)))
+    )
+
+  /** Returns the characters assigned in the version or earlier, which `u_versionFromString` reads from the value (e.g.
+    * `3.0`), where a value without a version is version 0.
+    */
+  private def icuAge(value: String): CharSet =
+    val parts = Array.fill(4)(0)
+    var rest = value
+    var i = 0
+    var continue = true
+    while continue && i < 4 do
+      ICUVersionPart.findPrefixMatchOf(rest) match
+        case Some(m) =>
+          parts(i) = BigInt(m.group(1)).mod(256).toInt
+          i += 1
+          rest = m.after.toString
+          continue = rest.startsWith(".")
+          rest = rest.drop(1)
+        case None => continue = false
+    val version = parts.toSeq
+    import scala.math.Ordering.Implicits.*
+    val ages = PropertyTable.Age.values
+      .drop(1)
+      .filter: v =>
+        val Array(major, minor) = v.shortName.split('.').map(_.toInt)
+        Seq(major, minor, 0, 0) <= version
+    CharSet.union(ages.map(_.set))
+
+  /** Looks up a `java` name of ICU, which has its own definitions (e.g. `javaLowerCase` is `Ll`). */
+  private def icuJava(name: String): PropertyResult =
+    def ignorable: CharSet =
+      CharSet.range(0, 8).union(CharSet.range(0x0e, 0x1b)).union(CharSet.range(0x7f, 0x9f)).union(gc("Cf"))
+
+    name match
+      case "javaDefined"                => found(gc("Cn").complement(unicodeUniverse))
+      case "javaDigit"                  => found(gc("Nd"))
+      case "javaIdentifierIgnorable"    => found(ignorable)
+      case "javaISOControl"             => found(CharSet.range(0, 0x1f).union(CharSet.range(0x7f, 0x9f)))
+      case "javaJavaIdentifierPart"     => found(gc("L", "Sc", "Pc", "Nd", "Nl", "Mc", "Mn").union(ignorable))
+      case "javaJavaIdentifierStart"    => found(gc("L", "Nl", "Sc", "Pc"))
+      case "javaLetter"                 => found(gc("L"))
+      case "javaLetterOrDigit"          => found(gc("L", "Nd"))
+      case "javaLowerCase"              => found(gc("Ll"))
+      case "javaMirrored"               => found(binary("Bidi_Mirrored"))
+      case "javaSpaceChar"              => found(gc("Z"))
+      case "javaSupplementaryCodePoint" => found(CharSet.range(0x10000, 0x10ffff))
+      case "javaTitleCase"              => found(gc("Lt"))
+      case "javaUnicodeIdentifierStart" => found(gc("L", "Nl"))
+      case "javaUnicodeIdentifierPart"  => found(gc("L", "Pc", "Nd", "Nl", "Mc", "Mn").union(ignorable))
+      case "javaUpperCase"              => found(gc("Lu"))
+      case "javaValidCodePoint"         => found(unicodeUniverse.universe)
+      case "javaWhitespace"             =>
+        found(gc("Z").diff(of("\u00A0\u2007\u202F")).union(CharSet.range(0x09, 0x0d)).union(CharSet.range(0x1c, 0x1f)))
+      case _ => Unknown

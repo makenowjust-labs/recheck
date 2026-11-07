@@ -1,6 +1,9 @@
 package codes.quine.labs.resyntax.ir
 package build
 
+import codes.quine.labs.resyntax.ast.BackslashKind.EscapeClass
+import codes.quine.labs.resyntax.ast.EscapeClassKind.UnicodeProperty
+import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.CompatibilityPropertyTable
 import codes.quine.labs.resyntax.charset.EnumeratedProperty
@@ -403,3 +406,71 @@ class IRPropertyLookupSuite extends munit.FunSuite with IRHelper:
         "\\p{NV=7/3}"
       )
     do interceptMessage[IRBuildingException]("Unknown Unicode property name at 0")(build(s, "", PR))
+
+  // ICU's properties are the ones of `UnicodeSet` with ICU's loose names, and the names of `java.util.regex` (ICU 79.1).
+  def icuGC(names: String*): CharSet = IRPropertyLookup.gc(names*)
+
+  def icuBinary(name: String): CharSet = PropertyTable.binary(name).get.set
+
+  val CP: UnitMode = UnitMode.CodePoint
+  chars("\\p{ L }", "", ICU)(icuGC("L"))
+  chars("\\p{general category = letter}", "", ICU)(icuGC("L"))
+  chars("\\p{Greek}", "", ICU)(value(PropertyTable.Script, "Greek"))
+  chars("\\p{Alpha}", "", ICU)(icuBinary("Alphabetic"))
+  chars("\\p{alnum}", "", ICU)(icuBinary("alnum"))
+  chars("\\p{punct}", "", ICU)(icuGC("P"))
+  chars("\\p{Assigned}", "", ICU)(icuGC("Cn").complement(CP))
+  chars("\\p{gcm=Lu}", "", ICU)(icuGC("Lu"))
+  chars("\\p{Alphabetic=No}", "", ICU)(icuBinary("Alphabetic").complement(CP))
+  chars("\\p{alpha=t}", "", ICU)(icuBinary("Alphabetic"))
+  chars("\\p{RGI_Emoji}", "", ICU)(icuBinary("RGI_Emoji"))
+  chars("\\P{RGI_Emoji}", "", ICU)(icuBinary("RGI_Emoji").complement(CP))
+  chars("\\p{gc≠L}", "", ICU)(icuGC("L").complement(CP))
+  chars("\\P{gc≠L}", "", ICU)(icuGC("L"))
+  chars("\\p{blk=Basic_Latin}", "", ICU)(CharSet.range(0, 0x7f))
+  chars("\\p{scx=Grek}", "", ICU)(value(PropertyTable.ScriptExtensions, "Greek"))
+  chars("\\p{idtype=Recommended}", "", ICU)(value(PropertyTable.IdentifierType, "Recommended"))
+  chars("\\p{Age=3.0}", "", ICU)(PropertyTable.presentIn(PropertyTable.Age.value("3.0").get))
+  chars("\\p{age= 3.0.0.1}", "", ICU)(PropertyTable.presentIn(PropertyTable.Age.value("3.0").get))
+  chars("\\p{Age=V3_0}", "", ICU)(CharSet.empty)
+  chars("\\p{ccc=230}", "", ICU)(value(PropertyTable.CanonicalCombiningClass, "230"))
+  chars("\\p{ccc=231}", "", ICU)(CharSet.empty)
+  chars("\\p{nv=0.5}", "", ICU)(PropertyTable.NumericValue.values.find(_.toDouble == 0.5).get.set)
+  chars("\\p{word}", "", ICU)(CompatibilityPropertyTable.Word)
+  chars("\\p{all}", "", ICU)(CP.universe)
+  chars("\\p{InGreek}", "", ICU)(value(PropertyTable.Block, "Greek"))
+  chars("\\p{IsLu}", "", ICU)(icuGC("Lu"))
+  chars("\\p{Isassigned}", "", ICU)(icuGC("Cn").complement(CP))
+  chars("\\p{IsTitleCase}", "", ICU)(icuGC("Lt"))
+  chars("\\p{javaLowerCase}", "", ICU)(icuGC("Ll"))
+  for name <- Seq("All", "isgreek", "In", "InFoo", "IsScript=Greek", "é", "gc=", "alpha=maybe", "ccc=256", "ccc=1.5")
+  do error(s"\\p{$name}", "", ICU)("Unknown Unicode property name at 0")
+  for name <- Seq("nv=1/2", "Unicode_1_Name=x", "Lowercase_Mapping=a", "javaFoo", "gc≠Foo", "Block") do
+    error(s"\\p{$name}", "", ICU)("Unknown Unicode property name at 0")
+  for name <- Seq("Name=DIGIT ONE", "lccc=230") do
+    check(s"\\p{$name}", "", ICU)(Unsupported(NodeData.Backslash(EscapeClass(UnicodeProperty(name)))))
+  test("IRBuilder.build: ICU's java names"):
+    val names = Seq(
+      "javaDefined" -> icuGC("Cn").complement(CP),
+      "javaDigit" -> icuGC("Nd"),
+      "javaISOControl" -> CharSet.range(0, 0x1f).union(CharSet.range(0x7f, 0x9f)),
+      "javaJavaIdentifierStart" -> icuGC("L", "Nl", "Sc", "Pc"),
+      "javaLetter" -> icuGC("L"),
+      "javaLetterOrDigit" -> icuGC("L", "Nd"),
+      "javaMirrored" -> icuBinary("Bidi_Mirrored"),
+      "javaSpaceChar" -> icuGC("Z"),
+      "javaSupplementaryCodePoint" -> CharSet.range(0x10000, 0x10ffff),
+      "javaTitleCase" -> icuGC("Lt"),
+      "javaUnicodeIdentifierStart" -> icuGC("L", "Nl"),
+      "javaUpperCase" -> icuGC("Lu"),
+      "javaValidCodePoint" -> CP.universe
+    )
+    for (name, set) <- names do assertEquals(build(s"\\p{$name}", "", ICU).node.data, Chars(set), name)
+    val ignorable = build("\\p{javaIdentifierIgnorable}", "", ICU).node.data
+    assertEquals(
+      ignorable,
+      Chars(CharSet.range(0, 8).union(CharSet.range(0x0e, 0x1b)).union(CharSet.range(0x7f, 0x9f)).union(icuGC("Cf")))
+    )
+    for name <- Seq("javaJavaIdentifierPart", "javaUnicodeIdentifierPart", "javaWhitespace") do
+      val Chars(set) = build(s"\\p{$name}", "", ICU).node.data: @unchecked
+      assert(set.contains('_') == (name != "javaWhitespace"), name)

@@ -33,6 +33,9 @@ private[build] sealed abstract class IRClassLookup:
   /** Returns the word characters of `\b` and `\B` under the flags. */
   def boundaryWord(flags: IRCharFlagSet): CharSet = word(flags)
 
+  /** Returns the marks that `\b` and `\B` take as word characters after a base under the flags, if any. */
+  def wordMarks(flags: IRCharFlagSet): Option[IRWordMarkSet] = None
+
   /** Returns the characters of `\h` as a horizontal space (Java, PCRE and Perl). */
   def horizontal: CharSet = pcreHorizontal
 
@@ -69,6 +72,7 @@ object IRClassLookup:
       case IRClassLookupKind.Python      => Python(mode)
       case IRClassLookupKind.PythonRegex => PythonRegex(mode)
       case IRClassLookupKind.Ruby        => Ruby(mode)
+      case IRClassLookupKind.ICU         => ICU
 
   private enum Rule:
 
@@ -101,6 +105,10 @@ object IRClassLookup:
     def space(flags: IRCharFlagSet): CharSet = pick(ruleOf(flags), ASCIISpace, CompatibilityPropertyTable.Space)
 
     def word(flags: IRCharFlagSet): CharSet = pick(ruleOf(flags), ASCIIWord, CompatibilityPropertyTable.Word)
+
+    // Java's `\b` with `U` has the non-spacing marks in its word set already.
+    override def wordMarks(flags: IRCharFlagSet): Option[IRWordMarkSet] =
+      Option.when(!flags.unicodeClass)(javaWordMarks)
 
   /** DotNet is the table of .NET, whose classes are of Unicode. */
   private[build] case object DotNet extends IRClassLookup:
@@ -260,6 +268,32 @@ object IRClassLookup:
             case _: IRCharset.ASCII => Rule.ASCII
             case _                  => Rule.Unicode
       IRPropertyLookup.rubyPOSIX(name).map(u => pick(rule, asciiSet.get, u))
+
+  /** ICU is the table of ICU, whose classes are of Unicode.
+    *
+    * Its `\b` takes a character of `Grapheme_Extend` or `Cf` as the word character before it, if any, as
+    * `isWordBoundary` of `rematch.cpp` skips them.
+    */
+  private[build] case object ICU extends IRClassLookup:
+
+    def digit(flags: IRCharFlagSet): CharSet = gc("Nd")
+
+    def space(flags: IRCharFlagSet): CharSet = CompatibilityPropertyTable.Space
+
+    def word(flags: IRCharFlagSet): CharSet = CompatibilityPropertyTable.Word
+
+    override def boundaryWord(flags: IRCharFlagSet): CharSet = CompatibilityPropertyTable.Word.diff(icuWordExtenders)
+
+    override def wordMarks(flags: IRCharFlagSet): Option[IRWordMarkSet] = Some(icuWordMarks)
+
+    override def horizontal: CharSet = gc("Zs").union(of("\t"))
+
+  /** The characters that ICU's `\b` skips: `Grapheme_Extend` and `Cf`. */
+  private lazy val icuWordExtenders: CharSet = binary("Grapheme_Extend").union(gc("Cf"))
+
+  /** The marks of ICU's `\b`, where a character that it skips is a word character after a word character. */
+  lazy val icuWordMarks: IRWordMarkSet =
+    IRWordMarkSet(icuWordExtenders, icuWordExtenders, CompatibilityPropertyTable.Word.diff(icuWordExtenders))
 
   /** The marks of Java's `\b` without `U`, where a non-spacing mark is a word character after a letter or a digit. */
   lazy val javaWordMarks: IRWordMarkSet =

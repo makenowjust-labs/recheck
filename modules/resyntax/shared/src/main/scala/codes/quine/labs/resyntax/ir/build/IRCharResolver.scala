@@ -73,14 +73,14 @@ private[build] final class IRCharResolver(
 
   /** Returns the marks that `\b` and `\B` take as word characters after a base at the flags, if any. */
   def wordMarks(flags: IRCharFlagSet): Option[IRWordMarkSet] =
-    // Java's `\b` with `U` has the non-spacing marks in its word set already.
-    Option.when(featureSet.hasMarkWordBoundary && !flags.unicodeClass):
-      val marks = IRClassLookup.javaWordMarks
-      IRWordMarkSet(
-        marks.marks.intersect(universe),
-        marks.extenders.intersect(universe),
-        marks.bases.intersect(universe)
-      )
+    classes
+      .wordMarks(flags)
+      .map: marks =>
+        IRWordMarkSet(
+          marks.marks.intersect(universe),
+          marks.extenders.intersect(universe),
+          marks.bases.intersect(universe)
+        )
 
   /** Checks whether the node is a literal character, which [[literals]] resolves with the others of its part. */
   def isLiteral(node: Node): Boolean = node.data match
@@ -149,7 +149,11 @@ private[build] final class IRCharResolver(
         // $COVERAGE-OFF$
         case data => throw new IllegalArgumentException(s"Not a literal: $data")
       // $COVERAGE-ON$
-    val merged = if readsByteEscapesAsUTF8 then mergeRubyBytes(lits.toIndexedSeq) else lits.toIndexedSeq
+    val merged =
+      if readsByteEscapesAsUTF8 then mergeRubyBytes(lits.toIndexedSeq)
+      else if featureSet.joinsLiteralsAsUTF16 && mode == UnitMode.UTF16CodePoint then
+        mergeSurrogatePairs(lits.toIndexedSeq)
+      else lits.toIndexedSeq
     val units = merged.flatMap: lit =>
       unitsOf(lit) match
         case Seq() => Seq(lit.copy(value = NoUnit))
@@ -296,6 +300,25 @@ private[build] final class IRCharResolver(
 
   private def isRubyByteLit(lit: Lit): Boolean = lit.escape.exists(isRubyByte(_, lit.value))
 
+  /** Joins a high surrogate and a low surrogate in a row into a pair, as ICU's UTF-16 string of the literals has them
+    * (e.g. `\x{D83D}\x{DE00}` matches `😀`).
+    */
+  private def mergeSurrogatePairs(lits: IndexedSeq[Lit]): IndexedSeq[Lit] =
+    val out = mutable.ArrayBuffer.empty[Lit]
+    var i = 0
+    while i < lits.length do
+      val lit = lits(i)
+      if i + 1 < lits.length && UTF16Encoding.isHighSurrogate(lit.value) &&
+        UTF16Encoding.isLowSurrogate(lits(i + 1).value)
+      then
+        val pair = UTF16Encoding.decodeSurrogatePair(lit.value, lits(i + 1).value)
+        out += lit.copy(value = pair, loc = SourceLocation(lit.loc.start, lits(i + 1).loc.end))
+        i += 2
+      else
+        out += lit
+        i += 1
+    out.toIndexedSeq
+
   /** The characters that the dialect does not fold to several characters (e.g. `İ` in python-regex). */
   private val unfoldedChars: CharSet =
     if featureSet.multiCharFoldingKind.foldsDottedCapitalI then CharSet.empty else CharSet.single(DottedCapitalI)
@@ -321,7 +344,13 @@ private[build] final class IRCharResolver(
   private def complement(set: CharSet): IRNodeData = IRNodeData.Chars(set.complement(universe))
 
   private def dot(flags: IRCharFlagSet): IRNodeData =
-    if flags.dotAll then chars(universe)
+    // ICU's `.` with `s` reads `\r\n` as one character, and does not backtrack into it, so a character alone does not end between `\r` and `\n`.
+    if flags.dotAll && featureSet.dotAllMatchesCRLF then
+      IRNodeData.Disjunction(
+        IRNodeData.Sequence(chars(CharSet.single(0x0d)), chars(CharSet.single(0x0a))),
+        IRNodeData.Sequence(chars(universe), IRNodeData.Assert(IRAssertKind.NotBetweenCRLF))
+      )
+    else if flags.dotAll then chars(universe)
     else
       val terminators = flags.lineTerminators
       val set = complement(CharSet.of(terminators.chars.toSeq*))
@@ -680,6 +709,9 @@ private[build] final class IRCharResolver(
         if invert && flags.unicodeSets && mayContainStrings(inner) then
           throw new IRBuildingException("Negated character class may contain strings", item.loc)
         if invert then negate(inner, flags) else classItem(inner, flags)
+      // ICU's `[:name:]` is a property, the same as `\p{name}`.
+      case ClassItemData.ClassPOSIX(invert, name) if featureSet.hasPropertyClassPOSIX =>
+        property(name, None, invert, flags, item.loc, inClass = true)
       case ClassItemData.ClassPOSIX(invert, name) =>
         val set = posix(name, flags, item.loc)
         if invert then ClassSet(set.complement(universe)) else ClassSet(set)
@@ -976,7 +1008,7 @@ private[build] object IRCharResolver:
         case IRCaseEquivalenceKind.PythonRegex if asciiOnly || mode == UnitMode.Byte => Keyed(asciiFold, mode)
         case IRCaseEquivalenceKind.PythonRegex                                       => PythonRegex(mode)
         case IRCaseEquivalenceKind.Ruby if mode == UnitMode.Byte                     => Keyed(asciiFold, mode)
-        case IRCaseEquivalenceKind.Ruby                                      => Keyed(CaseMapping.SimpleFold, mode)
+        case IRCaseEquivalenceKind.Ruby | IRCaseEquivalenceKind.ICU          => Keyed(CaseMapping.SimpleFold, mode)
         case IRCaseEquivalenceKind.Perl if flags.charset == IRCharset.Locale => PerlLocale(mode)
         case IRCaseEquivalenceKind.Perl if perlNative                        => PerlNative(mode)
         case IRCaseEquivalenceKind.Perl if flags.caselessRestrict => PCRERestrict(CaseMapping.SimpleFold, mode)

@@ -554,3 +554,31 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   )
   check("(*FAIL)", "", PythonRegex())(Chars(CharSet.empty))
   check("a{e}", "", PythonRegex())(Unsupported(NodeData.Command(CommandKind.Fuzzy(NodeData.Literal('a'), "e"))))
+
+  // ICU's `\b` skips the characters of `Grapheme_Extend` and `Cf`, and `(?w)` makes it UAX #29's (ICU 79.1).
+  locally:
+    val marks = IRClassLookup.icuWordMarks
+    check("\\b", "", ICU)(Assert(IRAssertKind.MarkWordBoundary(marks.bases, marks)))
+    check("\\B", "", ICU)(Assert(IRAssertKind.NotMarkWordBoundary(marks.bases, marks)))
+    test("IRBuilder.build: ICU's word marks"):
+      assert(marks.marks.contains(0x00ad) && marks.marks.contains(0x0301) && marks.marks.contains(0x200d))
+      assert(marks.bases.contains('a') && marks.bases.contains('_') && !marks.bases.contains(0x200d))
+  check("\\b", "w", ICU)(Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.Boundary(None)))))
+  check("(?w:\\B)", "", ICU)(Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.NonBoundary(None)))))
+  check("^", "w", ICU)(Assert(IRAssertKind.TextBegin))
+  // ICU's look-behind tries the starts by the lengths in characters, where a literal under `i` may be its folding.
+  check("(?<=ab)", "", ICU)(
+    LookBehind(false, Sequence(char('a'), char('b')), Forward(Seq(IRLookBehindStartRange(2, 2))))
+  )
+  checkPattern("(?<=ß)", "i", ICU): pattern =>
+    val LookBehind(_, _, m) = pattern.node.data: @unchecked
+    assertEquals(m, Forward(Seq(IRLookBehindStartRange(0, 2))))
+  checkPattern("(?<=.\\p{L})", "s", ICU): pattern =>
+    val LookBehind(_, _, m) = pattern.node.data: @unchecked
+    assertEquals(m, Forward(Seq(IRLookBehindStartRange(2, 3))))
+  // ICU repeats a bounded repetition without checking an empty iteration.
+  test("IRBuilder.build: ICU's empty iterations"):
+    assertEquals(
+      build("a", "", ICU).emptyIteration,
+      IREmptyIterationSemantics(IREmptyIteration.ExitFromMin, IREmptyIteration.Ignore, false)
+    )

@@ -196,6 +196,9 @@ object IRBuilder:
     * Ruby (Onigmo) counts a character folded to several characters under `i` by the folding (e.g. `ß` as two), and a
     * class having such a character and another has a variable width (e.g. `[ßa]`, but `[ß]` is two). The nodes are
     * Ruby's escapes of the bytes of a character (e.g. `\xC3\x9F`), or one node otherwise.
+    *
+    * ICU's literal under `i` matches up to the characters of its full case folding, and literals in a row may match
+    * fewer characters than them (e.g. `ss` matches `ß`).
     */
   private def charWidth(
       table: CaptureTable,
@@ -253,6 +256,16 @@ object IRBuilder:
                     case _                                      =>
                       chars.rubyClassWidths(node, flags).fold(single(1))(ws => Width(ws.min, ws.max.toLong))
                 case _ => single(1)
+      case IRLookBehindRule.ICU =>
+        nodes =>
+          val node = nodes.head
+          val value = node.data match
+            case NodeData.Literal(value)                                 => Some(value)
+            case NodeData.Backslash(value: BackslashKind.BackslashValue) => Some(value.value)
+            case _                                                       => None
+          value
+            .filter(_ => table.charFlagsOf(node).exists(_.ignoreCase))
+            .fold(single(1))(v => Width(0, FullCaseFolding(v).length.toLong))
       case _ => nodes => single(nodes.size)
 
   /** Returns the flags with python-regex's global inline flags anywhere in the pattern: `b`, `e`, `p`, `r`, `V0` and
@@ -449,6 +462,9 @@ private[build] class IRBuilder(
 
   /** Whether python-regex's `w` (WORD) is on, which changes the word boundaries and the line terminators. */
   def isWordFlag: Boolean = featureSet.hasUnsupportedWordFlag && context.flagSet.word
+
+  /** Whether ICU's `w` (UWORD) is on, which makes `\b` and `\B` the word boundaries of UAX #29 with dictionaries. */
+  def isWordBoundaryFlag: Boolean = featureSet.hasUnsupportedWordBoundaryFlag && context.flagSet.word
 
   /** Builds a part, which is literal characters in a row, together (e.g. for multi-character case folding). */
   def buildPart(nodes: Seq[Node]): Seq[IRNode] =
@@ -682,7 +698,8 @@ private[build] class IRBuilder(
     chars.backReference(backReferences(NodeKey(node)), charFlags)
 
   def buildAssert(node: Node, kind: AssertKind): IRNodeData = kind match
-    case AssertKind.Boundary(_) | AssertKind.NonBoundary(_) | AssertKind.WordStart | AssertKind.WordEnd if isWordFlag =>
+    case AssertKind.Boundary(_) | AssertKind.NonBoundary(_) | AssertKind.WordStart | AssertKind.WordEnd
+        if isWordFlag || isWordBoundaryFlag =>
       IRNodeData.Unsupported(node.data)
     // python-regex's `\m` and `\M` are a boundary before and after a word character.
     case AssertKind.WordStart | AssertKind.WordEnd =>
@@ -711,6 +728,9 @@ private[build] class IRBuilder(
     case AssertKind.LowerEnd => IRNodeData.Assert(IRAssertKind.TextEnd)
     case AssertKind.UpperEnd =>
       if featureSet.upperEndIsTextEnd then IRNodeData.Assert(IRAssertKind.TextEnd)
+      // ICU's `d` (UNIX_LINES) changes `.`, `^` and `$`, but not `\Z`.
+      else if featureSet.upperEndIgnoresUnixLines then
+        IRNodeData.Assert(IRAssertKind.ChompTextEnd(featureSet.lineTerminators))
       else IRNodeData.Assert(IRAssertKind.ChompTextEnd(context.lineTerminators))
     // `\G` is the start of the search, and the checkers search from the start of the input.
     case AssertKind.Sticky                                              => IRNodeData.Assert(IRAssertKind.TextBegin)

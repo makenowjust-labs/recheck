@@ -40,6 +40,13 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
   check("\\Z", "D", PCRE)(Assert(ChompTextEnd(LT.LF)))
   check("\\Z", "", Java)(Assert(ChompTextEnd(LT.Java)))
 
+  // ICU's line terminators have VT and FF: `a$` matches `a\f`, and `(?m)^` matches only the empty string at the end.
+  check("^", "m", ICU)(Assert(LineBegin(LT.ICU, InputBegin)))
+  check("$", "", ICU)(Assert(ChompTextEnd(LT.ICU)))
+  check("$", "dm", ICU)(Assert(LineEnd(LT.LF)))
+  // ICU's `d` changes `$`, but not `\Z`: `(?d)a\Z` matches `a\f`.
+  check("$\\Z", "d", ICU)(Sequence(Assert(ChompTextEnd(LT.LF)), Assert(ChompTextEnd(LT.ICU))))
+
   // Java's `d` (UNIX_LINES): `(?d)a$` does not match `a\r`.
   check("$", "d", Java)(Assert(ChompTextEnd(LT.LF)))
   check("(?d)^(?-d)^", "m", Java)(
@@ -64,6 +71,7 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
       case DotNet | _: Python | _: PythonRegex => LineBegin(LT.LF, AfterTerminator)
       case Java                                => LineBegin(LT.Java, Never)
       case PCRE | _: Perl | _: Ruby            => LineBegin(LT.LF, InputBegin)
+      case ICU                                 => LineBegin(LT.ICU, InputBegin)
     Sequence(Assert(begin), Assert(if d == Ruby() then begin else TextBegin))
   )
   // `(?:(?m))^a` does not match `b\na`, but `(?:(?m)x|^)a` matches it.

@@ -90,8 +90,8 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
   private val charFlags = mutable.Map.empty[NodeKey, IRCharFlagSet]
 
   private val recordsCharFlags = featureSet.lookBehindRule match
-    case IRLookBehindRule.Perl | IRLookBehindRule.Ruby => true
-    case _                                             => false
+    case IRLookBehindRule.Perl | IRLookBehindRule.Ruby | IRLookBehindRule.ICU => true
+    case _                                                                    => false
 
   private var branchResetDepth: Int = 0
 
@@ -128,7 +128,7 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
     case NodeData.Command(kind)       => walkCommand(node, kind)
     case NodeData.Backslash(_: BackslashKind.EscapeBackReference | _: BackslashKind.EscapeCall) =>
       markSite(node)
-    case NodeData.Literal(_) | NodeData.Class(_, _) |
+    case NodeData.Literal(_) | NodeData.Class(_, _) | NodeData.Dot |
         NodeData.Backslash(_: BackslashKind.BackslashValue | _: BackslashKind.EscapeClass) if recordsCharFlags =>
       charFlags(NodeKey(node)) = context.charFlags
     case _ => ()
