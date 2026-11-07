@@ -7,7 +7,7 @@ import Select from '../form/Select';
 import TextArea from '../form/TextArea';
 import { formatBuild } from './builds';
 import styles from './Demo.module.css';
-import { DEFAULT_DIALECT, DIALECT_TITLES, dialectOf, paramsOf, selectValues } from './params';
+import { DEFAULT_DIALECT, DIALECT_TITLES, dialectOf, paramsOf, selectValues, titleOf } from './params';
 
 import type { Build } from './builds';
 import type { Param } from './params';
@@ -50,7 +50,7 @@ const DemoParams: React.FC<{ build: Build }> = ({ build }) => {
           .map((param) => (
             <div className="row margin-vert--sm" key={param.name}>
               <div className="col col--3">
-                <h4>{`${param.title}${param.type === 'duration' ? ' (ms)' : ''}`}</h4>
+                <h4>{`${titleOf(param, dialect)}${param.type === 'duration' ? ' (ms)' : ''}`}</h4>
               </div>
               <div className="col col--2 col--offset-1">
                 <ParamInput param={param} dialect={dialect} />

@@ -6,6 +6,7 @@ import {
   paramsOf,
   parseParams,
   selectValues,
+  titleOf,
 } from "./params";
 
 import type { Build } from "./builds";
@@ -170,6 +171,17 @@ describe("selectValues", () => {
       "fuzz",
       "automaton",
     ]);
+  });
+});
+
+describe("titleOf", () => {
+  test("gives the title of the dialect's setting", () => {
+    const param = (name: string) => params.find((p) => p.name === name)!;
+    expect(titleOf(param("dialectType"), "python")).toBe("Python Type");
+    expect(titleOf(param("dialectType"), "python-regex")).toBe(
+      "Python regex Type",
+    );
+    expect(titleOf(param("timeout"), "python-regex")).toBe("Timeout");
   });
 });
 
