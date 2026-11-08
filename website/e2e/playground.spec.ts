@@ -59,7 +59,7 @@ const open = async (page: Page, hash = ""): Promise<void> => {
 
 const input = (page: Page) => page.locator('textarea[name="input"]');
 const check = (page: Page) =>
-  page.getByRole("button", { name: "Check" }).click();
+  page.getByRole("button", { name: "Check", exact: true }).click();
 const resultTitles = (page: Page) =>
   page.locator(".card__header h3", { hasText: "Result" });
 const footers = (page: Page) => page.locator(".card__footer");
@@ -183,4 +183,37 @@ test("shows the parameters of the selected dialect", async ({ page }) => {
   await expect(select("dialect")).toHaveValue("perl");
   await expect(select("dialectUtf8")).toHaveValue("false");
   await expect(select("dialectSource")).toHaveValue("literal");
+});
+
+test("repairs a vulnerable result and records the repair in the permalink", async ({
+  page,
+}) => {
+  await open(page);
+  const version = page.getByLabel("recheck version");
+  const bundled = (await version.locator("option").allTextContents()).at(-1)!;
+  await version.selectOption(bundled);
+  await input(page).fill("/^(a|a)*$/");
+  await check(page);
+  await expect(page.locator(".badge", { hasText: "vulnerable" })).toBeVisible();
+
+  await page.getByLabel("Keep").selectOption("match-range");
+  await page.getByRole("button", { name: "Repair", exact: true }).click();
+  await expect(page.locator(".badge", { hasText: "repaired" })).toBeVisible();
+  await expect(page.locator(".badge", { hasText: "equivalent" })).toBeVisible();
+
+  // The permalink restores the repair.
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await expect(
+    page.locator(".card__header", { hasText: "Repair" }).locator(".badge"),
+  ).toHaveText("recorded");
+  await expect(page.locator(".badge", { hasText: "repaired" })).toBeVisible();
+
+  // The repaired regular expression is checked again.
+  await check(page);
+  await expect(page.getByLabel("Keep")).toHaveValue("match-range");
+  await page.getByRole("button", { name: "Repair", exact: true }).click();
+  await page.getByRole("button", { name: "Check it" }).click();
+  await expect(input(page)).not.toHaveValue("/^(a|a)*$/");
+  await expect(page.locator(".badge", { hasText: "safe" })).toBeVisible();
 });

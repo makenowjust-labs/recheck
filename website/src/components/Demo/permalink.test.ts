@@ -5,12 +5,13 @@ import {
   decode,
   encode,
   hotspotOf,
+  makeRepairSnapshot,
   makeSnapshot,
   sameRequest,
   summarize,
 } from "./permalink";
 
-import type { Diagnostics } from "recheck";
+import type { Diagnostics, Rx } from "recheck";
 import type { Build } from "./builds";
 import type { Snapshot } from "./permalink";
 
@@ -203,9 +204,88 @@ describe("makeSnapshot", () => {
   });
 });
 
+describe("makeRepairSnapshot", () => {
+  const rx = {
+    source: "^(a|a)*$",
+    flags: "",
+    dialect: { name: "javascript" },
+  } as const;
+
+  test("records only what the repair card shows", () => {
+    const repaired: Rx = {
+      ...rx,
+      unitMode: "utf16",
+      status: "repaired",
+      repaired: "^(a)*$",
+      complexity: { type: "linear", summary: "linear", isFuzz: false },
+      kept: [0, 1],
+      comparison: {
+        kind: "different",
+        input: "aa",
+        original: [
+          [0, 2],
+          [1, 2],
+        ],
+        repaired: null,
+      },
+    };
+    expect(makeRepairSnapshot("all", repaired, 34)).toEqual({
+      keep: "all",
+      result: {
+        status: "repaired",
+        repaired: "^(a)*$",
+        complexity: { type: "linear", summary: "linear" },
+        kept: [0, 1],
+        comparison: {
+          kind: "different",
+          input: "aa",
+          original: [
+            [0, 2],
+            [1, 2],
+          ],
+          repaired: null,
+        },
+      },
+      time: 34,
+    });
+  });
+
+  test("keeps the error only when there is one", () => {
+    const unknown = (error: Extract<Rx, { status: "unknown" }>["error"]) =>
+      makeRepairSnapshot("match", { ...rx, status: "unknown", error }, 5)
+        .result;
+    expect(unknown(null)).toEqual({ status: "unknown", error: null });
+    expect(unknown({ kind: "timeout" })).toEqual({
+      status: "unknown",
+      error: { kind: "timeout" },
+    });
+    expect(unknown({ kind: "unsupported", message: "recursion" })).toEqual({
+      status: "unknown",
+      error: { kind: "unsupported", message: "recursion" },
+    });
+    expect(
+      makeRepairSnapshot("named", { ...rx, status: "safe" }, 5).result,
+    ).toEqual({ status: "safe" });
+  });
+});
+
 describe("encode and decode", () => {
   test("round-trips a snapshot through the hash", () => {
-    for (const snapshot of [safe, vulnerable]) {
+    const repaired: Snapshot = {
+      ...vulnerable,
+      repair: {
+        keep: "match-range",
+        result: {
+          status: "repaired",
+          repaired: "^(a)*$",
+          complexity: { type: "linear", summary: "linear" },
+          kept: [0],
+          comparison: { kind: "equivalent" },
+        },
+        time: 34,
+      },
+    };
+    for (const snapshot of [safe, vulnerable, repaired]) {
       const hash = encode(snapshot);
       expect(hash).toMatch(/^r=[A-Za-z0-9+\-$]+$/);
       expect(decode(hash)).toEqual(snapshot);

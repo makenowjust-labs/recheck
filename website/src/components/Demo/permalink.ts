@@ -5,7 +5,7 @@ import {
 
 import { parseParams } from "./params";
 
-import type { Diagnostics, Hotspot, UpperBound } from "recheck";
+import type { Diagnostics, Hotspot, Match, Rx, UpperBound } from "recheck";
 import type { Build } from "./builds";
 import type { CheckParams } from "./params";
 
@@ -59,6 +59,35 @@ export type DiagnosticsSnapshot =
       upperBound?: UpperBoundSnapshot;
     };
 
+export type Keep = "all" | "named" | "match-range" | "match";
+
+// Only what the repair card shows is recorded, as for `DiagnosticsSnapshot`.
+export type RxSnapshot =
+  | { status: "safe" }
+  | {
+      status: "repaired";
+      repaired: string;
+      complexity: { type: string; summary: string };
+      kept: number[];
+      comparison:
+        | { kind: "equivalent" }
+        | { kind: "unknown" }
+        | {
+            kind: "different";
+            input: string | number[];
+            original: Match | null;
+            repaired: Match | null;
+          };
+    }
+  | { status: "unknown"; error: { kind: string; message?: string } | null };
+
+/** A repair of the vulnerable result of a snapshot. */
+export type RepairSnapshot = {
+  keep: Keep;
+  result: RxSnapshot;
+  time: number;
+};
+
 /** A result and everything needed to reproduce it, as stored in a permalink. */
 export type Snapshot = {
   v: 1;
@@ -68,6 +97,7 @@ export type Snapshot = {
   result: DiagnosticsSnapshot;
   time: number;
   date: string;
+  repair?: RepairSnapshot;
 };
 
 const PREFIX = "r=";
@@ -161,6 +191,41 @@ export const makeSnapshot = ({
   time,
   date,
 });
+
+export const makeRepairSnapshot = (
+  keep: Keep,
+  rx: Rx,
+  time: number,
+): RepairSnapshot => {
+  switch (rx.status) {
+    case "safe":
+      return { keep, result: { status: "safe" }, time };
+    case "repaired":
+      return {
+        keep,
+        result: {
+          status: "repaired",
+          repaired: rx.repaired,
+          complexity: {
+            type: rx.complexity.type,
+            summary: rx.complexity.summary,
+          },
+          kept: rx.kept,
+          comparison: rx.comparison,
+        },
+        time,
+      };
+    case "unknown": {
+      const error =
+        rx.error === null
+          ? null
+          : "message" in rx.error
+            ? { kind: rx.error.kind, message: rx.error.message }
+            : { kind: rx.error.kind };
+      return { keep, result: { status: "unknown", error }, time };
+    }
+  }
+};
 
 /** Whether the snapshot was recorded for the given input and the parameters of the build.
  *

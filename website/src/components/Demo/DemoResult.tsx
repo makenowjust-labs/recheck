@@ -14,7 +14,7 @@ const REPORTS_URL = 'https://github.com/makenowjust-labs/recheck/discussions/cat
 const REPORTS_EMAIL = 'make.just.on@gmail.com';
 const SPONSORS_URL = 'https://github.com/sponsors/makenowjust';
 
-const Row: React.FC<{ title: string; children?: React.ReactNode }> = ({ title, children }) => (
+export const Row: React.FC<{ title: string; children?: React.ReactNode }> = ({ title, children }) => (
   <div className="row">
     <div className="col col--3">
       <h4>{title}</h4>
@@ -23,13 +23,13 @@ const Row: React.FC<{ title: string; children?: React.ReactNode }> = ({ title, c
   </div>
 );
 
-const Badge: React.FC<{ kind: string; children: string }> = ({ kind, children }) => (
+export const Badge: React.FC<{ kind: string; children: string }> = ({ kind, children }) => (
   <p>
     <span className={`badge badge--${kind}`}>{children}</span>
   </p>
 );
 
-const CopyButton: React.FC<{ text: string }> = ({ text }) => {
+export const CopyButton: React.FC<{ text: string }> = ({ text }) => {
   const [copied, setCopied] = React.useState(false);
   const copy = async () => {
     await navigator.clipboard.writeText(text);
@@ -43,7 +43,7 @@ const CopyButton: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-const Loading: React.FC = () => (
+export const Loading: React.FC = () => (
   <div className="row">
     <div className="col col--12 text--center">
       <div className={styles.demoResultLoading} role="status" aria-label="Loading">
