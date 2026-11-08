@@ -125,3 +125,20 @@
   color: var(--ifm-color-emphasis-600);
   text-align: right;
 }
+
+.repairControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem 1rem;
+}
+
+.repairKeep {
+  flex: none;
+}
+
+.repairActions {
+  display: flex;
+  gap: 0.5rem;
+}

@@ -4,7 +4,9 @@ import { importModule } from "./importModule";
 
 import type { Build } from "./builds";
 
-export type Checker = Pick<typeof bundled, "check">;
+// The releases before 5.0.0 have no `repair`.
+export type Checker = Pick<typeof bundled, "check"> &
+  Partial<Pick<typeof bundled, "repair">>;
 
 const moduleUrl = (version: string): string =>
   `https://cdn.jsdelivr.net/npm/recheck@${version}/lib/browser.mjs`;

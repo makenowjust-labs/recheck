@@ -5,12 +5,13 @@ import { FormProvider, useForm } from 'react-hook-form';
 import { availableBuilds, findBuild, formatBuild, sameBuild } from './builds';
 import { loadChecker } from './checker';
 import DemoInput from './DemoInput';
+import DemoRepair from './DemoRepair';
 import DemoResult from './DemoResult';
 import { extract, formValues, parseParams } from './params';
-import { decode, encode, makeSnapshot, sameRequest, summarize } from './permalink';
+import { decode, encode, makeRepairSnapshot, makeSnapshot, sameRequest, summarize } from './permalink';
 
 import type { Diagnostics } from 'recheck';
-import type { InvalidInput, Snapshot } from './permalink';
+import type { InvalidInput, Keep, Snapshot } from './permalink';
 
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -26,6 +27,10 @@ const Demo: React.FC = () => {
   const [recorded, setRecorded] = React.useState<Snapshot | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const abortControllerRef = React.useRef<AbortController | null>(null);
+  // Whether the build of the current result has `repair`.
+  const [repairable, setRepairable] = React.useState(false);
+  const [repairing, setRepairing] = React.useState(false);
+  const repairControllerRef = React.useRef<AbortController | null>(null);
 
   const build = findBuild(builds, String(methods.watch('version'))) ?? defaultBuild;
 
@@ -34,11 +39,17 @@ const Demo: React.FC = () => {
     if (snapshot !== null) {
       setRecorded(snapshot);
       const recordedBuild = findBuild(builds, formatBuild(snapshot.build)) ?? defaultBuild;
-      methods.reset({ input: snapshot.input, ...formValues(snapshot.params), version: formatBuild(recordedBuild) });
+      methods.reset({
+        input: snapshot.input,
+        ...formValues(snapshot.params),
+        version: formatBuild(recordedBuild),
+        keep: snapshot.repair?.keep ?? 'all',
+      });
     }
   }, []);
 
   const check = methods.handleSubmit(async (values) => {
+    repairControllerRef.current?.abort();
     setRunning(true);
     setCurrent(null);
     setLog([]);
@@ -101,12 +112,59 @@ const Demo: React.FC = () => {
     });
     window.history.replaceState(null, '', `#${encode(snapshot)}`);
     setCurrent(snapshot);
+    setRepairable(checker.repair !== undefined);
     setRunning(false);
   });
 
   const cancel = React.useCallback(() => {
     abortControllerRef.current?.abort();
   }, []);
+
+  const repair = async () => {
+    if (current === null || current.result.status !== 'vulnerable') return;
+    const target = current;
+    const { source, flags } = current.result;
+    const keep = String(methods.getValues('keep') ?? 'all') as Keep;
+
+    let checker;
+    try {
+      checker = await loadChecker(target.build);
+    } catch (error) {
+      setLoadError(`Failed to load recheck ${formatBuild(target.build)}: ${error instanceof Error ? error.message : error}`);
+      return;
+    }
+    if (checker.repair === undefined) return;
+
+    setRepairing(true);
+    const controller = new AbortController();
+    repairControllerRef.current = controller;
+    const start = Date.now();
+    const rx = await checker.repair(source, flags, {
+      ...target.params,
+      logger: undefined,
+      keep,
+      signal: controller.signal,
+    });
+    repairControllerRef.current = null;
+    setRepairing(false);
+
+    // A check started meanwhile replaces the result that the repair is of.
+    const snapshot = { ...target, repair: makeRepairSnapshot(keep, rx, Date.now() - start) };
+    setCurrent((current) => {
+      if (current !== target) return current;
+      window.history.replaceState(null, '', `#${encode(snapshot)}`);
+      return snapshot;
+    });
+  };
+
+  const cancelRepair = React.useCallback(() => {
+    repairControllerRef.current?.abort();
+  }, []);
+
+  const checkInput = (input: string) => {
+    methods.setValue('input', input);
+    void check();
+  };
 
   const permalink = typeof window === 'undefined' ? null : window.location.href;
 
@@ -163,6 +221,17 @@ const Demo: React.FC = () => {
           </DemoResult>
         ) : null}
 
+        {!running && current !== null && current.result.status === 'vulnerable' && repairable ? (
+          <DemoRepair
+            running={repairing}
+            repair={current.repair ?? null}
+            flags={current.result.flags}
+            start={repair}
+            cancel={cancelRepair}
+            check={checkInput}
+          />
+        ) : null}
+
         {recorded !== null ? (
           <DemoResult
             recorded
@@ -173,6 +242,10 @@ const Demo: React.FC = () => {
             date={recorded.date}
             permalink={permalink}
           />
+        ) : null}
+
+        {recorded?.repair !== undefined && recorded.result.status === 'vulnerable' ? (
+          <DemoRepair recorded running={false} repair={recorded.repair} flags={recorded.result.flags} />
         ) : null}
       </div>
     </FormProvider>
