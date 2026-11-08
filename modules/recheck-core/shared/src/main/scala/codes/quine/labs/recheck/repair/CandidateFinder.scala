@@ -42,6 +42,11 @@ private[repair] final case class Candidate(
   *   - a repetition read at most once or exactly its minimum (e.g. `(a+)+` to `(a+)`, and `(\s*)*` to `(\s*)?`),
   *   - the characters of the earlier alternatives removed from a later one, or a later alternative removed if an
   *     earlier one is the same or covers it (e.g. `(?:\w|\d)` to `(?:\w)`),
+  *   - an alternative of a repetition removed if the earlier ones read each of its strings in turn (e.g. `(?:ab|abab)*`
+  *     to `(?:ab)*`),
+  *   - a repetition of the powers of a word `u` written with its least power `u^p` and the least power of each other
+  *     remainder modulo `p`, which read a string in one way (e.g. `(?:aa|aaa)*` to `(?:aa)*(?:aaa)?`, and `(aa|aaa)*`
+  *     to `(?:(?:aa)*(aa|aaa))?` with the capture of the last iteration),
   *   - for adjacent repetitions (possibly with an optional part between them), the characters of the first removed from
   *     the start of the next, or the minimum of one of them if the other reads its characters (e.g. `a*[ab]*` to
   *     `[ab]*`, `\s*,?\s*` to `\s*(?:,\s*)?`, and `\d+\.?\d+` to `\d+(?:\.\d+|\d)`),
@@ -235,6 +240,8 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
           candidates ++= delimitLazyLoop(n, child, q, following(n)).map(Candidate(_))
           candidates ++= reduceRepetition(n, child, q).map(Candidate(_))
           candidates ++= unrollRepetition(n, child, q)
+          candidates ++= removeRepeatedAlternatives(child, q).map(Candidate(_))
+          candidates ++= rewritePowers(n, child, q)
         case NodeData.Disjunction(alternatives) => candidates ++= trimAlternatives(n, alternatives).map(Candidate(_))
         case NodeData.Sequence(elements)        => candidates ++= separateAdjacent(items(elements)).map(Candidate(_))
         case _                                  => ()
@@ -346,9 +353,7 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
       .zip(earlierSets.drop(1))
       .flatMap:
         case ((alternative, i), earlier) =>
-          lazy val remove = alternatives.patch(i, Nil, 1) match
-            case Seq(rest) => edit(n -> Seq(rest))
-            case rest      => edit(n -> Seq(Node(NodeData.Disjunction(rest))))
+          lazy val remove = removeAlternative(n, alternatives, i)
           lazy val isRepeated =
             alternatives.take(i).exists(a => unblank(a).data.equalsWithoutLoc(unblank(alternative).data))
           if hasCapture(alternative) then None
@@ -359,6 +364,124 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
               if rest == set then None
               else if rest.isEmpty then Some(remove)
               else Some(edit(unblank(alternative) -> Seq(Node(ClassBuilder(rest, features, ir.mode)))))
+
+  private def removeAlternative(n: Node, alternatives: Seq[Node], i: Int): Node =
+    alternatives.patch(i, Nil, 1) match
+      case Seq(rest) => edit(n -> Seq(rest))
+      case rest      => edit(n -> Seq(Node(NodeData.Disjunction(rest))))
+
+  /** The sets that the node reads in turn, if it reads a fixed number of atoms. */
+  private def setWord(n: Node): Option[Seq[CharSet]] = n.data match
+    case NodeData.Sequence(ns) =>
+      items(ns).foldLeft(Option(Seq.empty[CharSet]))((word, item) => word.flatMap(w => setWord(item).map(w ++ _)))
+    case NodeData.Group(GroupKind.NonCapture, child)      => setWord(child)
+    case NodeData.Repeat(atom, Quantifier.Exact(k, _), _) => setOf(atom).map(Seq.fill(k)(_))
+    case _                                                => setOf(n).map(Seq(_))
+
+  private def isCapture(kind: GroupKind): Boolean = kind match
+    case GroupKind.IndexedCapture | _: GroupKind.NamedCapture | _: GroupKind.PNamedCapture => true
+    case _                                                                                 => false
+
+  /** The disjunction that the node is, out of the groups around it that do not capture or capture. */
+  private def disjunctionIn(n: Node): Option[Node] = unblank(n).data match
+    case NodeData.Disjunction(_)                                                        => Some(unblank(n))
+    case NodeData.Group(kind, child) if kind == GroupKind.NonCapture || isCapture(kind) => disjunctionIn(child)
+    case _                                                                              => None
+
+  /** Tests whether each string of the sets of `word` is a concatenation of strings of the sets of `words`. */
+  private def readsInTurn(word: Seq[CharSet], words: Seq[Seq[CharSet]]): Boolean =
+    // The sets split into disjoint pieces, so each piece is in a set or out of it.
+    val pieces = (word ++ words.flatten).foldLeft(Seq.empty[CharSet]): (pieces, set) =>
+      val rest = pieces.foldLeft(set)(_ diff _)
+      pieces.flatMap(p => Seq(p.intersect(set), p.diff(set))).filter(_.nonEmpty) ++ Option.when(rest.nonEmpty)(rest)
+
+    // A state is the positions in `words` after the strings read so far, where `None` is the end of a word.
+    def step(state: Set[Option[(Int, Int)]], piece: CharSet): Set[Option[(Int, Int)]] =
+      val starts = if state.contains(None) then words.indices.map(k => (k, 0)) else Seq.empty
+      (state.flatten ++ starts).collect:
+        case (k, j) if piece.subsetOf(words(k)(j)) => Option.when(j + 1 < words(k).size)((k, j + 1))
+
+    val states = word.foldLeft(Set(Set(Option.empty[(Int, Int)]))): (states, set) =>
+      for state <- states; piece <- pieces.filter(_.subsetOf(set)) yield step(state, piece)
+    states.forall(_.contains(None))
+
+  /** An alternative of a repetition removed if the earlier ones read each of its strings in turn (e.g. `(?:ab|abab)*`
+    * to `(?:ab)*`).
+    */
+  private def removeRepeatedAlternatives(child: Node, q: Quantifier): Seq[Node] =
+    if q.strategy == BacktrackStrategy.Possessive then Seq.empty
+    else
+      for
+        disjunction <- disjunctionIn(child).toSeq
+        alternatives = disjunction.data match
+          case NodeData.Disjunction(ns) => ns
+          case _                        => Seq.empty
+        words = alternatives.map(a => setWord(unblank(a)).filter(_.nonEmpty))
+        i <- alternatives.indices.drop(1)
+        word <- words(i)
+        if !hasCapture(alternatives(i)) && readsInTurn(word, words.take(i).flatten)
+      yield removeAlternative(disjunction, alternatives, i)
+
+  /** A repetition of the powers of a word `u` written with its least power `u^p` and the least power of each other
+    * remainder modulo `p`, as concatenations of the alternatives, which read a string in one way (e.g. `(?:aa|aaa)*` to
+    * `(?:aa)*(?:aaa)?`). A kept capture of the alternatives captures the last iteration with the repetition of `u^p`
+    * before it (e.g. `(aa|aaa)*` to `(?:(?:aa)*(aa|aaa))?`).
+    */
+  private def rewritePowers(n: Node, child: Node, q: Quantifier): Option[Candidate] =
+    val (body, outerRemoved) = strip(child)
+    val (capture, inner, removedCaptures) = body.data match
+      case NodeData.Group(kind, c) if isCapture(kind) =>
+        val (stripped, innerRemoved) = strip(c)
+        (Some(kind), stripped, outerRemoved ++ innerRemoved)
+      case _ => (None, body, outerRemoved)
+    val alternatives = unblank(inner).data match
+      case NodeData.Disjunction(ns) if !ns.exists(hasCapture) => ns.map(unblank)
+      case _                                                  => Seq.empty
+    val words = alternatives.flatMap(a => setWord(a).filter(_.nonEmpty))
+    val unit = Option
+      .when(alternatives.size >= 2 && words.size == alternatives.size && q.strategy == BacktrackStrategy.Greedy):
+        val length = words.map(_.size).reduce((a, b) => BigInt(a).gcd(BigInt(b)).toInt)
+        val shortest = words.minBy(_.size)
+        (1 to length)
+          .filter(length % _ == 0)
+          .map(shortest.take)
+          .find(u => words.forall(w => w == Seq.fill(w.size / u.size)(u).flatten))
+      .flatten
+    for
+      u <- unit
+      m <- min(q)
+      if m <= 1
+    yield
+      val powers = words.map(_.size / u.size)
+      val p = powers.min
+      // The alternatives in turn of the least power with each remainder modulo `p`.
+      val least = Array.fill(p)(Option.empty[Seq[Int]])
+      least(0) = Some(Seq.empty)
+      var changed = true
+      while changed do
+        changed = false
+        for r <- 0 until p; path <- least(r); k <- powers.indices do
+          val next = path :+ k
+          val r1 = next.map(powers).sum % p
+          if least(r1).forall(_.map(powers).sum > next.map(powers).sum) then
+            least(r1) = Some(next)
+            changed = true
+      val first = Seq(powers.indexOf(p))
+      val rest = least.toSeq.drop(1).flatten.sortBy(_.map(powers).sum)
+      def choice(paths: Seq[Seq[Int]]): Node = paths.map(path => sequence(path.map(alternatives))) match
+        case Seq(n) => n
+        case ns     => Node(NodeData.Disjunction(ns))
+      def grouped(n: Node): Node = if isAtom(n) then n else group(n)
+      val loop = repeat(grouped(alternatives(first.head)), Quantifier.Star(BacktrackStrategy.Greedy))
+      val replacement = (capture, m) match
+        case (None, 0) if rest.isEmpty => Seq(loop)
+        case (None, 0)       => Seq(loop, repeat(grouped(choice(rest)), Quantifier.Question(BacktrackStrategy.Greedy)))
+        case (None, _)       => Seq(loop, grouped(choice(first +: rest)))
+        case (Some(kind), _) =>
+          val last = Node(NodeData.Group(kind, choice(first +: rest)))
+          if m == 0 then Seq(repeat(group(loop, last), Quantifier.Question(BacktrackStrategy.Greedy)))
+          else Seq(loop, last)
+      Candidate(edit(n -> replacement), removedCaptures)
 
   private def separateAdjacent(elements: Seq[Node]): Seq[Node] =
     elements.indices.flatMap: i =>

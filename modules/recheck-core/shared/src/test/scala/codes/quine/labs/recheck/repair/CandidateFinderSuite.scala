@@ -76,6 +76,28 @@ class CandidateFinderSuite extends munit.FunSuite:
     assertEquals(edited("(?:a|(?<x>a))"), Seq.empty)
     assertEquals(edited("(?<y>a)(?:a|(?<x-y>a))", Dialect.DotNet), Seq.empty)
 
+  test("CandidateFinder#find: alternatives of repetitions read by the earlier ones in turn"):
+    assert(clue(edited("(?:ab|abab)*")).contains("(?:ab)*"))
+    assert(clue(edited("(ab|abab)+")).contains("(ab)+"))
+    assert(clue(edited("(?:a|b|ab)*")).contains("(?:a|b)*"))
+    assert(clue(edited("(?:a|b|[ab]{2})*")).contains("(?:a|b)*"))
+    // `[ab]` reads `b`, which `a` does not.
+    assert(!edited("(?:a|[ab]a)*").contains("(?:a)*"))
+    assert(!edited("(?:ab|ba)*").contains("(?:ab)*"))
+    assert(!edited("(?:a|(aa))*").contains("(?:a)*"))
+
+  test("CandidateFinder#find: repetitions of the powers of a word"):
+    assert(clue(edited("(?:aa|aaa)*")).contains("(?:aa)*(?:aaa)?"))
+    assert(clue(edited("(?:aaa|aaaaa)*")).contains("(?:aaa)*(?:aaaaa|aaaaaaaaaa)?"))
+    assert(clue(edited("(?:\\d{2}|\\d{3})+")).contains("(?:\\d{2})*(?:\\d{2}|\\d{3})"))
+    assert(clue(edited("(?:abab|ab)*")).contains("(?:ab)*"))
+    // A kept capture captures the last iteration, and one not kept is removed.
+    assert(clue(edited("(aa|aaa)*")).contains("(?:(?:aa)*(aa|aaa))?"))
+    assert(clue(edited("(aa|aaa)+")).contains("(?:aa)*(aa|aaa)"))
+    assert(clue(find("(aa|aaa)*", kept = Some(Set(0)))).contains(("(?:aa)*(?:aaa)?", Seq(1), false)))
+    assert(!edited("(?:aa|ab)*").exists(_.startsWith("(?:aa)*")))
+    assert(!edited("(?:aa|aaa)*?").exists(_.startsWith("(?:aa)*")))
+
   test("CandidateFinder#find: adjacent repetitions"):
     assert(clue(edited("a*[ab]*")).containsSlice(Seq("[ab]*", "a*(?:b[ab]*)?")))
     assert(clue(edited("\\d+\\d+")).contains("\\d+\\d"))

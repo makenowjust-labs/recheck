@@ -49,8 +49,17 @@ class RepairSuite extends munit.FunSuite:
     assertEquals(search("^(?:a+)+$", Dialect.Java), repaired("^(?:a)+$", Dialect.Java))
 
   test("Repair.search: alternatives"):
-    assertEquals(search("^(?:a|a)*$"), repaired("^(?:a)*$"))
+    assertEquals(search("^(?:a|a)*$"), repaired("^a*$"))
     assertEquals(search("^(?:\\w|\\d)+$"), repaired("^(?:\\w)+$"))
+    assertEquals(search("^(ab|abab)*$"), repaired("^(ab)*$"))
+    assertEquals(search("^(?:a|b|ab)*$"), repaired("^(?:a|b)*$"))
+
+  test("Repair.search: powers of a word"):
+    assertEquals(search("^(aa|aaa)*$"), repaired("^(?:(?:aa)*(aa|aaa))?$"))
+    assertEquals(
+      search("^(aa|aaa)*$", captures = Some(Seq(0))),
+      repaired("^(?:aa)*(?:aaa)?$", captures = Some(Seq(0)))
+    )
 
   test("Repair.search: adjacent repetitions"):
     assertEquals(search("^\\s*\\s*$"), repaired("^\\s*$"))
