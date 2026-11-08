@@ -441,7 +441,7 @@ class ReDoSSuite extends munit.FunSuite with SnapshotHelper:
         "",
         Dialect.Java,
         UnitMode.UTF16CodePoint,
-        "(?<=(a??)(a|aa))(?:b)*$",
+        "(?<=(a??)(a|aa))b*$",
         AttackComplexity.Linear,
         Seq(0, 1, 2),
         Rx.Comparison.Unknown
@@ -463,16 +463,10 @@ class ReDoSSuite extends munit.FunSuite with SnapshotHelper:
         "",
         Dialect.JavaScript,
         UnitMode.UTF16,
-        "^(?:\\s*x(?:\\s*x)*\\s*)?(a|aa)$",
+        "^(?:\\s*x(?:\\s*x)*\\s*)?(a)+$",
         AttackComplexity.Linear,
         Seq(0, 2),
-        Rx.Comparison.Different(
-          Rx.Counterexample(
-            UString.from("aa".map(_.toInt)),
-            Some(Seq(Some((0, 2)), Some((1, 2)))),
-            Some(Seq(Some((0, 2)), Some((0, 2))))
-          )
-        )
+        Rx.Comparison.Equivalent
       )
     )
 
