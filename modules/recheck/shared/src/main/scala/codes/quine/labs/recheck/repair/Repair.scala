@@ -59,6 +59,9 @@ private[recheck] object Repair:
   /** The edits that a round compares at most by the inputs they differ on, without an equivalent one. */
   val MaxDifferent = 8
 
+  /** The equivalent edits keeping the score that a round tries another edit after at most, without a better edit. */
+  val MaxNeutral = 4
+
   /** How many times smaller the generations of the fuzz checker are while the repair scores the edits. */
   val FuzzScale = 4
 
@@ -68,9 +71,11 @@ private[recheck] object Repair:
     * The checker of `params` checks the original and the result as [[ReDoS.check]] does, so a safe result is what it
     * finds safe, and it scores the edits with the generations of the fuzz checker [[FuzzScale]] times smaller. Each
     * round takes the best edit by the complexity after it, preferring an equivalent one, or else the one that differs
-    * on the longest input among the first [[MaxDifferent]] best ones. It stops when the pattern is safe, no edit makes
-    * it better, or after [[MaxRounds]] rounds. An edit may remove a capture not kept, which renumbers the later ones.
-    * It throws [[UnsupportedException]] when the checker does not support the original pattern.
+    * on the longest input among the first [[MaxDifferent]] best ones. Without a better edit, it tries another edit
+    * after each of the first [[MaxNeutral]] equivalent edits keeping the score, and takes the two if they are better
+    * and equivalent. It stops when the pattern is safe, no edit makes it better, or after [[MaxRounds]] rounds. An edit
+    * may remove a capture not kept, which renumbers the later ones. It throws [[UnsupportedException]] when the checker
+    * does not support the original pattern.
     *
     * When the time runs out after a round, the result is the pattern of the rounds so far, which is equivalent if every
     * edit is, and else compared only if the time allows, and its complexity is the score of the edit if the time does
@@ -105,8 +110,13 @@ private[recheck] object Repair:
           throw new UnexpectedException(s"an edit makes an invalid pattern /$source/: ${ex.getMessage}")
         // $COVERAGE-ON$
 
-    // Returns the best edit of the round, with its comparison.
-    def step(current: Pattern, indices: Seq[Int], score: Score): Option[(Pattern, Seq[Int], Score, Comparison)] =
+    // Returns the best edit of the round, with its comparison, which may be two equivalent edits unless `isLast`.
+    def step(
+        current: Pattern,
+        indices: Seq[Int],
+        score: Score,
+        isLast: Boolean = false
+    ): Option[(Pattern, Seq[Int], Score, Comparison)] =
       var scoring = 0L
       var scored = 0
       var comparing = 0L
@@ -130,7 +140,7 @@ private[recheck] object Repair:
           parseEdited(current.print(candidate.node)).map: next =>
             (next, indices.map(i => i - candidate.removedCaptures.count(_ < i)), candidate)
         .sortBy((next, _, candidate) => (candidate.isFallback, growth(next)))
-      val improved = LazyList
+      val scoredEdits = LazyList
         .from(edits)
         .flatMap: (next, nextIndices, candidate) =>
           val started = System.nanoTime()
@@ -139,7 +149,8 @@ private[recheck] object Repair:
             finally
               scoring += System.nanoTime() - started
               scored += 1
-          nextScore.filter(_ > score).map((next, nextIndices, _, candidate))
+          nextScore.map((next, nextIndices, _, candidate))
+      val improved = scoredEdits.filter(_._3 > score)
       val chosen = improved
         .find((next, nextIndices, nextScore, _) =>
           nextScore.isSafe && compareOnce(next, nextIndices) == Comparison.Equivalent
@@ -182,7 +193,23 @@ private[recheck] object Repair:
       ctx.log:
         s"""|repair: ${edits.size} candidates, $scored scored in ${scoring / 1000000} ms,
             |  ${comparisons.size} compared in ${comparing / 1000000} ms""".stripMargin
-      chosen
+
+      // An equivalent edit keeping the score may make way for another, as the two together repair
+      // `; (SAMSUNG-)([A-Za-z0-9\-]+).* Build/` though neither does alone. The time running out there ends the search.
+      def twoEdits: Option[(Pattern, Seq[Int], Score, Comparison)] =
+        try
+          scoredEdits
+            .filter: (next, nextIndices, nextScore, _) =>
+              !(nextScore > score) && !(score > nextScore) && compareOnce(next, nextIndices) == Comparison.Equivalent
+            .take(MaxNeutral)
+            .flatMap: (next, nextIndices, nextScore, _) =>
+              ctx.log(s"repair: two edits from /${next.source}/")
+              step(next, nextIndices, nextScore, isLast = true).filter: (_, _, twiceScore, comparison) =>
+                twiceScore > score && comparison == Comparison.Equivalent
+            .headOption
+        catch case _: TimeoutException => None
+
+      chosen.orElse(if isLast then None else twoEdits)
 
     // `indices` are the current indices of `captures`, and `isEquivalent` tells whether every edit so far is.
     def loop(

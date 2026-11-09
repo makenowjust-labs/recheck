@@ -131,6 +131,23 @@ class RepairSuite extends munit.FunSuite:
   test("Repair.search: not found"):
     assertEquals(search("^[^*]*(?:\\*(?!/)[^*]*)*@[^*]*(?:\\*(?!/)[^*]*)*$"), Result.NotFound)
 
+  test("Repair.search: two edits"):
+    // Neither restricting the starts nor reading one character in the capture makes it better alone.
+    assertEquals(
+      search("; (SAMSUNG-)([A-Za-z0-9\\-]+).* Build/", Dialect.Java, captures = Some(Seq.empty)),
+      repaired(
+        "(?<!.)(?:(?!; SAMSUNG-[A-Za-z0-9\\-]).)*; (SAMSUNG-)([A-Za-z0-9\\-]).* Build/",
+        Dialect.Java,
+        captures = Some(Seq.empty)
+      )
+    )
+
+  test("Repair.search: starts of searches after alternatives"):
+    assertEquals(
+      search("(?:MSIE|XBMC).*\\b(Xbox)\\b", Dialect.Java, captures = Some(Seq.empty)),
+      repaired("(?<!.)(?:(?!MSIE|XBMC).)*(?:MSIE|XBMC).*\\b(Xbox)\\b", Dialect.Java, captures = Some(Seq.empty))
+    )
+
   test("Repair.search: large bounded repetitions"):
     // The automaton checker finds them constant, but `ReDoS.check` with the auto checker finds them vulnerable.
     assertEquals(search("^(a|a){50}$"), repaired("^(a){50}$"))
