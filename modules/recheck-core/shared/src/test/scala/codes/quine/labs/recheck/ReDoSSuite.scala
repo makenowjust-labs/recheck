@@ -167,6 +167,20 @@ class ReDoSSuite extends munit.FunSuite:
     assertEquals(kept(Keep.Match), Seq.empty)
     assertEquals(kept(Keep.Captures(Seq(1, "x"))), Seq(0, 1, 2))
 
+  test("ReDoS.repair: repairTimeout"):
+    // The repair runs out of `repairTimeout`, not `timeout`.
+    assertEquals(
+      ReDoS.repair("^(a|a)*$", "", Parameters(timeout = Duration.Inf, repairTimeout = Duration.Zero)),
+      Rx.Unknown("^(a|a)*$", "", Dialect.JavaScript, Some(Diagnostics.ErrorKind.Timeout))
+    )
+    assertEquals(
+      ReDoS.repair("^(a|a)*$", "", Parameters(timeout = Duration.Zero)) match
+        case r: Rx.Repaired => r.repaired
+        case rx             => fail(s"not repaired: $rx")
+      ,
+      "^(a)*$"
+    )
+
   test("ReDoS.repair: keeping less"):
     // JavaScript has no `\K`, so the repair that moves the start of the match keeps only whether it matches.
     assertEquals(

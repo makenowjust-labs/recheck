@@ -90,7 +90,8 @@ object ReDoS:
     * checker of `params.checker` finds as [[check]] does, preferring the edits that keep the matches, until it is safe
     * or no edit makes it better. The result has the complexity of the repaired RegExp, and the shortest input on which
     * the matches differ if they do. Without a safe repair keeping what `keep` tells, a safe repair keeping less (the
-    * range of the match, and then only whether it matches) is the result, whose `kept` tells what it keeps.
+    * range of the match, and then only whether it matches) is the result, whose `kept` tells what it keeps. The time is
+    * limited by `params.repairTimeout`.
     */
   def repair(
       source: String,
@@ -99,7 +100,7 @@ object ReDoS:
       keep: Keep = Keep.All,
       token: Option[CancellationToken] = None
   ): Rx =
-    given ctx: Context = Context(params.timeout, token, params.logger)
+    given ctx: Context = Context(params.repairTimeout, token, params.logger)
     val dialect = params.dialect
     try
       val original = Repair.Pattern.parse(source, flags, dialect)

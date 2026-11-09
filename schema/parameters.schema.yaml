@@ -386,6 +386,22 @@ properties:
     x-cli: "random-seed"
     x-since: "4.0.0"
 
+  repairTimeout:
+    title: "Repair Timeout"
+    description: |-
+      The upper limit of repairing time, instead of `timeout`.
+
+      When it is exceeded before the repair finds a better RegExp, the result is `unknown` with the `timeout` error, and after it, the result is the best one so far (see [Repair](/docs/usage/repair)).
+      It has no limit if it is infinite in Scala or `null` in TypeScript.
+      In TypeScript, it is in milliseconds.
+    type: [integer, "null"]
+    default: 30000
+    x-unit: "milliseconds"
+    x-scala-type: "Duration"
+    x-cli: "repair-timeout"
+    x-exclude: ["eslint-plugin"]
+    x-since: "5.0.0"
+
   runtimeAttackLimit:
     title: "Runtime Attack Limit"
     description: |-

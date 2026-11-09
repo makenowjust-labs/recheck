@@ -15,7 +15,10 @@ describe("defaults", () => {
 describe("propertiesFor", () => {
   test("leaves out the parameters that the target excludes, in the schema order", () => {
     expect(propertiesFor("eslint-plugin").map(([name]) => name)).toEqual(
-      names.filter((name) => name !== "dialect" && name !== "logger"),
+      names.filter(
+        (name) =>
+          name !== "dialect" && name !== "logger" && name !== "repairTimeout",
+      ),
     );
     expect(propertiesFor("playground").map(([name]) => name)).toEqual(
       names.filter((name) => name !== "logger"),
