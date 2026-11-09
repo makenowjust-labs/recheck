@@ -59,19 +59,30 @@ private[recheck] object Repair:
   /** The edits that a round compares at most by the inputs they differ on, without an equivalent one. */
   val MaxDifferent = 8
 
+  /** How many times smaller the generations of the fuzz checker are while the repair scores the edits. */
+  val FuzzScale = 4
+
   /** Searches for a safe pattern by edits around the hotspots, preferring the ones that keep the extraction, where
     * `captures` are the indices of the captures to keep and `0` is the whole match.
     *
-    * The checker of `params` checks the patterns as [[ReDoS.check]] does, so a safe result is what it finds safe. Each
+    * The checker of `params` checks the original and the result as [[ReDoS.check]] does, so a safe result is what it
+    * finds safe, and it scores the edits with the generations of the fuzz checker [[FuzzScale]] times smaller. Each
     * round takes the best edit by the complexity after it, preferring an equivalent one, or else the one that differs
     * on the longest input among the first [[MaxDifferent]] best ones. It stops when the pattern is safe, no edit makes
     * it better, or after [[MaxRounds]] rounds. An edit may remove a capture not kept, which renumbers the later ones.
     * It throws [[UnsupportedException]] when the checker does not support the original pattern.
     *
     * When the time runs out after a round, the result is the pattern of the rounds so far, which is equivalent if every
-    * edit is, and else compared only if the time allows.
+    * edit is, and else compared only if the time allows, and its complexity is the score of the edit if the time does
+    * not allow checking it.
     */
   def search(original: Pattern, captures: Seq[Int], params: Parameters)(using ctx: Context): Result =
+    val smallerFuzz = params.copy(
+      maxIteration = (params.maxIteration / FuzzScale).max(1),
+      maxInitialGenerationSize = (params.maxInitialGenerationSize / FuzzScale).max(1),
+      maxGenerationSize = (params.maxGenerationSize / FuzzScale).max(1)
+    )
+
     def compare(a: Pattern, aIndices: Seq[Int], b: Pattern, bIndices: Seq[Int]): Comparison =
       try
         Equivalence
@@ -124,7 +135,7 @@ private[recheck] object Repair:
         .flatMap: (next, nextIndices, candidate) =>
           val started = System.nanoTime()
           val nextScore =
-            try Score.of(next.ir, params)
+            try Score.of(next.ir, smallerFuzz)
             finally
               scoring += System.nanoTime() - started
               scored += 1
@@ -205,8 +216,16 @@ private[recheck] object Repair:
             else
               ctx.log("repair: comparison with the original")
               try compare(original, captures, fixed, indices)
-              catch case _: TimeoutException => Comparison.Unknown
-          Result.Repaired(fixed, indices, fixedScore.complexity, comparison)
+              catch
+                case _: TimeoutException => Comparison.Unknown
+          // The fuzz checker of the scoring runs smaller generations, so the result is checked as `ReDoS.check` does.
+          val checked =
+            if !fixedScore.complexity.isFuzz then fixedScore
+            else
+              ctx.log("repair: check of the result")
+              try Score.of(fixed.ir, params).getOrElse(fixedScore)
+              catch case _: TimeoutException => fixedScore
+          Result.Repaired(fixed, indices, checked.complexity, comparison)
 
   /** Counts the repetitions without a maximum in the syntax tree. */
   private def unboundedRepeats(node: Node): Int =
