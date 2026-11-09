@@ -131,13 +131,18 @@ class RepairSuite extends munit.FunSuite:
   test("Repair.search: not found"):
     assertEquals(search("^[^*]*(?:\\*(?!/)[^*]*)*@[^*]*(?:\\*(?!/)[^*]*)*$"), Result.NotFound)
 
-  test("Repair.search: upper bounds"):
-    // Without the expansion, the exact complexity of a back-reference is unknown, but the linear upper bound of the
-    // repair shows it safe.
+  test("Repair.search: large bounded repetitions"):
+    // The automaton checker finds them constant, but `ReDoS.check` with the auto checker finds them vulnerable.
+    assertEquals(search("^(a|a){50}$"), repaired("^(a){50}$"))
+    assertEquals(search("^(\\w+\\s?){1,50}$"), repaired("^(\\w+(?!\\w)\\s?){1,50}$"))
+
+  test("Repair.search: back-references"):
+    // Without the expansion, the fuzz checker checks a back-reference, while the comparison of the repairs still
+    // expands it.
     val bound = Parameters(maxBackReferenceStrings = 0)
-    assertEquals(search("^(a|a)\\1*$", params = bound), repaired("^(a)\\1*$"))
-    // The repair lowers the upper bound to quadratic, which does not show the pattern better.
-    assertEquals(search("^(?:a|a)*(x)\\1*\\1*$", params = bound), Result.NotFound)
+    assertEquals(search("^(a|a)\\1*$", params = bound), Result.Safe)
+    assertEquals(search("^(?:a|a)*(x)\\1$", params = bound), repaired("^a*(x)\\1$"))
+    assertEquals(search("^(?:a|a)*(x)\\1*\\1*$", params = bound), repaired("^a*(x)\\1?\\1*$"))
 
   test("Repair.search: repetitions up to the first of the items after them"):
     assertEquals(search("^.*Mobile.*AspiegelBot$"), repaired("^(?:(?!Mobile).)*Mobile.*AspiegelBot$"))
@@ -189,7 +194,7 @@ class RepairSuite extends munit.FunSuite:
     intercept[TimeoutException](search("^(a|a)*$")(using outOfTimeAt("repair: round 0")))
 
   test("Repair.search: unsupported"):
-    interceptMessage[UnsupportedException]("the automaton checker cannot check the pattern"):
+    interceptMessage[UnsupportedException]("the checker cannot check the pattern"):
       search("^(a|a)*(?R)?$", Dialect.PCRE)
     // Unrolling the repetition nests the groups deeper than the parser supports, so another edit repairs it.
     val deep = "^" + "(?:" * 149 + "(?:\\w+\\s?)*" + ")" * 149 + "$"

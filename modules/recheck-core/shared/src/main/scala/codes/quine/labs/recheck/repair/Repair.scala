@@ -3,7 +3,7 @@ package repair
 
 import scala.collection.mutable
 
-import codes.quine.labs.recheck.automaton.Complexity
+import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.Parameters
@@ -12,13 +12,11 @@ import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.Hotspot
-import codes.quine.labs.recheck.fuzz.FuzzChecker
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.SourceLocation
-import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.ir.IRPattern
@@ -64,15 +62,11 @@ private[recheck] object Repair:
   /** Searches for a safe pattern by edits around the hotspots, preferring the ones that keep the extraction, where
     * `captures` are the indices of the captures to keep and `0` is the whole match.
     *
-    * The automaton checker checks the patterns with `params` (see [[ReDoS.computeAutomatonComplexities]]). Each round
-    * takes the best edit by the complexity after it, preferring an equivalent one, or else the one that differs on the
-    * longest input among the first [[MaxDifferent]] best ones. It stops when the pattern is safe, no edit makes it
-    * better, or after [[MaxRounds]] rounds. An edit may remove a capture not kept, which renumbers the later ones.
-    *
-    * When the automaton checker gives up on the exact complexities (e.g. with a back-reference), the upper bound of the
-    * fuzz checker scores the pattern. A result scored only by an upper bound that is not linear is not reported, since
-    * the bound does not show it better, but a linear one shows it safe. It throws [[UnsupportedException]] when there
-    * is neither for the original pattern.
+    * The checker of `params` checks the patterns as [[ReDoS.check]] does, so a safe result is what it finds safe. Each
+    * round takes the best edit by the complexity after it, preferring an equivalent one, or else the one that differs
+    * on the longest input among the first [[MaxDifferent]] best ones. It stops when the pattern is safe, no edit makes
+    * it better, or after [[MaxRounds]] rounds. An edit may remove a capture not kept, which renumbers the later ones.
+    * It throws [[UnsupportedException]] when the checker does not support the original pattern.
     *
     * When the time runs out after a round, the result is the pattern of the rounds so far, which is equivalent if every
     * edit is, and else compared only if the time allows.
@@ -137,7 +131,7 @@ private[recheck] object Repair:
           nextScore.filter(_ > score).map((next, nextIndices, _, candidate))
       val chosen = improved
         .find((next, nextIndices, nextScore, _) =>
-          nextScore.isSafe && !nextScore.isUpperBound && compareOnce(next, nextIndices) == Comparison.Equivalent
+          nextScore.isSafe && compareOnce(next, nextIndices) == Comparison.Equivalent
         )
         .map((next, nextIndices, nextScore, _) => (next, nextIndices, nextScore, Comparison.Equivalent))
         .orElse:
@@ -145,7 +139,13 @@ private[recheck] object Repair:
             .from(
               // The rank is negated as a `Long`, since `-Int.MinValue` (the rank of an exponential one) overflows.
               improved.sortBy: (next, _, nextScore, candidate) =>
-                (-nextScore.rank.toLong, nextScore.count, nextScore.isUpperBound, candidate.isFallback, growth(next))
+                (
+                  -nextScore.rank.toLong,
+                  nextScore.count,
+                  nextScore.complexity.isFuzz,
+                  candidate.isFallback,
+                  growth(next)
+                )
             )
             .map((next, nextIndices, nextScore, _) => (next, nextIndices, nextScore, compareOnce(next, nextIndices)))
             // A different edit is taken only if it matches the same strings, since it differs only in what it extracts,
@@ -194,12 +194,11 @@ private[recheck] object Repair:
           case None => (current, indices, score, isEquivalent)
 
     Score.of(original.ir, params) match
-      case None => throw new UnsupportedException("the automaton checker cannot check the pattern")
+      case None                        => throw new UnsupportedException("the checker cannot check the pattern")
       case Some(score) if score.isSafe => Result.Safe
       case Some(score)                 =>
         val (fixed, indices, fixedScore, isEquivalent) = loop(original, captures, score, 0, true)
-        // An upper bound that is not linear does not show that the result is better.
-        if (fixed eq original) || (fixedScore.isUpperBound && !fixedScore.isSafe) then Result.NotFound
+        if fixed eq original then Result.NotFound
         else
           val comparison =
             if isEquivalent then Comparison.Equivalent
@@ -252,50 +251,41 @@ private[recheck] object Repair:
       val (flagSet, node, ir) = ReDoS.parseTree(source, flags, dialect)
       Pattern(source, flags, dialect, flagSet, node, ir)
 
-  /** Score is the vulnerabilities of a pattern, with the rank of the worst one (higher is better), their count, the
-    * spots of the worst one, the complexity, and whether they are of the upper bound instead of the exact ones.
+  /** Score is the vulnerabilities of a pattern that the checker finds, with the rank of the worst one (higher is
+    * better), their count, the spots of the worst one, and the complexity.
     */
-  private final case class Score(
-      rank: Int,
-      count: Int,
-      spots: Set[SourceLocation],
-      complexity: AttackComplexity,
-      isUpperBound: Boolean
-  ):
+  private final case class Score(rank: Int, count: Int, spots: Set[SourceLocation], complexity: AttackComplexity):
 
     def isSafe: Boolean = count == 0
 
-    def >(that: Score): Boolean = rank > that.rank || (rank == that.rank && count < that.count)
+    /** Tests whether this is better, where the count of the fuzz checker, which finds one in a run, compares with none.
+      */
+    def >(that: Score): Boolean =
+      rank > that.rank || (rank == that.rank && !complexity.isFuzz && !that.complexity.isFuzz && count < that.count)
 
   private object Score:
 
     /** The vulnerabilities counted at most. */
     val maxCount = 16
 
-    /** Checks the pattern by the automaton checker, by the upper bound (see [[FuzzChecker.upperBound]]) if it gives up
-      * on the exact complexities, or returns `None` if there is no bound either.
+    /** Checks the pattern by the checker of the parameters as [[ReDoS.check]] does, without runtime attacks, or returns
+      * `None` if the checker does not support it.
       */
     def of(ir: IRPattern, params: Parameters)(using ctx: Context): Option[Score] =
+      val avoidsAttack = (_: AttackComplexity.Vulnerable, _: Hotspot) => false
+      val (diagnostics, safe, _) = params.checker match
+        case Checker.Automaton => ReDoS.checkAutomaton("", "", ir, params)
+        case Checker.Fuzz      => ReDoS.checkFuzz("", "", ir, params, avoidsAttack)
+        case Checker.Auto      => ReDoS.checkAuto("", "", ir, params, avoidsAttack)
       try
-        val (complexities, rest) =
-          ReDoS.computeAutomatonComplexities(ir, params).span(_.isInstanceOf[Complexity.Vulnerable[?]])
-        val vulnerable = complexities.collect { case v: Complexity.Vulnerable[UChar] => v }.take(maxCount).toSeq
-        if vulnerable.isEmpty then Some(Score(Int.MaxValue, 0, Set.empty, ReDoS.toSafeComplexity(rest), false))
-        else Some(of(vulnerable, false))
-      catch
-        case _: UnsupportedException =>
-          FuzzChecker
-            .upperBound(ir, params.maxRepeatCount, params.maxNFASize, params.maxInitialGenerationSize)
-            .map: vulnerable =>
-              // A cost bounded from above by a linear one is safe, even when the exact one is unknown.
-              if vulnerable.isEmpty then Score(Int.MaxValue, 0, Set.empty, AttackComplexity.Safe(false), false)
-              else of(vulnerable.take(maxCount), true)
-
-    /** Returns the score of the vulnerable complexities from the worst. */
-    private def of(vulnerable: Seq[Complexity.Vulnerable[UChar]], isUpperBound: Boolean): Score =
-      val worst = vulnerable.head
-      val rank = worst match
-        case _: Complexity.Exponential[?] => Int.MinValue
-        case p: Complexity.Polynomial[?]  => -p.degree
-      val spots = worst.hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Hot) => SourceLocation(s, e) }
-      Score(rank, vulnerable.size, spots.toSet, worst.toAttackComplexity, isUpperBound)
+        diagnostics.nextOption() match
+          case None        => Some(Score(Int.MaxValue, 0, Set.empty, safe().complexity))
+          case Some(worst) =>
+            // The fuzz checker would run again for another one.
+            val count = if worst.checker == Checker.Fuzz then 1 else 1 + diagnostics.take(maxCount - 1).size
+            val rank = worst.complexity match
+              case _: AttackComplexity.Exponential => Int.MinValue
+              case p: AttackComplexity.Polynomial  => -p.degree
+            val spots = worst.hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Hot) => SourceLocation(s, e) }
+            Some(Score(rank, count, spots.toSet, worst.complexity))
+      catch case _: UnsupportedException => None

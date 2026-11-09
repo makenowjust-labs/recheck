@@ -13,7 +13,7 @@ sealed abstract class Rx extends Product with Serializable
 /** Rx types. */
 object Rx:
 
-  /** Safe is the result for a RegExp that the automaton checker finds safe, which needs no repair. */
+  /** Safe is the result for a RegExp that the checker finds safe, which needs no repair. */
   final case class Safe(source: String, flags: String, dialect: Dialect) extends Rx:
 
     override def toString: String =

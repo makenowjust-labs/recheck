@@ -87,10 +87,10 @@ object ReDoS:
   /** Returns a better RegExp for the given one, keeping what `keep` tells of its matches.
     *
     * The pattern and the flags are of `params.dialect`. The repair edits the pattern around the hotspots that the
-    * automaton checker finds, preferring the edits that keep the matches, until it is safe or no edit makes it better.
-    * The result has the complexity of the repaired RegExp, and the shortest input on which the matches differ if they
-    * do. Without a safe repair keeping what `keep` tells, a safe repair keeping less (the range of the match, and then
-    * only whether it matches) is the result, whose `kept` tells what it keeps.
+    * checker of `params.checker` finds as [[check]] does, preferring the edits that keep the matches, until it is safe
+    * or no edit makes it better. The result has the complexity of the repaired RegExp, and the shortest input on which
+    * the matches differ if they do. Without a safe repair keeping what `keep` tells, a safe repair keeping less (the
+    * range of the match, and then only whether it matches) is the result, whose `kept` tells what it keeps.
     */
   def repair(
       source: String,
