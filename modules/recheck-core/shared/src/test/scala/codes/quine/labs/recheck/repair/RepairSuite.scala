@@ -118,6 +118,14 @@ class RepairSuite extends munit.FunSuite:
     // The repair lowers the upper bound to quadratic, which does not show the pattern better.
     assertEquals(search("^(?:a|a)*(x)\\1*\\1*$", params = bound), Result.NotFound)
 
+  test("Repair.search: a safe edit before an exponential one"):
+    // Removing `*` after `\s` lowers the number of the exponential vulnerabilities, but the possessive one is safe.
+    val source = "^([-/:,#%.'\"\\s!\\w]|\\w-\\w|'[\\s\\w]+'\\s*|\"[\\s\\w]+\"|\\([\\d,%\\.\\s]+\\))*$"
+    assertEquals(
+      search(source, Dialect.Java),
+      repaired("^([-/:,#%.'\"\\s!\\w]|\\w-\\w|'[\\s\\w]+'\\s*|\"[\\s\\w]+\"|\\([\\d,%\\.\\s]+\\))*+$", Dialect.Java)
+    )
+
   test("Repair.search: timeouts"):
     // The time runs out at the log message starting with `message`, as a slow step there would make it.
     def outOfTimeAt(message: String): Context =
