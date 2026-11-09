@@ -88,6 +88,7 @@ An edit may remove a capture that is not kept, so the later captures may have sm
 `Rx` has three statuses.
 
 The repair checks the regular expressions as `check` does with the same parameters, except runtime-attack verification, so a safe repair is one that `check` finds safe.
+While it tries the edits, it runs the fuzz checker with smaller generations, and it checks the result with the parameters as they are.
 
 - `safe` means that the checker finds the regular expression safe, so it needs no repair.
 - `repaired` means that the repair found a better regular expression.

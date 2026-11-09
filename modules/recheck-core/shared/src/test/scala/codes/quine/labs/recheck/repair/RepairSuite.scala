@@ -168,8 +168,7 @@ class RepairSuite extends munit.FunSuite:
 
   test("Repair.search: timeouts"):
     // The time runs out at the log message starting with `message`, as a slow step there would make it.
-    def outOfTimeAt(message: String): Context =
-      val timeout = 1.second
+    def outOfTimeAt(message: String, timeout: FiniteDuration = 1.second): Context =
       val started = System.nanoTime()
       val logger = new Context.Logger:
         def apply(log: String): Unit =
@@ -190,6 +189,11 @@ class RepairSuite extends munit.FunSuite:
       search("^(\\w+\\s?)+\\d$", Dialect.Java)(using outOfTimeAt("repair: comparison")),
       repaired("^(\\w\\s?)+\\d$", Dialect.Java, Comparison.Unknown)
     )
+    // The check of the result has no time, so its complexity is the score of the edit, which the fuzz checker gives.
+    search("^(?:a|a)*(x)\\1*\\1*$")(using outOfTimeAt("repair: check of the result", 10.seconds)) match
+      case Result.Repaired(pattern, _, complexity, _) =>
+        assertEquals((pattern.source, complexity), ("^a*(x)\\1*\\1*$", AttackComplexity.Polynomial(2, true)))
+      case result => fail(s"not repaired: $result")
     // The first round has no time, so nothing is found.
     intercept[TimeoutException](search("^(a|a)*$")(using outOfTimeAt("repair: round 0")))
 
