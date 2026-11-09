@@ -79,6 +79,21 @@ class RepairSuite extends munit.FunSuite:
     assertEquals(search("^(\\d+\\.?\\d+)$"), repaired("^(\\d+(?:\\.\\d+|\\d))$"))
     assertEquals(search("^[a-z0-9]+[a-z0-9._-]*@"), repaired("^[a-z0-9][a-z0-9._-]*@"))
 
+  test("Repair.search: starts of searches"):
+    // `\K` keeps the start of the match.
+    assertEquals(
+      search("foo[a-z]*bar", Dialect.PCRE),
+      repaired("(?<![a-z])(?:(?!foo)[a-z])*\\Kfoo[a-z]*bar", Dialect.PCRE)
+    )
+    assertEquals(
+      search("foo[a-z]*bar", captures = Some(Seq.empty)),
+      repaired("(?<![a-z])(?:(?!foo)[a-z])*foo[a-z]*bar", captures = Some(Seq.empty))
+    )
+    assertEquals(
+      search("Mozilla.*Mobile.*AspiegelBot", captures = Some(Seq.empty)),
+      repaired("(?<!.)(?:(?!Mozilla).)*Mozilla(?:(?!Mobile).)*Mobile.*AspiegelBot", captures = Some(Seq.empty))
+    )
+
   test("Repair.search: searches"):
     assertEquals(search("\\s*$"), repaired("(?<!\\s)\\s*$"))
     assertEquals(search("(\\d+)+x"), repaired("(?<!\\d)(\\d+)x"))
