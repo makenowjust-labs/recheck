@@ -172,6 +172,12 @@ class CandidateFinderSuite extends munit.FunSuite:
     assertEquals(restricted("(?:MSIE|XBMC).*X"), Seq("(?<!.)(?:(?!MSIE|XBMC).)*(?:MSIE|XBMC).*X"))
     assertEquals(restricted("(a\\d+|b\\d+).*X"), Seq("(?<!.)(?:(?!a\\d+|b\\d+).)*(a\\d+|b\\d+).*X"))
     assertEquals(restricted("(?:aab|ab).*X"), Seq.empty)
+    // Every match of `P` has a prefix of its shortest length that matches too, so the first one ends first.
+    assert(clue(restricted("version/([\\w.]+).+?x")).contains("(?<!.)(?:(?!version/[\\w.]+).)*version/([\\w.]+).+?x"))
+    assert(clue(restricted("(Da)/(9).(\\d+).*x")).contains("(?<!.)(?:(?!Da/9.\\d+).)*(Da)/(9).(\\d+).*x"))
+    assert(!restricted("a\\d+a.*x").exists(_.contains("(?!a\\d+a)")))
+    // A repetition at the start of a look-ahead reads in turn too.
+    assertEquals(restricted("(?=.*a)(?=.*b)"), Seq("(?<!.)(?=.*a)(?=.*b)"))
     // A later `P` may end first (e.g. on `baXa`), or `P` may read what `E` does not.
     assertEquals(restricted("(?:a|b.{3}).*X"), Seq.empty)
     assertEquals(restricted("a\\n?.*X"), Seq.empty)

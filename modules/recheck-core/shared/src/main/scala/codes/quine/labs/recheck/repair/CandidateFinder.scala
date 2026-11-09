@@ -724,7 +724,9 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
           case NodeData.Repeat(_, q, _) if min(q).nonEmpty => LazyList((Seq.empty, n))
           case NodeData.Sequence(ms)                       => splits(items(ms))
           case NodeData.Group(kind, child) if kind == GroupKind.NonCapture || isCapture(kind) => splits(Seq(child))
-          case _                                                                              => LazyList.empty
+          // A repetition at the start of a look-ahead reads in turn too, and its look-behind keeps the start of a match.
+          case NodeData.Group(_: GroupKind.PositiveLookAhead, child) => splits(Seq(child)).filter(_._1.isEmpty)
+          case _                                                     => LazyList.empty
         inside #::: splits(rest).map((before, repeated) => (n +: before, repeated))
 
     // `D` of `(?:(?!X)D)`, which is read up to the first `X` (see `readUntil`).
@@ -738,7 +740,6 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
           case _ => n
       case _ => n
 
-    // The first atom of the node, if it reads it once first.
     // The first atoms of the node, one for each alternative, if it reads one once first in each way.
     def leading(n: Node): Option[Seq[Node]] = unblank(n).data match
       case NodeData.Sequence(ns)    => items(ns).headOption.flatMap(leading)
@@ -754,6 +755,29 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
       case NodeData.Group(kind, child) if kind == GroupKind.NonCapture || isCapture(kind) => words(child)
       case _ => setWord(unblank(n)).filter(_.nonEmpty).map(Seq(_))
 
+    // The sets that the node reads in turn, if it reads a fixed number of atoms, out of the captures too.
+    def fixedWord(n: Node): Option[Seq[CharSet]] = unblank(n).data match
+      case NodeData.Sequence(ns) =>
+        items(ns).foldLeft(Option(Seq.empty[CharSet]))((word, item) => word.flatMap(w => fixedWord(item).map(w ++ _)))
+      case NodeData.Group(kind, child) if kind == GroupKind.NonCapture || isCapture(kind) => fixedWord(child)
+      case _                                                                              => setWord(unblank(n))
+
+    // The length of the shortest matches of the node, if every match has a prefix of this length that matches too, as
+    // fixed items followed by a repetition of a fixed-width body do (e.g. `version/[\w.]+`).
+    def uniform(n: Node): Option[Int] = unblank(n).data match
+      case NodeData.Sequence(ns) =>
+        items(ns) match
+          case Seq() => Some(0)
+          case is    => for w <- fixedWord(sequence(is.init)); m <- uniform(is.last) yield w.size + m
+      case NodeData.Disjunction(ns) =>
+        ns.map(uniform).distinct match
+          case Seq(m) => m
+          case _      => None
+      case NodeData.Group(kind, child) if kind == GroupKind.NonCapture || isCapture(kind) => uniform(child)
+      case NodeData.Repeat(body, q, _) if q.strategy != BacktrackStrategy.Possessive      =>
+        fixedWord(body).filter(_.nonEmpty).map(_.size * minimumCount(q))
+      case _ => fixedWord(n).map(_.size)
+
     def atoms(n: Node): Seq[Node] = if isAtom(n) then Seq(n) else children(n).flatMap(atoms)
 
     def union(sets: Seq[CharSet]): CharSet = sets.foldLeft(CharSet.empty)(_.union(_))
@@ -762,13 +786,14 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
       case _: IRNodeData.BackReference | _: IRNodeData.Conditional => true
       case _                                                       => false
 
-    // A later `P` in what `E` reads ends no earlier than the first one, if `P` has a fixed width, or if a later `P`
-    // starts after the shortest match of the first one: no word of `P` starts in another for alternatives of words, and
-    // else the first atoms read none of the characters of the rest. `E` reads the characters of `P` then, so the first
-    // one reaches what a later one does.
+    // A later `P` in what `E` reads ends no earlier than the first one, if `P` has a fixed width, if every match of `P`
+    // has a prefix of the same length that matches too, or if a later `P` starts after the shortest match of the first
+    // one: no word of `P` starts in another for alternatives of words, and else the first atoms read none of the
+    // characters of the rest. `E` reads the characters of `P` then, so the first one reaches what a later one does.
     def endsFirst(p: Node, word: Seq[CharSet]): Boolean =
       setWord(p).nonEmpty || (!referred && (word match
-        case Seq(e) =>
+        case Seq(e) if uniform(p).exists(_ >= 1) && union(atoms(p).flatMap(setOf)).subsetOf(e) => true
+        case Seq(e)                                                                            =>
           words(p) match
             case Some(ws) =>
               val overlaps = ws.exists: a =>
