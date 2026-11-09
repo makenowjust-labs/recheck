@@ -100,6 +100,7 @@ A `repaired` one also has the following fields.
   A case or quoting command of a Perl regex literal that does not cover whole items is written as applied (e.g. `x\Ua|b\Ey` is written as `xA|By`).
 - `complexity` is the complexity of the repaired regular expression (see [Complexity](diagnostics.mdx#complexity)).
   It is safe unless no edit makes the regular expression safe (e.g. an exponential one repaired into a quadratic one), or the time runs out first.
+  The repair does not make a repetition without a maximum bounded (e.g. `.*` to `.`) unless the matches stay the same, since the result would read much fewer strings.
 - `kept` is the numbers of the kept captures, where `0` is the match.
 - `unitMode` is the unit of the input of the comparison (see [Matching Units](dialects.mdx#matching-units)).
 - `comparison` tells how the matches compare.

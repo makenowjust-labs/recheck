@@ -15,6 +15,8 @@ import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.FuzzChecker
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.Node
+import codes.quine.labs.resyntax.ast.NodeData
+import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
@@ -141,6 +143,11 @@ private[recheck] object Repair:
                 (-nextScore.rank.toLong, nextScore.count, nextScore.isUpperBound, candidate.isFallback, growth(next))
             )
             .map((next, nextIndices, nextScore, _) => (next, nextIndices, nextScore, compareOnce(next, nextIndices)))
+            // An edit that bounds a repetition is taken only if it is equivalent, since it reads fewer strings (e.g.
+            // `.*` to `.`), which no one would take as a repair.
+            .filter((next, _, _, comparison) =>
+              comparison == Comparison.Equivalent || unboundedRepeats(next.node) >= unboundedRepeats(current.node)
+            )
           // Without an equivalent edit, the best ones differ on the longest input.
           compared
             .find(_._4 == Comparison.Equivalent)
@@ -192,6 +199,21 @@ private[recheck] object Repair:
               try compare(original, captures, fixed, indices)
               catch case _: TimeoutException => Comparison.Unknown
           Result.Repaired(fixed, indices, fixedScore.complexity, comparison)
+
+  /** Counts the repetitions without a maximum in the syntax tree. */
+  private def unboundedRepeats(node: Node): Int =
+    val own = node.data match
+      case NodeData.Repeat(_, Quantifier.Star(_) | Quantifier.Plus(_) | Quantifier.Unbounded(_, _), _) => 1
+      case _                                                                                           => 0
+    val children = node.data match
+      case NodeData.Disjunction(ns)      => ns
+      case NodeData.Sequence(ns)         => ns
+      case NodeData.Repeat(n, _, _)      => Seq(n)
+      case NodeData.Group(_, n)          => Seq(n)
+      case NodeData.UnicodeList(ns, _)   => ns
+      case NodeData.CaseRegion(_, ps, _) => ps.map(_.value)
+      case _                             => Seq.empty
+    own + children.map(unboundedRepeats).sum
 
   /** Pattern is a pattern parsed in the dialect, with its syntax tree for the edits and its IR for the checks. */
   final case class Pattern(
