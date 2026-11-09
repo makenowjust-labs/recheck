@@ -386,6 +386,22 @@ properties:
     x-cli: "random-seed"
     x-since: "4.0.0"
 
+  repairAttackTimeout:
+    title: "Repair Attack Timeout"
+    description: |-
+      The upper limit of matching time on an attack string of the fuzz checker while the repair scores the edits, instead of `attackTimeout`.
+
+      An attack string that runs over it is an attack, as for `attackTimeout`, so a shorter one only ends the run sooner.
+      The repair checks its result with `attackTimeout` (see [Repair](/docs/usage/repair)).
+      In TypeScript, it is in milliseconds.
+    type: [integer, "null"]
+    default: 100
+    x-unit: "milliseconds"
+    x-scala-type: "Duration"
+    x-cli: "repair-attack-timeout"
+    x-exclude: ["eslint-plugin"]
+    x-since: "5.0.0"
+
   repairTimeout:
     title: "Repair Timeout"
     description: |-

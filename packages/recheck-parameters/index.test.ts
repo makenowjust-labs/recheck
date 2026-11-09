@@ -17,7 +17,12 @@ describe("propertiesFor", () => {
     expect(propertiesFor("eslint-plugin").map(([name]) => name)).toEqual(
       names.filter(
         (name) =>
-          name !== "dialect" && name !== "logger" && name !== "repairTimeout",
+          ![
+            "dialect",
+            "logger",
+            "repairAttackTimeout",
+            "repairTimeout",
+          ].includes(name),
       ),
     );
     expect(propertiesFor("playground").map(([name]) => name)).toEqual(
