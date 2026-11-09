@@ -14,6 +14,7 @@ import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.ReDoSException
+import codes.quine.labs.recheck.common.TimeoutException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.Diagnostics
@@ -88,7 +89,8 @@ object ReDoS:
     * The pattern and the flags are of `params.dialect`. The repair edits the pattern around the hotspots that the
     * automaton checker finds, preferring the edits that keep the matches, until it is safe or no edit makes it better.
     * The result has the complexity of the repaired RegExp, and the shortest input on which the matches differ if they
-    * do.
+    * do. Without a safe repair keeping what `keep` tells, a safe repair keeping less (the range of the match, and then
+    * only whether it matches) is the result, whose `kept` tells what it keeps.
     */
   def repair(
       source: String,
@@ -101,8 +103,23 @@ object ReDoS:
     val dialect = params.dialect
     try
       val original = Repair.Pattern.parse(source, flags, dialect)
-      val kept = keep.captureIndices(original.ir)
-      Repair.search(original, kept, params) match
+      def isSafe(result: Repair.Result): Boolean = result match
+        case Repair.Result.Safe                                        => true
+        case Repair.Result.Repaired(_, _, _: AttackComplexity.Safe, _) => true
+        case _                                                         => false
+
+      val requested = keep.captureIndices(original.ir)
+      val fewer = Seq(Keep.MatchRange, Keep.Match).map(_.captureIndices(original.ir)).filter(_.size < requested.size)
+      // A search keeping fewer captures is the result only if it is safe, and the time it runs out keeps the earlier.
+      val (kept, found) = fewer.distinct.foldLeft((requested, Repair.search(original, requested, params))):
+        case (best @ (_, found), _) if isSafe(found) => best
+        case (best, indices)                         =>
+          ctx.log(s"repair: keep ${indices.mkString("[", ", ", "]")}")
+          try
+            val found = Repair.search(original, indices, params)
+            if isSafe(found) then (indices, found) else best
+          catch case _: TimeoutException => best
+      found match
         case Repair.Result.Safe     => Rx.Safe(source, flags, dialect)
         case Repair.Result.NotFound => Rx.Unknown(source, flags, dialect, None)
         case Repair.Result.Repaired(repaired, captures, complexity, comparison) =>

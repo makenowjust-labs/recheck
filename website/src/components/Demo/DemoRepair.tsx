@@ -132,6 +132,9 @@ const RepairRows: React.FC<RowsProps> = ({ repair, flags, check }) => {
             ) : null}
           </p>
         </Row>,
+        <Row title="Kept" key="kept">
+          <p>{result.kept.length === 0 ? KEEP_LABELS.match : result.kept.map(captureName).join(', ')}</p>
+        </Row>,
         <Row title="Complexity" key="complexity">
           <Badge kind={complexityKind(result.complexity.type)}>{result.complexity.summary}</Badge>
         </Row>,

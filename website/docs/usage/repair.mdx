@@ -76,6 +76,9 @@ Its permalink records the repair too.
 | `[1, "year"]` (`--keep=1,year` in CLI) | `Keep.Captures(Seq(1, "year"))` | The range of the match and these captures. |
 
 The captures that a back-reference or a conditional refers to are kept always.
+When no safe repair keeps what `keep` tells, the repair keeps less: the range of the match, and then only whether it matches.
+`kept` of the result tells what it keeps.
+For example, `/Mozilla.*Mobile/` is repaired as `/(?<!.)(?:(?!Mozilla).)*Mozilla.*Mobile/`, whose match starts at the start of the line, so `kept` is empty.
 A number or a name that refers to no capture makes the result `unknown` with the `invalid-keep` error.
 An edit may remove a capture that is not kept, so the later captures may have smaller numbers in the repaired regular expression.
 
