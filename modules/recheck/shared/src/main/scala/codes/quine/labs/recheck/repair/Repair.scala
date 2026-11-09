@@ -5,6 +5,7 @@ import codes.quine.labs.recheck.automaton.Complexity
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.common.TimeoutException
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
@@ -68,6 +69,9 @@ private[recheck] object Repair:
     * fuzz checker scores the pattern. A result scored only by an upper bound that is not linear is not reported, since
     * the bound does not show it better, but a linear one shows it safe. It throws [[UnsupportedException]] when there
     * is neither for the original pattern.
+    *
+    * When the time runs out after a round, the result is the pattern of the rounds so far, which is equivalent if every
+    * edit is, and else compared only if the time allows.
     */
   def search(original: Pattern, captures: Seq[Int], params: Parameters)(using ctx: Context): Result =
     def compare(a: Pattern, aIndices: Seq[Int], b: Pattern, bIndices: Seq[Int]): Comparison =
@@ -87,51 +91,81 @@ private[recheck] object Repair:
           throw new UnexpectedException(s"an edit makes an invalid pattern /$source/: ${ex.getMessage}")
         // $COVERAGE-ON$
 
-    // `indices` are the current indices of `captures`.
-    def loop(current: Pattern, indices: Seq[Int], score: Score, round: Int): (Pattern, Seq[Int], Score) =
-      if score.isSafe || round >= MaxRounds then (current, indices, score)
+    // Returns the best edit of the round, with its comparison.
+    def step(current: Pattern, indices: Seq[Int], score: Score): Option[(Pattern, Seq[Int], Score, Comparison)] =
+      val started = System.nanoTime()
+      val candidates = current.candidates(score.spots, indices.toSet)
+      val improved = candidates
+        .flatMap: candidate =>
+          for
+            next <- parseEdited(current.print(candidate.node))
+            nextScore <- Score.of(next.ir, params)
+            if nextScore > score
+          yield
+            val nextIndices = indices.map(i => i - candidate.removedCaptures.count(_ < i))
+            (next, nextIndices, nextScore, candidate)
+        .sortBy: (next, _, nextScore, candidate) =>
+          val growth = next.source.length - current.source.length
+          (-nextScore.rank, nextScore.count, nextScore.isUpperBound, candidate.isFallback, growth)
+      val scored = System.nanoTime()
+      var comparisons = 0
+      val compared = LazyList
+        .from(improved)
+        .map: (next, nextIndices, nextScore, _) =>
+          comparisons += 1
+          (next, nextIndices, nextScore, compare(current, indices, next, nextIndices))
+      // Without an equivalent edit, the best ones differ on the longest input.
+      val chosen = compared
+        .find(_._4 == Comparison.Equivalent)
+        .orElse:
+          compared.headOption.flatMap: (_, _, best, _) =>
+            compared
+              .takeWhile((_, _, score, _) => score.rank == best.rank && score.count == best.count)
+              .take(MaxDifferent)
+              .maxByOption:
+                case (_, _, _, Comparison.Different(input)) => input.length
+                case _                                      => -1
+      val finished = System.nanoTime()
+      ctx.log:
+        s"""|repair: ${candidates.size} candidates (${improved.size} better) scored in ${(scored - started) / 1000000} ms,
+            |  $comparisons compared in ${(finished - scored) / 1000000} ms""".stripMargin
+      chosen
+
+    // `indices` are the current indices of `captures`, and `isEquivalent` tells whether every edit so far is.
+    def loop(
+        current: Pattern,
+        indices: Seq[Int],
+        score: Score,
+        round: Int,
+        isEquivalent: Boolean
+    ): (Pattern, Seq[Int], Score, Boolean) =
+      if score.isSafe || round >= MaxRounds then (current, indices, score, isEquivalent)
       else
-        val improved = current
-          .candidates(score.spots, indices.toSet)
-          .flatMap: candidate =>
-            for
-              next <- parseEdited(current.print(candidate.node))
-              nextScore <- Score.of(next.ir, params)
-              if nextScore > score
-            yield
-              val nextIndices = indices.map(i => i - candidate.removedCaptures.count(_ < i))
-              (next, nextIndices, nextScore, candidate)
-          .sortBy: (next, _, nextScore, candidate) =>
-            val growth = next.source.length - current.source.length
-            (-nextScore.rank, nextScore.count, nextScore.isUpperBound, candidate.isFallback, growth)
-        val compared = LazyList
-          .from(improved)
-          .map((next, nextIndices, nextScore, _) =>
-            (next, nextIndices, nextScore, compare(current, indices, next, nextIndices))
-          )
-        // Without an equivalent edit, the best ones differ on the longest input.
-        val chosen = compared
-          .find(_._4 == Comparison.Equivalent)
-          .orElse:
-            compared.headOption.flatMap: (_, _, best, _) =>
-              compared
-                .takeWhile((_, _, score, _) => score.rank == best.rank && score.count == best.count)
-                .take(MaxDifferent)
-                .maxByOption:
-                  case (_, _, _, Comparison.Different(input)) => input.length
-                  case _                                      => -1
+        ctx.log(s"repair: round $round from /${current.source}/")
+        // A round without the time keeps the pattern of the rounds so far, if any.
+        val chosen =
+          try step(current, indices, score)
+          catch case _: TimeoutException if round > 0 => None
         chosen match
-          case Some((next, nextIndices, nextScore, _)) => loop(next, nextIndices, nextScore, round + 1)
-          case None                                    => (current, indices, score)
+          case Some((next, nextIndices, nextScore, comparison)) =>
+            loop(next, nextIndices, nextScore, round + 1, isEquivalent && comparison == Comparison.Equivalent)
+          case None => (current, indices, score, isEquivalent)
 
     Score.of(original.ir, params) match
       case None => throw new UnsupportedException("the automaton checker cannot check the pattern")
       case Some(score) if score.isSafe => Result.Safe
       case Some(score)                 =>
-        val (fixed, indices, fixedScore) = loop(original, captures, score, 0)
+        val (fixed, indices, fixedScore, isEquivalent) = loop(original, captures, score, 0, true)
         // An upper bound that is not linear does not show that the result is better.
         if (fixed eq original) || (fixedScore.isUpperBound && !fixedScore.isSafe) then Result.NotFound
-        else Result.Repaired(fixed, indices, fixedScore.complexity, compare(original, captures, fixed, indices))
+        else
+          val comparison =
+            if isEquivalent then Comparison.Equivalent
+            else
+              ctx.log("repair: comparison with the original")
+              try compare(original, captures, fixed, indices)
+              catch case _: TimeoutException => Comparison.Unknown
+          Result.Repaired(fixed, indices, fixedScore.complexity, comparison)
 
   /** Pattern is a pattern parsed in the dialect, with its syntax tree for the edits and its IR for the checks. */
   final case class Pattern(

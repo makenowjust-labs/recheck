@@ -1,8 +1,11 @@
 package codes.quine.labs.recheck
 package repair
 
+import scala.concurrent.duration.*
+
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.common.TimeoutException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.repair.Repair.Comparison
@@ -22,7 +25,7 @@ class RepairSuite extends munit.FunSuite:
       dialect: Dialect = Dialect.JavaScript,
       captures: Option[Seq[Int]] = None,
       params: Parameters = Parameters()
-  ): Result =
+  )(using ctx: Context): Result =
     val original = Repair.Pattern.parse(source, "", dialect)
     val kept = captures.getOrElse(0 to original.ir.captureCount)
     Repair.search(original, kept, params.copy(dialect = dialect)) match
@@ -114,6 +117,33 @@ class RepairSuite extends munit.FunSuite:
     assertEquals(search("^(a|a)\\1*$", params = bound), repaired("^(a)\\1*$"))
     // The repair lowers the upper bound to quadratic, which does not show the pattern better.
     assertEquals(search("^(?:a|a)*(x)\\1*\\1*$", params = bound), Result.NotFound)
+
+  test("Repair.search: timeouts"):
+    // The time runs out at the log message starting with `message`, as a slow step there would make it.
+    def outOfTimeAt(message: String): Context =
+      val timeout = 1.second
+      val started = System.nanoTime()
+      val logger = new Context.Logger:
+        def apply(log: String): Unit =
+          if log.startsWith(message) then while System.nanoTime() - started <= timeout.toNanos do ()
+      Context(timeout, logger = Some(logger))
+
+    // The second round has no time, so the result is of the first one, which is equivalent as its edit is.
+    // It is still vulnerable.
+    search("^(\\s*x\\s*)*(a+)+$", captures = Some(Seq(0, 2)))(using outOfTimeAt("repair: round 1")) match
+      case Result.Repaired(pattern, indices, complexity, comparison) =>
+        assertEquals(
+          (pattern.source, indices, complexity.isInstanceOf[AttackComplexity.Safe], comparison),
+          ("^(\\s*x\\s*)*(a+)$", Seq(0, 2), false, Comparison.Equivalent)
+        )
+      case result => fail(s"not repaired: $result")
+    // The comparison with the original has no time.
+    assertEquals(
+      search("^(\\w+\\s?)+\\d$", Dialect.Java)(using outOfTimeAt("repair: comparison")),
+      repaired("^(\\w+\\s?)\\d$", Dialect.Java, Comparison.Unknown)
+    )
+    // The first round has no time, so nothing is found.
+    intercept[TimeoutException](search("^(a|a)*$")(using outOfTimeAt("repair: round 0")))
 
   test("Repair.search: unsupported"):
     interceptMessage[UnsupportedException]("the automaton checker cannot check the pattern"):
