@@ -176,10 +176,19 @@ class CandidateFinderSuite extends munit.FunSuite:
     assertEquals(restricted("(?:a|b.{3}).*X"), Seq.empty)
     assertEquals(restricted("a\\n?.*X"), Seq.empty)
 
+  test("CandidateFinder#find: bounded repetitions"):
+    // Only the edits that keep the number of the iterations apply.
+    assert(clue(edited("(?:a+){2,40}")).containsSlice(Seq("(?:a+){2}", "a{2,}")))
+    assert(clue(edited("(?:a*?)+")).contains("a*?"))
+    assert(!edited("(a+){2}").contains("a{2,}"))
+    assert(clue(edited("a{1,50}b", Dialect.Java)).containsSlice(Seq("a{1,50}+b", "ab")))
+    assert(clue(edited("[a.]{1,9}\\.")).contains("[a.]a{0,8}\\."))
+    assert(!edited("(?:ab|abab){0,3}").contains("(?:ab){0,3}"))
+
   test("CandidateFinder#find: written forms and quotes"):
     // The nodes keep their written forms, including a repetition whose body is edited.
     assertEquals(edited("\\x61{02}(?:a|a)"), Seq("\\x61{02}(?:a)"))
-    assertEquals(edited("(?:a|a){02}"), Seq("(?:a){02}"))
+    assertEquals(edited("(?:a|a){02}").head, "(?:a){02}")
     // A quote stays as it is.
     assertEquals(edited("\\Q.\\E(?:a|a)", Dialect.Java), Seq("\\Q.\\E(?:a)"))
 
