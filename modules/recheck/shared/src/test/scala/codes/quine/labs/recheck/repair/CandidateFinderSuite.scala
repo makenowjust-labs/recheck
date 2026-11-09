@@ -167,6 +167,11 @@ class CandidateFinderSuite extends munit.FunSuite:
       find(source, kept = Some(Set.empty)).map(_._1).filter(_.startsWith("(?<!"))
     assert(clue(restricted("; *(Pixel.*?)x")).contains("(?<!.)(?:(?!; *Pixel).)*; *(Pixel.*?)x"))
     assertEquals(restricted("(M) (\\d+|x).*X"), Seq("(?<!.)(?:(?!M (?:\\d+|x)).)*(M) (\\d+|x).*X"))
+    // Alternatives of words do not start in another, though `M` is in `XBMC`, and the first atoms of alternatives read
+    // none of the characters of the rest.
+    assertEquals(restricted("(?:MSIE|XBMC).*X"), Seq("(?<!.)(?:(?!MSIE|XBMC).)*(?:MSIE|XBMC).*X"))
+    assertEquals(restricted("(a\\d+|b\\d+).*X"), Seq("(?<!.)(?:(?!a\\d+|b\\d+).)*(a\\d+|b\\d+).*X"))
+    assertEquals(restricted("(?:aab|ab).*X"), Seq.empty)
     // A later `P` may end first (e.g. on `baXa`), or `P` may read what `E` does not.
     assertEquals(restricted("(?:a|b.{3}).*X"), Seq.empty)
     assertEquals(restricted("a\\n?.*X"), Seq.empty)

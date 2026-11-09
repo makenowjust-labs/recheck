@@ -683,26 +683,47 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
       case _ => n
 
     // The first atom of the node, if it reads it once first.
-    def leading(n: Node): Option[Node] = unblank(n).data match
-      case NodeData.Sequence(ns) => items(ns).headOption.flatMap(leading)
+    // The first atoms of the node, one for each alternative, if it reads one once first in each way.
+    def leading(n: Node): Option[Seq[Node]] = unblank(n).data match
+      case NodeData.Sequence(ns)    => items(ns).headOption.flatMap(leading)
+      case NodeData.Disjunction(ns) =>
+        ns.foldLeft(Option(Seq.empty[Node]))((firsts, a) => firsts.flatMap(fs => leading(a).map(fs ++ _)))
       case NodeData.Group(kind, child) if kind == GroupKind.NonCapture || isCapture(kind) => leading(child)
-      case _ => Option.when(isAtom(unblank(n)))(unblank(n))
+      case _ => Option.when(isAtom(unblank(n)))(Seq(unblank(n)))
+
+    // The words of the alternatives of the node, if each reads a fixed number of atoms.
+    def words(n: Node): Option[Seq[Seq[CharSet]]] = unblank(n).data match
+      case NodeData.Disjunction(ns) =>
+        ns.foldLeft(Option(Seq.empty[Seq[CharSet]]))((ws, a) => ws.flatMap(w => words(a).map(w ++ _)))
+      case NodeData.Group(kind, child) if kind == GroupKind.NonCapture || isCapture(kind) => words(child)
+      case _ => setWord(unblank(n)).filter(_.nonEmpty).map(Seq(_))
 
     def atoms(n: Node): Seq[Node] = if isAtom(n) then Seq(n) else children(n).flatMap(atoms)
+
+    def union(sets: Seq[CharSet]): CharSet = sets.foldLeft(CharSet.empty)(_.union(_))
 
     val referred = ir.node.exists:
       case _: IRNodeData.BackReference | _: IRNodeData.Conditional => true
       case _                                                       => false
 
-    // A later `P` in what `E` reads ends no earlier than the first one, if `P` has a fixed width, or if its first atom
-    // reads none of the characters of the rest, so a later `P` starts after the shortest match of the first one. `E`
-    // reads the characters of `P` then, so the first one reaches what a later one does.
+    // A later `P` in what `E` reads ends no earlier than the first one, if `P` has a fixed width, or if a later `P`
+    // starts after the shortest match of the first one: no word of `P` starts in another for alternatives of words, and
+    // else the first atoms read none of the characters of the rest. `E` reads the characters of `P` then, so the first
+    // one reaches what a later one does.
     def endsFirst(p: Node, word: Seq[CharSet]): Boolean =
-      setWord(p).nonEmpty || ((word, leading(p).flatMap(first => setOf(first).map((first, _)))) match
-        case (Seq(e), Some((first, set))) if !referred =>
-          val rest = atoms(p).filter(_ ne first).flatMap(setOf).foldLeft(CharSet.empty)(_.union(_))
-          set.intersect(rest).isEmpty && set.union(rest).subsetOf(e)
-        case _ => false)
+      setWord(p).nonEmpty || (!referred && (word match
+        case Seq(e) =>
+          words(p) match
+            case Some(ws) =>
+              val overlaps = ws.exists: a =>
+                (1 until a.size).exists(k => ws.exists(b => a.drop(k).zip(b).forall(_.intersect(_).nonEmpty)))
+              !overlaps && union(ws.flatten).subsetOf(e)
+            case None =>
+              leading(p).exists: firsts =>
+                val sets = firsts.flatMap(setOf)
+                val rest = union(atoms(p).filterNot(a => firsts.exists(_ eq a)).flatMap(setOf))
+                sets.size == firsts.size && union(sets).intersect(rest).isEmpty && union(sets).union(rest).subsetOf(e)
+        case _ => false))
 
     val restricted =
       for
@@ -730,6 +751,10 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
         val scan = (setOf(body), setWord(p)) match
           case (Some(set), Some(Seq(stop))) if set.diff(stop).nonEmpty => without(body, set, stop)
           case _                                                       =>
-            group(Node(NodeData.Group(GroupKind.NegativeLookAhead(AssertNameStyle.Symbolic), uncaptured(p))), opened)
+            // The look-ahead is a group for the alternatives of `P` already.
+            val inside = uncaptured(p).data match
+              case NodeData.Group(GroupKind.NonCapture, child) => child
+              case _                                           => uncaptured(p)
+            group(Node(NodeData.Group(GroupKind.NegativeLookAhead(AssertNameStyle.Symbolic), inside)), opened)
         val k = Option.when(cut)(Node(NodeData.Backslash(BackslashKind.Assert(AssertKind.Cut))))
         edit(node -> (Seq(lookBehind, repeat(scan, Quantifier.Star(BacktrackStrategy.Greedy))) ++ k :+ node))
