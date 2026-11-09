@@ -115,7 +115,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           2,
-          Witness(Seq((Seq(a), Seq(a, a, other2, a))), Seq.empty),
+          Witness(Seq((Seq(other2), Seq(a, a, other2))), Seq.empty),
           Hotspot(Seq(Spot(2, 3, Hot), Spot(6, 8, Hot), Spot(10, 14, Hot)))
         )
       )

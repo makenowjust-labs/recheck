@@ -1,6 +1,7 @@
 package codes.quine.labs.recheck
 package automaton
 
+import scala.collection.immutable.BitSet
 import scala.collection.mutable
 
 import codes.quine.labs.recheck.automaton.Complexity.*
@@ -98,38 +99,59 @@ private final class AutomatonChecker[A, Q, P](
   /** The states where a witness stops following the transitions, after which it follows the look-ahead DFA. */
   private val witnessEnds = if countsAcceptedPaths then nfaWLA.acceptSet else nfaWLA.stateSet
 
-  /** A [[nfaWLA]] transition graph's SCCs. */
-  private val scc = graph.scc
+  /** A [[nfaWLA]] transition graph's SCCs, numbered by their indices, where an SCC comes after the ones it reaches. */
+  private val scc = graph.scc.toIndexedSeq
 
-  /** A map from a state of [[nfaWLA]] to SCC. */
-  private val sccMap = interrupt((for sc <- scc; q <- sc yield q -> sc).toMap)
+  /** A map from a state of [[nfaWLA]] to the index of its SCC. */
+  private val sccIndex = interrupt((for (sc, i) <- scc.zipWithIndex; q <- sc yield q -> i).toMap)
 
-  /** A graph with transitions between SCCs. */
-  private val sccGraph = interrupt:
-    val edges = graph.edges.iterator
-      .map { case (q1, _, q2) => (sccMap(q1), (), sccMap(q2)) }
-      .filter { case (sc1, _, sc2) => sc1 != sc2 }
-    val edgeSet = mutable.LinkedHashSet.empty[(IndexedSeq[(Q, P)], Unit, IndexedSeq[(Q, P)])]
-    for edge <- edges do interrupt(edgeSet.addOne(edge))
-    Graph.from(edgeSet.toIndexedSeq)
+  /** The transitions from the states of each SCC, with the indices of the SCCs that they go to. */
+  private val sccOutEdges = interrupt:
+    val edges = Array.fill(scc.size)(Vector.newBuilder[(Int, B, R, R)])
+    for (q1, a, q2) <- graph.edges do interrupt(edges(sccIndex(q1)).addOne((sccIndex(q2), a, q1, q2)))
+    edges.map(_.result()).toIndexedSeq
 
-  /** A map from SCC to reachable SCCs. */
-  private val sccReachableMap = sccGraph.reachableMap
+  /** The indices of the other SCCs that each SCC has transitions to, in the order of the transitions. */
+  private val sccNeighbors = interrupt(scc.indices.map(i => sccOutEdges(i).map(_._1).filter(_ != i).distinct))
 
-  /** A map from SCC to reachable SCCs on reversed [[sccGraph]]. */
-  private val sccReverseReachableMap = sccGraph.reverse.reachableMap
+  /** The indices of the other SCCs that have transitions to each SCC. */
+  private lazy val sccPredecessors = interrupt:
+    val predecessors = Array.fill(scc.size)(Vector.newBuilder[Int])
+    for i <- scc.indices; j <- sccNeighbors(i) do predecessors(j).addOne(i)
+    predecessors.map(_.result()).toIndexedSeq
 
-  /** A map from a pair of SCCs to edges (transitions) between two SCCs. */
+  /** The SCCs that the SCC reaches through `neighbors`, including itself. */
+  private def reach(i: Int, neighbors: IndexedSeq[IndexedSeq[Int]]): BitSet = interrupt:
+    val seen = mutable.BitSet(i)
+    val stack = mutable.Stack(i)
+    while stack.nonEmpty do interrupt(for k <- neighbors(stack.pop()) if seen.add(k) do stack.push(k))
+    seen.toImmutable
+
+  /** The SCCs that each SCC reaches, including itself, computed when needed. */
+  private val sccReachable = mutable.Map.empty[Int, BitSet]
+
+  private def reachable(i: Int): BitSet = sccReachable.getOrElseUpdate(i, reach(i, sccNeighbors))
+
+  /** The SCCs that reach each SCC, including itself, computed when needed. */
+  private val sccCoreachable = mutable.Map.empty[Int, BitSet]
+
+  private def coreachable(i: Int): BitSet = sccCoreachable.getOrElseUpdate(i, reach(i, sccPredecessors))
+
+  /** A map from a pair of the indices of SCCs to the transitions between them by the letters. */
   private val sccPairEdges = interrupt:
-    graph.edges
-      .groupMap { case (q1, _, q2) => (sccMap(q1), sccMap(q2)) } { case (q1, a, q2) => a -> (q1, q2) }
+    scc.indices
+      .flatMap(i => sccOutEdges(i).map((j, a, q1, q2) => ((i, j), a, (q1, q2))))
+      .groupMap(_._1)(e => (e._2, e._3))
       .view
       .mapValues(_.groupMap(_._1)(_._2).withDefaultValue(Vector.empty))
       .toMap
       .withDefaultValue(Map.empty.withDefaultValue(Vector.empty))
 
-  /** A map from an SCC to the lookahead DFA states in this. */
-  private val sccLookaheadMap = scc.map { sc => sc -> sc.map(_._2).toSet }.toMap
+  /** The lookahead DFA states in each SCC. */
+  private val sccLookaheads = scc.map(_.map(_._2).toSet)
+
+  /** Whether each SCC is an atom, which is a singleton and does not have a self-loop. */
+  private val sccIsAtom = scc.indices.map(i => scc(i).size == 1 && !sccOutEdges(i).exists(_._1 == i))
 
   /** A type of [[nfaWLA]] state. */
   private type R = (Q, P)
@@ -139,10 +161,6 @@ private final class AutomatonChecker[A, Q, P](
 
   /** A type of a pair of pumps of witness and hotspots. */
   private type Pump = (R, Seq[B], R, Seq[SourceLocation])
-
-  /** Tests whether the SCC is an atom, which is a singleton and does not have a self-loop. */
-  private def isAtom(sc: Seq[R]): Boolean =
-    sc.size == 1 && !graph.neighbors(sc.head).exists(_._2 == sc.head)
 
   /** Runs a checker. */
   def check(): Iterator[Complexity[A]] = interrupt:
@@ -155,15 +173,15 @@ private final class AutomatonChecker[A, Q, P](
   private def checkExponential(): Iterator[Complexity[A]] =
     log("automaton: find EDA")
     interrupt:
-      scc.iterator
-        .filterNot(isAtom)
+      scc.indices.iterator
+        .filterNot(sccIsAtom)
         .flatMap(findEDA)
         .map: pump =>
           val (w, hotspot) = witness(Vector(pump))
           Exponential(w, hotspot)
 
-  /** Finds an EDA structure in the SCC. */
-  private def findEDA(sc: IndexedSeq[R]): Option[Pump] =
+  /** Finds an EDA structure in the SCC of the index. */
+  private def findEDA(sc: Int): Option[Pump] =
     interrupt:
       val edges = interrupt(sccPairEdges((sc, sc)))
 
@@ -202,7 +220,7 @@ private final class AutomatonChecker[A, Q, P](
   private def checkPolynomial(): Iterator[Complexity[A]] =
     log("automaton: find IDA")
     interrupt:
-      scc
+      scc.indices
         .map(findIDAChain)
         .sortBy(-_._1)
         .iterator
@@ -215,31 +233,30 @@ private final class AutomatonChecker[A, Q, P](
             Polynomial(degree, w, hotspot)
 
   /** An internal cache of [[findIDAChain]] method's result. */
-  private val idaChainCache = mutable.Map.empty[Seq[R], (Int, Seq[Pump])]
+  private val idaChainCache = mutable.Map.empty[Int, (Int, Seq[Pump])]
 
-  /** Finds an IDA structure chain from the SCC. */
-  private def findIDAChain(sc: IndexedSeq[R]): (Int, Seq[Pump]) =
+  /** Finds an IDA structure chain from the SCC of the index. */
+  private def findIDAChain(sc: Int): (Int, Seq[Pump]) =
     idaChainCache.getOrElseUpdate(
       sc,
       interrupt:
         // Computes the maximum IDA structure chain from neighbors.
         val (maxDegree, maxPumps) = interrupt:
-          sccGraph
-            .neighbors(sc)
-            .map { case ((), sc) => findIDAChain(sc) }
+          sccNeighbors(sc)
+            .map(findIDAChain)
             .maxByOption(_._1)
             .getOrElse((0, Vector.empty))
-        if maxDegree == 0 then (if isAtom(sc) then 0 else 1, Vector.empty)
-        else if isAtom(sc) then (maxDegree, maxPumps)
+        if maxDegree == 0 then (if sccIsAtom(sc) then 0 else 1, Vector.empty)
+        else if sccIsAtom(sc) then (maxDegree, maxPumps)
         else
           // Appends an IDA structure between the SCC and the maximum chain's source into the chain.
           val result = interrupt:
-            sccReachableMap(sc).iterator
+            reachable(sc).iterator
               .filter: target =>
-                sc != target && !isAtom(target) && findIDAChain(target)._1 == maxDegree &&
+                sc != target && !sccIsAtom(target) && findIDAChain(target)._1 == maxDegree &&
                   // If the intersection of lookahead states of `sc` and `target` is empty,
                   // then there is no IDA structure between them.
-                  (sccLookaheadMap(sc) & sccLookaheadMap(target)).nonEmpty
+                  (sccLookaheads(sc) & sccLookaheads(target)).nonEmpty
               .flatMap(target => findIDABetween(sc, target).map((target, _)))
               .map { case (target, pump) => (maxDegree + 1, pump +: findIDAChain(target)._2) }
               .nextOption()
@@ -247,39 +264,55 @@ private final class AutomatonChecker[A, Q, P](
           result
     )
 
-  /** Finds an IDA structure between source and target SCCs. */
-  private def findIDABetween(source: IndexedSeq[R], target: IndexedSeq[R]): Option[Pump] =
+  /** Finds an IDA structure between the source and the target SCCs of the indices. */
+  private def findIDABetween(source: Int, target: Int): Option[Pump] =
     val sourceEdges = interrupt(sccPairEdges((source, source)))
-    val between = interrupt(sccReachableMap(source) & sccReverseReachableMap(target))
-    val betweenEdges = interrupt(for sc1 <- between; sc2 <- between yield sccPairEdges((sc1, sc2)))
-    val targetEdges = interrupt(sccPairEdges((target, target)))
+    val between = interrupt(reachable(source) & coreachable(target))
+    // The transitions from the states in the SCCs between them, by the letters and the states.
+    val betweenNext = interrupt:
+      between.toSeq
+        .flatMap(i => sccOutEdges(i).collect { case (j, a, q1, q2) if between(j) => (a, q1, q2) })
+        .groupMap(_._1)(e => (e._2, e._3))
+        .view
+        .mapValues(_.groupMap(_._1)(_._2))
+        .toMap
+    val targetNext = interrupt(sccPairEdges((target, target)).view.mapValues(_.groupMap(_._1)(_._2)).toMap)
+    val sourceOut = interrupt:
+      sourceEdges.toSeq.flatMap((a, es) => es.map((q1, q2) => (q1, a, q2))).groupMap(_._1)(e => (e._2, e._3))
 
+    // The product of the transitions in `source`, between them, and in `target`, which is built only from the
+    // triples `(q1, q1, q2)` for `q1` in `source` and `q2` in `target`, since only them matter.
+    val starts = interrupt(scc(source).flatMap(q1 => scc(target).map(q2 => (q1, q1, q2))))
     val g3 = interrupt:
-      Graph.from(
-        (for
-          a <- nfaWLA.alphabet.iterator
-          (q11, q12) <- sourceEdges(a)
-          (q21, q22) <- betweenEdges.flatMap(_(a))
-          (q31, q32) <- targetEdges(a)
-        yield
-          val edge = interrupt(((q11, q21, q31), a, (q12, q22, q32)))
-          edge
-        ).toIndexedSeq
-      )
+      val seen = mutable.HashSet.from(starts)
+      val queue = mutable.Queue.from(starts)
+      val edges = Vector.newBuilder[((R, R, R), B, (R, R, R))]
+      while queue.nonEmpty do
+        interrupt:
+          val (q1, q2, q3) = queue.dequeue()
+          for
+            (a, p1) <- sourceOut.getOrElse(q1, Vector.empty)
+            p2 <- betweenNext.get(a).flatMap(_.get(q2)).getOrElse(Vector.empty)
+            p3 <- targetNext.get(a).flatMap(_.get(q3)).getOrElse(Vector.empty)
+          do
+            edges.addOne(((q1, q2, q3), a, (p1, p2, p3)))
+            if seen.add((p1, p2, p3)) then queue.enqueue((p1, p2, p3))
+      Graph.from(edges.result())
     val g3back = interrupt:
       Graph.from:
-        source.flatMap(q1 => target.map { q2 => ((q1, q2, q2), None, (q1, q1, q2)) }) ++
+        scc(source).flatMap(q1 => scc(target).map { q2 => ((q1, q2, q2), None, (q1, q1, q2)) }) ++
           g3.edges.map { case (qqq1, a, qqq2) => (qqq1, Some(a), qqq2) }
 
     val result = interrupt:
       g3back.scc.iterator
         .flatMap: sc =>
+          val members = interrupt(sc.toSet)
           val ida = interrupt:
             // If there is an SCC of `g3back` that contains `(q1, q1, q2)` and `(q1, q2, q2)`,
             // then an IDA structure exists between `source` and `target`.
             sc
               .collect:
-                case (q1, q2, q3) if q1 == q2 && q2 != q3 && sc.contains((q1, q3, q3)) => (q1, q3)
+                case (q1, q2, q3) if q1 == q2 && q2 != q3 && members.contains((q1, q3, q3)) => (q1, q3)
               .flatMap:
                 case (q1, q2) =>
                   g3.path(Set((q1, q1, q2)), (q1, q2, q2))
