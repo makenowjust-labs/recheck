@@ -44,6 +44,11 @@ private[repair] final case class Candidate(
   *     earlier one is the same or covers it (e.g. `(?:\w|\d)` to `(?:\w)`),
   *   - an alternative of a repetition removed if the earlier ones read each of its strings in turn (e.g. `(?:ab|abab)*`
   *     to `(?:ab)*`),
+  *   - for an alternative of a repetition that starts with a character of an earlier one, a negative look-ahead of the
+  *     earlier one or of its first atom before it (e.g. `(?:\{[^}]+\}|[^}])+` to `(?:\{[^}]+\}|(?!\{)[^}])+`),
+  *   - an optional atom at the end of an alternative of the last item of a repeated body removed, if another
+  *     alternative reads its characters after the nullable items before (e.g. `(?:.*(?:\r\n?|\n))*` to
+  *     `(?:.*(?:\r|\n))*`),
   *   - a repetition of the powers of a word `u` written with its least power `u^p` and the least power of each other
   *     remainder modulo `p`, which read a string in one way (e.g. `(?:aa|aaa)*` to `(?:aa)*(?:aaa)?`, and `(aa|aaa)*`
   *     to `(?:(?:aa)*(aa|aaa))?` with the capture of the last iteration),
@@ -242,6 +247,8 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
           candidates ++= unrollRepetition(n, child, q)
           candidates ++= removeRepeatedAlternatives(child, q).map(Candidate(_))
           candidates ++= rewritePowers(n, child, q)
+          candidates ++= excludeEarlierAlternatives(child, q).map(Candidate(_))
+          candidates ++= removeRereadOptionals(child).map(Candidate(_))
         case NodeData.Disjunction(alternatives) => candidates ++= trimAlternatives(n, alternatives).map(Candidate(_))
         case NodeData.Sequence(elements)        => candidates ++= separateAdjacent(items(elements)).map(Candidate(_))
         case _                                  => ()
@@ -421,6 +428,74 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
         word <- words(i)
         if !hasCapture(alternatives(i)) && readsInTurn(word, words.take(i).flatten)
       yield removeAlternative(disjunction, alternatives, i)
+
+  /** The first atom that the node reads, if it starts with one that it reads at least once. */
+  private def firstAtom(n: Node): Option[Node] = unblank(n).data match
+    case NodeData.Sequence(ns)                               => items(ns).headOption.flatMap(firstAtom)
+    case NodeData.Group(GroupKind.NonCapture, child)         => firstAtom(child)
+    case NodeData.Repeat(atom, q, _) if minimumCount(q) >= 1 => firstAtom(atom)
+    case _                                                   => Option.when(isAtom(unblank(n)))(unblank(n))
+
+  /** For an alternative of a repetition that starts with a character of an earlier one, a negative look-ahead of the
+    * earlier one or of its first atom before it (e.g. `(?:\{[^}]+\}|[^}])+` to `(?:\{[^}]+\}|(?!\{)[^}])+`).
+    */
+  private def excludeEarlierAlternatives(child: Node, q: Quantifier): Seq[Node] =
+    if q.strategy == BacktrackStrategy.Possessive then Seq.empty
+    else
+      for
+        disjunction <- disjunctionIn(child).toSeq
+        alternatives = disjunction.data match
+          case NodeData.Disjunction(ns) => ns
+          case _                        => Seq.empty
+        i <- alternatives.indices.drop(1)
+        set <- firstAtom(alternatives(i)).flatMap(setOf).toSeq
+        earlier <- alternatives.take(i)
+        if !hasCapture(earlier)
+        atom <- firstAtom(earlier).toSeq
+        if setOf(atom).exists(_.intersect(set).nonEmpty)
+        excluded <- Seq(atom, unblank(earlier)).distinct
+      yield
+        val lookAhead = Node(NodeData.Group(GroupKind.NegativeLookAhead(AssertNameStyle.Symbolic), excluded))
+        edit(alternatives(i) -> Seq(lookAhead, alternatives(i)))
+
+  private def isNullable(n: Node): Boolean = unblank(n).data match
+    case NodeData.Repeat(_, q, _)                    => minimumCount(q) == 0
+    case NodeData.Group(GroupKind.NonCapture, child) => isNullable(child)
+    case NodeData.Sequence(ns)                       => items(ns).forall(isNullable)
+    case NodeData.Disjunction(ns)                    => ns.exists(isNullable)
+    case _                                           => false
+
+  /** An optional atom at the end of an alternative of the last item of a repeated body removed, if another alternative
+    * reads its characters after the nullable items before, since the next iteration reads them then (e.g.
+    * `(?:.*(?:\r\n?|\n))*` to `(?:.*(?:\r|\n))*`).
+    */
+  private def removeRereadOptionals(child: Node): Seq[Node] =
+    def nonCapture(n: Node): Node = unblank(n).data match
+      case NodeData.Group(GroupKind.NonCapture, c) => nonCapture(c)
+      case _                                       => unblank(n)
+    val elements = nonCapture(child).data match
+      case NodeData.Sequence(ns) => items(ns)
+      case _                     => Seq(nonCapture(child))
+    for
+      last <- elements.lastOption.toSeq
+      if elements.init.forall(isNullable)
+      disjunction <- disjunctionIn(last).toSeq
+      alternatives = disjunction.data match
+        case NodeData.Disjunction(ns) => ns.map(unblank)
+        case _                        => Seq.empty
+      (alternative, k) <- alternatives.zipWithIndex
+      altItems = alternative.data match
+        case NodeData.Sequence(ns) => items(ns)
+        case _                     => Seq(alternative)
+      if altItems.size >= 2
+      optional = altItems.last
+      word <- (optional.data match
+        case NodeData.Repeat(x, Quantifier.Question(_), _) => setWord(x)
+        case _                                             => None
+      ).toSeq
+      if alternatives.indices.exists: m =>
+        m != k && setWord(alternatives(m)).exists(w => w.size == word.size && word.zip(w).forall(_.subsetOf(_)))
+    yield edit(optional -> Seq.empty)
 
   /** A repetition of the powers of a word `u` written with its least power `u^p` and the least power of each other
     * remainder modulo `p`, as concatenations of the alternatives, which read a string in one way (e.g. `(?:aa|aaa)*` to

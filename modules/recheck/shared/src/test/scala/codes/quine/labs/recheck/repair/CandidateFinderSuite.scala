@@ -86,6 +86,20 @@ class CandidateFinderSuite extends munit.FunSuite:
     assert(!edited("(?:ab|ba)*").contains("(?:ab)*"))
     assert(!edited("(?:a|(aa))*").contains("(?:a)*"))
 
+  test("CandidateFinder#find: alternatives of repetitions without the earlier ones"):
+    assert(clue(edited("(?:\\{[^}]+\\}|[^}])+")).containsSlice(Seq("(?:\\{[^}]+\\}|(?!\\{)[^}])+")))
+    assert(clue(edited("(?:\\{[^}]+\\}|[^}])+")).contains("(?:\\{[^}]+\\}|(?!\\{[^}]+\\})[^}])+"))
+    // An alternative that starts with no character of the earlier one, or an earlier one with a capture, gives none.
+    assert(!edited("(?:\\{[^}]+\\}|a)+").exists(_.contains("(?!\\{")))
+    assert(!edited("(?:(\\{)[^}]+\\}|[^}])+").exists(_.contains("(?!\\{")))
+
+  test("CandidateFinder#find: optional atoms read by the next iteration"):
+    assert(clue(edited("(?:.*(?:\\r\\n?|\\n))*")).contains("(?:.*(?:\\r|\\n))*"))
+    assert(clue(edited("(?:\\r\\n?|\\n)*")).contains("(?:\\r|\\n)*"))
+    // `x` is not nullable, and no alternative reads `\n` alone.
+    assert(!edited("(?:x(?:\\r\\n?|\\n))*").contains("(?:x(?:\\r|\\n))*"))
+    assert(!edited("(?:.*(?:\\r\\n?|a))*").contains("(?:.*(?:\\r|a))*"))
+
   test("CandidateFinder#find: repetitions of the powers of a word"):
     assert(clue(edited("(?:aa|aaa)*")).contains("(?:aa)*(?:aaa)?"))
     assert(clue(edited("(?:aaa|aaaaa)*")).contains("(?:aaa)*(?:aaaaa|aaaaaaaaaa)?"))
