@@ -137,6 +137,39 @@ private final class AutomatonChecker[A, Q, P](
 
   private def coreachable(i: Int): BitSet = sccCoreachable.getOrElseUpdate(i, reach(i, sccPredecessors))
 
+  /** The first number of the states of each SCC, where the states are numbered in the order of the SCCs. */
+  private lazy val sccStateStarts = scc.scanLeft(0)(_ + _.size)
+
+  /** The SCC of each numbered state. */
+  private lazy val stateSccs = scc.indices.flatMap(i => Iterator.fill(scc(i).size)(i))
+
+  /** The numbers of the states that each numbered state has transitions to. */
+  private lazy val stateSuccessors = interrupt:
+    val numbers = (for (sc, i) <- scc.zipWithIndex; (q, k) <- sc.zipWithIndex yield q -> (sccStateStarts(i) + k)).toMap
+    val successors = Array.fill(numbers.size)(Vector.newBuilder[Int])
+    for (q1, _, q2) <- graph.edges do interrupt(successors(numbers(q1)).addOne(numbers(q2)))
+    successors.map(_.result().distinct).toIndexedSeq
+
+  /** The other SCCs that each SCC reaches, nearest first by the length of the input to them, computed when needed. */
+  private val sccNearest = mutable.Map.empty[Int, IndexedSeq[Int]]
+
+  private def nearest(i: Int): IndexedSeq[Int] =
+    sccNearest.getOrElseUpdate(
+      i,
+      interrupt:
+        val starts = sccStateStarts(i) until sccStateStarts(i + 1)
+        val seen = mutable.BitSet()
+        seen ++= starts
+        val queue = mutable.Queue.from(starts)
+        val order = mutable.LinkedHashSet.empty[Int]
+        while queue.nonEmpty do
+          interrupt:
+            for q <- stateSuccessors(queue.dequeue()) if seen.add(q) do
+              order.add(stateSccs(q))
+              queue.enqueue(q)
+        order.toIndexedSeq
+    )
+
   /** A map from a pair of the indices of SCCs to the transitions between them by the letters. */
   private val sccPairEdges = interrupt:
     scc.indices
@@ -249,9 +282,11 @@ private final class AutomatonChecker[A, Q, P](
         if maxDegree == 0 then (if sccIsAtom(sc) then 0 else 1, Vector.empty)
         else if sccIsAtom(sc) then (maxDegree, maxPumps)
         else
-          // Appends an IDA structure between the SCC and the maximum chain's source into the chain.
+          // Appends an IDA structure between the SCC and the maximum chain's source into the chain. The nearest target
+          // comes first, since a witness through less of the pattern is likelier to run as it is (e.g. not through
+          // the copy of a capture that an upper bound makes for a back-reference).
           val result = interrupt:
-            reachable(sc).iterator
+            nearest(sc).iterator
               .filter: target =>
                 sc != target && !sccIsAtom(target) && findIDAChain(target)._1 == maxDegree &&
                   // If the intersection of lookahead states of `sc` and `target` is empty,
