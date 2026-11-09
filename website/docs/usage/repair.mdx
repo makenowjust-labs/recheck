@@ -85,6 +85,7 @@ An edit may remove a capture that is not kept, so the later captures may have sm
 
 - `safe` means that the automaton checker finds the regular expression safe, so it needs no repair.
 - `repaired` means that the repair found a better regular expression.
+  When the time runs out after it found one, the result is the best one so far, which may not be safe.
 - `unknown` means that the repair found no better regular expression (`error` is `null`), or it could not finish because of the `error`.
   The `kind` of the error is one of `timeout`, `cancel`, `unsupported`, `invalid`, `invalid-keep` and `unexpected`.
   The repair needs the automaton checker.
@@ -98,7 +99,7 @@ A `repaired` one also has the following fields.
   It is written from the syntax tree, which keeps the regular expression as written, except the whitespace in a construct (e.g. `{1, 3}` is written as `{1,3}`).
   A case or quoting command of a Perl regex literal that does not cover whole items is written as applied (e.g. `x\Ua|b\Ey` is written as `xA|By`).
 - `complexity` is the complexity of the repaired regular expression (see [Complexity](diagnostics.mdx#complexity)).
-  It is safe unless no edit makes the regular expression safe (e.g. an exponential one repaired into a quadratic one).
+  It is safe unless no edit makes the regular expression safe (e.g. an exponential one repaired into a quadratic one), or the time runs out first.
 - `kept` is the numbers of the kept captures, where `0` is the match.
 - `unitMode` is the unit of the input of the comparison (see [Matching Units](dialects.mdx#matching-units)).
 - `comparison` tells how the matches compare.
@@ -107,7 +108,7 @@ A `repaired` one also has the following fields.
     `input` is the shortest input on which they differ, which is an array of the units instead when a string cannot carry them exactly, as an attack string is.
     `original` and `repaired` are their matches on it: the begin and the end of each kept capture in the order of `kept` (`null` for an unset capture), or `null` for no match.
     The positions are in the units of `unitMode`.
-  - `unknown` means that the comparison does not support the regular expressions.
+  - `unknown` means that the comparison does not support the regular expressions, or that the time runs out before it finishes.
 
 ## Approximations
 
