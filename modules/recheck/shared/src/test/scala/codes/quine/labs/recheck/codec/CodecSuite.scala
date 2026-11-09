@@ -567,6 +567,7 @@ class CodecSuite extends munit.FunSuite:
           "dialect" := Json.obj("name" := "perl", "utf8" := false, "source" := "string"),
           "maxRefutedAttacks" := 123,
           "maxRefutedAttackPartSize" := 123,
+          "repairAttackTimeout" := 123,
           "repairTimeout" := 123
         )
       ),
@@ -608,6 +609,7 @@ class CodecSuite extends munit.FunSuite:
           dialect = Dialect.Perl(utf8 = false, source = PerlSource.String),
           maxRefutedAttacks = 123,
           maxRefutedAttackPartSize = 123,
+          repairAttackTimeout = Duration(123, MILLISECONDS),
           repairTimeout = Duration(123, MILLISECONDS)
         )
       )

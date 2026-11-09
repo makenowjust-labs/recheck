@@ -72,13 +72,14 @@ private[recheck] object Repair:
     * `captures` are the indices of the captures to keep and `0` is the whole match.
     *
     * The checker of `params` checks the original and the result as [[ReDoS.check]] does, so a safe result is what it
-    * finds safe, and it scores the edits with the generations of the fuzz checker [[FuzzScale]] times smaller. Each
-    * round takes the best edit by the complexity after it, preferring an equivalent one, or else the one that differs
-    * on the longest input among the first [[MaxDifferent]] best ones. Without a better edit, it tries the next edits
-    * after each of the first [[MaxNeutral]] equivalent edits keeping the score, up to [[MaxNeutralDepth]] of them in
-    * turn, and takes them if they end better and equivalent. It stops when the pattern is safe, no edit makes it
-    * better, or after [[MaxRounds]] rounds. An edit may remove a capture not kept, which renumbers the later ones. It
-    * throws [[UnsupportedException]] when the checker does not support the original pattern.
+    * finds safe, and it scores the edits with the generations of the fuzz checker [[FuzzScale]] times smaller and
+    * `params.repairAttackTimeout` for an attack. Each round takes the best edit by the complexity after it, preferring
+    * an equivalent one, or else the one that differs on the longest input among the first [[MaxDifferent]] best ones.
+    * Without a better edit, it tries the next edits after each of the first [[MaxNeutral]] equivalent edits keeping the
+    * score, up to [[MaxNeutralDepth]] of them in turn, and takes them if they end better and equivalent. It stops when
+    * the pattern is safe, no edit makes it better, or after [[MaxRounds]] rounds. An edit may remove a capture not
+    * kept, which renumbers the later ones. It throws [[UnsupportedException]] when the checker does not support the
+    * original pattern.
     *
     * When the time runs out after a round, the result is the pattern of the rounds so far, which is equivalent if every
     * edit is, and else compared only if the time allows, and its complexity is the score of the edit if the time does
@@ -92,7 +93,8 @@ private[recheck] object Repair:
     val smallerFuzz = params.copy(
       maxIteration = (params.maxIteration / FuzzScale).max(1),
       maxInitialGenerationSize = (params.maxInitialGenerationSize / FuzzScale).max(1),
-      maxGenerationSize = (params.maxGenerationSize / FuzzScale).max(1)
+      maxGenerationSize = (params.maxGenerationSize / FuzzScale).max(1),
+      attackTimeout = params.repairAttackTimeout
     )
 
     // Scores the pattern with the smaller fuzz generations, or with `params` as `check` does.
