@@ -1,6 +1,8 @@
 package codes.quine.labs.recheck
 package repair
 
+import scala.collection.mutable
+
 import codes.quine.labs.recheck.automaton.Complexity
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.InvalidRegExpException
@@ -93,42 +95,66 @@ private[recheck] object Repair:
 
     // Returns the best edit of the round, with its comparison.
     def step(current: Pattern, indices: Seq[Int], score: Score): Option[(Pattern, Seq[Int], Score, Comparison)] =
-      val started = System.nanoTime()
-      val candidates = current.candidates(score.spots, indices.toSet)
-      val improved = candidates
+      var scoring = 0L
+      var scored = 0
+      var comparing = 0L
+      val comparisons = mutable.Map.empty[String, Comparison]
+
+      def growth(next: Pattern): Int = next.source.length - current.source.length
+
+      def compareOnce(next: Pattern, nextIndices: Seq[Int]): Comparison =
+        comparisons.getOrElseUpdate(
+          next.source, {
+            val started = System.nanoTime()
+            try compare(current, indices, next, nextIndices)
+            finally comparing += System.nanoTime() - started
+          }
+        )
+
+      // The edits in the order that breaks the ties of the scores, so the first safe and equivalent one is the best.
+      val edits = current
+        .candidates(score.spots, indices.toSet)
         .flatMap: candidate =>
-          for
-            next <- parseEdited(current.print(candidate.node))
-            nextScore <- Score.of(next.ir, params)
-            if nextScore > score
-          yield
-            val nextIndices = indices.map(i => i - candidate.removedCaptures.count(_ < i))
-            (next, nextIndices, nextScore, candidate)
-        .sortBy: (next, _, nextScore, candidate) =>
-          val growth = next.source.length - current.source.length
-          (-nextScore.rank, nextScore.count, nextScore.isUpperBound, candidate.isFallback, growth)
-      val scored = System.nanoTime()
-      var comparisons = 0
-      val compared = LazyList
-        .from(improved)
-        .map: (next, nextIndices, nextScore, _) =>
-          comparisons += 1
-          (next, nextIndices, nextScore, compare(current, indices, next, nextIndices))
-      // Without an equivalent edit, the best ones differ on the longest input.
-      val chosen = compared
-        .find(_._4 == Comparison.Equivalent)
+          parseEdited(current.print(candidate.node)).map: next =>
+            (next, indices.map(i => i - candidate.removedCaptures.count(_ < i)), candidate)
+        .sortBy((next, _, candidate) => (candidate.isFallback, growth(next)))
+      val improved = LazyList
+        .from(edits)
+        .flatMap: (next, nextIndices, candidate) =>
+          val started = System.nanoTime()
+          val nextScore =
+            try Score.of(next.ir, params)
+            finally
+              scoring += System.nanoTime() - started
+              scored += 1
+          nextScore.filter(_ > score).map((next, nextIndices, _, candidate))
+      val chosen = improved
+        .find((next, nextIndices, nextScore, _) =>
+          nextScore.isSafe && !nextScore.isUpperBound && compareOnce(next, nextIndices) == Comparison.Equivalent
+        )
+        .map((next, nextIndices, nextScore, _) => (next, nextIndices, nextScore, Comparison.Equivalent))
         .orElse:
-          compared.headOption.flatMap: (_, _, best, _) =>
-            compared
-              .takeWhile((_, _, score, _) => score.rank == best.rank && score.count == best.count)
-              .take(MaxDifferent)
-              .maxByOption:
-                case (_, _, _, Comparison.Different(input)) => input.length
-                case _                                      => -1
-      val finished = System.nanoTime()
+          val compared = LazyList
+            .from(
+              // The rank is negated as a `Long`, since `-Int.MinValue` (the rank of an exponential one) overflows.
+              improved.sortBy: (next, _, nextScore, candidate) =>
+                (-nextScore.rank.toLong, nextScore.count, nextScore.isUpperBound, candidate.isFallback, growth(next))
+            )
+            .map((next, nextIndices, nextScore, _) => (next, nextIndices, nextScore, compareOnce(next, nextIndices)))
+          // Without an equivalent edit, the best ones differ on the longest input.
+          compared
+            .find(_._4 == Comparison.Equivalent)
+            .orElse:
+              compared.headOption.flatMap: (_, _, best, _) =>
+                compared
+                  .takeWhile((_, _, score, _) => score.rank == best.rank && score.count == best.count)
+                  .take(MaxDifferent)
+                  .maxByOption:
+                    case (_, _, _, Comparison.Different(input)) => input.length
+                    case _                                      => -1
       ctx.log:
-        s"""|repair: ${candidates.size} candidates (${improved.size} better) scored in ${(scored - started) / 1000000} ms,
-            |  $comparisons compared in ${(finished - scored) / 1000000} ms""".stripMargin
+        s"""|repair: ${edits.size} candidates, $scored scored in ${scoring / 1000000} ms,
+            |  ${comparisons.size} compared in ${comparing / 1000000} ms""".stripMargin
       chosen
 
     // `indices` are the current indices of `captures`, and `isEquivalent` tells whether every edit so far is.
