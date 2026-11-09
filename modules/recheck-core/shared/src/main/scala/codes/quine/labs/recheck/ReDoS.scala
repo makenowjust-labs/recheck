@@ -112,12 +112,14 @@ object ReDoS:
       val requested = keep.captureIndices(original.ir)
       val fewer = Seq(Keep.MatchRange, Keep.Match).map(_.captureIndices(original.ir)).filter(_.size < requested.size)
       // A search keeping fewer captures is the result only if it is safe, and the time it runs out keeps the earlier.
-      val (kept, found) = fewer.distinct.foldLeft((requested, Repair.search(original, requested, params))):
+      // The searches share the scores of the patterns.
+      val scores = Repair.Scores()
+      val (kept, found) = fewer.distinct.foldLeft((requested, Repair.search(original, requested, params, scores))):
         case (best @ (_, found), _) if isSafe(found) => best
         case (best, indices)                         =>
           ctx.log(s"repair: keep ${indices.mkString("[", ", ", "]")}")
           try
-            val found = Repair.search(original, indices, params)
+            val found = Repair.search(original, indices, params, scores)
             if isSafe(found) then (indices, found) else best
           catch case _: TimeoutException => best
       found match

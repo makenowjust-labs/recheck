@@ -83,13 +83,24 @@ private[recheck] object Repair:
     * When the time runs out after a round, the result is the pattern of the rounds so far, which is equivalent if every
     * edit is, and else compared only if the time allows, and its complexity is the score of the edit if the time does
     * not allow checking it.
+    *
+    * The searches with the same `scores` share the scores of the patterns, which do not depend on `captures`.
     */
-  def search(original: Pattern, captures: Seq[Int], params: Parameters)(using ctx: Context): Result =
+  def search(original: Pattern, captures: Seq[Int], params: Parameters, scores: Scores = Scores())(using
+      ctx: Context
+  ): Result =
     val smallerFuzz = params.copy(
       maxIteration = (params.maxIteration / FuzzScale).max(1),
       maxInitialGenerationSize = (params.maxInitialGenerationSize / FuzzScale).max(1),
       maxGenerationSize = (params.maxGenerationSize / FuzzScale).max(1)
     )
+
+    // Scores the pattern with the smaller fuzz generations, or with `params` as `check` does.
+    def scoreOf(pattern: Pattern, asCheck: Boolean): Option[Score] =
+      scores.scores.getOrElseUpdate(
+        (pattern.source, asCheck),
+        Score.of(pattern.ir, if asCheck then params else smallerFuzz)
+      )
 
     def compare(a: Pattern, aIndices: Seq[Int], b: Pattern, bIndices: Seq[Int]): Comparison =
       try
@@ -148,10 +159,13 @@ private[recheck] object Repair:
         .flatMap: (next, nextIndices, candidate) =>
           val started = System.nanoTime()
           val nextScore =
-            try Score.of(next.ir, smallerFuzz)
+            try scoreOf(next, asCheck = false)
             finally
               scoring += System.nanoTime() - started
               scored += 1
+          ctx.log:
+            val result = nextScore.fold("unsupported")(_.complexity.toString)
+            s"repair: score $result in ${(System.nanoTime() - started) / 1000000} ms of /${next.source}/"
           nextScore.map((next, nextIndices, _, candidate))
       val improved = scoredEdits.filter(_._3 > score)
       val chosen = improved
@@ -234,7 +248,7 @@ private[recheck] object Repair:
             loop(next, nextIndices, nextScore, round + 1, isEquivalent && comparison == Comparison.Equivalent)
           case None => (current, indices, score, isEquivalent)
 
-    Score.of(original.ir, params) match
+    scoreOf(original, asCheck = true) match
       case None                        => throw new UnsupportedException("the checker cannot check the pattern")
       case Some(score) if score.isSafe => Result.Safe
       case Some(score)                 =>
@@ -253,7 +267,7 @@ private[recheck] object Repair:
             if !fixedScore.complexity.isFuzz then fixedScore
             else
               ctx.log("repair: check of the result")
-              try Score.of(fixed.ir, params).getOrElse(fixedScore)
+              try scoreOf(fixed, asCheck = true).getOrElse(fixedScore)
               catch case _: TimeoutException => fixedScore
           Result.Repaired(fixed, indices, checked.complexity, comparison)
 
@@ -299,6 +313,10 @@ private[recheck] object Repair:
     def parse(source: String, flags: String, dialect: Dialect)(using ctx: Context): Pattern =
       val (flagSet, node, ir) = ReDoS.parseTree(source, flags, dialect)
       Pattern(source, flags, dialect, flagSet, node, ir)
+
+  /** Scores keeps the scores of the patterns by their sources, and whether they are checked as `check` does. */
+  final class Scores:
+    private[Repair] val scores = mutable.Map.empty[(String, Boolean), Option[Score]]
 
   /** Score is the vulnerabilities of a pattern that the checker finds, with the rank of the worst one (higher is
     * better), their count, the spots of the worst one, and the complexity.
