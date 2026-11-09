@@ -160,6 +160,15 @@ class CandidateFinderSuite extends munit.FunSuite:
     // Without `\K`, the match is not kept.
     assert(!edited("foo[a-z]*bar").exists(_.startsWith("(?<!")))
     assert(clue(find("foo[a-z]*bar", kept = Some(Set.empty))).exists(_._1 == "(?<![a-z])(?:(?!foo)[a-z])*foo[a-z]*bar"))
+    // The items may have repetitions and captures if a later one starts after the first one, as the first atom reads
+    // none of the characters of the rest. The look-ahead has no captures.
+    def restricted(source: String): Seq[String] =
+      find(source, kept = Some(Set.empty)).map(_._1).filter(_.startsWith("(?<!"))
+    assert(clue(restricted("; *(Pixel.*?)x")).contains("(?<!.)(?:(?!; *Pixel).)*; *(Pixel.*?)x"))
+    assertEquals(restricted("(M) (\\d+|x).*X"), Seq("(?<!.)(?:(?!M (?:\\d+|x)).)*(M) (\\d+|x).*X"))
+    // A later `P` may end first (e.g. on `baXa`), or `P` may read what `E` does not.
+    assertEquals(restricted("(?:a|b.{3}).*X"), Seq.empty)
+    assertEquals(restricted("a\\n?.*X"), Seq.empty)
 
   test("CandidateFinder#find: written forms and quotes"):
     // The nodes keep their written forms, including a repetition whose body is edited.

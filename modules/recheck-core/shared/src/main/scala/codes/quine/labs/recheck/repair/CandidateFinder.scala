@@ -61,9 +61,9 @@ private[repair] final case class Candidate(
   *     `[ab]*`, `\s*,?\s*` to `\s*(?:,\s*)?`, and `\d+\.?\d+` to `\d+(?:\.\d+|\d)`),
   *   - a repetition of words with an optional separator unrolled (e.g. `(?:\w+\s?)*` to `(?:\w+(?:\s\w+)*\s?)?`), or
   *     `(?:L M T)*` unrolled to `(?:L M (?:L M)* T)?` if `L` reads the characters of `T` (e.g. `(?:\s*X\s*)*`), and
-  *   - for a search whose fixed items `P` at the start (possibly none) are followed by a repetition of a fixed-width
-  *     `E`, a negative look-behind of `E` and `E` read up to the first `P` before it, so a match starts only at the
-  *     first `P` in what `E` reads in turn (e.g. `\s*$` to `(?<!\s)\s*$`, and `foo[a-z]*bar` to
+  *   - for a search whose items `P` at the start (possibly none) are followed by a repetition of a fixed-width `E`, a
+  *     negative look-behind of `E` and `E` read up to the first `P` before it, so a match starts only at the first `P`
+  *     in what `E` reads in turn (e.g. `\s*$` to `(?<!\s)\s*$`, and `foo[a-z]*bar` to
   *     `(?<![a-z])(?:(?!foo)[a-z])*foo[a-z]*bar`, with `\K` before `foo` if the dialect has it).
   *
   * An edit does not copy a capture, and it removes only the captures not in `kept`, which are the indices of the
@@ -217,6 +217,20 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
           (stripped, index +: indices)
         case _ => (n, Seq.empty)
     case _ => (n, Seq.empty)
+
+  /** Returns a copy of the node without the captures, where a group remains only if the parser needs it. */
+  private def uncaptured(n: Node): Node = n.data match
+    case NodeData.Group(kind, child) if isCapture(kind) =>
+      val inner = uncaptured(child)
+      if unblank(inner).data.isInstanceOf[NodeData.Disjunction] then group(inner) else inner
+    case NodeData.Group(kind, child)         => n.copy(data = NodeData.Group(kind, uncaptured(child)))
+    case NodeData.Sequence(ns)               => sequence(ns.map(uncaptured))
+    case NodeData.Disjunction(ns)            => n.copy(data = NodeData.Disjunction(ns.map(uncaptured)))
+    case data @ NodeData.Repeat(child, _, _) =>
+      val inner = uncaptured(child)
+      val repeated = if isAtom(inner) || inner.data.isInstanceOf[NodeData.Group] then inner else group(inner)
+      n.copy(data = data.copy(node = repeated))
+    case _ => n
 
   /** Lists the candidates around the atoms at the spots. */
   def find(spots: Set[SourceLocation]): Seq[Candidate] =
@@ -639,24 +653,26 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
         edit(middle -> Seq(replacement), next -> Seq.empty)
       pairs ++ optional
 
-  /** For a search whose fixed items `P` at the start (possibly none) are followed by a repetition of a fixed-width `E`,
+  /** For a search whose items `P` at the start (possibly none) are followed by a repetition of a fixed-width `E`,
     * either of which is hot, a negative look-behind of `E` and `E` read up to the first `P` before it, as
     * `(?<!E)(?:(?!P)E)*`, so a match starts only at the first `P` in what `E` reads in turn (e.g. `\s*$` to
-    * `(?<!\s)\s*$`, and `foo[a-z]*bar` to `(?<![a-z])(?:(?!foo)[a-z])*foo[a-z]*bar`). Without `P`, it does not move the
-    * start of a match. With `P`, it does, so `\K` before `P` keeps the start if the dialect has it, and else the match
-    * is not kept.
+    * `(?<!\s)\s*$`, `foo[a-z]*bar` to `(?<![a-z])(?:(?!foo)[a-z])*foo[a-z]*bar`, and `; *(Pixel.*)x` to
+    * `(?<!.)(?:(?!; *Pixel).)*; *(Pixel.*)x`). `P` is the items up to the repetition in the groups around it, without
+    * the captures in the look-ahead. Without `P`, it does not move the start of a match. With `P`, it does, so `\K`
+    * before `P` keeps the start if the dialect has it, and else the match is not kept.
     */
-  private def restrictStarts(hot: SourceLocation => Boolean): Option[Node] =
-    def elements(n: Node): Seq[Node] = n.data match
-      case NodeData.Sequence(ns)                       => items(ns)
-      case NodeData.Group(GroupKind.NonCapture, child) => elements(child)
-      case _                                           => Seq(n)
-
-    // The first item that is not a group, without the fixed items.
-    def first(n: Node): Node = n.data match
-      case NodeData.Sequence(ns) if items(ns).nonEmpty                                    => first(items(ns).head)
-      case NodeData.Group(kind, child) if kind == GroupKind.NonCapture || isCapture(kind) => first(child)
-      case _                                                                              => n
+  private def restrictStarts(hot: SourceLocation => Boolean): Seq[Node] =
+    // The ways to split the items at the start into the items before a repetition and the repetition, where the groups
+    // around the repetition are opened.
+    def splits(ns: Seq[Node]): LazyList[(Seq[Node], Node)] = ns match
+      case Seq()     => LazyList.empty
+      case n +: rest =>
+        val inside = n.data match
+          case NodeData.Repeat(_, q, _) if min(q).nonEmpty => LazyList((Seq.empty, n))
+          case NodeData.Sequence(ms)                       => splits(items(ms))
+          case NodeData.Group(kind, child) if kind == GroupKind.NonCapture || isCapture(kind) => splits(Seq(child))
+          case _                                                                              => LazyList.empty
+        inside #::: splits(rest).map((before, repeated) => (n +: before, repeated))
 
     // `D` of `(?:(?!X)D)`, which is read up to the first `X` (see `readUntil`).
     def plain(n: Node): Node = n.data match
@@ -669,21 +685,44 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
           case _ => n
       case _ => n
 
-    val prefix = elements(node).takeWhile(e => setWord(e).exists(_.nonEmpty))
-    val repetition = elements(node).drop(prefix.size).headOption.map(e => if prefix.isEmpty then first(e) else e)
-    for
-      repeated <- repetition
-      (body, q) <- repeated.data match
-        case NodeData.Repeat(body, q, _) if min(q).nonEmpty => Some((plain(body), q))
-        case _                                              => None
-      // A fixed width is what a look-behind of any dialect may have.
-      word <- setWord(body)
-      // The restarts of the search make `P` hot too.
-      if ir.needsSigmaStarAtBegin && (repeated +: prefix).exists(n => hot(n.loc))
-      if q.strategy != BacktrackStrategy.Possessive
-      cut = prefix.nonEmpty && features.hasBackslashCut
-      if prefix.isEmpty || cut || !kept.contains(0)
-    yield
+    // The first atom of the node, if it reads it once first.
+    def leading(n: Node): Option[Node] = unblank(n).data match
+      case NodeData.Sequence(ns) => items(ns).headOption.flatMap(leading)
+      case NodeData.Group(kind, child) if kind == GroupKind.NonCapture || isCapture(kind) => leading(child)
+      case _ => Option.when(isAtom(unblank(n)))(unblank(n))
+
+    def atoms(n: Node): Seq[Node] = if isAtom(n) then Seq(n) else children(n).flatMap(atoms)
+
+    val referred = ir.node.exists:
+      case _: IRNodeData.BackReference | _: IRNodeData.Conditional => true
+      case _                                                       => false
+
+    // A later `P` in what `E` reads ends no earlier than the first one, if `P` has a fixed width, or if its first atom
+    // reads none of the characters of the rest, so a later `P` starts after the shortest match of the first one. `E`
+    // reads the characters of `P` then, so the first one reaches what a later one does.
+    def endsFirst(p: Node, word: Seq[CharSet]): Boolean =
+      setWord(p).nonEmpty || ((word, leading(p).flatMap(first => setOf(first).map((first, _)))) match
+        case (Seq(e), Some((first, set))) if !referred =>
+          val rest = atoms(p).filter(_ ne first).flatMap(setOf).foldLeft(CharSet.empty)(_.union(_))
+          set.intersect(rest).isEmpty && set.union(rest).subsetOf(e)
+        case _ => false)
+
+    val restricted =
+      for
+        (prefix, repeated) <- splits(Seq(node))
+        (body, q) <- repeated.data match
+          case NodeData.Repeat(body, q, _) => Some((plain(body), q))
+          case _                           => None
+        // A fixed width is what a look-behind of any dialect may have.
+        word <- setWord(body)
+        // The restarts of the search make `P` hot too.
+        if ir.needsSigmaStarAtBegin && (repeated +: prefix).exists(n => hot(n.loc))
+        if q.strategy != BacktrackStrategy.Possessive
+        cut = prefix.nonEmpty && features.hasBackslashCut
+        if prefix.isEmpty || cut || !kept.contains(0)
+        if prefix.isEmpty || endsFirst(sequence(prefix), word)
+      yield (prefix, body, cut)
+    restricted.toList.map: (prefix, body, cut) =>
       val opened = body.data match
         case NodeData.Group(GroupKind.NonCapture, child) => child
         case _                                           => body
@@ -694,6 +733,6 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
         val scan = (setOf(body), setWord(p)) match
           case (Some(set), Some(Seq(stop))) if set.diff(stop).nonEmpty => without(body, set, stop)
           case _                                                       =>
-            group(Node(NodeData.Group(GroupKind.NegativeLookAhead(AssertNameStyle.Symbolic), p)), opened)
+            group(Node(NodeData.Group(GroupKind.NegativeLookAhead(AssertNameStyle.Symbolic), uncaptured(p))), opened)
         val k = Option.when(cut)(Node(NodeData.Backslash(BackslashKind.Assert(AssertKind.Cut))))
         edit(node -> (Seq(lookBehind, repeat(scan, Quantifier.Star(BacktrackStrategy.Greedy))) ++ k :+ node))
