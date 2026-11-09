@@ -485,3 +485,27 @@ class ReDoSSuite extends munit.FunSuite with SnapshotHelper:
     assertEquals(kept(Keep.MatchRange), Seq(0))
     assertEquals(kept(Keep.Match), Seq.empty)
     assertEquals(kept(Keep.Captures(Seq(1, "x"))), Seq(0, 1, 2))
+
+  test("ReDoS.repair: keeping less"):
+    // JavaScript has no `\K`, so the repair that moves the start of the match keeps only whether it matches.
+    assertEquals(
+      ReDoS.repair("Mozilla.*Mobile", ""),
+      Rx.Repaired(
+        "Mozilla.*Mobile",
+        "",
+        Dialect.JavaScript,
+        UnitMode.UTF16,
+        "(?<!.)(?:(?!Mozilla).)*Mozilla.*Mobile",
+        AttackComplexity.Linear,
+        Seq.empty,
+        Rx.Comparison.Equivalent
+      )
+    )
+    // PCRE keeps the start of the match by `\K`.
+    assertEquals(
+      ReDoS.repair("Mozilla.*Mobile", "", Parameters(dialect = Dialect.PCRE)) match
+        case r: Rx.Repaired => (r.repaired, r.kept)
+        case rx             => fail(s"not repaired: $rx")
+      ,
+      ("(?<!.)(?:(?!Mozilla).)*\\KMozilla.*Mobile", Seq(0))
+    )
