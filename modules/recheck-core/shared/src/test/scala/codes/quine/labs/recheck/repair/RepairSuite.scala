@@ -49,7 +49,7 @@ class RepairSuite extends munit.FunSuite:
 
   test("Repair.search: nested repetitions"):
     assertEquals(search("^(a+)+$"), repaired("^(a+)$"))
-    assertEquals(search("^(?:a+)+$", Dialect.Java), repaired("^(?:a)+$", Dialect.Java))
+    assertEquals(search("^(?:a+)+$", Dialect.Java), repaired("^a+$", Dialect.Java))
 
   test("Repair.search: alternatives"):
     assertEquals(search("^(?:a|a)*$"), repaired("^a*$"))
@@ -152,6 +152,8 @@ class RepairSuite extends munit.FunSuite:
     // The automaton checker finds them constant, but `ReDoS.check` with the auto checker finds them vulnerable.
     assertEquals(search("^(a|a){50}$"), repaired("^(a){50}$"))
     assertEquals(search("^(\\w+\\s?){1,50}$"), repaired("^(\\w+(?!\\w)\\s?){1,50}$"))
+    // A nested repetition is one repetition.
+    assertEquals(search("^(?:a+){2,40}$"), repaired("^a{2,}$"))
 
   test("Repair.search: back-references"):
     // Without the expansion, the fuzz checker checks a back-reference, while the comparison of the repairs still

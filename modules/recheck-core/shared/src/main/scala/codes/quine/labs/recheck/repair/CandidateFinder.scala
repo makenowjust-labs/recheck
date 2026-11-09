@@ -41,9 +41,10 @@ private[repair] final case class Candidate(
   *   - a repetition read up to the first `X` of the items after it, as `(?:(?!X)D)*` for a repetition of `D`, where `X`
   *     is the fixed items after it or their first atom (e.g. `.*Mobile` to `(?:(?!Mobile).)*Mobile`), and an atom
   *     without the characters of a single atom `X` is written as a class (e.g. `<(.*?)>` to `<([^>]*)>`, and `\s*\n` to
-  *     `[^\S\n]*\n`); a lazy repetition reads its minimum first and the rest greedily (e.g. `\[(.+?)\]` to
-  *     `\[(.[^\]]*)\]` with `s`),
+  *     `[^\S\n]*\n`); a repetition reads its minimum first and the rest greedily (e.g. `\[(.+?)\]` to `\[(.[^\]]*)\]`
+  *     with `s`),
   *   - a repetition read at most once or exactly its minimum (e.g. `(a+)+` to `(a+)`, and `(\s*)*` to `(\s*)?`),
+  *   - a repetition of a repetition without a maximum as one repetition (e.g. `(?:a+){2,40}` to `a{2,}`),
   *   - the characters of the earlier alternatives removed from a later one, or a later alternative removed if an
   *     earlier one is the same or covers it (e.g. `(?:\w|\d)` to `(?:\w)`),
   *   - an alternative of a repetition removed if the earlier ones read each of its strings in turn (e.g. `(?:ab|abab)*`
@@ -65,6 +66,9 @@ private[repair] final case class Candidate(
   *     negative look-behind of `E` and `E` read up to the first `P` before it, so a match starts only at the first `P`
   *     in what `E` reads in turn (e.g. `\s*$` to `(?<!\s)\s*$`, and `foo[a-z]*bar` to
   *     `(?<![a-z])(?:(?!foo)[a-z])*foo[a-z]*bar`, with `\K` before `foo` if the dialect has it).
+  *
+  * A repetition with a maximum has only the edits that keep the number of the iterations: a possessive one, reading up
+  * to the first `X`, its minimum, one repetition, and a negative look-ahead of an earlier alternative.
   *
   * An edit does not copy a capture, and it removes only the captures not in `kept`, which are the indices of the
   * captures that a repair keeps. The blanks of the extended mode are skipped between the items of a sequence, and the
@@ -264,11 +268,20 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
           candidates ++= makePossessive(n, child, q)
           candidates ++= readUntil(n, child, q, after(n)).map(Candidate(_))
           candidates ++= reduceRepetition(n, child, q).map(Candidate(_))
+          candidates ++= flattenRepetition(n, child, q).map(Candidate(_))
           candidates ++= unrollRepetition(n, child, q)
           candidates ++= removeRepeatedAlternatives(child, q).map(Candidate(_))
           candidates ++= rewritePowers(n, child, q)
           candidates ++= excludeEarlierAlternatives(child, q).map(Candidate(_))
           candidates ++= removeRereadOptionals(child).map(Candidate(_))
+        // A large maximum makes a repetition as slow as one without it, but only the edits that keep the number of the
+        // iterations apply to it.
+        case NodeData.Repeat(child, q, _) if maxCount(q).exists(_ > 1) =>
+          candidates ++= makePossessive(n, child, q)
+          candidates ++= readUntil(n, child, q, after(n)).map(Candidate(_))
+          candidates ++= reduceRepetition(n, child, q).map(Candidate(_))
+          candidates ++= flattenRepetition(n, child, q).map(Candidate(_))
+          candidates ++= excludeEarlierAlternatives(child, q).map(Candidate(_))
         case NodeData.Disjunction(alternatives) => candidates ++= trimAlternatives(n, alternatives).map(Candidate(_))
         case NodeData.Sequence(elements)        => candidates ++= separateAdjacent(items(elements)).map(Candidate(_))
         case _                                  => ()
@@ -292,13 +305,24 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
           Candidate(edit(n -> Seq(n, lookAhead)), isFallback = true)
 
   private def withStrategy(q: Quantifier, strategy: BacktrackStrategy): Quantifier = q match
-    case Quantifier.Star(_)         => Quantifier.Star(strategy)
-    case Quantifier.Plus(_)         => Quantifier.Plus(strategy)
-    case Quantifier.Unbounded(m, _) => Quantifier.Unbounded(m, strategy)
-    // Only a repetition without a maximum has candidates.
+    case Quantifier.Star(_)          => Quantifier.Star(strategy)
+    case Quantifier.Plus(_)          => Quantifier.Plus(strategy)
+    case Quantifier.Unbounded(m, _)  => Quantifier.Unbounded(m, strategy)
+    case Quantifier.Exact(n, _)      => Quantifier.Exact(n, strategy)
+    case Quantifier.Bounded(m, k, _) => Quantifier.Bounded(m, k, strategy)
+    case Quantifier.MaxBounded(k, _) => Quantifier.MaxBounded(k, strategy)
+    // A repetition read at most once has no candidates.
     // $COVERAGE-OFF$
-    case q => throw new IllegalArgumentException(s"a repetition with a maximum: $q")
+    case q => throw new IllegalArgumentException(s"a repetition read at most once: $q")
     // $COVERAGE-ON$
+
+  /** The maximum count of the repetition, if it has one. */
+  private def maxCount(q: Quantifier): Option[Int] = q match
+    case Quantifier.Star(_) | Quantifier.Plus(_) | Quantifier.Unbounded(_, _) => None
+    case Quantifier.Question(_)                                               => Some(1)
+    case Quantifier.Exact(n, _)                                               => Some(n)
+    case Quantifier.Bounded(_, k, _)                                          => Some(k)
+    case Quantifier.MaxBounded(k, _)                                          => Some(k)
 
   /** A repetition read up to the first `X` of the items after it, as `(?:(?!X)D)*` for a repetition of `D`, so an
     * iteration does not start where `X` matches (e.g. `.*Mobile` to `(?:(?!Mobile).)*Mobile`). `X` is the fixed items
@@ -318,11 +342,15 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
             case NodeData.Repeat(atom, q1, _) if minimumCount(q1) >= 1 && isAtom(atom) => Seq(atom)
             case _                                                                     => Seq.empty
       case _ => (firstAtom(fixed.head).toSeq ++ Seq(sequence(fixed))).distinctBy(x => setWord(x))
-    val m = min(q).getOrElse(0)
+    val m = minimumCount(q)
+    // The rest after the minimum keeps the maximum, if any.
+    val rest = maxCount(q) match
+      case None    => Quantifier.Star(BacktrackStrategy.Greedy)
+      case Some(k) => Quantifier.Bounded(0, k - m, BacktrackStrategy.Greedy)
     for
       x <- delimiters
       // Reading the minimum first would copy a capture in it.
-      if q.strategy != BacktrackStrategy.Possessive && !(m > 0 && hasCapture(child))
+      if q.strategy != BacktrackStrategy.Possessive && !(m > 0 && hasCapture(child)) && !maxCount(q).contains(m)
       stop <- firstSet(x).toSeq
       if firstSet(child).exists(_.intersect(stop).nonEmpty)
       body <- (setOf(child), setWord(x)) match
@@ -339,7 +367,7 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
         if m == 0 then Seq.empty
         else if m == 1 then Seq(child)
         else Seq(repeat(if isAtom(child) then child else group(child), Quantifier.Exact(m, BacktrackStrategy.Greedy)))
-      edit(n -> (head :+ repeat(body, Quantifier.Star(BacktrackStrategy.Greedy))))
+      edit(n -> (head :+ repeat(body, rest)))
 
   private def minimumCount(q: Quantifier): Int = q match
     case Quantifier.Star(_) | Quantifier.Question(_) | Quantifier.MaxBounded(_, _) => 0
@@ -348,14 +376,42 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
     case Quantifier.Bounded(min, _, _)                                             => min
     case Quantifier.Unbounded(min, _)                                              => min
 
-  /** The repetition read at most once, or exactly its minimum (e.g. `(a+)+` to `(a+)`, and `(.*,)+` to `(.*,)`). */
+  /** The repetition read at most once, or exactly its minimum (e.g. `(a+)+` to `(a+)`, `(.*,)+` to `(.*,)`, and
+    * `(?:a+){2,40}` to `(?:a+){2}`).
+    */
   private def reduceRepetition(n: Node, child: Node, q: Quantifier): Seq[Node] =
-    val quantifiers = min(q).toSeq.flatMap:
-      case 0 => Seq(Some(Quantifier.Question(q.strategy)), None)
-      case 1 => Seq(None)
-      case m => Seq(Some(Quantifier.Exact(m, BacktrackStrategy.Greedy)))
+    val m = minimumCount(q)
+    val quantifiers = if maxCount(q).contains(m) then Seq.empty
+    else
+      m match
+        case 0 => Seq(Some(Quantifier.Question(q.strategy)), None)
+        case 1 => Seq(None)
+        case m => Seq(Some(Quantifier.Exact(m, BacktrackStrategy.Greedy)))
     if q.strategy == BacktrackStrategy.Possessive then Seq.empty
     else quantifiers.map(q => edit(n -> Seq(q.fold(child)(repeat(child, _)))))
+
+  /** A repetition of a repetition without a maximum, read at least once, as one repetition of the inner body, which
+    * reads the same (e.g. `(?:a+){2,40}` to `a{2,}`).
+    */
+  private def flattenRepetition(n: Node, child: Node, q: Quantifier): Option[Node] =
+    def inner(c: Node): Node = unblank(c).data match
+      case NodeData.Group(GroupKind.NonCapture, g) => inner(g)
+      case _                                       => unblank(c)
+
+    for
+      (body, q1) <- inner(child).data match
+        case NodeData.Repeat(body, q1, _) => Some((body, q1))
+        case _                            => None
+      a <- min(q1)
+      m = minimumCount(q) * a
+      if minimumCount(q) >= 1 && !hasCapture(child)
+      if q.strategy != BacktrackStrategy.Possessive && q1.strategy != BacktrackStrategy.Possessive
+    yield
+      val flat = m match
+        case 0 => Quantifier.Star(q1.strategy)
+        case 1 => Quantifier.Plus(q1.strategy)
+        case _ => Quantifier.Unbounded(m, q1.strategy)
+      edit(n -> Seq(repeat(body, flat)))
 
   private def unrollRepetition(n: Node, child: Node, q: Quantifier): Option[Candidate] =
     val (body, removedCaptures) = strip(child)
