@@ -85,6 +85,11 @@ private[recheck] object Repair:
           .fold(Comparison.Equivalent)(Comparison.Different(_))
       catch case _: UnsupportedException => Comparison.Unknown
 
+    // Tests whether the patterns match the same strings, which is false if the comparison does not support them.
+    def matchesSame(a: Pattern, b: Pattern): Boolean =
+      try Equivalence.findCounterexample(a.ir, b.ir, Seq.empty, params.maxNFASize, params.maxDFASize).isEmpty
+      catch case _: UnsupportedException => false
+
     def parseEdited(source: String): Option[Pattern] =
       try Some(Pattern.parse(source, original.flags, original.dialect))
       catch
@@ -143,11 +148,15 @@ private[recheck] object Repair:
                 (-nextScore.rank.toLong, nextScore.count, nextScore.isUpperBound, candidate.isFallback, growth(next))
             )
             .map((next, nextIndices, nextScore, _) => (next, nextIndices, nextScore, compareOnce(next, nextIndices)))
-            // An edit that bounds a repetition is taken only if it is equivalent, since it reads fewer strings (e.g.
-            // `.*` to `.`), which no one would take as a repair.
-            .filter((next, _, _, comparison) =>
-              comparison == Comparison.Equivalent || unboundedRepeats(next.node) >= unboundedRepeats(current.node)
-            )
+            // A different edit is taken only if it matches the same strings, since it differs only in what it extracts,
+            // and else it may match much fewer (e.g. `.*` to `.`, or `.*AspiegelBot` to `.*(?!.)AspiegelBot`, which
+            // matches nothing), which no one would take as a repair. Without the comparison, an edit that bounds a
+            // repetition is not taken for the same reason.
+            .filter: (next, _, _, comparison) =>
+              comparison match
+                case Comparison.Equivalent   => true
+                case Comparison.Different(_) => matchesSame(current, next)
+                case Comparison.Unknown      => unboundedRepeats(next.node) >= unboundedRepeats(current.node)
           // Without an equivalent edit, the best ones differ on the longest input.
           compared
             .find(_._4 == Comparison.Equivalent)
