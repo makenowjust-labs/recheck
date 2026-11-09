@@ -37,8 +37,11 @@ private[repair] final case class Candidate(
   *   - a possessive quantifier or an atomic group of a repetition, if the dialect has it, or else, as a fallback, a
   *     negative look-ahead of the atom after a repetition of it, which reads the most as a possessive one does (e.g.
   *     `[a-z]+` to `[a-z]+(?![a-z])`),
-  *   - a lazy repetition of an atom read greedily without the characters of the next item after its minimum, where it
-  *     stops (e.g. `<(.*?)>` to `<([^>]*)>`, and `\[(.+?)\]` to `\[(.[^\]]*)\]` with `s`),
+  *   - a repetition read up to the first `X` of the items after it, as `(?:(?!X)D)*` for a repetition of `D`, where `X`
+  *     is the fixed items after it or their first atom (e.g. `.*Mobile` to `(?:(?!Mobile).)*Mobile`), and an atom
+  *     without the characters of a single atom `X` is written as a class (e.g. `<(.*?)>` to `<([^>]*)>`, and `\s*\n` to
+  *     `[^\S\n]*\n`); a lazy repetition reads its minimum first and the rest greedily (e.g. `\[(.+?)\]` to
+  *     `\[(.[^\]]*)\]` with `s`),
   *   - a repetition read at most once or exactly its minimum (e.g. `(a+)+` to `(a+)`, and `(\s*)*` to `(\s*)?`),
   *   - the characters of the earlier alternatives removed from a later one, or a later alternative removed if an
   *     earlier one is the same or covers it (e.g. `(?:\w|\d)` to `(?:\w)`),
@@ -55,7 +58,6 @@ private[repair] final case class Candidate(
   *   - for adjacent repetitions (possibly with an optional part between them), the characters of the first removed from
   *     the start of the next, or the minimum of one of them if the other reads its characters (e.g. `a*[ab]*` to
   *     `[ab]*`, `\s*,?\s*` to `\s*(?:,\s*)?`, and `\d+\.?\d+` to `\d+(?:\.\d+|\d)`),
-  *   - the characters of the next atom removed from a repetition of an atom (e.g. `\s*\n\s*` to `[^\S\n]*\n\s*`),
   *   - a repetition of words with an optional separator unrolled (e.g. `(?:\w+\s?)*` to `(?:\w+(?:\s\w+)*\s?)?`), or
   *     `(?:L M T)*` unrolled to `(?:L M (?:L M)* T)?` if `L` reads the characters of `T` (e.g. `(?:\s*X\s*)*`), and
   *   - for a search, a look-behind before the repetition at the start, so a match does not start in the middle of its
@@ -227,22 +229,23 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
 
     walk(node, Nil)
 
-    // The item that the matching reads right after the node, out of the groups and the alternatives that end with it.
-    def following(n: Node): Option[Node] =
-      Option(parents.get(n)).flatMap: parent =>
-        parent.data match
-          case NodeData.Sequence(ns) => items(ns).dropWhile(_ ne n).drop(1).headOption.orElse(following(parent))
-          case NodeData.Disjunction(_) | NodeData.Group(GroupKind.NonCapture, _) => following(parent)
-          case NodeData.Group(GroupKind.IndexedCapture | _: GroupKind.NamedCapture | _: GroupKind.PNamedCapture, _) =>
-            following(parent)
-          case _ => None
+    // The items that the matching reads after the node, out of the groups and the alternatives that end with it.
+    def after(n: Node): LazyList[Node] =
+      Option(parents.get(n)) match
+        case None         => LazyList.empty
+        case Some(parent) =>
+          parent.data match
+            case NodeData.Sequence(ns)   => LazyList.from(items(ns).dropWhile(_ ne n).drop(1)) #::: after(parent)
+            case NodeData.Disjunction(_) => after(parent)
+            case NodeData.Group(kind, _) if kind == GroupKind.NonCapture || isCapture(kind) => after(parent)
+            case _                                                                          => LazyList.empty
 
     val candidates = Vector.newBuilder[Candidate]
     for n <- hot if n.loc != SourceLocation.Invalid do
       n.data match
         case NodeData.Repeat(child, q, _) if min(q).nonEmpty =>
           candidates ++= makePossessive(n, child, q)
-          candidates ++= delimitLazyLoop(n, child, q, following(n)).map(Candidate(_))
+          candidates ++= readUntil(n, child, q, after(n)).map(Candidate(_))
           candidates ++= reduceRepetition(n, child, q).map(Candidate(_))
           candidates ++= unrollRepetition(n, child, q)
           candidates ++= removeRepeatedAlternatives(child, q).map(Candidate(_))
@@ -280,23 +283,49 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
     case q => throw new IllegalArgumentException(s"a repetition with a maximum: $q")
     // $COVERAGE-ON$
 
-  /** A lazy repetition of an atom read greedily without the characters of the next item after its minimum, since it
-    * stops at them only after its minimum (e.g. `<(.*?)>` to `<([^>]*)>`, and `\[(.+?)\]` to `\[(.[^\]]*)\]` with `s`).
+  /** A repetition read up to the first `X` of the items after it, as `(?:(?!X)D)*` for a repetition of `D`, so an
+    * iteration does not start where `X` matches (e.g. `.*Mobile` to `(?:(?!Mobile).)*Mobile`). `X` is the fixed items
+    * after it, or their first atom, or the atom of a repetition after it that reads it at least once, which starts with
+    * a character that `D` starts with. An atom without the characters of a single atom `X` is written as a class (e.g.
+    * `<(.*?)>` to `<([^>]*)>`, and `\s*\n` to `[^\S\n]*\n`).
+    *
+    * A lazy repetition reads its minimum first and the rest greedily, since it stops at `X` only after its minimum
+    * (e.g. `\[(.+?)\]` to `\[(.[^\]]*)\]` with `s`), and a greedy one keeps its quantifier.
     */
-  private def delimitLazyLoop(n: Node, child: Node, q: Quantifier, next: Option[Node]): Option[Node] =
-    // The characters that the next item reads first, if it reads one.
-    val nextSet = next.flatMap: next =>
-      next.data match
-        case NodeData.Repeat(atom, q, _) if minimumCount(q) >= 1 => setOf(atom)
-        case _                                                   => setOf(next)
+  private def readUntil(n: Node, child: Node, q: Quantifier, after: Seq[Node]): Seq[Node] =
+    val fixed = after.takeWhile(a => setWord(unblank(a)).exists(_.nonEmpty))
+    val delimiters = fixed match
+      case Seq() =>
+        after.headOption.toSeq.flatMap: a =>
+          unblank(a).data match
+            case NodeData.Repeat(atom, q1, _) if minimumCount(q1) >= 1 && isAtom(atom) => Seq(atom)
+            case _                                                                     => Seq.empty
+      case _ => (firstAtom(fixed.head).toSeq ++ Seq(sequence(fixed))).distinctBy(x => setWord(x))
+    val m = min(q).getOrElse(0)
+    // A lazy one reads its minimum first, which would copy a capture in it.
+    val copies = q.strategy == BacktrackStrategy.Lazy && m > 0
     for
-      set <- setOf(child)
-      stop <- nextSet
-      m <- min(q)
-      if q.strategy == BacktrackStrategy.Lazy && set.intersect(stop).nonEmpty && set.diff(stop).nonEmpty
+      x <- delimiters
+      if q.strategy != BacktrackStrategy.Possessive && !(copies && hasCapture(child))
+      stop <- firstSet(x).toSeq
+      if firstSet(child).exists(_.intersect(stop).nonEmpty)
+      body <- (setOf(child), setWord(x)) match
+        case (Some(set), Some(Seq(_))) =>
+          Option.when(set.diff(stop).nonEmpty)(without(child, set, stop)).toSeq
+        case _ =>
+          // A non-capture group is opened in the new group, unless it has alternatives.
+          val inner = child.data match
+            case NodeData.Group(GroupKind.NonCapture, c) if !unblank(c).data.isInstanceOf[NodeData.Disjunction] => c
+            case _                                                                                              => child
+          Seq(group(Node(NodeData.Group(GroupKind.NegativeLookAhead(AssertNameStyle.Symbolic), x)), inner))
     yield
-      val head = if m == 0 then Seq.empty else Seq(minimum(AtomLoop(set, m, child)))
-      edit(n -> (head :+ repeat(without(child, set, stop), Quantifier.Star(BacktrackStrategy.Greedy))))
+      if q.strategy == BacktrackStrategy.Lazy then
+        val head =
+          if m == 0 then Seq.empty
+          else if m == 1 then Seq(child)
+          else Seq(repeat(if isAtom(child) then child else group(child), Quantifier.Exact(m, BacktrackStrategy.Greedy)))
+        edit(n -> (head :+ repeat(body, Quantifier.Star(BacktrackStrategy.Greedy))))
+      else edit(n -> Seq(repeat(body, q)))
 
   private def minimumCount(q: Quantifier): Int = q match
     case Quantifier.Star(_) | Quantifier.Question(_) | Quantifier.MaxBounded(_, _) => 0
@@ -431,10 +460,19 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
 
   /** The first atom that the node reads, if it starts with one that it reads at least once. */
   private def firstAtom(n: Node): Option[Node] = unblank(n).data match
-    case NodeData.Sequence(ns)                               => items(ns).headOption.flatMap(firstAtom)
-    case NodeData.Group(GroupKind.NonCapture, child)         => firstAtom(child)
-    case NodeData.Repeat(atom, q, _) if minimumCount(q) >= 1 => firstAtom(atom)
-    case _                                                   => Option.when(isAtom(unblank(n)))(unblank(n))
+    case NodeData.Sequence(ns) => items(ns).headOption.flatMap(firstAtom)
+    case NodeData.Group(kind, child) if kind == GroupKind.NonCapture || isCapture(kind) => firstAtom(child)
+    case NodeData.Repeat(atom, q, _) if minimumCount(q) >= 1                            => firstAtom(atom)
+    case _ => Option.when(isAtom(unblank(n)))(unblank(n))
+
+  /** The characters that the node reads first, if it reads one first in each way. */
+  private def firstSet(n: Node): Option[CharSet] = unblank(n).data match
+    case NodeData.Disjunction(ns) =>
+      ns.foldLeft(Option(CharSet.empty))((set, a) => set.flatMap(s => firstSet(a).map(s.union)))
+    case NodeData.Sequence(ns) => items(ns).headOption.flatMap(firstSet)
+    case NodeData.Group(kind, child) if kind == GroupKind.NonCapture || isCapture(kind) => firstSet(child)
+    case NodeData.Repeat(atom, q, _) if minimumCount(q) >= 1                            => firstSet(atom)
+    case _                                                                              => setOf(unblank(n))
 
   /** For an alternative of a repetition that starts with a character of an earlier one, a negative look-ahead of the
     * earlier one or of its first atom before it (e.g. `(?:\{[^}]+\}|[^}])+` to `(?:\{[^}]+\}|(?!\{)[^}])+`).
@@ -596,14 +634,7 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
           if nextLoop.min == 0 then repeat(group(inner, next), Quantifier.Question(BacktrackStrategy.Greedy))
           else group(Node(NodeData.Disjunction(Seq(sequence(Seq(inner, next)), minimum(nextLoop)))))
         edit(middle -> Seq(replacement), next -> Seq.empty)
-      // The characters of the next atom are removed from this one, so it reads up to the first of them.
-      val atom = for
-        loop <- loopOf(first).toSeq
-        next <- elements.lift(i + 1).toSeq
-        nextSet <- setOf(next).toSeq
-        if loop.set.intersect(nextSet).nonEmpty && loop.set.diff(nextSet).nonEmpty
-      yield edit(loop.atom -> Seq(without(loop.atom, loop.set, nextSet)))
-      pairs ++ optional ++ atom
+      pairs ++ optional
 
   /** A look-behind before the repetition at the start of a search, which is hot. */
   private def addLookBehind(hot: SourceLocation => Boolean): Option[Node] =

@@ -44,6 +44,16 @@ class CandidateFinderSuite extends munit.FunSuite:
     assertEquals(edited("a*?b", Dialect.Java), Seq("a??b", "ab"))
     assertEquals(edited("a++b", Dialect.Java), Seq.empty)
 
+  test("CandidateFinder#find: repetitions up to the first of the items after them"):
+    assert(clue(edited(".*Mobile.*AspiegelBot")).contains("(?:(?!Mobile).)*Mobile.*AspiegelBot"))
+    assert(clue(edited("(?:ab|c)*cd")).contains("(?:(?!cd)(?:ab|c))*cd"))
+    assert(clue(edited("(?:\\w+\\s)*foo\\s(?:\\w+\\s)*bar")).contains("(?:(?!foo\\s)\\w+\\s)*foo\\s(?:\\w+\\s)*bar"))
+    // The items after it may be out of the group, and a lazy one with a capture is not copied by its minimum.
+    assert(clue(edited("(a*)ab")).contains("((?:(?!ab)a)*)ab"))
+    assert(!edited("(a)+?b").exists(_.contains("(?!")))
+    // `D` that starts with no character of `X` gives none.
+    assert(!edited("(?:ab|c)*xd").exists(_.contains("(?!x")))
+
   test("CandidateFinder#find: lazy repetitions before a delimiter"):
     assert(clue(edited("<(.*?)>", flags = "s")).contains("<([^>]*)>"))
     // The next item may be after the end of a group, and it may be a repetition reading at least once.
