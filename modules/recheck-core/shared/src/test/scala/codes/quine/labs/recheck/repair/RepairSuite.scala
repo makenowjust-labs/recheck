@@ -96,10 +96,15 @@ class RepairSuite extends munit.FunSuite:
     )
 
   test("Repair.search: a repair that differs"):
-    // Reading the words at most once is safe too, but it bounds the repetition, which a repair takes only if equivalent.
+    // It matches the same strings, but the captures differ.
+    // The possessive `(\w++\s?)+\d` is safe too, but it does not match `0 0`.
     assertEquals(
       search("^(\\w+\\s?)+\\d$", Dialect.Java),
-      repaired("^(\\w++\\s?)+\\d$", Dialect.Java, Comparison.Different(UString(0x30, 0x30)))
+      repaired("^(\\w\\s?)+\\d$", Dialect.Java, Comparison.Different(UString(0x30, 0x30, 0x30)))
+    )
+    assertEquals(
+      search("((\\r\\n|\\r|\\n)+) *$"),
+      repaired("((\\r\\n|(?!\\r\\n)\\r|\\n)) *$", comparison = Comparison.Different(UString(0x0d, 0x0d)))
     )
 
   test("Repair.search: empty iterations"):
@@ -163,7 +168,7 @@ class RepairSuite extends munit.FunSuite:
     // The comparison with the original has no time.
     assertEquals(
       search("^(\\w+\\s?)+\\d$", Dialect.Java)(using outOfTimeAt("repair: comparison")),
-      repaired("^(\\w++\\s?)+\\d$", Dialect.Java, Comparison.Unknown)
+      repaired("^(\\w\\s?)+\\d$", Dialect.Java, Comparison.Unknown)
     )
     // The first round has no time, so nothing is found.
     intercept[TimeoutException](search("^(a|a)*$")(using outOfTimeAt("repair: round 0")))

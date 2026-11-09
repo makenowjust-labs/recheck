@@ -103,10 +103,16 @@ class ReDoSSuite extends munit.FunSuite:
         "",
         Dialect.Java,
         UnitMode.UTF16CodePoint,
-        "^(\\w++\\s?)+\\d$",
+        "^(\\w\\s?)+\\d$",
         AttackComplexity.Linear,
         Seq(0, 1),
-        Rx.Comparison.Different(Rx.Counterexample(UString(0x30, 0x30), Some(Seq(Some((0, 2)), Some((0, 1)))), None))
+        Rx.Comparison.Different(
+          Rx.Counterexample(
+            UString(0x30, 0x30, 0x30),
+            Some(Seq(Some((0, 3)), Some((0, 2)))),
+            Some(Seq(Some((0, 3)), Some((1, 2))))
+          )
+        )
       )
     )
     // No edit around the hotspot makes this better.
