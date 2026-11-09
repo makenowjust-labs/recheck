@@ -20,6 +20,7 @@ import codes.quine.labs.recheck.vm.Interpreter.MatchState
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
+import codes.quine.labs.recheck.vm.Interpreter.UCode
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UChar
@@ -34,6 +35,11 @@ import codes.quine.labs.resyntax.ir.IRWordMarkSet
 
 /** Interpreter executes a program on an input. */
 object Interpreter:
+
+  /** UCode is a character of the input, or `-1` for none at the start or the end, which reads take without allocating
+    * an option.
+    */
+  type UCode = Int
 
   /** Runs a program on a given input.
     *
@@ -140,7 +146,7 @@ object Interpreter:
   private[vm] final case class Junction(
       state: MatchState,
       steps: Int,
-      heatmap: Option[Map[SourceLocation, Int]],
+      heats: Option[IArray[Int]],
       time: Long
   )
 
@@ -149,7 +155,7 @@ object Interpreter:
     */
   private[vm] final case class Diff(
       steps: Int,
-      heatmap: Option[Map[SourceLocation, Int]],
+      heats: Option[IArray[Int]],
       failedCaptures: Vector[Int],
       held: Map[Int, (Int, Int)]
   )
@@ -186,11 +192,21 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     /** The time this frame is made, which tells whether the captures were held after it. */
     var time: Long = 0
 
-    /** Gets a previous character. */
-    def previousChar: Option[UChar] = input.getBefore(pos)
+    /** Gets a previous character, or `-1` at the start. */
+    def previousCode: UCode = if 0 < pos && pos <= input.length then input(pos - 1) else -1
 
-    /** Gets a current character. */
-    def currentChar: Option[UChar] = input.getAt(pos)
+    /** Gets a current character, or `-1` at the end. */
+    def currentCode: UCode = if 0 <= pos && pos < input.length then input(pos) else -1
+
+    /** Tests whether a previous character exists and satisfies `f`. */
+    def previousCharExists(f: UChar => Boolean): Boolean =
+      val c = previousCode
+      c >= 0 && f(c)
+
+    /** Tests whether a current character exists and satisfies `f`. */
+    def currentCharExists(f: UChar => Boolean): Boolean =
+      val c = currentCode
+      c >= 0 && f(c)
 
     /** Opens a capture of the index at the current position. */
     def capOpen(index: Int): Unit =
@@ -281,8 +297,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** A failed points set. */
   private val failedPoints: mutable.Set[FailedPoint] = mutable.Set.empty
 
-  /** A heatmap on matching. */
-  private var heatmap: Map[SourceLocation, Int] = Map.empty[SourceLocation, Int].withDefaultValue(0)
+  /** The heats of a heatmap on matching, by the indices of [[Program.heatLocations]]. */
+  private val heats: Array[Int] = if options.needsHeatmap then new Array(program.heatLocations.size) else Array.empty
 
   /** The captures of the last failed matching, which `cap_keep` takes. */
   private var failedCaptures: Vector[Int] = Vector.empty
@@ -308,7 +324,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       .flatMap:
         case (_, seq) => seq.sliding(2).collect { case Seq(i, j) if i < j => (i, j) }
       .toSeq
-    Result(status, captures, steps, loops, failedPoints.toSet, coverage.toSet, heatmap)
+    val heatmap =
+      heats.indices.iterator.collect { case k if heats(k) > 0 => program.heatLocations(k) -> heats(k) }.toMap
+    Result(status, captures, steps, loops, failedPoints.toSet, coverage.toSet, heatmap.withDefaultValue(0))
 
   /** Runs matching from the start of the input. */
   def run(): Result =
@@ -327,13 +345,22 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     try runLoop(frame)
     catch case _: ArithmeticException => result(Status.Limit, None)
 
+  /** Runs the body with checking interruption on some of the iterations of the run loop, whose iterations are too short
+    * to read the clock in each.
+    */
+  private inline def interruptPeriodically[A](iterations: Int)(inline body: A): A =
+    if (iterations & 0xff) == 0 then ctx.interrupt(())
+    body
+
   /** Runs matching loop. */
   private def runLoop(initialFrame: Frame): Result =
     var frame = initialFrame
+    var iterations = 0
 
     // $COVERAGE-OFF$
     while true do
-      ctx.interrupt:
+      iterations += 1
+      interruptPeriodically(iterations):
         // $COVERAGE-ON$
 
         if options.limit <= steps then return result(Status.Limit, None)
@@ -351,9 +378,10 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
               for (index, (begin, end)) <- diff.held do held(index) = (begin, end, tick())
               steps = Math.addExact(steps, diff.steps)
               if options.needsHeatmap then
-                for (loc, n) <- diff.heatmap.get do heatmap = heatmap.updated(loc, heatmap(loc) + n)
+                val diffHeats = diff.heats.get
+                for k <- diffHeats.indices do heats(k) += diffHeats(k)
             case None =>
-              val junction = Junction(state, steps, if options.needsHeatmap then Some(heatmap) else None, tick())
+              val junction = Junction(state, steps, Option.when(options.needsHeatmap)(IArray.from(heats)), tick())
               frame.junctions = junction +: frame.junctions
 
         if options.needsLoopAnalysis then
@@ -498,17 +526,13 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
               if memoizes && frame.junctions.size > fallback.junctions.size then
                 val d = frame.junctions.size - fallback.junctions.size
                 for jx <- frame.junctions.take(d) do
-                  val diffHeatmap = Option.when(options.needsHeatmap):
-                    val jxHeatmap = jx.heatmap.get
-                    val builder = Map.newBuilder[SourceLocation, Int]
-                    for (loc, n) <- heatmap do
-                      val m = jxHeatmap(loc)
-                      if n != m then builder.addOne(loc -> (n - m))
-                    builder.result()
+                  val diffHeats = Option.when(options.needsHeatmap):
+                    val jxHeats = jx.heats.get
+                    IArray.tabulate(heats.length)(k => heats(k) - jxHeats(k))
                   val diffHeld =
                     if held.isEmpty then Map.empty
                     else held.iterator.collect { case (i, (b, e, t)) if t > jx.time => (i, (b, e)) }.toMap
-                  memoTable(jx.state) = Diff(steps - jx.steps, diffHeatmap, captures, diffHeld)
+                  memoTable(jx.state) = Diff(steps - jx.steps, diffHeats, captures, diffHeld)
               frame = fallback
               restoreHeld(frame)
             case None => return result(Status.Fail, None)
@@ -578,8 +602,11 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
   /** Runs a given block. */
   private def block(frame: Frame, block: Block): Boolean =
-    val it = block.insts.iterator
-    while it.hasNext do if !inst(frame, it.next()) then return false
+    val insts = block.insts
+    var i = 0
+    while i < insts.length do
+      if !inst(frame, insts(i)) then return false
+      i += 1
     true
 
   /** Runs a given instruction. */
@@ -599,9 +626,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       case Inst.Assert(kind) =>
         val ok = kind match
           case AssertKind.WordBoundary(word) =>
-            frame.previousChar.exists(word.contains) != frame.currentChar.exists(word.contains)
+            frame.previousCharExists(word.contains) != frame.currentCharExists(word.contains)
           case AssertKind.WordBoundaryNot(word) =>
-            frame.previousChar.exists(word.contains) == frame.currentChar.exists(word.contains)
+            frame.previousCharExists(word.contains) == frame.currentCharExists(word.contains)
           case AssertKind.MarkWordBoundary(word, marks) =>
             isMarkWordBefore(frame, word, marks) != isMarkWordAt(frame, word, marks)
           case AssertKind.MarkWordBoundaryNot(word, marks) =>
@@ -677,11 +704,11 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
   /** Tests whether the character before the position is a word character, or an extender of the marks after a base. */
   private def isMarkWordBefore(frame: Frame, word: CharSet, marks: IRWordMarkSet): Boolean =
-    frame.previousChar.exists(c => word.contains(c) || marks.extenders.contains(c) && hasBase(frame.pos, marks))
+    frame.previousCharExists(c => word.contains(c) || marks.extenders.contains(c) && hasBase(frame.pos, marks))
 
   /** Tests whether the character at the position is a word character, or a mark after a base. */
   private def isMarkWordAt(frame: Frame, word: CharSet, marks: IRWordMarkSet): Boolean =
-    frame.currentChar.exists(c => word.contains(c) || marks.marks.contains(c) && hasBase(frame.pos, marks))
+    frame.currentCharExists(c => word.contains(c) || marks.marks.contains(c) && hasBase(frame.pos, marks))
 
   /** Tests whether the position is after a line terminator. */
   private def afterTerminator(pos: Int, terminators: LineTerminatorSet): Boolean =
@@ -771,9 +798,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** Runs a `read` (or `read_back`) instruction of a back-reference. */
   private def instReadRef(
       frame: Frame,
-      inst: Inst,
+      inst: Inst.HeatSource,
       ref: ReadKind.Ref,
-      loc: Option[SourceLocation],
       back: Boolean
   ): Boolean =
     val candidates = refCandidates(frame, ref)
@@ -790,7 +816,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
     if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
     if ok then
-      if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
+      if options.needsHeatmap && inst.heatIndex >= 0 then heats(inst.heatIndex) += 1
       frame.pos += (if back then -width.get else width.get)
       true
     else
@@ -802,13 +828,13 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
   /** Runs a given `read` instruction. */
   private def instRead(frame: Frame, inst: Inst.Read): Boolean = inst match
-    case Inst.Read(ref: ReadKind.Ref, loc) => instReadRef(frame, inst, ref, loc, false)
-    case Inst.Read(kind, loc)              =>
-      val c = frame.currentChar
+    case Inst.Read(ref: ReadKind.Ref, _) => instReadRef(frame, inst, ref, false)
+    case Inst.Read(kind, _)              =>
+      val c = frame.currentCode
       val ok = read(c, kind)
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
-        if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
+        if options.needsHeatmap && inst.heatIndex >= 0 then heats(inst.heatIndex) += 1
         steps = Math.addExact(steps, 1)
         frame.pos += 1
         true
@@ -820,13 +846,13 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
   /** Runs a given `read-back` instruction. */
   private def instReadBack(frame: Frame, inst: Inst.ReadBack): Boolean = inst match
-    case Inst.ReadBack(ref: ReadKind.Ref, loc) => instReadRef(frame, inst, ref, loc, true)
-    case Inst.ReadBack(kind, loc)              =>
-      val c = frame.previousChar
+    case Inst.ReadBack(ref: ReadKind.Ref, _) => instReadRef(frame, inst, ref, true)
+    case Inst.ReadBack(kind, _)              =>
+      val c = frame.previousCode
       val ok = read(c, kind)
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
-        if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
+        if options.needsHeatmap && inst.heatIndex >= 0 then heats(inst.heatIndex) += 1
         steps = Math.addExact(steps, 1)
         frame.pos -= 1
         true
@@ -836,17 +862,15 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           failedPoints.add(point)
         false
 
-  /** Checks to match `read` instruction. */
-  private def read(c: Option[UChar], kind: ReadKind): Boolean =
-    c match
-      case Some(c) =>
-        kind match
-          case ReadKind.Any         => true
-          case ReadKind.Char(d)     => c == d
-          case ReadKind.Class(s)    => s.contains(c)
-          case ReadKind.ClassNot(s) => !s.contains(c)
-          // `instRead` and `instReadBack` take a back-reference before this.
-          // $COVERAGE-OFF$
-          case _: ReadKind.Ref => sys.error("unreachable")
+  /** Checks to match `read` instruction on the character. */
+  private def read(c: UCode, kind: ReadKind): Boolean =
+    c >= 0 && (kind match
+        case ReadKind.Any         => true
+        case ReadKind.Char(d)     => c == d
+        case ReadKind.Class(s)    => s.contains(c)
+        case ReadKind.ClassNot(s) => !s.contains(c)
+        // `instRead` and `instReadBack` take a back-reference before this.
+        // $COVERAGE-OFF$
+        case _: ReadKind.Ref => sys.error("unreachable")
         // $COVERAGE-ON$
-      case None => false
+    )

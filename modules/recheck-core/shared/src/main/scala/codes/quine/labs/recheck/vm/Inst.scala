@@ -211,8 +211,16 @@ object Inst:
 
     override def toString: String = s"assert $kind"
 
+  /** HeatSource is an instruction that heats its location in a heatmap when it reads a character. */
+  sealed trait HeatSource extends Inst:
+
+    def loc: Option[SourceLocation]
+
+    /** The index of `loc` in [[Program.heatLocations]], or `-1`. */
+    private[vm] var heatIndex: Int = -1
+
   /** `read`: Tests current position with advancing. */
-  final case class Read(kind: ReadKind, loc: Option[SourceLocation]) extends NonTerminator:
+  final case class Read(kind: ReadKind, loc: Option[SourceLocation]) extends NonTerminator with HeatSource:
 
     override def toString: String =
       val loc = this.loc match
@@ -221,7 +229,7 @@ object Inst:
       s"read $kind$loc"
 
   /** `read_back`: Tests current position with receding. */
-  final case class ReadBack(kind: ReadKind, loc: Option[SourceLocation]) extends NonTerminator:
+  final case class ReadBack(kind: ReadKind, loc: Option[SourceLocation]) extends NonTerminator with HeatSource:
 
     override def toString: String =
       val loc = this.loc match
