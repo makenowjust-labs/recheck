@@ -119,6 +119,13 @@ class RepairSuite extends munit.FunSuite:
     // The repair lowers the upper bound to quadratic, which does not show the pattern better.
     assertEquals(search("^(?:a|a)*(x)\\1*\\1*$", params = bound), Result.NotFound)
 
+  test("Repair.search: repetitions up to the first of the items after them"):
+    assertEquals(search("^.*Mobile.*AspiegelBot$"), repaired("^(?:(?!Mobile).)*Mobile.*AspiegelBot$"))
+    assertEquals(
+      search("^(?:\\w+\\s)*foo\\s(?:\\w+\\s)*bar$"),
+      repaired("^(?:(?!foo\\s)\\w+\\s)*foo\\s(?:\\w+\\s)*bar$")
+    )
+
   test("Repair.search: optional atoms read by the next iteration"):
     assertEquals(search("^(?:.*(?:\\r\\n?|\\n))*?x$"), repaired("^(?:.*(?:\\r|\\n))*?x$"))
     assertEquals(
