@@ -50,6 +50,8 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     assertEquals(check("\\A(?:[a\\n]|\\Z(?<=[a\\n]*))*x", "", Dialect.DotNet), Success(Linear))
     assertEquals(check("^(?>(?:a|a)*)b", "", Dialect.PCRE), Success(Linear))
     assertEquals(check("^(?>a*)a*b", "", Dialect.PCRE), Success(Linear))
+    // A back-reference just after a look-ahead of its capture is an atomic group.
+    assertEquals(check("^(?=(a*))\\1a*b", ""), Success(Linear))
 
   test("AutomatonChecker.check: polynomial"):
     val a = CharSet.single('a')

@@ -329,6 +329,10 @@ private[build] class IRBuilder(
 
   private val featureSet = initial.featureSet
 
+  /** The number of the back-references and the conditionals that refer to each capture. */
+  private val referenceCounts: Map[Int, Int] =
+    backReferences.values.toSeq.flatten.groupMapReduce(identity)(_ => 1)(_ + _)
+
   var context: BuildingContext = initial
 
   def build(node: Node): IRNode =
@@ -387,9 +391,23 @@ private[build] class IRBuilder(
             nodes += build(children(i))
             i += 1
         // A part resolved together may become one node (e.g. `ss` under Ruby's case folding).
-        nodes.result() match
+        atomicCaptures(nodes.result()) match
           case Seq(node) => Right(node)
           case nodes     => Left(IRNodeData.Sequence(nodes))
+
+  /** Replaces `(?=(D))\1` with `(?>(D))`, which matches the same, when the capture has no other reference.
+    *
+    * The back-reference reads what the look-ahead has just captured, so the pair is an atomic group of the capture,
+    * which the checkers support.
+    */
+  def atomicCaptures(nodes: Seq[IRNode]): Seq[IRNode] =
+    nodes.foldRight(List.empty[IRNode]):
+      case (
+            IRNode(IRNodeData.LookAhead(false, capture @ IRNode(IRNodeData.Capture(i, _, _), _)), loc),
+            IRNode(IRNodeData.BackReference(Seq(j), _, _), next) :: rest
+          ) if i == j && referenceCounts(i) == 1 =>
+        IRNode(IRNodeData.Atomic(capture), SourceLocation(loc.start, next.end)) :: rest
+      case (node, rest) => node :: rest
 
   def buildRepeat(node: Node, child: Node, quantifier: Quantifier): IRNodeData =
     val ir = build(child)

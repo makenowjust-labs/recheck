@@ -391,6 +391,16 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   checkWith("(a)\\1", "", Perl(utf8 = false))(d =>
     Sequence(Capture(1, None, char('a')), referenceOf(d, unicode = false))
   )
+  // A back-reference just after a look-ahead of its capture reads what it has captured, as an atomic group does.
+  check("x(?=(a+))\\1", "", All*)(
+    Sequence(char('x'), Atomic(Capture(1, None, Repeat(char('a'), Unbounded(1, Greedy)))))
+  )
+  checkWith("(?=(a))\\1\\1", "", All*)(d =>
+    Sequence(LookAhead(false, Capture(1, None, char('a'))), referenceOf(d), referenceOf(d))
+  )
+  checkWith("(?=(a))(?=\\1)", "", All*)(d =>
+    Sequence(LookAhead(false, Capture(1, None, char('a'))), LookAhead(false, referenceOf(d)))
+  )
   checkPattern("(a)(?i)\\1", "", Perl(), Ruby()): pattern =>
     val Sequence(Seq(_, _, IRNode(BackReference(_, _, folding), _))) = pattern.node.data: @unchecked
     assertEquals(folding, IRBackReferenceFolding.Full(0))
