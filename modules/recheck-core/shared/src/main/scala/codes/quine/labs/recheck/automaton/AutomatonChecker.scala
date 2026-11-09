@@ -18,8 +18,11 @@ object AutomatonChecker:
       val nfaWLA = nfa.toNFAwLA(maxNFASize)
       val complexities = new AutomatonChecker(nfaWLA, false).check()
       nfa.lookBehind match
-        case None             => complexities
-        case Some(lookBehind) =>
+        case None => complexities
+        // A look-behind whose inner expression has no cycle costs at most a constant on each attempt, which is less
+        // than the cost of the transition that tries it.
+        case Some(lookBehind) if !hasCycle(lookBehind.inner) => complexities
+        case Some(lookBehind)                                =>
           val product = LookBehindProduct.build(nfaWLA, lookBehind, maxNFASize)
           val lookBehindComplexities = new AutomatonChecker(product, true).check().map(dropInputEnds)
           merge(complexities, lookBehindComplexities).distinct
@@ -36,6 +39,11 @@ object AutomatonChecker:
       .map: _ =>
         if !by.hasNext || bx.hasNext && complexityOrder(bx.head) <= complexityOrder(by.head) then bx.next()
         else by.next()
+
+  /** Tests whether the NFA has a cycle of transitions. */
+  private def hasCycle[A](nfa: OrderedNFA[A, Int])(using ctx: Context): Boolean =
+    val graph = Graph.from(nfa.delta.toIndexedSeq.flatMap { case ((s1, a), b) => b.leaves.map((s1, a, _)) })
+    graph.scc.exists(sc => sc.size > 1 || graph.neighbors(sc.head).exists(_._2 == sc.head))
 
   /** Orders complexities from the worst. */
   private def complexityOrder(c: Complexity[?]): Int = c match

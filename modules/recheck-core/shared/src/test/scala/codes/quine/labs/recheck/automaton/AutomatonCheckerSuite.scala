@@ -145,6 +145,25 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       )
     )
 
+  test("AutomatonChecker.check: complexities of look-behinds"):
+    // The complexities of the inner expressions of the look-behinds merge into the others, from the worst.
+    def degree(c: Complexity[?]): Int = c match
+      case _: Exponential[?] => Int.MaxValue
+      case p: Polynomial[?]  => p.degree
+      case Linear            => 1
+      case Constant          => 0
+    def degrees(source: String): Seq[Int] =
+      val ir = ReDoS.parse(source, "", Dialect.JavaScript)
+      val nfa = EpsNFABuilder.build(ir).toOrderedNFA.rename
+      AutomatonChecker.check(nfa, Int.MaxValue).map(degree).toSeq
+
+    assertEquals(degrees("^(?:b|b)*a+(?<=a*)$"), Seq(Int.MaxValue, Int.MaxValue, 2, 1, 0))
+    assertEquals(degrees("c?a+(?<=ba*)$"), Seq(3, 3) ++ Seq.fill(9)(2) ++ Seq(1, 0))
+    assertEquals(degrees("^a*$(?<=a*)"), Seq(1, 0))
+    // An inner expression without a cycle costs at most a constant on each attempt, so it adds no complexity, unlike
+    // `a*` above.
+    assertEquals(degrees("^(?:b|b)*a+(?<=ba)$"), Seq(Int.MaxValue, 1, 0))
+
   test("AutomatonChecker.check: exponential"):
     val a = CharSet.single('a')
     val b = CharSet.single('b')
