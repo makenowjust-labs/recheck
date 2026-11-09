@@ -7,7 +7,7 @@ import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 
 `repair` suggests a better regular expression for a vulnerable one.
-It edits the regular expression around the hotspot that the automaton checker finds, preferring the edits whose matches extract the same as the original ones.
+It edits the regular expression around the hotspot that the checker finds, preferring the edits whose matches extract the same as the original ones.
 The result `Rx` has the repaired regular expression, its complexity, and how its matches compare with the original ones, with the shortest input on which they differ if they do.
 Read the comparison before you replace the original regular expression.
 
@@ -86,14 +86,14 @@ An edit may remove a capture that is not kept, so the later captures may have sm
 
 `Rx` has three statuses.
 
-- `safe` means that the automaton checker finds the regular expression safe, so it needs no repair.
+The repair checks the regular expressions as `check` does with the same parameters, except runtime-attack verification, so a safe repair is one that `check` finds safe.
+
+- `safe` means that the checker finds the regular expression safe, so it needs no repair.
 - `repaired` means that the repair found a better regular expression.
   When the time runs out after it found one, the result is the best one so far, which may not be safe.
 - `unknown` means that the repair found no better regular expression (`error` is `null`), or it could not finish because of the `error`.
   The `kind` of the error is one of `timeout`, `cancel`, `unsupported`, `invalid`, `invalid-keep` and `unexpected`.
-  The repair needs the automaton checker.
-  When the automaton checker cannot tell the exact complexity (e.g. with a back-reference), the repair uses the upper bound of the matching time (see [Criteria](../internals/criteria.mdx)), and reports a repair only when the bound of the repaired regular expression is linear, which shows it safe.
-  A regular expression that the automaton checker cannot bound either (e.g. one with a recursion) is `unknown` with an `unsupported` error.
+  A regular expression that the checker does not support (e.g. one with a recursion) is `unknown` with an `unsupported` error.
 
 Every `Rx` has `source`, `flags` and `dialect` as [`Diagnostics`](diagnostics.mdx#common-fields) has.
 A `repaired` one also has the following fields.
