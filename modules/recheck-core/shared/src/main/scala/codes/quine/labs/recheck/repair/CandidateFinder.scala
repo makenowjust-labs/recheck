@@ -306,8 +306,8 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
     * a character that `D` starts with. An atom without the characters of a single atom `X` is written as a class (e.g.
     * `<(.*?)>` to `<([^>]*)>`, and `\s*\n` to `[^\S\n]*\n`).
     *
-    * A lazy repetition reads its minimum first and the rest greedily, since it stops at `X` only after its minimum
-    * (e.g. `\[(.+?)\]` to `\[(.[^\]]*)\]` with `s`), and a greedy one keeps its quantifier.
+    * It reads its minimum first and the rest greedily, since it stops at `X` only after its minimum (e.g. `\[(.+?)\]`
+    * to `\[(.[^\]]*)\]` with `s`, and `[a-z.]+\.[a-z.]+$` to `[a-z.][a-z]*\.[a-z.]+$`).
     */
   private def readUntil(n: Node, child: Node, q: Quantifier, after: Seq[Node]): Seq[Node] =
     val fixed = after.takeWhile(a => setWord(unblank(a)).exists(_.nonEmpty))
@@ -319,11 +319,10 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
             case _                                                                     => Seq.empty
       case _ => (firstAtom(fixed.head).toSeq ++ Seq(sequence(fixed))).distinctBy(x => setWord(x))
     val m = min(q).getOrElse(0)
-    // A lazy one reads its minimum first, which would copy a capture in it.
-    val copies = q.strategy == BacktrackStrategy.Lazy && m > 0
     for
       x <- delimiters
-      if q.strategy != BacktrackStrategy.Possessive && !(copies && hasCapture(child))
+      // Reading the minimum first would copy a capture in it.
+      if q.strategy != BacktrackStrategy.Possessive && !(m > 0 && hasCapture(child))
       stop <- firstSet(x).toSeq
       if firstSet(child).exists(_.intersect(stop).nonEmpty)
       body <- (setOf(child), setWord(x)) match
@@ -336,13 +335,11 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
             case _                                                                                              => child
           Seq(group(Node(NodeData.Group(GroupKind.NegativeLookAhead(AssertNameStyle.Symbolic), x)), inner))
     yield
-      if q.strategy == BacktrackStrategy.Lazy then
-        val head =
-          if m == 0 then Seq.empty
-          else if m == 1 then Seq(child)
-          else Seq(repeat(if isAtom(child) then child else group(child), Quantifier.Exact(m, BacktrackStrategy.Greedy)))
-        edit(n -> (head :+ repeat(body, Quantifier.Star(BacktrackStrategy.Greedy))))
-      else edit(n -> Seq(repeat(body, q)))
+      val head =
+        if m == 0 then Seq.empty
+        else if m == 1 then Seq(child)
+        else Seq(repeat(if isAtom(child) then child else group(child), Quantifier.Exact(m, BacktrackStrategy.Greedy)))
+      edit(n -> (head :+ repeat(body, Quantifier.Star(BacktrackStrategy.Greedy))))
 
   private def minimumCount(q: Quantifier): Int = q match
     case Quantifier.Star(_) | Quantifier.Question(_) | Quantifier.MaxBounded(_, _) => 0

@@ -150,6 +150,11 @@ class RepairSuite extends munit.FunSuite:
       search("^(?:\\w+\\s)*foo\\s(?:\\w+\\s)*bar$"),
       repaired("^(?:(?!foo\\s)\\w+\\s)*foo\\s(?:\\w+\\s)*bar$")
     )
+    // The repetition reads its minimum first, so the domain may start with `.` as before.
+    assertEquals(
+      search("^\\S+@[a-zA-Z0-9._-]+\\.[a-zA-Z0-9._-]+$", Dialect.Java),
+      repaired("^\\S+@[a-zA-Z0-9._-][\\-0-9A-Z_a-z]*\\.[a-zA-Z0-9._-]+$", Dialect.Java)
+    )
 
   test("Repair.search: optional atoms read by the next iteration"):
     assertEquals(search("^(?:.*(?:\\r\\n?|\\n))*?x$"), repaired("^(?:.*(?:\\r|\\n))*?x$"))
