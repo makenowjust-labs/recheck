@@ -3,6 +3,7 @@ package repair
 
 import scala.collection.mutable
 
+import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.AssertNameStyle
 import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
@@ -60,8 +61,10 @@ private[repair] final case class Candidate(
   *     `[ab]*`, `\s*,?\s*` to `\s*(?:,\s*)?`, and `\d+\.?\d+` to `\d+(?:\.\d+|\d)`),
   *   - a repetition of words with an optional separator unrolled (e.g. `(?:\w+\s?)*` to `(?:\w+(?:\s\w+)*\s?)?`), or
   *     `(?:L M T)*` unrolled to `(?:L M (?:L M)* T)?` if `L` reads the characters of `T` (e.g. `(?:\s*X\s*)*`), and
-  *   - for a search, a look-behind before the repetition at the start, so a match does not start in the middle of its
-  *     characters (e.g. `\s*$` to `(?<!\s)\s*$`).
+  *   - for a search whose fixed items `P` at the start (possibly none) are followed by a repetition of a fixed-width
+  *     `E`, a negative look-behind of `E` and `E` read up to the first `P` before it, so a match starts only at the
+  *     first `P` in what `E` reads in turn (e.g. `\s*$` to `(?<!\s)\s*$`, and `foo[a-z]*bar` to
+  *     `(?<![a-z])(?:(?!foo)[a-z])*foo[a-z]*bar`, with `\K` before `foo` if the dialect has it).
   *
   * An edit does not copy a capture, and it removes only the captures not in `kept`, which are the indices of the
   * captures that a repair keeps. The blanks of the extended mode are skipped between the items of a sequence, and the
@@ -255,7 +258,7 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
         case NodeData.Disjunction(alternatives) => candidates ++= trimAlternatives(n, alternatives).map(Candidate(_))
         case NodeData.Sequence(elements)        => candidates ++= separateAdjacent(items(elements)).map(Candidate(_))
         case _                                  => ()
-    candidates ++= addLookBehind(overlaps).map(Candidate(_))
+    candidates ++= restrictStarts(overlaps).map(Candidate(_))
     candidates.result().distinct
 
   private def makePossessive(n: Node, child: Node, q: Quantifier): Option[Candidate] =
@@ -636,17 +639,61 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
         edit(middle -> Seq(replacement), next -> Seq.empty)
       pairs ++ optional
 
-  /** A look-behind before the repetition at the start of a search, which is hot. */
-  private def addLookBehind(hot: SourceLocation => Boolean): Option[Node] =
-    def first(n: Node): Node = n.data match
-      case NodeData.Sequence(elements) if items(elements).nonEmpty                       => first(items(elements).head)
-      case NodeData.Group(GroupKind.NonCapture | GroupKind.IndexedCapture, child)        => first(child)
-      case NodeData.Group(_: GroupKind.NamedCapture | _: GroupKind.PNamedCapture, child) => first(child)
-      case _                                                                             => n
+  /** For a search whose fixed items `P` at the start (possibly none) are followed by a repetition of a fixed-width `E`,
+    * either of which is hot, a negative look-behind of `E` and `E` read up to the first `P` before it, as
+    * `(?<!E)(?:(?!P)E)*`, so a match starts only at the first `P` in what `E` reads in turn (e.g. `\s*$` to
+    * `(?<!\s)\s*$`, and `foo[a-z]*bar` to `(?<![a-z])(?:(?!foo)[a-z])*foo[a-z]*bar`). Without `P`, it does not move the
+    * start of a match. With `P`, it does, so `\K` before `P` keeps the start if the dialect has it, and else the match
+    * is not kept.
+    */
+  private def restrictStarts(hot: SourceLocation => Boolean): Option[Node] =
+    def elements(n: Node): Seq[Node] = n.data match
+      case NodeData.Sequence(ns)                       => items(ns)
+      case NodeData.Group(GroupKind.NonCapture, child) => elements(child)
+      case _                                           => Seq(n)
 
+    // The first item that is not a group, without the fixed items.
+    def first(n: Node): Node = n.data match
+      case NodeData.Sequence(ns) if items(ns).nonEmpty                                    => first(items(ns).head)
+      case NodeData.Group(kind, child) if kind == GroupKind.NonCapture || isCapture(kind) => first(child)
+      case _                                                                              => n
+
+    // `D` of `(?:(?!X)D)`, which is read up to the first `X` (see `readUntil`).
+    def plain(n: Node): Node = n.data match
+      case NodeData.Group(GroupKind.NonCapture, child) =>
+        unblank(child).data match
+          case NodeData.Sequence(ns) =>
+            items(ns) match
+              case Seq(Node(NodeData.Group(_: GroupKind.NegativeLookAhead, _), _), d) => d
+              case _                                                                  => n
+          case _ => n
+      case _ => n
+
+    val prefix = elements(node).takeWhile(e => setWord(e).exists(_.nonEmpty))
+    val repetition = elements(node).drop(prefix.size).headOption.map(e => if prefix.isEmpty then first(e) else e)
     for
-      loop <- loopOf(first(node))
-      if ir.needsSigmaStarAtBegin && hot(loop.atom.loc)
+      repeated <- repetition
+      (body, q) <- repeated.data match
+        case NodeData.Repeat(body, q, _) if min(q).nonEmpty => Some((plain(body), q))
+        case _                                              => None
+      // A fixed width is what a look-behind of any dialect may have.
+      word <- setWord(body)
+      // The restarts of the search make `P` hot too.
+      if ir.needsSigmaStarAtBegin && (repeated +: prefix).exists(n => hot(n.loc))
+      if q.strategy != BacktrackStrategy.Possessive
+      cut = prefix.nonEmpty && features.hasBackslashCut
+      if prefix.isEmpty || cut || !kept.contains(0)
     yield
-      val lookBehind = Node(NodeData.Group(GroupKind.NegativeLookBehind(AssertNameStyle.Symbolic), loop.atom))
-      edit(node -> Seq(lookBehind, node))
+      val opened = body.data match
+        case NodeData.Group(GroupKind.NonCapture, child) => child
+        case _                                           => body
+      val lookBehind = Node(NodeData.Group(GroupKind.NegativeLookBehind(AssertNameStyle.Symbolic), opened))
+      if prefix.isEmpty then edit(node -> Seq(lookBehind, node))
+      else
+        val p = sequence(prefix)
+        val scan = (setOf(body), setWord(p)) match
+          case (Some(set), Some(Seq(stop))) if set.diff(stop).nonEmpty => without(body, set, stop)
+          case _                                                       =>
+            group(Node(NodeData.Group(GroupKind.NegativeLookAhead(AssertNameStyle.Symbolic), p)), opened)
+        val k = Option.when(cut)(Node(NodeData.Backslash(BackslashKind.Assert(AssertKind.Cut))))
+        edit(node -> (Seq(lookBehind, repeat(scan, Quantifier.Star(BacktrackStrategy.Greedy))) ++ k :+ node))

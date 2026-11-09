@@ -41,7 +41,7 @@ class CandidateFinderSuite extends munit.FunSuite:
     assertEquals(edited("a*b", Dialect.DotNet).head, "(?>a*)b")
     // JavaScript has neither, so a negative look-ahead of the atom comes as a fallback.
     assertEquals(find("a*b").head, ("a*(?!a)b", Seq.empty, true))
-    assertEquals(edited("a*?b", Dialect.Java), Seq("a??b", "ab"))
+    assertEquals(edited("a*?b", Dialect.Java), Seq("a??b", "ab", "(?<!a)a*?b"))
     assertEquals(edited("a++b", Dialect.Java), Seq.empty)
 
   test("CandidateFinder#find: repetitions up to the first of the items after them"):
@@ -68,11 +68,13 @@ class CandidateFinderSuite extends munit.FunSuite:
     assert(!edited("(.*?)$", flags = "s").exists(_.contains("[^")))
 
   test("CandidateFinder#find: repetitions read at most once or exactly their minimums"):
-    assertEquals(edited("(?:ab)*c"), Seq("(?:ab)?c", "(?:ab)c"))
-    assertEquals(edited("(?:ab)*?c"), Seq("(?:ab)??c", "(?:ab)c"))
-    assertEquals(edited("(?:ab){3,}c"), Seq("(?:ab){3}c"))
+    // The look-behinds before the repetitions at the start are not about these.
+    def reduced(source: String): Seq[String] = edited(source).filterNot(_.startsWith("(?<!"))
+    assertEquals(reduced("(?:ab)*c"), Seq("(?:ab)?c", "(?:ab)c"))
+    assertEquals(reduced("(?:ab)*?c"), Seq("(?:ab)??c", "(?:ab)c"))
+    assertEquals(reduced("(?:ab){3,}c"), Seq("(?:ab){3}c"))
     // An exact repetition has no candidates, so only the outer one has.
-    assertEquals(edited("(?:a{2})*"), Seq("(?:a{2})?", "(?:a{2})"))
+    assertEquals(reduced("(?:a{2})*"), Seq("(?:a{2})?", "(?:a{2})"))
 
   test("CandidateFinder#find: alternatives"):
     assertEquals(edited("(?:a|a)"), Seq("(?:a)"))
@@ -151,6 +153,13 @@ class CandidateFinderSuite extends munit.FunSuite:
     assert(clue(edited("\\s*$")).contains("(?<!\\s)\\s*$"))
     assert(clue(edited("(?<n>\\s*)$")).contains("(?<!\\s)(?<n>\\s*)$"))
     assert(!edited("^\\s*$").exists(_.contains("(?<!")))
+    assert(clue(edited("(?:ab)*c")).contains("(?<!ab)(?:ab)*c"))
+    // With the fixed items at the start, the start of a match moves to the first of them, which `\K` keeps.
+    assert(clue(edited("foo[a-z]*bar", Dialect.PCRE)).contains("(?<![a-z])(?:(?!foo)[a-z])*\\Kfoo[a-z]*bar"))
+    assert(clue(edited("ab(?:ab)*c", Dialect.PCRE)).contains("(?<!ab)(?:(?!ab)ab)*\\Kab(?:ab)*c"))
+    // Without `\K`, the match is not kept.
+    assert(!edited("foo[a-z]*bar").exists(_.startsWith("(?<!")))
+    assert(clue(find("foo[a-z]*bar", kept = Some(Set.empty))).exists(_._1 == "(?<![a-z])(?:(?!foo)[a-z])*foo[a-z]*bar"))
 
   test("CandidateFinder#find: written forms and quotes"):
     // The nodes keep their written forms, including a repetition whose body is edited.
