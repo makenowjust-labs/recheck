@@ -59,6 +59,7 @@ ReDoS.repair("^(\\w+\\s?)+$", "", keep = Keep.All)
 </Tabs>
 
 The pattern and the flags are of the [`dialect`](parameters.mdx#dialect) parameter, as in `check`.
+The time of the repair is limited by [`repairTimeout`](parameters.mdx#repairtimeout) (30 seconds by default) instead of `timeout`.
 
 The [Playground](/playground) repairs a regular expression that it finds vulnerable: choose what to keep and press Repair under the result.
 Its permalink records the repair too.
