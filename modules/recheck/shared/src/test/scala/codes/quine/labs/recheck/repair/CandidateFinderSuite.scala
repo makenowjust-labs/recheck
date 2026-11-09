@@ -132,7 +132,8 @@ class CandidateFinderSuite extends munit.FunSuite:
     assert(clue(edited("\\d+\\.?\\d*")).contains("\\d+(?:\\.\\d*)?"))
     // The characters of the next atom are removed, by the complement of the complement for a class escape.
     assert(clue(edited("\\s*\\n\\s*")).contains("[^\\S\\x0A]*\\n\\s*"))
-    assert(clue(edited("(?:\\w+x)*")).contains("(?:[^\\Wx]+x)*"))
+    // A repetition reads its minimum first, so `xx` matches as before.
+    assert(clue(edited("(?:\\w+x)*")).contains("(?:\\w[^\\Wx]*x)*"))
     assert(clue(edited("[a\\n]*\\n")).contains("a*\\n"))
 
   test("CandidateFinder#find: unrolled repetitions"):
