@@ -115,7 +115,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           2,
-          Witness(Seq((Seq(other2), Seq(a, a, other2))), Seq.empty),
+          Witness(Seq((Seq(at), Seq(a, a, other2))), Seq.empty),
           Hotspot(Seq(Spot(2, 3, Hot), Spot(6, 8, Hot), Spot(10, 14, Hot)))
         )
       )
@@ -145,7 +145,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           3,
-          Witness(Seq((Seq.empty, Seq(a)), (Seq.empty, Seq(a)), (Seq.empty, Seq(a))), Seq(a)),
+          Witness(Seq((Seq(b), Seq(a)), (Seq.empty, Seq(a)), (Seq.empty, Seq(a))), Seq(b, a)),
           Hotspot(Seq(Spot(2, 3, Hot), Spot(9, 10, Hot)))
         )
       )
@@ -171,7 +171,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           2,
-          Witness(Seq((Seq.empty, Seq(a))), Seq(CharSet.union(Seq(a, b)).complement(UnitMode.Byte), b)),
+          Witness(Seq((Seq.empty, Seq(a))), Seq.empty),
           Hotspot(Seq(Spot(3, 4, Hot)))
         )
       )
@@ -218,7 +218,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       check("^.*(?<=^(?:a|a)*bc)d", ""),
       Success(
         Exponential(
-          Witness(Seq((Seq(b, a), Seq(a))), Seq(b, c, d, c, d)),
+          Witness(Seq((Seq(b, a), Seq(a))), Seq(b, c, d)),
           Hotspot(Seq(Spot(1, 2, Hot), Spot(11, 12, Hot), Spot(13, 14, Hot), Spot(16, 18, Warm)))
         )
       )
@@ -240,7 +240,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       check("^(aa|b|aab)*$", ""),
       Success(
         Exponential(
-          Witness(Seq((Seq(a), Seq(a, b, a, a, b, a))), Seq(other2)),
+          Witness(Seq((Seq(a, a), Seq(b, a, a, b, a, a))), Seq(other2)),
           Hotspot(Seq(Spot(2, 4, Hot), Spot(5, 6, Hot), Spot(7, 10, Hot)))
         )
       )

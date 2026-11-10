@@ -134,53 +134,57 @@ final case class OrderedNFA[A, Q](
             |  alphabet size: ${dfa.alphabet.size}""".stripMargin
       dfa
 
-  /** Converts this into [[NFAwLA]].
+  /** Converts this into [[NFAwLA]] with the look-ahead DFA, whose state `p` succeeds on the states `statesOf(p)` (see
+    * [[toLookAheadDFA]]).
     *
     * With [[inputStates]], a look-ahead that none of them has is of no input, which the result does not have.
     *
     * With `isUpperBound`, the result has every leaf of the transitions, as no look-ahead prunes them, so its paths
     * include every explored path.
     */
-  def toNFAwLA(isUpperBound: Boolean, maxNFASize: Int, maxDFASize: Int)(using ctx: Context): NFAwLA[A, Q, Set[Q]] =
+  def toNFAwLA[P](lookAheadDFA: DFA[A, P], statesOf: P => Set[Q], isUpperBound: Boolean, maxNFASize: Int)(using
+      ctx: Context
+  ): NFAwLA[A, Q, P] =
     ctx.interrupt:
-      val lookAheadDFA = if isUpperBound then DFA.universal(alphabet, Set.empty[Q]) else toLookAheadDFA(maxDFASize)
-      def isInput(p: Set[Q]): Boolean = isUpperBound || inputStates.isEmpty || p.exists(inputStates.contains)
+      val inputs = lookAheadDFA.stateSet.filter: p =>
+        isUpperBound || inputStates.isEmpty || statesOf(p).exists(inputStates.contains)
 
       val reverseDelta = ctx.interrupt:
         lookAheadDFA.delta
-          .filter { case (_, p1) => isInput(p1) }
+          .filter { case (_, p1) => inputs.contains(p1) }
           .groupMap(_._1._2) { case (p2, _) -> p1 => ctx.interrupt((p1, p2)) }
           .withDefaultValue(Vector.empty)
 
-      val newAlphabet = Set.newBuilder[(A, Set[Q])]
-      val newStateSet = Set.newBuilder[(Q, Set[Q])]
-      val newInits = ctx.interrupt(MultiSet.from(for q <- inits; p <- lookAheadDFA.stateSet if isInput(p) yield (q, p)))
+      val newAlphabet = Set.newBuilder[(A, P)]
+      val newStateSet = Set.newBuilder[(Q, P)]
+      val newInits = ctx.interrupt(MultiSet.from(for q <- inits; p <- inputs yield (q, p)))
       val newAcceptSet = ctx.interrupt(for q <- acceptSet yield (q, lookAheadDFA.init))
       val newSourcemap =
-        mutable.Map.empty[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[SourceLocation]].withDefaultValue(Vector.empty)
+        mutable.Map.empty[((Q, P), (A, P), (Q, P)), Seq[SourceLocation]].withDefaultValue(Vector.empty)
 
-      val newDelta =
-        mutable.Map.empty[((Q, Set[Q]), (A, Set[Q])), MultiSet[(Q, Set[Q])]].withDefaultValue(MultiSet.empty)
+      val newDelta = mutable.Map.empty[((Q, P), (A, P)), MultiSet[(Q, P)]].withDefaultValue(MultiSet.empty)
       var deltaSize = 0
       for ((q1, a) -> b) <- delta if !inputStates.contains(q1) do
         ctx.interrupt:
           for (p1, p2) <- reverseDelta(a) do
             // The ordered NFA has `q1 --(a)-> b`, and the look-ahead DFA has `p1 <-(a)-- p2`.
             // So the result has `(q1, p1) --(a)-> (q2, p2)` exactly when a matcher explores `q2` in `b` while `p2` succeeds.
-            val qp2s = (if isUpperBound then b.leaves else b.explore(p2.contains)).map((_, p2))
-            newDelta(((q1, p1), (a, p2))) = newDelta(((q1, p1), (a, p2))) ++ MultiSet.from(qp2s)
-            for (q2, p2) <- qp2s do
-              newSourcemap(((q1, p1), (a, p2), (q2, p2))) ++= sourcemap.getOrElse((q1, a, q2), Vector.empty)
+            val qp2s = (if isUpperBound then b.leaves else b.explore(statesOf(p2).contains)).map((_, p2))
+            // Most pairs of the look-ahead DFA states have no transition, which the result does not keep.
+            if qp2s.nonEmpty then
+              newDelta(((q1, p1), (a, p2))) = newDelta(((q1, p1), (a, p2))) ++ MultiSet.from(qp2s)
+              for (q2, p2) <- qp2s do
+                newSourcemap(((q1, p1), (a, p2), (q2, p2))) ++= sourcemap.getOrElse((q1, a, q2), Vector.empty)
 
-            newAlphabet.addOne((a, p2))
-            newStateSet.addOne((q1, p1)).addAll(qp2s)
+              newAlphabet.addOne((a, p2))
+              newStateSet.addOne((q1, p1)).addAll(qp2s)
 
-            deltaSize += qp2s.size
-            if deltaSize >= maxNFASize then
-              ctx.log("auto: exceed maxNFASize on NFAwLA construction")
-              throw new UnsupportedException("NFAwLA size is too large")
+              deltaSize += qp2s.size
+              if deltaSize >= maxNFASize then
+                ctx.log("auto: exceed maxNFASize on NFAwLA construction")
+                throw new UnsupportedException("NFAwLA size is too large")
 
-      val nfaWLA = NFAwLA[A, Q, Set[Q]](
+      val nfaWLA = NFAwLA[A, Q, P](
         newAlphabet.result(),
         newStateSet.result(),
         newInits,

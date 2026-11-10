@@ -22,7 +22,11 @@ object AutomatonChecker:
       ctx: Context
   ): Iterator[Complexity[A]] =
     ctx.interrupt:
-      val nfaWLA = nfa.toNFAwLA(isUpperBound, maxNFASize, maxDFASize)
+      val lookAheadDFA =
+        if isUpperBound then DFA.universal(nfa.alphabet, Set.empty[Q]) else nfa.toLookAheadDFA(maxDFASize)
+      // The look-ahead DFA states are numbered, since hashing their sets takes most of the time on a large NFA.
+      val sets = lookAheadDFA.stateSet.toIndexedSeq
+      val nfaWLA = nfa.toNFAwLA(lookAheadDFA.mapState(sets.zipWithIndex.toMap), sets, isUpperBound, maxNFASize)
       val complexities = new AutomatonChecker(nfaWLA, false, isUpperBound).check()
       nfa.lookBehind match
         case None => complexities
