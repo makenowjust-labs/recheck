@@ -53,6 +53,7 @@ In a way, this pair of states is like a seed of IDA or EDA structure. Adding a r
 The idea of statically analyzing regular expressions to obtain strings that may cause ReDoS vulnerabilities can be seen in the research of Li et al [[2]](#ref-li-2021). However, that work was the syntax direction analysis of regular expressions, and there was a possibility of missing parts of EDA or IDA structures. The observation of state pairs is similar to that of Linear Time Property in Chida et al.'s research [[3]](#ref-chida-2020), but this observation is more detailed.
 
 When the upper bound of the matching time that the fuzzing finds first is not linear (see [Criteria](criteria.mdx)), the strings of the EDA and IDA structures of the bound come first in the initial generation, each repeated as many times as its complexity needs.
+The bound may be above the actual complexity, so each string also comes repeated as many times as each lower degree needs, and cut after each of its repetitions but the last, since the rest of the string may let the match succeed.
 The attacks then do not assume a complexity above the bound: without an EDA structure in the bound, they do not try an exponential one.
 
 <details>
@@ -69,7 +70,7 @@ In the dynamic analysis, we first input an empty string and record the character
 
 Incubation is the step in which the initial generation obtained by seeding is turned into a string that takes longer to match using a genetic algorithm.
 
-If we find a string that takes enough matching time at this stage, we move on to attack to verify if the string is attackable. In order to acceleration regular expression matching, which will be explained on the next page, the number of times a character is read during the matching is used to determine if the matching takes time or not, rather than the actual matching time.
+The strings that take enough matching time in a generation become the candidates of attacks, up to `maxAttackCandidates` of them, and we move on to attack to verify if they are attackable. In order to accelerate regular expression matching, which will be explained on the next page, the number of times a character is read during the matching is used to determine if the matching takes time or not, rather than the actual matching time.
 
 Then, if no attackable string is found after repeating the generation of the genetic algorithm for the specified number of times, we report that the regular expression is safe.
 
@@ -81,7 +82,9 @@ Attack is the step to verify whether an attack is actually possible by matching 
 
 As mentioned above, the genetic algorithm uses strings with repetition structures, and we apply this to determine whether the matching time is exponential or polynomial.
 
-First, assuming that the matching time increases exponentially, we try to match the number of repetitions as the logarithm of the threshold. If the threshold is reached here, then the matching time is exponential. If not, assume that the matching time is polynomially increasing of order $d$ and do the same. Repeating this until $d$ becomes $2$, and if the threshold is not reached until the end, we assume that it is safe for this string and return to incubation.
+First, we estimate how fast the matching time of each candidate grows. We match the candidate with the number of repetitions halved and doubled, and take the slope of the matching time over the length of the repeated part on the log-log scale. The slope is the order $d$ of a polynomial growth, and it keeps increasing for an exponential one. A candidate whose slope is below $1.5$ is not an attack.
+
+Then, from the candidate with the steepest slope, we match it with the number of repetitions that reaches the threshold under the estimated complexity. If the threshold is reached here, it is an attack of that complexity. If no candidate reaches it, we return to incubation.
 
 ## Notes
 

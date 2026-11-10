@@ -151,6 +151,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
       DefaultMaxAttackStringSize,
       DefaultMaxInitialGenerationSize,
       maxGenerationSize,
+      DefaultMaxAttackCandidates,
       DefaultMaxIteration,
       DefaultMaxDegree,
       DefaultHeatRatio,
@@ -178,12 +179,20 @@ class FuzzCheckerSuite extends munit.FunSuite:
     // Nor do the repetitions that stay with too many repeats, whose bound would hide the `2^50` paths of `(a?){50}`.
     assertEquals(upperBound("^(a?){50}a{50}$"), None)
 
-  test("FuzzChecker.buildSeed"):
-    val witness = Witness[UChar](Seq((Seq('x'), Seq('a')), (Seq.empty, Seq('b', 'c'))), Seq('!'))
-    val seq = Vector(Wrap('x'), Repeat(0, 1), Wrap('a'), Repeat(0, 2), Wrap('b'), Wrap('c'), Wrap('!'))
-    // The repeat count reaches the limit by the complexity.
-    assertEquals(FuzzChecker.buildSeed(Complexity.Polynomial(2, witness), 1000, 100), FString(26, seq))
-    assertEquals(FuzzChecker.buildSeed(Complexity.Exponential(witness), 1000, 100), FString(9, seq))
+  test("FuzzChecker.buildSeeds"):
+    val witness = Witness[UChar](Seq((Seq('x'), Seq('a')), (Seq.empty, Seq('b', 'c', 'd'))), Seq('!'))
+    val seq = Vector(Wrap('x'), Repeat(0, 1), Wrap('a'), Repeat(0, 3), Wrap('b'), Wrap('c'), Wrap('d'), Wrap('!'))
+    val first = Vector(Wrap('x'), Repeat(0, 1), Wrap('a'))
+    // The repeat count reaches the limit by the complexity, and then by each lower degree, for the whole witness and
+    // then for the first pump only.
+    assertEquals(
+      FuzzChecker.buildSeeds(Complexity.Polynomial(3, witness), 1000, 100, 4),
+      Seq(FString(12, seq), FString(23, seq), FString(12, first), FString(23, first))
+    )
+    assertEquals(
+      FuzzChecker.buildSeeds(Complexity.Exponential(witness), 1000, 100, 3).take(3),
+      Seq(FString(8, seq), FString(12, seq), FString(23, seq))
+    )
 
   /** A witness of `^a*$` for the upper bounds in the tests. */
   val witness: Witness[UChar] = Witness(Seq((Seq.empty, Seq('a'))), Seq('!'))
@@ -210,12 +219,44 @@ class FuzzCheckerSuite extends munit.FunSuite:
   test("FuzzChecker#seed"):
     val ir = ReDoS.parse("^a*$", "", Dialect.JavaScript)
     val quadratic = Complexity.Polynomial(2, witness)
-    val seed = checkerOf(ir, upperBound = Some(Seq(quadratic, quadratic))).seed()
+    val cubic = Complexity.Polynomial(3, witness)
+    val seed = checkerOf(ir, upperBound = Some(Seq(cubic, quadratic, quadratic))).seed()
+    def seeds(complexity: Complexity.Vulnerable[UChar]): Seq[FString] =
+      FuzzChecker.buildSeeds(
+        complexity,
+        Parameters.DefaultIncubationLimit,
+        Parameters.DefaultMaxGeneStringSize,
+        Parameters.DefaultMaxDegree
+      )
+    // The first seeds of the witnesses come before the others, without duplicates.
     val upperBoundSeed =
-      FuzzChecker.buildSeed(quadratic, Parameters.DefaultIncubationLimit, Parameters.DefaultMaxGeneStringSize)
-    assertEquals(seed.head, upperBoundSeed)
-    assertEquals(seed.count(_ == upperBoundSeed), 1)
-    assertEquals(seed.tail.toSet, checkerOf(ir).seed().toSet - upperBoundSeed)
+      Seq(seeds(cubic).head, seeds(quadratic).head) ++ seeds(cubic).tail.filterNot(seeds(quadratic).contains)
+    assertEquals(seed.take(upperBoundSeed.size), upperBoundSeed)
+    assertEquals(seed.drop(upperBoundSeed.size).toSet, checkerOf(ir).seed().toSet -- upperBoundSeed)
+
+  /** A string of `n` repetitions of the character, followed by `!`. */
+  def repeatOf(c: Char, n: Int): FString =
+    FString(n, IndexedSeq(FString.Repeat(0, 1), FString.Wrap(c), FString.Wrap('!')))
+
+  test("FuzzChecker#estimate"):
+    val ir = ReDoS.parse("^(?:a*$|b*b*$|(?:c|c)*$)", "", Dialect.JavaScript)
+    val checker = checkerOf(ir)
+    assertEquals(checker.estimate(repeatOf('a', 1000)), None)
+    assertEqualsDouble(checker.estimate(repeatOf('b', 1000)).get, 2.0, 0.2)
+    assert(checker.estimate(repeatOf('c', 30)).get > Parameters.DefaultMaxDegree + 0.5)
+    assert(checker.estimate(FString(1, IndexedSeq(FString.Wrap('c'), FString.Wrap('!')))).get.isPosInfinity)
+
+  test("FuzzChecker#attack: the steepest candidate first"):
+    val ir = ReDoS.parse("^(?:b*b*$|(?:c|c)*$)", "", Dialect.JavaScript)
+    val checker = checkerOf(ir)
+    val results = checker.attack(Iterator(repeatOf('b', 1000), repeatOf('c', 30)))
+    assertEquals(results.next()._1, AttackComplexity.Exponential(true))
+    assertEquals(results.next()._1, AttackComplexity.Polynomial(2, true))
+    // A string whose steps grow linearly is not an attack.
+    assertEquals(
+      checker.attack(Iterator(FString(1000, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('x'))))).toSeq,
+      Seq.empty
+    )
 
   test("FuzzChecker#Population#execute: strings that some repeat count makes no string of the mode"):
     val ir = ReDoS.parse("^[\\uD800-\\uDBFF]*[\\uDC00-\\uDFFF]*$", "u", Dialect.JavaScript)
@@ -235,6 +276,20 @@ class FuzzCheckerSuite extends munit.FunSuite:
     val pop = new checker.Population(0, mutable.Set.empty, mutable.Set.empty)
     pop.execute(FString(1, IndexedSeq(low, high)))
     assertEquals(checker.inputs.toSet, Set(UString(0xdc00, 0xd800)))
+
+  test("FuzzChecker#Population#execute: candidates"):
+    val ir = ReDoS.parse("^(?:a|a)*$", "", Dialect.JavaScript)
+    val checker = checkerOf(ir)
+    val pop = new checker.Population(0, mutable.Set.empty, mutable.Set.empty)
+    val max = Parameters.DefaultMaxAttackCandidates
+    val strs = (1 to max + 1).map: k =>
+      FString(30, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a')) ++ IndexedSeq.fill(k)(FString.Wrap('!')))
+    // The same sequence is one candidate, and no string runs after `maxAttackCandidates` candidates.
+    pop.execute(strs(0))
+    pop.execute(strs(0).copy(n = 31))
+    strs.foreach(pop.execute)
+    assertEquals(pop.candidates.values.toSeq, strs.take(max))
+    assertEquals(checker.inputs.size, max + 1)
 
   test("FuzzChecker#Population#toGeneration: strings with an avoided attack rank last"):
     val ir = ReDoS.parse("^(a|a)*$", "", Dialect.JavaScript)

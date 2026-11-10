@@ -277,6 +277,7 @@ object ReDoS:
         maxAttackStringSize,
         maxInitialGenerationSize,
         maxGenerationSize,
+        maxAttackCandidates,
         maxIteration,
         maxDegree,
         heatRatio,

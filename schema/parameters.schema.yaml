@@ -227,6 +227,15 @@ properties:
     x-exclude: ["cli", "eslint-plugin", "playground"]
     x-since: "4.2.0"
 
+  maxAttackCandidates:
+    title: "Max Attack Candidates"
+    description: "The maximum number of strings reaching `incubationLimit` that each generation collects on fuzzing before the attacks."
+    type: integer
+    default: 8
+    x-scala-type: "Int"
+    x-cli: "max-attack-candidates"
+    x-since: "5.0.0"
+
   maxAttackStringSize:
     title: "Max Attack String Size"
     description: "The maximum length of the attack string on fuzzing."

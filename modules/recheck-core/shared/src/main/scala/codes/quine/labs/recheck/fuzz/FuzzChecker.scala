@@ -63,6 +63,7 @@ object FuzzChecker:
       maxAttackStringSize: Int = Parameters.DefaultMaxAttackStringSize,
       maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
       maxGenerationSize: Int = Parameters.DefaultMaxGenerationSize,
+      maxAttackCandidates: Int = Parameters.DefaultMaxAttackCandidates,
       maxIteration: Int = Parameters.DefaultMaxIteration,
       maxDegree: Int = Parameters.DefaultMaxDegree,
       heatRatio: Double = Parameters.DefaultHeatRatio,
@@ -101,6 +102,7 @@ object FuzzChecker:
           maxAttackStringSize,
           maxInitialGenerationSize,
           maxGenerationSize,
+          maxAttackCandidates,
           maxIteration,
           maxDegree,
           heatRatio,
@@ -141,15 +143,26 @@ object FuzzChecker:
             .toVector
       catch case _: UnsupportedException => None
 
-  /** Builds a seed from a witness of the upper bound, which repeats the pumps as many times as the complexity needs to
-    * reach `limit` steps.
-    */
-  private[fuzz] def buildSeed(complexity: Complexity.Vulnerable[UChar], limit: Int, maxSize: Int): FString =
+  /** Builds seeds from a witness of the upper bound, for its complexity and for each lower degree. */
+  private[fuzz] def buildSeeds(
+      complexity: Complexity.Vulnerable[UChar],
+      limit: Int,
+      maxSize: Int,
+      maxDegree: Int
+  ): Seq[FString] =
     val witness = complexity.witness
-    val seq = witness.pumps.flatMap: (prefix, pump) =>
+    val pumps = witness.pumps.map: (prefix, pump) =>
       prefix.map(FString.Wrap(_)) ++ (FString.Repeat(0, pump.size) +: pump.map(FString.Wrap(_)))
-    val n = complexity.bestRepeatCount(limit, maxSize).max(1)
-    FString(n, (seq ++ witness.suffix.map(FString.Wrap(_))).toIndexedSeq)
+    val seqs =
+      (pumps.flatten ++ witness.suffix.map(FString.Wrap(_))) +: (pumps.size - 1 to 1 by -1).map(pumps.take(_).flatten)
+    val lowerDegrees = complexity match
+      case _: Complexity.Exponential[UChar]    => maxDegree to 2 by -1
+      case Complexity.Polynomial(degree, _, _) => degree - 1 to 2 by -1
+    val counts =
+      complexity.bestRepeatCount(limit, maxSize) +:
+        lowerDegrees.map(Complexity.Polynomial(_, witness).bestRepeatCount(limit, maxSize))
+    val seeds = for seq <- seqs; n <- counts.map(_.max(1)).distinct yield FString(n, seq.toIndexedSeq)
+    seeds.distinct
 
   /** Trace is a summary of IR execution. */
   private[fuzz] final case class Trace(
@@ -186,6 +199,7 @@ private[fuzz] final class FuzzChecker(
     val maxAttackStringSize: Int,
     val maxInitialGenerationSize: Int,
     val maxGenerationSize: Int,
+    val maxAttackCandidates: Int,
     val maxIteration: Int,
     val maxDegree: Int,
     val heatRatio: Double,
@@ -240,16 +254,20 @@ private[fuzz] final class FuzzChecker(
 
   /** Creates the initial generation from the seed set. */
   def init(): (Iterator[AttackResult], Population) = interrupt:
-    val seed = this.seed()
     val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty)
-    (seed.iterator.flatMap(pop.execute), pop)
+    val results = Iterator
+      .single(pop)
+      .flatMap: pop =>
+        seed().foreach(pop.execute)
+        attack(pop.candidates.valuesIterator)
+    (results, pop)
 
   /** Computes the seed set, where the witnesses of the upper bound come first. */
   def seed(): Seq[FString] = interrupt:
     log(s"fuzz: seeding start (seeder: $seeder)")
-    val upperBoundSeed = upperBound.toSeq.flatten
-      .map(buildSeed(_, incubationLimit, maxGeneStringSize))
-      .distinct
+    // The first seeds of the witnesses come before the others, so that every witness has a seed.
+    val boundSeeds = upperBound.toSeq.flatten.map(buildSeeds(_, incubationLimit, maxGeneStringSize, maxDegree))
+    val upperBoundSeed = (boundSeeds.map(_.head) ++ boundSeeds.flatMap(_.tail)).distinct
       .take(maxInitialGenerationSize)
     val seederSeed: Set[FString] = seeder match
       case Seeder.Static =>
@@ -291,13 +309,13 @@ private[fuzz] final class FuzzChecker(
           |  traces: ${gen.traces.size}
           |     max: ${max.str} (steps: ${max.steps}, rate: ${max.rate})""".stripMargin
 
-    val crossovers = (1 to crossoverSize).iterator.flatMap(_ => cross(gen, next))
-    val mutations = (1 to mutationSize).iterator.flatMap(_ => mutate(gen, next))
+    for _ <- 1 to crossoverSize do cross(gen, next)
+    for _ <- 1 to mutationSize do mutate(gen, next)
 
-    ((crossovers ++ mutations), next)
+    (attack(next.candidates.valuesIterator), next)
 
   /** Simulates a crossover. */
-  def cross(gen: Generation, next: Population): Iterator[AttackResult] = interrupt:
+  def cross(gen: Generation, next: Population): Unit = interrupt:
     val i1 = random.between(0, gen.traces.size)
     val i2 = random.between(0, gen.traces.size)
 
@@ -308,15 +326,16 @@ private[fuzz] final class FuzzChecker(
     val pos2 = random.between(0, t2.size + 1)
 
     val (s1, s2) = FString.cross(t1, t2, pos1, pos2)
-    Seq(s1, s2).iterator.flatMap(next.execute)
+    next.execute(s1)
+    next.execute(s2)
 
   /** Simulates a mutation. */
-  def mutate(gen: Generation, next: Population): Iterator[AttackResult] = interrupt:
+  def mutate(gen: Generation, next: Population): Unit = interrupt:
     val i = random.nextInt(mutators.size)
     mutators(i)(gen, next)
 
   /** Mutators list defined in this fuzzer. */
-  val mutators: IndexedSeq[(Generation, Population) => Iterator[AttackResult]] = IndexedSeq(
+  val mutators: IndexedSeq[(Generation, Population) => Unit] = IndexedSeq(
     mutateRepeat,
     mutateInsert,
     mutateInsertPart,
@@ -326,10 +345,10 @@ private[fuzz] final class FuzzChecker(
   )
 
   /** A mutator to update a base repeat number. */
-  def mutateRepeat(gen: Generation, next: Population): Iterator[AttackResult] = interrupt:
+  def mutateRepeat(gen: Generation, next: Population): Unit = interrupt:
     val i = random.between(0, gen.traces.size)
     val t = gen.traces(i).str
-    if t.isConstant then return Iterator.empty
+    if t.isConstant then return
 
     val s = random.between(0, 2) match
       case 0 =>
@@ -341,7 +360,7 @@ private[fuzz] final class FuzzChecker(
     next.execute(s)
 
   /** A mutator to insert a character or a repeat specifier. */
-  def mutateInsert(gen: Generation, next: Population): Iterator[AttackResult] = interrupt:
+  def mutateInsert(gen: Generation, next: Population): Unit = interrupt:
     val i = random.nextInt(gen.traces.size)
     val t = gen.traces(i).str
 
@@ -351,7 +370,7 @@ private[fuzz] final class FuzzChecker(
         val c = alphabet.pairs(idx)._1.representative
         FString.Wrap(c)
       case 1 =>
-        if t.isEmpty then return Iterator.empty
+        if t.isEmpty then return
         val m = random.between(0, 10)
         val size = random.between(0, t.size)
         FString.Repeat(m, size)
@@ -361,7 +380,7 @@ private[fuzz] final class FuzzChecker(
     next.execute(s)
 
   /** A mutator to insert a part of the pattern (with/without a repeat specifier). */
-  def mutateInsertPart(gen: Generation, next: Population): Iterator[AttackResult] = interrupt:
+  def mutateInsertPart(gen: Generation, next: Population): Unit = interrupt:
     // Falls back when there is no part in the pattern.
     if parts.isEmpty then return mutateInsert(gen, next)
 
@@ -381,10 +400,10 @@ private[fuzz] final class FuzzChecker(
     next.execute(s)
 
   /** A mutator to update a character or a repeat specifier. */
-  def mutateUpdate(gen: Generation, next: Population): Iterator[AttackResult] = interrupt:
+  def mutateUpdate(gen: Generation, next: Population): Unit = interrupt:
     val i = random.nextInt(gen.traces.size)
     val t = gen.traces(i).str
-    if t.isEmpty then return Iterator.empty
+    if t.isEmpty then return
 
     val pos = random.between(0, t.size)
     val fc = t(pos) match
@@ -407,10 +426,10 @@ private[fuzz] final class FuzzChecker(
     next.execute(s)
 
   /** A mutator to copy a part of characters of a string. */
-  def mutateCopy(gen: Generation, next: Population): Iterator[AttackResult] = interrupt:
+  def mutateCopy(gen: Generation, next: Population): Unit = interrupt:
     val i = random.nextInt(gen.traces.size)
     val t = gen.traces(i).str
-    if t.size < 2 then return Iterator.empty
+    if t.size < 2 then return
 
     val pos1 = random.between(0, t.size - 1)
     val size = random.between(1, t.size - pos1 + 1)
@@ -421,30 +440,108 @@ private[fuzz] final class FuzzChecker(
     next.execute(s)
 
   /** A mutator to delete a part of characters of a string. */
-  def mutateDelete(gen: Generation, next: Population): Iterator[AttackResult] = interrupt:
+  def mutateDelete(gen: Generation, next: Population): Unit = interrupt:
     val i = random.nextInt(gen.traces.size)
     val t = gen.traces(i).str
 
-    if t.size < 2 then return Iterator.empty
+    if t.size < 2 then return
 
     val pos = random.between(0, t.size)
     val size = random.between(1, t.size - pos + 1)
     val s = t.delete(pos, size)
     next.execute(s)
 
-  /** Constructs an attack string. */
-  def tryAttack(str: FString): Iterator[AttackResult] = interrupt:
-    val exponential = if triesExponential then tryAttackExponential(str).iterator else Iterator.empty
-    val polynomials = (maxTriedDegree to 2 by -1).iterator.flatMap(tryAttackPolynomial(str, _))
+  /** Runs the attacks from the candidates, the steepest estimate first. */
+  def attack(candidates: Iterator[FString]): Iterator[AttackResult] = interrupt:
+    val failed = mutable.ArrayBuffer.empty[FString]
+    attackInOrder(candidates, failed) ++
+      failed.iterator.flatMap(str => record(str, tryAttackPolynomial(str, maxTriedDegree)))
 
-    (exponential ++ polynomials)
+  /** Runs the attacks of [[attack]], adding the candidates whose exponential attacks fail to `failed`. */
+  def attackInOrder(candidates: Iterator[FString], failed: mutable.Buffer[FString]): Iterator[AttackResult] =
+    interrupt:
+      val estimates = mutable.ArrayBuffer.empty[(FString, Double)]
+      while candidates.hasNext && !estimates.exists((_, slope) => isSteepest(slope)) do
+        val str = candidates.next()
+        for slope <- estimate(str) do estimates.addOne((str, slope))
+      if estimates.isEmpty then Iterator.empty
+      else
+        val results = estimates
+          .sortBy(-_._2)
+          .iterator
+          .flatMap: (str, slope) =>
+            degreeOf(slope) match
+              case None =>
+                val result = tryAttackExponential(str)
+                if result.isEmpty then failed.addOne(str)
+                record(str, result)
+              case Some(degree) => record(str, tryAttackPolynomial(str, degree))
+        results ++ attackInOrder(candidates, failed)
+
+  /** The step limit of the runs on estimation. */
+  val estimationLimit: Int = Math.min(attackLimit.toDouble, incubationLimit * Math.pow(2, maxDegree + 1)).toInt
+
+  /** Estimates the growth of the steps of the string as their log-log slope, or `None` if it is less than quadratic. */
+  def estimate(str: FString): Option[Double] = interrupt:
+    if str.isConstant then return Some(Double.PositiveInfinity)
+
+    val opts = Options(estimationLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode))
+    // The steps on the repeat count, and whether the run stops before the match ends.
+    def run(n: Int): (Double, Boolean) =
+      val result = Interpreter.runWithTimeout(program, str.copy(n = n).toUString, opts, attackTimeout)
+      (result.steps.toDouble, result.status == Status.Limit || result.status == Status.Timeout)
+    def repeatedSize(n: Int): Double = str.seq.collect { case FString.Repeat(m, size) => (n + m).max(0) * size }.sum
+    def slope(n1: Int, steps1: Double, n2: Int, steps2: Double): Double =
+      Math.log(steps2 / steps1) / Math.log(repeatedSize(n2) / repeatedSize(n1))
+
+    var n = str.n
+    var (s, stops) = run(n)
+    var above = Option.empty[(Int, Double)]
+    while stops && n > 1 do
+      above = Some((n, s))
+      n /= 2
+      val (s1, stops1) = run(n)
+      s = s1
+      stops = stops1
+    if stops then return Option.when(s >= estimationLimit)(Double.PositiveInfinity)
+    if repeatedSize(n) == 0 || s == 0 then return None
+
+    val upper = above match
+      case Some((n2, s2))                                                     => Some(slope(n, s, n2, s2))
+      case None if str.fixedSize + repeatedSize(2 * n) <= maxAttackStringSize => Some(slope(n, s, 2 * n, run(2 * n)._1))
+      case None                                                               => None
+    val lower =
+      if repeatedSize(n / 2) == 0 then None
+      else
+        val (s0, stops0) = run(n / 2)
+        Option.unless(stops0 || s0 == 0)(slope(n / 2, s0, n, s))
+    val estimate = (upper ++ lower).maxOption
+    log(s"""|fuzz: estimate (slope: ${estimate.getOrElse("none")})
+            |  string: $str""".stripMargin)
+    estimate.filter(_ >= 1.5)
+
+  /** The degree of the polynomial attack for the slope, or `None` for the exponential one. */
+  def degreeOf(slope: Double): Option[Int] =
+    if triesExponential && slope > maxDegree + 0.5 then None
+    else Some(Math.round(slope.min(maxTriedDegree.toDouble)).toInt.max(2))
+
+  /** Whether no attack can be steeper than the one of the slope. */
+  def isSteepest(slope: Double): Boolean =
+    degreeOf(slope) == (if triesExponential then None else Some(maxTriedDegree))
+
+  /** Records the attack from the string. */
+  def record(str: FString, result: Option[AttackResult]): Iterator[AttackResult] =
+    result.iterator.map: r =>
+      val (complexity, _, hotspot) = r
+      attacks(str) = (complexity, hotspot) :: attacks.getOrElse(str, Nil)
+      r
 
   /** Constructs an attack string on assuming the pattern is exponential. */
   def tryAttackExponential(str: FString): Option[AttackResult] = interrupt:
     log("fuzz: attack (exponential)")
     val n = RepeatUtil.exponential(attackLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
     val attack = str.copy(n = n)
-    tryAttackExecute(attack, None).map:
+    tryAttackExecute(attack).map:
       case (pattern, hotspot) => (AttackComplexity.Exponential(true), pattern, hotspot)
 
   /** Constructs an attack string on assuming the pattern is polynomial. */
@@ -452,19 +549,13 @@ private[fuzz] final class FuzzChecker(
     log(s"fuzz: attack (polynomial: $degree)")
     val n = RepeatUtil.polynomial(degree, attackLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
     val attack = str.copy(n = n)
-    tryAttackExecute(attack, Some(degree)).map:
+    tryAttackExecute(attack).map:
       case (pattern, hotspot) => (AttackComplexity.Polynomial(degree, true), pattern, hotspot)
 
-  /** Executes the string to construct attack string.
-    *
-    * `degree` is the assumed polynomial degree, or `None` for exponential.
-    */
-  def tryAttackExecute(str: FString, degree: Option[Int]): Option[(AttackPattern, Hotspot)] = interrupt:
+  /** Executes the string to construct attack string. */
+  def tryAttackExecute(str: FString): Option[(AttackPattern, Hotspot)] = interrupt:
     val input = str.toUString
-    // A timeout of a long polynomial attack string alone proves nothing, because a linear but slow pattern also runs
-    // over `attackTimeout`, so the growth is measured first on strings small enough to finish.
-    // An exponential attack string is short, so a timeout on it is a blow-up and it runs as is.
-    if input.length <= maxAttackStringSize && degree.forall(growsAsExpected(str, _)) then
+    if input.length <= maxAttackStringSize then
       val usesAcceleration = fuzz.usesAcceleration(accelerationMode)
       val opts = Options(attackLimit, usesAcceleration = usesAcceleration, needsHeatmap = true)
       val result = Interpreter.runWithTimeout(program, input, opts, attackTimeout)
@@ -475,26 +566,6 @@ private[fuzz] final class FuzzChecker(
         return Some((str.toAttackPattern(pattern.mode), Hotspot.build(result.heatmap, heatRatio)))
     None
 
-  /** Checks that the steps grow with the repeat count as `degree` predicts, by measuring two smaller strings. */
-  def growsAsExpected(str: FString, degree: Int): Boolean = interrupt:
-    // TODO: `incubationLimit` is only the closest existing value; the size of these probes deserves its own parameter.
-    val n1 = RepeatUtil.polynomial(degree, incubationLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
-    val n2 = n1 / 2
-    if n2 < 1 then return true
-
-    val opts = Options(attackLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode))
-    val results = Seq(n1, n2).map: n =>
-      Interpreter.runWithTimeout(program, str.copy(n = n).toUString, opts, attackTimeout)
-    // A string that cannot be measured is at least as heavy as assumed.
-    if results.exists(r => r.status == Status.Limit || r.status == Status.Timeout) then return true
-
-    val Seq(steps1, steps2) = results.map(_.steps.toDouble)
-    val exponent = if steps2 == 0 then Double.PositiveInfinity else Math.log(steps1 / steps2) / Math.log(2)
-    log:
-      s"""|fuzz: attack growth (degree: $degree, exponent: $exponent)
-          |  steps: $steps1 (n: $n1), $steps2 (n: $n2)""".stripMargin
-    exponent >= degree - 0.5
-
   /** Population is a mutable generation on fuzzing. */
   final class Population(
       var minRate: Double,
@@ -502,15 +573,16 @@ private[fuzz] final class FuzzChecker(
       val visited: mutable.Set[CoverageItem]
   ):
 
-    /** Executes the string and adds its result.
-      *
-      * It discards a string that some repeat count makes no string of the mode (see [[FString.admitsAnyRepeatCount]]).
-      */
-    def execute(str: FString): Iterator[AttackResult] =
-      if str.countRepeat >= maxDegree || !str.admitsAnyRepeatCount(pattern.mode) then return Iterator.empty
+    /** The strings that reach `incubationLimit`, one for each sequence. */
+    val candidates: mutable.LinkedHashMap[IndexedSeq[FString.FChar], FString] = mutable.LinkedHashMap.empty
+
+    /** Executes the string and adds its result, and a candidate of an attack if it reaches `incubationLimit`. */
+    def execute(str: FString): Unit =
+      if candidates.size >= maxAttackCandidates then return
+      if str.countRepeat >= maxDegree || !str.admitsAnyRepeatCount(pattern.mode) then return
 
       val input = str.toUString
-      if inputs.contains(input) || input.length >= maxGeneStringSize then return Iterator.empty
+      if inputs.contains(input) || input.length >= maxGeneStringSize then return
 
       val opts =
         Options(incubationLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode), needsCoverage = true)
@@ -518,14 +590,9 @@ private[fuzz] final class FuzzChecker(
       add(str, input, result)
       if result.status == Status.Limit || result.status == Status.Timeout then
         log:
-          s"""|fuzz: attack start (status: ${result.status})
+          s"""|fuzz: candidate (status: ${result.status})
               |  string: $str""".stripMargin
-        return tryAttack(str).map: r =>
-          val (complexity, _, hotspot) = r
-          attacks(str) = (complexity, hotspot) :: attacks.getOrElse(str, Nil)
-          r
-
-      Iterator.empty
+        if !candidates.contains(str.seq) then candidates(str.seq) = str
 
     /** Records the execution result. */
     def add(str: FString, input: UString, result: Result): Unit =
