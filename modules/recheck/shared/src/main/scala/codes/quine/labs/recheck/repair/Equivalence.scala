@@ -26,14 +26,20 @@ object Equivalence:
     *
     * They differ when one of them matches and the other does not, or when a pair of `captures` differs in the match,
     * where a pair has the capture indices of `a` and `b`, and `(0, 0)` is the whole match. A capture is the last one
-    * set on the path of the match, or unset.
+    * set on the path of the match, or unset. The back-references are expanded as [[EpsNFABuilder.build]] does with
+    * `maxBackReferenceStrings`.
     */
-  def findCounterexample(a: IRPattern, b: IRPattern, captures: Seq[(Int, Int)], maxNFASize: Int, maxDFASize: Int)(using
-      ctx: Context
-  ): Option[UString] =
+  def findCounterexample(
+      a: IRPattern,
+      b: IRPattern,
+      captures: Seq[(Int, Int)],
+      maxNFASize: Int,
+      maxDFASize: Int,
+      maxBackReferenceStrings: Int = Parameters.DefaultMaxBackReferenceStrings
+  )(using ctx: Context): Option[UString] =
     ctx.interrupt:
-      val sideA = ComparedPattern(a, captures.map(_._1), maxNFASize, maxDFASize)
-      val sideB = ComparedPattern(b, captures.map(_._2), maxNFASize, maxDFASize)
+      val sideA = ComparedPattern(a, captures.map(_._1), maxNFASize, maxDFASize, maxBackReferenceStrings)
+      val sideB = ComparedPattern(b, captures.map(_._2), maxNFASize, maxDFASize, maxBackReferenceStrings)
       new Equivalence(sideA, sideB, maxNFASize).findCounterexample()
 
   /** The value of a begin or an end of a capture that is unset. */
@@ -71,11 +77,10 @@ object Equivalence:
 
   private[repair] object ComparedPattern:
 
-    def apply(pattern: IRPattern, captures: Seq[Int], maxNFASize: Int, maxDFASize: Int)(using
-        ctx: Context
+    def apply(pattern: IRPattern, captures: Seq[Int], maxNFASize: Int, maxDFASize: Int, maxBackReferenceStrings: Int)(
+        using ctx: Context
     ): ComparedPattern =
-      val epsNFA =
-        EpsNFABuilder.build(pattern, captures.toSet, maxNFASize, Parameters.DefaultMaxBackReferenceStrings)
+      val epsNFA = EpsNFABuilder.build(pattern, captures.toSet, maxNFASize, maxBackReferenceStrings)
       val nfa = epsNFA.foldCaptureMarks.toOrderedNFA(false, maxNFASize, maxDFASize, Some(_._2)).rename
       val lookBehindMarking = nfa.lookBehind.fold(Set.empty)(lb => markingStates(lb.inner, Set.empty))
       val marking = markingStates(nfa, lookBehindMarking)

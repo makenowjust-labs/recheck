@@ -156,12 +156,17 @@ class RepairSuite extends munit.FunSuite:
     assertEquals(search("^(?:a+){2,40}$"), repaired("^a{2,}$"))
 
   test("Repair.search: back-references"):
-    // Without the expansion, the fuzz checker checks a back-reference, while the comparison of the repairs still
-    // expands it.
+    // The automaton checker expands a back-reference to a group of a finite language, so the comparison is exact.
+    assertEquals(search("^(a|a)\\1*$"), Result.Safe)
+    assertEquals(search("^(?:a|a)*(x)\\1$"), repaired("^a*(x)\\1$", comparison = Comparison.Equivalent))
+    // Without the expansion, the automaton checker gives up on them, and the fuzz checker bounds them from above and
+    // fuzzes when the bound is not linear, as `ReDoS.check` does.
     val bound = Parameters(maxBackReferenceStrings = 0)
-    assertEquals(search("^(a|a)\\1*$", params = bound), Result.Safe)
-    assertEquals(search("^(?:a|a)*(x)\\1$", params = bound), repaired("^a*(x)\\1$"))
-    assertEquals(search("^(?:a|a)*(x)\\1*\\1*$", params = bound), repaired("^a*(x)\\1?\\1*$"))
+    assertEquals(search("^(?:a|a)*(x)\\1$", params = bound), repaired("^a*(x)\\1$", comparison = Comparison.Unknown))
+    search("^(?:a|a)*(x)\\1*\\1*$", params = bound) match
+      case Result.Repaired(pattern, _, complexity, _) =>
+        assertEquals((pattern.source, complexity), ("^a*(x)\\1*\\1*$", AttackComplexity.Polynomial(2, true)))
+      case result => fail(s"not repaired: $result")
 
   test("Repair.search: repetitions up to the first of the items after them"):
     assertEquals(search("^.*Mobile.*AspiegelBot$"), repaired("^(?:(?!Mobile).)*Mobile.*AspiegelBot$"))
@@ -214,7 +219,8 @@ class RepairSuite extends munit.FunSuite:
       repaired("^(\\w\\s?)+\\d$", Dialect.Java, Comparison.Unknown)
     )
     // The check of the result has no time, so its complexity is the score of the edit, which the fuzz checker gives.
-    search("^(?:a|a)*(x)\\1*\\1*$")(using outOfTimeAt("repair: check of the result", 10.seconds)) match
+    val bound = Parameters(maxBackReferenceStrings = 0)
+    search("^(?:a|a)*(x)\\1*\\1*$", params = bound)(using outOfTimeAt("repair: check of the result", 10.seconds)) match
       case Result.Repaired(pattern, _, complexity, _) =>
         assertEquals((pattern.source, complexity), ("^a*(x)\\1*\\1*$", AttackComplexity.Polynomial(2, true)))
       case result => fail(s"not repaired: $result")
