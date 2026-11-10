@@ -189,12 +189,13 @@ private final class AutomatonChecker[A, Q, P](
           result
 
   /** Finds an IDA structure chain in the graph. */
-  private def checkPolynomial(): Seq[Complexity[A]] =
+  private def checkPolynomial(): Iterator[Complexity[A]] =
     log("automaton: find IDA")
     interrupt:
       scc
         .map(findIDAChain)
         .sortBy(-_._1)
+        .iterator
         .map((degree, pumps) => (degree - degreeOffset, pumps))
         .map:
           case (degree, _) if degree <= 0 => Constant
