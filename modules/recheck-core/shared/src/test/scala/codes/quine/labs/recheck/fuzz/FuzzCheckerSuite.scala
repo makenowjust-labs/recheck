@@ -245,6 +245,10 @@ class FuzzCheckerSuite extends munit.FunSuite:
     assertEqualsDouble(checker.estimate(repeatOf('b', 1000)).get, 2.0, 0.2)
     assert(checker.estimate(repeatOf('c', 30)).get > Parameters.DefaultMaxDegree + 0.5)
     assert(checker.estimate(FString(1, IndexedSeq(FString.Wrap('c'), FString.Wrap('!')))).get.isPosInfinity)
+    // The steps grow quadratically up to 100 characters after `=`, and the match succeeds past them (#1310).
+    val bounded = checkerOf(ReDoS.parse("^.*?=[^&]{100}", "", Dialect.JavaScript))
+    val str = FString(30, IndexedSeq(FString.Repeat(0, 2), FString.Wrap('='), FString.Wrap('x')))
+    assertEquals(bounded.estimate(str), None)
 
   test("FuzzChecker#attack: the steepest candidate first"):
     val ir = ReDoS.parse("^(?:b*b*$|(?:c|c)*$)", "", Dialect.JavaScript)
@@ -276,6 +280,16 @@ class FuzzCheckerSuite extends munit.FunSuite:
     val pop = new checker.Population(0, mutable.Set.empty, mutable.Set.empty)
     pop.execute(FString(1, IndexedSeq(low, high)))
     assertEquals(checker.inputs.toSet, Set(UString(0xdc00, 0xd800)))
+
+  test("FuzzChecker#attack: the skeletons of failed attacks"):
+    // The steps grow quadratically up to 100 characters, and the match succeeds on longer strings (#1310).
+    val ir = ReDoS.parse("[a-z0-9]{100,}", "", Dialect.JavaScript)
+    val checker = checkerOf(ir)
+    val str = FString(30, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a')))
+    val same = FString(15, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'), FString.Repeat(0, 1), FString.Wrap('a')))
+    assertEquals(checker.attack(Iterator(str, same)).toSeq, Seq.empty)
+    assertEquals(checker.failedSkeletons.toSet, Set(str.skeleton))
+    assert(!check("[a-z0-9]{100,}", "", quick = true))
 
   test("FuzzChecker#Population#execute: candidates"):
     val ir = ReDoS.parse("^(?:a|a)*$", "", Dialect.JavaScript)

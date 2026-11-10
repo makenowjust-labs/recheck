@@ -454,8 +454,10 @@ private[fuzz] final class FuzzChecker(
   /** Runs the attacks from the candidates, the steepest estimate first. */
   def attack(candidates: Iterator[FString]): Iterator[AttackResult] = interrupt:
     val failed = mutable.ArrayBuffer.empty[FString]
-    attackInOrder(candidates, failed) ++
-      failed.iterator.flatMap(str => record(str, tryAttackPolynomial(str, maxTriedDegree)))
+    attackInOrder(candidates, failed) ++ failed.iterator.flatMap(tryAttackPolynomialOnce(_, maxTriedDegree))
+
+  /** The skeletons of the candidates whose attacks fail or whose steps grow less than quadratically. */
+  val failedSkeletons: mutable.Set[UString] = mutable.Set.empty
 
   /** Runs the attacks of [[attack]], adding the candidates whose exponential attacks fail to `failed`. */
   def attackInOrder(candidates: Iterator[FString], failed: mutable.Buffer[FString]): Iterator[AttackResult] =
@@ -463,20 +465,33 @@ private[fuzz] final class FuzzChecker(
       val estimates = mutable.ArrayBuffer.empty[(FString, Double)]
       while candidates.hasNext && !estimates.exists((_, slope) => isSteepest(slope)) do
         val str = candidates.next()
-        for slope <- estimate(str) do estimates.addOne((str, slope))
+        if !failedSkeletons.contains(str.skeleton) then
+          estimate(str) match
+            case Some(slope) => estimates.addOne((str, slope))
+            case None        => failedSkeletons.add(str.skeleton)
       if estimates.isEmpty then Iterator.empty
       else
         val results = estimates
           .sortBy(-_._2)
           .iterator
+          .filterNot((str, _) => failedSkeletons.contains(str.skeleton))
           .flatMap: (str, slope) =>
             degreeOf(slope) match
-              case None =>
-                val result = tryAttackExponential(str)
-                if result.isEmpty then failed.addOne(str)
-                record(str, result)
-              case Some(degree) => record(str, tryAttackPolynomial(str, degree))
+              case None         => tryAttackExponentialOnce(str, failed)
+              case Some(degree) => tryAttackPolynomialOnce(str, degree)
         results ++ attackInOrder(candidates, failed)
+
+  /** Runs the exponential attack from the candidate, and adds it to `failed` if it fails. */
+  def tryAttackExponentialOnce(str: FString, failed: mutable.Buffer[FString]): Iterator[AttackResult] =
+    val result = tryAttackExponential(str)
+    if result.isEmpty then failed.addOne(str)
+    record(str, result)
+
+  /** Runs the polynomial attack from the candidate, and adds its skeleton to [[failedSkeletons]] if it fails. */
+  def tryAttackPolynomialOnce(str: FString, degree: Int): Iterator[AttackResult] =
+    val result = tryAttackPolynomial(str, degree)
+    if result.isEmpty then failedSkeletons.add(str.skeleton)
+    record(str, result)
 
   /** The step limit of the runs on estimation. */
   val estimationLimit: Int = Math.min(attackLimit.toDouble, incubationLimit * Math.pow(2, maxDegree + 1)).toInt
@@ -488,7 +503,7 @@ private[fuzz] final class FuzzChecker(
     val opts = Options(estimationLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode))
     // The steps on the repeat count, and whether the run stops before the match ends.
     def run(n: Int): (Double, Boolean) =
-      val result = Interpreter.runWithTimeout(program, str.copy(n = n).toUString, opts, attackTimeout)
+      val result = Interpreter.runWithTimeout(program, str.copy(n = n).toUString, opts, incubationTimeout)
       (result.steps.toDouble, result.status == Status.Limit || result.status == Status.Timeout)
     def repeatedSize(n: Int): Double = str.seq.collect { case FString.Repeat(m, size) => (n + m).max(0) * size }.sum
     def slope(n1: Int, steps1: Double, n2: Int, steps2: Double): Double =
@@ -506,16 +521,21 @@ private[fuzz] final class FuzzChecker(
     if stops then return Option.when(s >= estimationLimit)(Double.PositiveInfinity)
     if repeatedSize(n) == 0 || s == 0 then return None
 
+    // The slope above the count, and whether it is exact, which it is not on a lower bound of the steps.
     val upper = above match
-      case Some((n2, s2))                                                     => Some(slope(n, s, n2, s2))
-      case None if str.fixedSize + repeatedSize(2 * n) <= maxAttackStringSize => Some(slope(n, s, 2 * n, run(2 * n)._1))
-      case None                                                               => None
+      case Some((n2, s2))                                                     => Some((slope(n, s, n2, s2), false))
+      case None if str.fixedSize + repeatedSize(2 * n) <= maxAttackStringSize =>
+        val (s2, stops2) = run(2 * n)
+        Some((slope(n, s, 2 * n, s2), !stops2))
+      case None => None
     val lower =
       if repeatedSize(n / 2) == 0 then None
       else
         val (s0, stops0) = run(n / 2)
         Option.unless(stops0 || s0 == 0)(slope(n / 2, s0, n, s))
-    val estimate = (upper ++ lower).maxOption
+    val estimate = upper match
+      case Some((slope, true)) if slope < 1.5 => Some(slope)
+      case _                                  => (upper.map(_._1) ++ lower).maxOption
     log(s"""|fuzz: estimate (slope: ${estimate.getOrElse("none")})
             |  string: $str""".stripMargin)
     estimate.filter(_ >= 1.5)
