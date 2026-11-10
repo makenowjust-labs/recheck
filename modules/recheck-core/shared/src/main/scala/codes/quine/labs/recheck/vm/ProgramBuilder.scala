@@ -219,7 +219,7 @@ private[vm] class ProgramBuilder(
     if inst.isInstanceOf[Inst.IfCap] then hasRef = true
     if inst == Inst.Leave then hasLeave = true
 
-    val block = Block(instsBuffer.toSeq, inst)
+    val block = Block(IArray.from(instsBuffer), inst)
     currentLabel.block = block
     labelsBuffer.append(currentLabel)
 

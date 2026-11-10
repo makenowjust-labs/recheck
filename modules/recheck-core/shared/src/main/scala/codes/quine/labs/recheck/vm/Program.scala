@@ -1,9 +1,23 @@
 package codes.quine.labs.recheck.vm
 
 import codes.quine.labs.recheck.vm.Program.Meta
+import codes.quine.labs.resyntax.ast.SourceLocation
 
 /** Program is a compiled RegExp pattern. */
 final case class Program(blocks: Vector[(Label, Block)], meta: Meta):
+
+  /** The source locations that a heatmap counts, whose indices the heat sources keep as `heatIndex`. */
+  private[vm] lazy val heatLocations: IndexedSeq[SourceLocation] =
+    val reads = blocks.iterator
+      .flatMap((_, block) => block.insts.iterator ++ Iterator(block.terminator))
+      .flatMap:
+        case read: Inst.HeatSource  => Iterator(read)
+        case Inst.TryLA(read, _, _) => Iterator(read)
+        case Inst.TryLB(read, _, _) => Iterator(read)
+        case _                      => Iterator.empty
+    val locations = collection.mutable.LinkedHashMap.empty[SourceLocation, Int]
+    for read <- reads; loc <- read.loc do read.heatIndex = locations.getOrElseUpdate(loc, locations.size)
+    locations.keys.toIndexedSeq
 
   override def toString: String =
     val sb = new StringBuilder
