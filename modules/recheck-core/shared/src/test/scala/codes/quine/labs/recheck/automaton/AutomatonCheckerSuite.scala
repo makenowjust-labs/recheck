@@ -8,6 +8,7 @@ import scala.util.Try
 import codes.quine.labs.recheck.automaton.Complexity.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.Hotspot.*
 import codes.quine.labs.resyntax.charset.CharSet
@@ -49,6 +50,12 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     case Linear            => 1
     case p: Polynomial[?]  => p.degree
     case _: Exponential[?] => Int.MaxValue
+
+  test("AutomatonChecker.checkStateCount"):
+    // The products pack three numbers of states into a `Long`.
+    AutomatonChecker.checkStateCount(1 << AutomatonChecker.StateBits)
+    interceptMessage[UnsupportedException]("NFAwLA has too many states"):
+      AutomatonChecker.checkStateCount((1 << AutomatonChecker.StateBits) + 1)
 
   test("AutomatonChecker.check: constant"):
     assertEquals(check("^$", ""), Success(Constant))
@@ -95,7 +102,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           2,
-          Witness(Seq((Seq(a), Seq(a, a))), Seq(other1, a, a, a)),
+          Witness(Seq((Seq.empty, Seq(a, a))), Seq(a, other1, a, a, a)),
           Hotspot(Seq(Spot(2, 4, Hot), Spot(6, 7, Hot), Spot(8, 10, Hot)))
         )
       )
@@ -240,7 +247,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       check("^(aa|b|aab)*$", ""),
       Success(
         Exponential(
-          Witness(Seq((Seq(a, a), Seq(b, a, a, b, a, a))), Seq(other2)),
+          Witness(Seq((Seq(a), Seq(a, a, a, b, a))), Seq(other2)),
           Hotspot(Seq(Spot(2, 4, Hot), Spot(5, 6, Hot), Spot(7, 10, Hot)))
         )
       )
