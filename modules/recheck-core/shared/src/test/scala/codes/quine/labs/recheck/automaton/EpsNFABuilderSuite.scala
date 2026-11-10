@@ -56,7 +56,6 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       alphabet,
       Set(0, 1, 2, 3),
       0,
-      3,
       Map(0 -> Eps(Seq(1)), 1 -> Consume(Set((set, CharKind.Normal)), 2), 2 -> Eps(Seq(3)))
     )
 
@@ -67,7 +66,6 @@ class EpsNFABuilderSuite extends munit.FunSuite:
         buildAlphabet(utf16),
         Set(0, 1, 2, 3, 4),
         1,
-        0,
         Map(
           1 -> Eps(Seq(4, 2)),
           2 -> LoopEnter(0, 3),
@@ -82,7 +80,6 @@ class EpsNFABuilderSuite extends munit.FunSuite:
         buildAlphabet(utf16),
         Set(0, 1, 2, 3, 4),
         0,
-        4,
         Map(
           0 -> Eps(Seq(3, 1)),
           1 -> LoopEnter(0, 2),
@@ -93,10 +90,10 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     )
 
   test("EpsNFABuilder.build: LineBegin, LineEnd, Sequence"):
-    assertEquals(build("^$"), EpsNFA(buildAlphabet(utf16), Set(0, 1), 0, 1, Map(0 -> Eps(Seq(1)))))
+    assertEquals(build("^$"), EpsNFA(buildAlphabet(utf16), Set(0, 1), 0, Map(0 -> Eps(Seq(1)))))
     assertEquals(
       build("^(?:)$"),
-      EpsNFA(buildAlphabet(utf16), Set(0, 1, 2), 0, 2, Map(0 -> Eps(Seq(1)), 1 -> Eps(Seq(2))))
+      EpsNFA(buildAlphabet(utf16), Set(0, 1, 2), 0, Map(0 -> Eps(Seq(1)), 1 -> Eps(Seq(2))))
     )
 
   test("EpsNFABuilder.build: WordBoundary"):
@@ -107,7 +104,6 @@ class EpsNFABuilderSuite extends munit.FunSuite:
           buildAlphabet(utf16, word = Some(word)),
           Set(0, 1, 2, 3),
           0,
-          3,
           Map(0 -> Eps(Seq(1)), 1 -> Assert(kind, 2), 2 -> Eps(Seq(3)))
         )
       )
@@ -150,7 +146,6 @@ class EpsNFABuilderSuite extends munit.FunSuite:
         buildAlphabet(utf16),
         Set(0, 1, 2, 3, 4, 5, 6, 7),
         0,
-        7,
         Map(
           0 -> Eps(Seq(5)),
           5 -> Eps(Seq(1, 3)),
@@ -171,7 +166,6 @@ class EpsNFABuilderSuite extends munit.FunSuite:
           buildAlphabet(utf16),
           Set(0, 1, 2, 3, 4, 5, 6, 7),
           0,
-          7,
           Map(
             0 -> Eps(Seq(3)),
             3 -> Eps(t),
@@ -190,7 +184,6 @@ class EpsNFABuilderSuite extends munit.FunSuite:
           buildAlphabet(utf16),
           Set(0, 1, 2, 3, 4, 5, 6),
           0,
-          6,
           Map(
             0 -> Eps(Seq(1)),
             1 -> Consume(Set((any16, CharKind.Normal)), 2),
@@ -208,7 +201,6 @@ class EpsNFABuilderSuite extends munit.FunSuite:
           buildAlphabet(utf16),
           Set(0, 1, 2, 3, 4),
           0,
-          4,
           Map(
             0 -> Eps(Seq(3)),
             3 -> Eps(t),
@@ -245,6 +237,30 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     // Strings are tried from the longest, and then the characters.
     assertEquals(build("^[\\q{ab|c}d]$", "v"), build("^(?:ab|[cd])$", "u"))
 
+  test("EpsNFABuilder: marks"):
+    def countMarks(source: String, marks: Set[Int], dialect: Dialect = Dialect.JavaScript): Map[CaptureMark, Int] =
+      val ir = ReDoS.parse(source, "", dialect)
+      val nfa = new EpsNFABuilder(ir, PatternAlphabet.of(ir), false, false, marks, Int.MaxValue).build()
+      nfa.tau.values.toSeq.collect { case MarkCapture(mark, _) => mark }.groupMapReduce(identity)(_ => 1)(_ + _)
+
+    import CaptureMark.*
+    assertEquals(countMarks("^(a)(b)$", Set(0, 2)), Map(Begin(0) -> 1, End(0) -> 1, Begin(2) -> 1, End(2) -> 1))
+    assertEquals(countMarks("^(?:(a)|b)*$", Set(1)), Map(Unset(1) -> 1, Begin(1) -> 1, End(1) -> 1))
+    assertEquals(
+      countMarks("^(?:(a)(b))*$", Set(1, 2)),
+      Map(Unset(1) -> 1, Unset(2) -> 1, Begin(1) -> 1, End(1) -> 1, Begin(2) -> 1, End(2) -> 1)
+    )
+    assertEquals(countMarks("^(?:(a)|b)*$", Set(1), Dialect.Perl()), Map(Begin(1) -> 1, End(1) -> 1))
+    assertEquals(countMarks("a\\Kb", Set(0), Dialect.PCRE), Map(Begin(0) -> 2, End(0) -> 1))
+    // The copies for `(*NOTEMPTY)` have the marks too, but the tests of an atomic group do not.
+    assertEquals(countMarks("(*NOTEMPTY)(a)", Set(1), Dialect.PCRE), Map(Begin(1) -> 2, End(1) -> 2))
+    assertEquals(countMarks("(?>(a))", Set(1), Dialect.PCRE), Map(Begin(1) -> 1, End(1) -> 1))
+    interceptMessage[UnsupportedException]("capture in look-around assertion")(countMarks("(?=(a))", Set(1)))
+    assertEquals(countMarks("(?=a\\K)", Set.empty, Dialect.Ruby()), Map.empty)
+    interceptMessage[UnsupportedException]("\\K in look-around assertion")(
+      countMarks("(?=a\\K)", Set(0), Dialect.Ruby())
+    )
+
   test("EpsNFABuilder.build: LookAhead"):
     assertEquals(
       build("^(?!a)$"),
@@ -252,7 +268,6 @@ class EpsNFABuilderSuite extends munit.FunSuite:
         buildAlphabet(utf16, Seq(CharSet.single('a'))),
         Set(0, 1, 2, 3, 4, 5),
         0,
-        5,
         Map(
           0 -> Eps(Seq(3)),
           1 -> Consume(Set((CharSet.single('a'), CharKind.Normal)), 2),
@@ -270,7 +285,6 @@ class EpsNFABuilderSuite extends munit.FunSuite:
         buildAlphabet(utf16, Seq(CharSet.single('a'), CharSet.single('b'))),
         Set(0, 5, 6, 7),
         0,
-        7,
         Map(
           0 -> Eps(Seq(5)),
           5 -> LookBehindAssert(true, 1, 6),

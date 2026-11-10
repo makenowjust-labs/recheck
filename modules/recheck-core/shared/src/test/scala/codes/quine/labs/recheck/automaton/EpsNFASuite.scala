@@ -104,7 +104,6 @@ class EpsNFASuite extends munit.FunSuite:
       buildAlphabet(Seq(CharSet.single('a'))),
       immutable.SortedSet(0, 1, 2, 3, 4, 5, 6),
       0,
-      6,
       Map(
         0 -> Eps(Seq(1)),
         1 -> Eps(Seq(2, 3)),
@@ -138,14 +137,14 @@ class EpsNFASuite extends munit.FunSuite:
 
     val lookAround = EpsNFA(
       buildAlphabet(Seq(CharSet.single('a'))),
-      immutable.SortedSet(0, 1, 2, 3, 4),
+      immutable.SortedSet(0, 1, 2, 3, 4, 5),
       0,
-      4,
       Map(
         0 -> LookAheadAssert(true, 1, 2),
         1 -> LookAroundAccept(),
         2 -> LookBehindAssert(false, 1, 3),
-        3 -> AtomicEps(Seq((1, 4)), 0)
+        3 -> AtomicEps(Seq((1, 4)), 0),
+        4 -> MarkCapture(CaptureMark.Begin(0), 5)
       )
     )
     assertEquals(
@@ -163,7 +162,9 @@ class EpsNFASuite extends munit.FunSuite:
          |  "3" [shape=diamond];
          |  "3" -> "4" [label="0 if 1"];
          |  "3" -> "0" [label=1];
-         |  "4" [shape=doublecircle];
+         |  "4" [shape=circle];
+         |  "4" -> "5" [label="MarkCapture(Begin(0))"];
+         |  "5" [shape=doublecircle];
          |}""".stripMargin
     )
 
@@ -172,7 +173,6 @@ class EpsNFASuite extends munit.FunSuite:
       buildAlphabet(Seq(CharSet.single('a'))),
       immutable.SortedSet(0, 2),
       0,
-      2,
       Map(0 -> LookBehindAssert(false, 1, 2)),
       Some(LookBehind(Set(1), Map(1 -> LookAroundAccept())))
     )
@@ -197,7 +197,6 @@ class EpsNFASuite extends munit.FunSuite:
       buildAlphabet(Seq.empty, Some(CharSet.single('\n'))),
       Set(0, 1, 2, 3, 4, 5, 6),
       0,
-      6,
       Map(
         0 -> Eps(Seq(1, 5)),
         1 -> LoopEnter(0, 2),
@@ -226,7 +225,6 @@ class EpsNFASuite extends munit.FunSuite:
       buildAlphabet(Seq.empty, Some(CharSet.single('\n')), Some(CharSet.single('a'))),
       Set(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
       0,
-      10,
       Map(
         0 -> Assert(lineEnd, 1),
         1 -> Eps(Seq(2, 8)),

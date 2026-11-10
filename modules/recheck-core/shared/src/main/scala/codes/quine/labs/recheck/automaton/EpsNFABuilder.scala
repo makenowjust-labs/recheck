@@ -54,8 +54,8 @@ object EpsNFABuilder:
       ctx: Context
   ): (EpsNFA[Int], Boolean) =
     ctx.interrupt:
-      val builder =
-        new EpsNFABuilder(pattern, PatternAlphabet.of(pattern), maxNFASize, isSimplified, lookBehindsAsLookAheads)
+      val alphabet = PatternAlphabet.of(pattern)
+      val builder = new EpsNFABuilder(pattern, alphabet, isSimplified, lookBehindsAsLookAheads, Set.empty, maxNFASize)
       val epsNFA = builder.build()
       ctx.log:
         s"""|automaton: EpsNFA construction
@@ -66,9 +66,13 @@ object EpsNFABuilder:
 private class EpsNFABuilder(
     private val pattern: IRPattern,
     private val alphabet: PatternAlphabet,
-    private val maxNFASize: Int,
     private val isSimplified: Boolean,
-    private val lookBehindsAsLookAheads: Boolean
+    private val lookBehindsAsLookAheads: Boolean,
+    /** The indices of the captures that the ε-NFA marks (see [[CaptureMark]]), where the 0th is the whole match. A
+      * marked capture or `\K` in the inner expression of a look-around is unsupported.
+      */
+    private val marks: Set[Int],
+    private val maxNFASize: Int
 )(using ctx: Context):
 
   /** Whether the cost of the simplified ε-NFA bounds the cost of the pattern from above. */
@@ -140,7 +144,7 @@ private class EpsNFABuilder(
   /** Builds EpsNFA for the pattern. */
   def build(): EpsNFA[Int] =
     val start = counterQ
-    val (i0, a00) = buildNode(pattern.node)
+    val (i0, a00) = buildMarkedCapture(0)(buildNode(pattern.node))
     val (first, later, a0) = rejectEmpty(start, i0, a00)
 
     val init = if pattern.needsSigmaStarAtBegin then
@@ -165,7 +169,7 @@ private class EpsNFABuilder(
 
     // A match ends at its first success, which no priority tells in the simplified ε-NFA.
     // So it does not read the rest of the input, where a path reaching the end of the pattern stops.
-    val accept = if pattern.needsSigmaStarAtEnd && !isSimplified then
+    if pattern.needsSigmaStarAtEnd && !isSimplified then
       val loop = nextLoop()
       val a1 = nextQ()
       val a2 = nextQ()
@@ -175,11 +179,9 @@ private class EpsNFABuilder(
       emit(a1 -> LoopEnter(loop, a2))
       emit(a2 -> Consume(alphabet.any, a0))
       emit(a3 -> LoopExit(loop, a4))
-      a4
-    else a0
 
     val lookBehind = Option.when(innerStates.nonEmpty)(LookBehind(innerStates.toSet, innerTau.toMap))
-    EpsNFA(alphabet, (0 until counterQ).toSet -- innerStates -- unusedStates, init, accept, tau.toMap, lookBehind)
+    EpsNFA(alphabet, (0 until counterQ).toSet -- innerStates -- unusedStates, init, tau.toMap, lookBehind)
 
   /** Makes the pattern's states between `start` and the current counter reject an empty match, as PCRE's `(*NOTEMPTY)`
     * and `(*NOTEMPTY_ATSTART)` do, and returns the initial states of the search at the start and after it, and the
@@ -210,7 +212,8 @@ private class EpsNFABuilder(
           case LookBehindAssert(negative, init, q) => LookBehindAssert(negative, init, f(q))
           case AtomicEps(alternatives, last)       =>
             AtomicEps(alternatives.map((test, q) => (f(test), f(q))), f(last))
-          case LookAroundAccept() => LookAroundAccept()
+          case LookAroundAccept()   => LookAroundAccept()
+          case MarkCapture(mark, q) => MarkCapture(mark, f(q))
 
         for q <- start until end; t <- tau.get(q) do
           // `\K` returns to the first copy for `(*NOTEMPTY)`, which sees the reported match.
@@ -259,7 +262,7 @@ private class EpsNFABuilder(
       case IRNodeData.Disjunction(ns)  => buildChoice(ns.map(n => () => buildNode(n)))
       case IRNodeData.Sequence(ns)     => buildSequence(ns.map(n => () => buildNode(n)))
       case IRNodeData.Empty            => epsilon()
-      case IRNodeData.Capture(_, _, n) => buildNode(n)
+      case IRNodeData.Capture(i, _, n) => buildMarkedCapture(i)(buildNode(n))
       case IRNodeData.Repeat(n, q)     => buildRepeat(n, q)
       case IRNodeData.Assert(kind)     => buildAssert(node, kind)
       case IRNodeData.Chars(set)       => consume(refine(set), node.loc.toOption)
@@ -272,10 +275,13 @@ private class EpsNFABuilder(
             () => buildSequence(s.iterator.toSeq.map(c => () => consume(refine(CharSet.single(c)), loc)))
         val chars = Option.when(set.chars.nonEmpty)(() => consume(refine(set.chars), loc))
         buildChoice(strings ++ chars)
-      case IRNodeData.ResetMatchStart if ignoresAssertions => epsilon()
-      case IRNodeData.ResetMatchStart                      =>
+      case IRNodeData.ResetMatchStart if ignoresAssertions                   => epsilon()
+      case IRNodeData.ResetMatchStart if marks.contains(0) && isInLookAround =>
+        throw new UnsupportedException("\\K in look-around assertion")
+      case IRNodeData.ResetMatchStart =>
         val (i, a) = (nextQ(), nextQ())
-        emit(i -> Eps(Vector(a)))
+        // `\K` begins the reported match again.
+        emit(i -> (if marks.contains(0) then MarkCapture(CaptureMark.Begin(0), a) else Eps(Vector(a))))
         resetMatchStarts.add(i)
         (i, a)
       case IRNodeData.BacktrackControl(_: IRBacktrackControl.Mark) => epsilon()
@@ -283,7 +289,7 @@ private class EpsNFABuilder(
       case IRNodeData.BacktrackControl(_)             => throw new UnsupportedException("backtracking control verb")
       case IRNodeData.Conditional(condition, yes, no) => buildNode(conditionalChoice(condition, yes, no))
       case IRNodeData.LookAhead(negative, n)          =>
-        val ((i0, a0), _) = withPath(buildNode(n))
+        val ((i0, a0), _) = withPath(buildInLookAround(buildNode(n)))
         val i = nextQ()
         val a = nextQ()
         emit(i -> LookAheadAssert(negative, i0, a))
@@ -303,7 +309,7 @@ private class EpsNFABuilder(
         validateLookBehindInner(n, matching)
         val wasBackward = isBackward
         isBackward = true
-        val ((i0, a0), _) = withPath(buildNode(reverseLookBehindInner(n)))
+        val ((i0, a0), _) = withPath(buildInLookAround(buildNode(reverseLookBehindInner(n))))
         emit(a0 -> LookAroundAccept())
         isBackward = wasBackward
         val i = nextQ()
@@ -369,6 +375,29 @@ private class EpsNFABuilder(
         built
       buildChoice(bodies :+ (() => epsilon()))
 
+  /** Whether the builder builds the inner expression of a look-around. */
+  private var isInLookAround = false
+
+  /** Builds EpsNFA transitions marking the begin and the end of the `i`-th capture around `build`, if it is marked. */
+  private def buildMarkedCapture(i: Int)(build: => (Int, Int)): (Int, Int) =
+    if !marks.contains(i) then build
+    else if isInLookAround then throw new UnsupportedException("capture in look-around assertion")
+    else
+      val begin = nextQ()
+      val (i0, a0) = build
+      val end = nextQ()
+      emit(begin -> MarkCapture(CaptureMark.Begin(i), i0))
+      emit(a0 -> MarkCapture(CaptureMark.End(i), end))
+      (begin, end)
+
+  /** Builds the inner expression of a look-around. */
+  private def buildInLookAround(build: => (Int, Int)): (Int, Int) =
+    val wasInLookAround = isInLookAround
+    isInLookAround = true
+    val built = build
+    isInLookAround = wasInLookAround
+    built
+
   /** Builds EpsNFA transitions for an atomic group.
     *
     * A choice of the group tries the alternatives in order, and commits to the first one that reaches the end of the
@@ -395,6 +424,8 @@ private class EpsNFABuilder(
         case Some(LookBehindAssert(negative, init, q1)) => LookBehindAssert(negative, init, test(q1))
         case Some(AtomicEps(alternatives, last))        =>
           AtomicEps(alternatives.map((t, q1) => (t, test(q1))), test(last))
+        // The tests set no captures, which the alternatives set.
+        case Some(MarkCapture(_, q1)) => Eps(Vector(test(q1)))
         // `a0` is the end of the group, which has no transition yet.
         case Some(LookAroundAccept()) | None => LookAroundAccept()
       emit(test(q) -> t)
@@ -412,9 +443,9 @@ private class EpsNFABuilder(
     q match
       case IRQuantifier.Unbounded(0, strategy)   => buildStar(n, strategy)
       case IRQuantifier.Unbounded(min, strategy) =>
-        buildSequence(Vector.fill(min - 1)(() => buildNode(n)) :+ (() => buildPlus(n, strategy)))
+        buildSequence(Vector.fill(min - 1)(() => buildIteration(n)) :+ (() => buildPlus(n, strategy)))
       case IRQuantifier.Exact(m) =>
-        buildSequence(Vector.fill(m)(() => buildNode(n)))
+        buildSequence(Vector.fill(m)(() => buildIteration(n)))
       case IRQuantifier.Bounded(min, max, strategy) =>
         def question(n: IRNode): IRNode = IRNode(IRNodeData.Repeat(n, IRQuantifier.Bounded(0, 1, strategy)))
 
@@ -422,7 +453,25 @@ private class EpsNFABuilder(
           Vector
             .fill(max - min)(n)
             .reduceRight((l, r) => IRNode(IRNodeData.Sequence(Vector(l, question(r)))))
-        buildSequence(Vector.fill(min)(() => buildNode(n)) ++ maxN.map(m => () => buildQuestion(m, strategy)))
+        buildSequence(Vector.fill(min)(() => buildIteration(n)) ++ maxN.map(m => () => buildQuestion(m, strategy)))
+
+  /** Builds EpsNFA transitions for an iteration of a repetition, which unsets the marked captures in it first if each
+    * iteration resets them.
+    */
+  private def buildIteration(n: IRNode): (Int, Int) =
+    val unsets =
+      if !pattern.captures.resetsEachIteration then Seq.empty
+      else n.captureRange.toSeq.flatMap((min, max) => (min to max).filter(marks.contains))
+    if unsets.isEmpty then buildNode(n)
+    else
+      val i = nextQ()
+      val (i0, a0) = buildNode(n)
+      val last = unsets.init.foldLeft(i): (q, k) =>
+        val q1 = nextQ()
+        emit(q -> MarkCapture(CaptureMark.Unset(k), q1))
+        q1
+      emit(last -> MarkCapture(CaptureMark.Unset(unsets.last), i0))
+      (i, a0)
 
   /** Builds EpsNFA transitions for `x*`. */
   private def buildStar(n: IRNode, strategy: BacktrackStrategy): (Int, Int) =
@@ -431,7 +480,7 @@ private class EpsNFABuilder(
     //  (i)-+->(i2)->[i0-->a0]-+  +->(a1)->(a)
     //   ^                     |
     //   +---------------------+
-    val (i0, a0) = buildNode(n)
+    val (i0, a0) = buildIteration(n)
     val loop = nextLoop()
     val i = nextQ()
     val i2 = nextQ()
@@ -449,7 +498,7 @@ private class EpsNFABuilder(
     // +----(i1)---+
     // |           |
     // +->[i-->a0]-+->(a1)->(a)
-    val (i, a0) = buildNode(n)
+    val (i, a0) = buildIteration(n)
     val loop = nextLoop()
     val i1 = nextQ()
     val a1 = nextQ()
@@ -465,7 +514,7 @@ private class EpsNFABuilder(
     //     +--------+
     //     |        v
     // (i)-+->[i0-->a]
-    val (i0, a) = buildNode(n)
+    val (i0, a) = buildIteration(n)
     val i = nextQ()
     val t = if strategy == BacktrackStrategy.Lazy then Vector(a, i0) else Vector(i0, a)
     emit(i -> Eps(t))

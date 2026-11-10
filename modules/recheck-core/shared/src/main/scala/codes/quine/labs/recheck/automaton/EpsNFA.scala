@@ -13,7 +13,7 @@ import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.alphabet.CharKind
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
-/** EpsNFA is an ordered ε-NFA on the units of the pattern's unit mode.
+/** EpsNFA is an ordered ε-NFA on the units of the pattern's unit mode, whose accepting states have no transitions.
   *
   * `lookBehind` is the ε-NFA of the inner expressions of its look-behind assertions.
   */
@@ -21,7 +21,6 @@ final case class EpsNFA[Q](
     alphabet: PatternAlphabet,
     stateSet: Set[Q],
     init: Q,
-    accept: Q,
     tau: Map[Q, Transition[Q]],
     lookBehind: Option[LookBehind[Q]] = None
 ):
@@ -57,6 +56,9 @@ final case class EpsNFA[Q](
         case Some(LoopExit(loop, q1)) =>
           sb.append(s"  ${escape(q0)} [shape=circle];\n")
           sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(s"Exit($loop)")}];\n")
+        case Some(MarkCapture(mark, q1)) =>
+          sb.append(s"  ${escape(q0)} [shape=circle];\n")
+          sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(s"MarkCapture($mark)")}];\n")
         case Some(LookAheadAssert(negative, init, q1)) =>
           sb.append(s"  ${escape(q0)} [shape=diamond];\n")
           sb.append(s"  ${escape(q0)} -> ${escape(init)} [label=${escape(if negative then "?!" else "?=")}];\n")
@@ -263,6 +265,9 @@ object EpsNFA:
   /** LoopExit is an ε-NFA transition with consuming no character and marking the exit from the loop. */
   final case class LoopExit[Q](loop: Int, to: Q) extends Transition[Q]
 
+  /** MarkCapture is an ε-NFA transition with consuming no character and marking a capture. */
+  final case class MarkCapture[Q](mark: CaptureMark, to: Q) extends Transition[Q]
+
   /** LookAheadAssert is an ε-NFA transition with a look-ahead assertion whose inner expression starts from `init`. */
   final case class LookAheadAssert[Q](negative: Boolean, init: Q, to: Q) extends Transition[Q]
 
@@ -441,6 +446,7 @@ object EpsNFA:
             case Some(LoopExit(loop, q1)) =>
               if loops.contains(loop) then Branch.Fail // An ε-loop is detected.
               else buildClosure(s0, ss, q1, loops)
+            case Some(MarkCapture(_, q1))                           => buildClosure(s0, ss, q1, loops)
             case Some(LookAheadAssert(_, init, q1)) if isSimplified =>
               Branch.choice(Seq(buildClosure(s0, ss, init, loops), buildClosure(s0, ss, q1, loops)))
             case Some(LookBehindAssert(_, _, q1)) if isSimplified =>
