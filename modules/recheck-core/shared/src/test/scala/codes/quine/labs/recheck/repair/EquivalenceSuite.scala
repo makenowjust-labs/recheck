@@ -51,6 +51,13 @@ class EquivalenceSuite extends munit.FunSuite:
     assertEquals(counterexample("^a$", "^(?:a|ab)$", Seq.empty), Some("ab"))
     assertEquals(counterexample("a|ab", "ab|a", Seq.empty), None)
 
+  test("Equivalence.findCounterexample: expanded back-references"):
+    assertEquals(counterexample("^(a|b)\\1$", "^(?:aa|bb)$", Seq.empty), None)
+    assertEquals(counterexample("^(a|b)\\1$", "^[ab]{2}$", Seq.empty).map(_.length), Some(2))
+    // A reference to an unset group matches the empty string in JavaScript.
+    assertEquals(counterexample("^(?:(a)|b)\\1$", "^(?:aa|b)$", Seq.empty), None)
+    assertEquals(counterexample("^(a)\\1|b$", "^(a)a|b$", Seq((1, 1))), None)
+
   test("Equivalence.findCounterexample: whole match"):
     assertEquals(counterexample("a|ab", "ab|a", Seq((0, 0))), Some("ab"))
     assertEquals(counterexample("a+", "aa*", Seq((0, 0))), None)

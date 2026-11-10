@@ -107,13 +107,30 @@ private[recheck] object Repair:
     def compare(a: Pattern, aIndices: Seq[Int], b: Pattern, bIndices: Seq[Int]): Comparison =
       try
         Equivalence
-          .findCounterexample(a.ir, b.ir, aIndices.zip(bIndices), params.maxNFASize, params.maxDFASize)
+          .findCounterexample(
+            a.ir,
+            b.ir,
+            aIndices.zip(bIndices),
+            params.maxNFASize,
+            params.maxDFASize,
+            params.maxBackReferenceStrings
+          )
           .fold(Comparison.Equivalent)(Comparison.Different(_))
       catch case _: UnsupportedException => Comparison.Unknown
 
     // Tests whether the patterns match the same strings, which is false if the comparison does not support them.
     def matchesSame(a: Pattern, b: Pattern): Boolean =
-      try Equivalence.findCounterexample(a.ir, b.ir, Seq.empty, params.maxNFASize, params.maxDFASize).isEmpty
+      try
+        Equivalence
+          .findCounterexample(
+            a.ir,
+            b.ir,
+            Seq.empty,
+            params.maxNFASize,
+            params.maxDFASize,
+            params.maxBackReferenceStrings
+          )
+          .isEmpty
       catch case _: UnsupportedException => false
 
     def parseEdited(source: String): Option[Pattern] =
