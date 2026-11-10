@@ -59,6 +59,10 @@ final case class EpsNFA[Q](
         case Some(MarkCapture(mark, q1)) =>
           sb.append(s"  ${escape(q0)} [shape=circle];\n")
           sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(s"MarkCapture($mark)")}];\n")
+        case Some(IterationEnd(loop, q1, empty)) =>
+          sb.append(s"  ${escape(q0)} [shape=circle];\n")
+          sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(s"End($loop)")}];\n")
+          for q2 <- empty do sb.append(s"  ${escape(q0)} -> ${escape(q2)} [label=${escape(s"Empty($loop)")}];\n")
         case Some(LookAheadAssert(negative, init, q1)) =>
           sb.append(s"  ${escape(q0)} [shape=diamond];\n")
           sb.append(s"  ${escape(q0)} -> ${escape(init)} [label=${escape(if negative then "?!" else "?=")}];\n")
@@ -268,6 +272,12 @@ object EpsNFA:
   /** MarkCapture is an ε-NFA transition with consuming no character and marking a capture. */
   final case class MarkCapture[Q](mark: CaptureMark, to: Q) extends Transition[Q]
 
+  /** IterationEnd is an ε-NFA transition with consuming no character and ending an iteration of the loop.
+    *
+    * It goes to `to` if the iteration consumed a character, or to `empty` otherwise, failing without it.
+    */
+  final case class IterationEnd[Q](loop: Int, to: Q, empty: Option[Q]) extends Transition[Q]
+
   /** LookAheadAssert is an ε-NFA transition with a look-ahead assertion whose inner expression starts from `init`. */
   final case class LookAheadAssert[Q](negative: Boolean, init: Q, to: Q) extends Transition[Q]
 
@@ -446,7 +456,11 @@ object EpsNFA:
             case Some(LoopExit(loop, q1)) =>
               if loops.contains(loop) then Branch.Fail // An ε-loop is detected.
               else buildClosure(s0, ss, q1, loops)
-            case Some(MarkCapture(_, q1))                           => buildClosure(s0, ss, q1, loops)
+            case Some(MarkCapture(_, q1))            => buildClosure(s0, ss, q1, loops)
+            case Some(IterationEnd(loop, q1, empty)) =>
+              // The iteration is empty if it entered the loop without consuming a character.
+              if !loops.contains(loop) then buildClosure(s0, ss, q1, loops)
+              else empty.fold(Branch.Fail)(buildClosure(s0, ss, _, loops))
             case Some(LookAheadAssert(_, init, q1)) if isSimplified =>
               Branch.choice(Seq(buildClosure(s0, ss, init, loops), buildClosure(s0, ss, q1, loops)))
             case Some(LookBehindAssert(_, _, q1)) if isSimplified =>

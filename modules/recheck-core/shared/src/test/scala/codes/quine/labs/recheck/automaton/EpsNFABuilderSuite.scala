@@ -229,6 +229,28 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     )
     for (source, expected) <- cases do assertEquals(build(source, "s"), build(expected, "s"), source)
 
+  test("EpsNFABuilder.build: empty iterations"):
+    // Whether each check of an iteration that can be empty ends the repetition, or fails, on an empty one.
+    def ends(source: String, dialect: Dialect): Seq[Boolean] =
+      build(source, "", dialect).tau.values.toSeq.collect { case IterationEnd(_, _, empty) => empty.isDefined }.sorted
+
+    // An empty iteration of `*` fails in JavaScript, and ends it in the others.
+    assertEquals(ends("^(?:a|)*$", Dialect.JavaScript), Seq.empty)
+    assertEquals(ends("^(?:a|)*$", Dialect.Python()), Seq(true))
+    // A mandatory one ends it in Java, and only the last one in PCRE.
+    assertEquals(ends("^(?:a|){2,}$", Dialect.JavaScript), Seq.empty)
+    assertEquals(ends("^(?:a|){2,}$", Dialect.Java), Seq(true, true, true))
+    assertEquals(ends("^(?:a|){2,}$", Dialect.PCRE), Seq(true, true))
+    assertEquals(ends("^(?:a|){2}$", Dialect.Java), Seq(true, true))
+    assertEquals(ends("^(?:a|){2}$", Dialect.Perl()), Seq.empty)
+    // An optional one fails in JavaScript, ends it in Python, and counts as the others in PCRE.
+    assertEquals(ends("^(?:a|){1,2}$", Dialect.JavaScript), Seq(false))
+    assertEquals(ends("^(?:a|){1,2}$", Dialect.Python()), Seq(true))
+    assertEquals(ends("^(?:a|){1,2}$", Dialect.PCRE), Seq.empty)
+    // The copies for `(*NOTEMPTY)` and the tests of an atomic group check them too.
+    assertEquals(ends("(*NOTEMPTY)(?:a|)*", Dialect.PCRE), Seq(true, true))
+    assertEquals(ends("(?>(?:a|)*)", Dialect.PCRE), Seq(true, true))
+
   test("EpsNFABuilder.build: Capture, NamedCapture, Group"):
     val nfaA = single(buildAlphabet(utf16, Seq(CharSet.single('a'))), CharSet.single('a'))
     for source <- Seq("^a$", "^(a)$", "^(?<foo>a)$", "^(?:a)$") do assertEquals(build(source), nfaA, source)

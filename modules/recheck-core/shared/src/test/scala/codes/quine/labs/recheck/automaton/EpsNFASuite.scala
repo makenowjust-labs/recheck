@@ -137,14 +137,15 @@ class EpsNFASuite extends munit.FunSuite:
 
     val lookAround = EpsNFA(
       buildAlphabet(Seq(CharSet.single('a'))),
-      immutable.SortedSet(0, 1, 2, 3, 4, 5),
+      immutable.SortedSet(0, 1, 2, 3, 4, 5, 6),
       0,
       Map(
         0 -> LookAheadAssert(true, 1, 2),
         1 -> LookAroundAccept(),
         2 -> LookBehindAssert(false, 1, 3),
         3 -> AtomicEps(Seq((1, 4)), 0),
-        4 -> MarkCapture(CaptureMark.Begin(0), 5)
+        4 -> MarkCapture(CaptureMark.Begin(0), 5),
+        5 -> IterationEnd(0, 6, Some(1))
       )
     )
     assertEquals(
@@ -164,7 +165,10 @@ class EpsNFASuite extends munit.FunSuite:
          |  "3" -> "0" [label=1];
          |  "4" [shape=circle];
          |  "4" -> "5" [label="MarkCapture(Begin(0))"];
-         |  "5" [shape=doublecircle];
+         |  "5" [shape=circle];
+         |  "5" -> "6" [label="End(0)"];
+         |  "5" -> "1" [label="Empty(0)"];
+         |  "6" [shape=doublecircle];
          |}""".stripMargin
     )
 
@@ -188,6 +192,16 @@ class EpsNFASuite extends munit.FunSuite:
          |  "1" [shape=doubleoctagon];
          |}""".stripMargin
     )
+
+    // The other polarities of the look-arounds.
+    val polarities = EpsNFA(
+      buildAlphabet(Seq(CharSet.single('a'))),
+      immutable.SortedSet(0, 1, 2, 3),
+      0,
+      Map(0 -> LookAheadAssert(false, 1, 2), 1 -> LookAroundAccept(), 2 -> LookBehindAssert(true, 1, 3))
+    )
+    assert(clue(polarities.toGraphviz).contains("\"0\" -> \"1\" [label=\"?=\"];"))
+    assert(polarities.toGraphviz.contains("\"2\" -> \"1\" [label=\"?<!\"];"))
 
   test("EpsNFA#toOrderedNFA"):
     val normal = CharKindState(CharKind.Normal)

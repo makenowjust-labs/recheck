@@ -16,6 +16,7 @@ import codes.quine.labs.resyntax.ir.IRAssertKind
 import codes.quine.labs.resyntax.ir.IRBacktrackControl
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRCondition
+import codes.quine.labs.resyntax.ir.IREmptyIteration
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
@@ -212,8 +213,9 @@ private class EpsNFABuilder(
           case LookBehindAssert(negative, init, q) => LookBehindAssert(negative, init, f(q))
           case AtomicEps(alternatives, last)       =>
             AtomicEps(alternatives.map((test, q) => (f(test), f(q))), f(last))
-          case LookAroundAccept()   => LookAroundAccept()
-          case MarkCapture(mark, q) => MarkCapture(mark, f(q))
+          case LookAroundAccept()           => LookAroundAccept()
+          case MarkCapture(mark, q)         => MarkCapture(mark, f(q))
+          case IterationEnd(loop, q, empty) => IterationEnd(loop, f(q), empty.map(f))
 
         for q <- start until end; t <- tau.get(q) do
           // `\K` returns to the first copy for `(*NOTEMPTY)`, which sees the reported match.
@@ -425,7 +427,8 @@ private class EpsNFABuilder(
         case Some(AtomicEps(alternatives, last))        =>
           AtomicEps(alternatives.map((t, q1) => (t, test(q1))), test(last))
         // The tests set no captures, which the alternatives set.
-        case Some(MarkCapture(_, q1)) => Eps(Vector(test(q1)))
+        case Some(MarkCapture(_, q1))            => Eps(Vector(test(q1)))
+        case Some(IterationEnd(loop, q1, empty)) => IterationEnd(loop, test(q1), empty.map(test))
         // `a0` is the end of the group, which has no transition yet.
         case Some(LookAroundAccept()) | None => LookAroundAccept()
       emit(test(q) -> t)
@@ -437,50 +440,92 @@ private class EpsNFABuilder(
 
   /** Builds EpsNFA transitions for a repetition.
     *
-    * `x{n,}` is built as `n - 1` copies of `x` and `x+`, and `x{n,m}` as `n` copies of `x` and nested `(x(x)?)?`.
+    * `x{n,}` is built as `n - 1` copies of `x` and `x+`, and `x{n,m}` as `n` copies of `x` and `m - n` optional ones,
+    * where skipping one skips the rest.
+    *
+    * An iteration matching the empty string fails or ends the repetition as the dialect tells (see
+    * [[IREmptyIteration]]). The ε-loop of an unbounded repetition fails without a check.
     */
   private def buildRepeat(n: IRNode, q: IRQuantifier): (Int, Int) =
-    q match
-      case IRQuantifier.Unbounded(0, strategy)   => buildStar(n, strategy)
-      case IRQuantifier.Unbounded(min, strategy) =>
-        buildSequence(Vector.fill(min - 1)(() => buildIteration(n)) :+ (() => buildPlus(n, strategy)))
-      case IRQuantifier.Exact(m) =>
-        buildSequence(Vector.fill(m)(() => buildIteration(n)))
-      case IRQuantifier.Bounded(min, max, strategy) =>
-        def question(n: IRNode): IRNode = IRNode(IRNodeData.Repeat(n, IRQuantifier.Bounded(0, 1, strategy)))
+    val empty =
+      if !n.canMatchEmpty then IREmptyIteration.Ignore
+      else
+        q match
+          case _: IRQuantifier.Unbounded => pattern.emptyIteration.unbounded
+          case _                         => pattern.emptyIteration.bounded
+    // An empty iteration ending the repetition goes to `exit`.
+    val exit = empty match
+      case IREmptyIteration.ExitOptional | IREmptyIteration.ExitFromMin | IREmptyIteration.ExitAll => Some(nextQ())
+      case IREmptyIteration.Ignore | IREmptyIteration.Reject                                       => None
+    // Where the `k`-th of the `min` mandatory iterations goes if it is empty, if it ends the repetition.
+    def mandatoryEnd(k: Int, min: Int, exact: Boolean): Option[Int] =
+      empty match
+        case IREmptyIteration.ExitAll                               => exit
+        case IREmptyIteration.ExitFromMin if !exact && k == min - 1 => exit
+        case _                                                      => None
 
-        val maxN = Option.when(max > min):
-          Vector
-            .fill(max - min)(n)
-            .reduceRight((l, r) => IRNode(IRNodeData.Sequence(Vector(l, question(r)))))
-        buildSequence(Vector.fill(min)(() => buildIteration(n)) ++ maxN.map(m => () => buildQuestion(m, strategy)))
+    def mandatory(min: Int, count: Int, exact: Boolean): Seq[() => (Int, Int)] =
+      (0 until count).map(k => () => buildIteration(n, mandatoryEnd(k, min, exact).map(Some(_))))
+
+    val (i, a) = q match
+      case IRQuantifier.Unbounded(0, strategy)   => buildStar(n, strategy, exit)
+      case IRQuantifier.Unbounded(min, strategy) =>
+        buildSequence(
+          mandatory(min, min - 1, false) :+ (() => buildPlus(n, strategy, mandatoryEnd(min - 1, min, false), exit))
+        )
+      case IRQuantifier.Exact(m)                    => buildSequence(mandatory(m, m, true))
+      case IRQuantifier.Bounded(min, max, strategy) =>
+        val optionalEnd = empty match
+          case IREmptyIteration.Ignore => None
+          case IREmptyIteration.Reject => Some(None)
+          case _                       => Some(exit)
+        buildSequence(
+          mandatory(min, min, false) :+ (() => buildOptionalIterations(n, max - min, strategy, optionalEnd))
+        )
+    exit match
+      case Some(e) =>
+        emit(a -> Eps(Vector(e)))
+        (i, e)
+      case None => (i, a)
 
   /** Builds EpsNFA transitions for an iteration of a repetition, which unsets the marked captures in it first if each
     * iteration resets them.
+    *
+    * With `empty`, the iteration is checked: if it is empty, it goes to the state of `empty`, or fails without one.
     */
-  private def buildIteration(n: IRNode): (Int, Int) =
+  private def buildIteration(n: IRNode, empty: Option[Option[Int]]): (Int, Int) =
     val unsets =
       if !pattern.captures.resetsEachIteration then Seq.empty
       else n.captureRange.toSeq.flatMap((min, max) => (min to max).filter(marks.contains))
-    if unsets.isEmpty then buildNode(n)
-    else
-      val i = nextQ()
-      val (i0, a0) = buildNode(n)
-      val last = unsets.init.foldLeft(i): (q, k) =>
-        val q1 = nextQ()
-        emit(q -> MarkCapture(CaptureMark.Unset(k), q1))
-        q1
-      emit(last -> MarkCapture(CaptureMark.Unset(unsets.last), i0))
-      (i, a0)
+    val (i0, a0) =
+      if unsets.isEmpty then buildNode(n)
+      else
+        val i = nextQ()
+        val (i0, a0) = buildNode(n)
+        val last = unsets.init.foldLeft(i): (q, k) =>
+          val q1 = nextQ()
+          emit(q -> MarkCapture(CaptureMark.Unset(k), q1))
+          q1
+        emit(last -> MarkCapture(CaptureMark.Unset(unsets.last), i0))
+        (i, a0)
+    empty match
+      case None        => (i0, a0)
+      case Some(empty) =>
+        val loop = nextLoop()
+        val i = nextQ()
+        val a = nextQ()
+        emit(i -> LoopEnter(loop, i0))
+        emit(a0 -> IterationEnd(loop, a, empty))
+        (i, a)
 
-  /** Builds EpsNFA transitions for `x*`. */
-  private def buildStar(n: IRNode, strategy: BacktrackStrategy): (Int, Int) =
+  /** Builds EpsNFA transitions for `x*`, whose empty iteration goes to `end` if it is given. */
+  private def buildStar(n: IRNode, strategy: BacktrackStrategy, end: Option[Int]): (Int, Int) =
     //      +---------------------+
     //      |                     |
     //  (i)-+->(i2)->[i0-->a0]-+  +->(a1)->(a)
     //   ^                     |
     //   +---------------------+
-    val (i0, a0) = buildIteration(n)
+    val (i0, a0) = buildIteration(n, None)
     val loop = nextLoop()
     val i = nextQ()
     val i2 = nextQ()
@@ -489,32 +534,58 @@ private class EpsNFABuilder(
     val t = if strategy == BacktrackStrategy.Lazy then Vector(a1, i2) else Vector(i2, a1)
     emit(i -> Eps(t))
     emit(i2 -> LoopEnter(loop, i0))
-    emit(a0 -> Eps(Vector(i)))
+    emit(a0 -> end.fold(Eps(Vector(i)))(e => IterationEnd(loop, i, Some(e))))
     emit(a1 -> LoopExit(loop, a))
     (i, a)
 
-  /** Builds EpsNFA transitions for `x+`. */
-  private def buildPlus(n: IRNode, strategy: BacktrackStrategy): (Int, Int) =
+  /** Builds EpsNFA transitions for `x+`, whose empty first iteration goes to `first` and empty later one goes to
+    * `later` if they are given.
+    */
+  private def buildPlus(n: IRNode, strategy: BacktrackStrategy, first: Option[Int], later: Option[Int]): (Int, Int) =
     // +----(i1)---+
     // |           |
     // +->[i-->a0]-+->(a1)->(a)
-    val (i, a0) = buildIteration(n)
+    val (i, a0) = buildIteration(n, None)
     val loop = nextLoop()
     val i1 = nextQ()
     val a1 = nextQ()
     val a = nextQ()
     val t = if strategy == BacktrackStrategy.Lazy then Vector(a1, i1) else Vector(i1, a1)
-    emit(a0 -> Eps(t))
+    val (entry, checked) = first match
+      case None    => (i, a0)
+      case Some(e) =>
+        val firstLoop = nextLoop()
+        val entry = nextQ()
+        val checked = nextQ()
+        emit(entry -> LoopEnter(firstLoop, i))
+        emit(a0 -> IterationEnd(firstLoop, checked, Some(e)))
+        (entry, checked)
+    later match
+      case None    => emit(checked -> Eps(t))
+      case Some(e) =>
+        val next = nextQ()
+        emit(checked -> IterationEnd(loop, next, Some(e)))
+        emit(next -> Eps(t))
     emit(i1 -> LoopEnter(loop, i))
     emit(a1 -> LoopExit(loop, a))
-    (i, a)
+    (entry, a)
 
-  /** Builds EpsNFA transitions for `x?`. */
-  private def buildQuestion(n: IRNode, strategy: BacktrackStrategy): (Int, Int) =
-    //     +--------+
+  /** Builds EpsNFA transitions for `count` optional iterations, each checked with `empty` (see [[buildIteration]]). */
+  private def buildOptionalIterations(
+      n: IRNode,
+      count: Int,
+      strategy: BacktrackStrategy,
+      empty: Option[Option[Int]]
+  ): (Int, Int) =
+    //     +----------------------+
     //     |        v
-    // (i)-+->[i0-->a]
-    val (i0, a) = buildIteration(n)
+    // (i)-+->[i0-->a0]->[rest]->(a)
+    val (i0, a0) = buildIteration(n, empty)
+    val a = if count == 1 then a0
+    else
+      val (ri, ra) = buildOptionalIterations(n, count - 1, strategy, empty)
+      emit(a0 -> Eps(Vector(ri)))
+      ra
     val i = nextQ()
     val t = if strategy == BacktrackStrategy.Lazy then Vector(a, i0) else Vector(i0, a)
     emit(i -> Eps(t))
