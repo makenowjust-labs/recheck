@@ -252,7 +252,7 @@ properties:
     title: "Max DFA Size"
     description: "The maximum size of the DFA to determine which algorithm is used."
     type: integer
-    default: 10000
+    default: 20000
     x-scala-type: "Int"
     x-cli: "max-dfa-size"
     x-since: "5.0.0"
@@ -306,7 +306,7 @@ properties:
     title: "Max NFA Size"
     description: "The maximum size of the NFA to determine which algorithm is used, and of the NFA on `static` seeding."
     type: integer
-    default: 35000
+    default: 70000
     x-scala-type: "Int"
     x-cli: "max-nfa-size"
     x-since: "1.0.0"
