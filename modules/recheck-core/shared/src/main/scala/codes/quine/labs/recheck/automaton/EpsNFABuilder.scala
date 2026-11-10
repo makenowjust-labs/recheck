@@ -29,18 +29,21 @@ import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 /** RegExp IR to ε-NFA Compiler. */
 object EpsNFABuilder:
 
-  /** Compiles RegExp IR into ε-NFA. */
-  def build(pattern: IRPattern, maxNFASize: Int, maxBackReferenceStrings: Int)(using ctx: Context): EpsNFA[Int] =
+  /** Compiles RegExp IR into ε-NFA, which marks the captures of `marks` (see [[CaptureMark]]). */
+  def build(pattern: IRPattern, marks: Set[Int], maxNFASize: Int, maxBackReferenceStrings: Int)(using
+      ctx: Context
+  ): EpsNFA[Int] =
     ctx.interrupt:
       val expanded = BackReferenceExpansion.groups(pattern, maxBackReferenceStrings)
       val groups = expanded.getOrElse(Set.empty)
       val alphabet = PatternAlphabet.of(pattern, BackReferenceExpansion.refinements(pattern, groups))
-      val builder = new EpsNFABuilder(pattern, alphabet, false, false, groups, expanded.isDefined, maxNFASize)
+      val builder = new EpsNFABuilder(pattern, alphabet, false, false, marks ++ groups, expanded.isDefined, maxNFASize)
       val built = run(builder)
       if builder.references.isEmpty then built
       else
         val unsetMatchesEmpty = pattern.backReference.unsetMatchesEmpty
-        BackReferenceExpansion.expand(built, builder.references.toMap, unsetMatchesEmpty, maxNFASize).rename
+        val references = builder.references.toMap
+        BackReferenceExpansion.expand(built, references, groups, marks, unsetMatchesEmpty, maxNFASize).rename
 
   /** A simplified ε-NFA, the ordered NFA converted from it, and whether their cost bounds the cost of the pattern from
     * above.

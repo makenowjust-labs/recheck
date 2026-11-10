@@ -197,7 +197,7 @@ object ReDoS:
         ctx.log("auto: exceed maxPatternSize")
         throw UnsupportedException("The pattern is too large")
       else
-        val epsNFA = EpsNFABuilder.build(ir, maxNFASize, maxBackReferenceStrings)
+        val epsNFA = EpsNFABuilder.build(ir, Set.empty, maxNFASize, maxBackReferenceStrings)
         val orderedNFA = epsNFA.toOrderedNFA(false, maxNFASize, maxDFASize).rename
         AutomatonChecker.check(
           epsNFA.restrictInputs(orderedNFA).mapAlphabet(_.representative),

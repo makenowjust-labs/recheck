@@ -31,7 +31,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     val ir = ReDoS.parse(source, flags, dialect)
     val nfa =
       if isSimplified then EpsNFABuilder.buildSimplified(ir, lookBehindsAsLookAheads, Int.MaxValue).epsNFA
-      else EpsNFABuilder.build(ir, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
+      else EpsNFABuilder.build(ir, Set.empty, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
     def withoutLocations(tau: Map[Int, Transition[Int]]): Map[Int, Transition[Int]] =
       tau.view.mapValues {
         case t: Consume[Int] => t.copy(loc = None)

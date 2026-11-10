@@ -33,7 +33,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         if isUpperBound then EpsNFABuilder.buildSimplified(ir, false, Int.MaxValue).orderedNFA
         else
           EpsNFABuilder
-            .build(ir, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
+            .build(ir, Set.empty, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
             .toOrderedNFA(false, Int.MaxValue, Int.MaxValue)
             .rename
       result <- Try(
@@ -102,7 +102,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           2,
-          Witness(Seq((Seq.empty, Seq(a, a))), Seq(a, other1, a, a, a)),
+          Witness(Seq((Seq(a), Seq(a, a))), Seq(a, a)),
           Hotspot(Seq(Spot(2, 4, Hot), Spot(6, 7, Hot), Spot(8, 10, Hot)))
         )
       )
@@ -122,7 +122,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           2,
-          Witness(Seq((Seq(at), Seq(a, a, other2))), Seq.empty),
+          Witness(Seq((Seq(word.diff(a)), Seq(a, a, other2, a))), Seq.empty),
           Hotspot(Seq(Spot(2, 3, Hot), Spot(6, 8, Hot), Spot(10, 14, Hot)))
         )
       )
@@ -152,7 +152,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           3,
-          Witness(Seq((Seq(b), Seq(a)), (Seq.empty, Seq(a)), (Seq.empty, Seq(a))), Seq(b, a)),
+          Witness(Seq((Seq.empty, Seq(a)), (Seq.empty, Seq(a)), (Seq.empty, Seq(a))), Seq(b, a)),
           Hotspot(Seq(Spot(2, 3, Hot), Spot(9, 10, Hot)))
         )
       )
@@ -195,7 +195,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     def degrees(source: String): Seq[Int] =
       val ir = ReDoS.parse(source, "", Dialect.JavaScript)
       val nfa = EpsNFABuilder
-        .build(ir, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
+        .build(ir, Set.empty, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
         .toOrderedNFA(false, Int.MaxValue, Int.MaxValue)
         .rename
       AutomatonChecker.check(nfa, false, Int.MaxValue, Int.MaxValue).map(degree).toSeq

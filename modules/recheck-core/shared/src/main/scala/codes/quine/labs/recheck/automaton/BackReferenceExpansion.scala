@@ -135,12 +135,14 @@ object BackReferenceExpansion:
   /** Expands the back-references of the ε-NFA, which are the ε-transitions of `references` to the groups and their case
     * equivalences, into the transitions reading what the groups captured.
     *
-    * The marks of the groups are folded into the states. A reference to the groups none of which is set matches the
-    * empty string with `unsetMatchesEmpty`, or fails.
+    * The marks of the groups are folded into the states, except the ones of `marks`, which stay. A reference to the
+    * groups none of which is set matches the empty string with `unsetMatchesEmpty`, or fails.
     */
   def expand(
       nfa: EpsNFA[Int],
       references: Map[Int, (Seq[Int], IRCaseEquivalence)],
+      groups: Set[Int],
+      marks: Set[Int],
       unsetMatchesEmpty: Boolean,
       maxNFASize: Int
   )(using ctx: Context): EpsNFA[State] =
@@ -183,7 +185,12 @@ object BackReferenceExpansion:
                     val pairs = chs.toVector.map(alphabet.pairs.indexOf).sorted
                     tau(from) = Eps(pairs.map(i => visit(State(q, captures, -i - 1))))
                 case Some(MarkCapture(mark, q1)) =>
-                  tau(from) = Eps(Vector(same(captures.update(mark))(q1)))
+                  val group = mark match
+                    case CaptureMark.Begin(i) => i
+                    case CaptureMark.End(i)   => i
+                    case CaptureMark.Unset(i) => i
+                  val next = if groups.contains(group) then same(captures.update(mark))(q1) else same(captures)(q1)
+                  tau(from) = if marks.contains(group) then MarkCapture(mark, next) else Eps(Vector(next))
                 case Some(t) => tau(from) = t.mapState(same(captures))
                 case None    => ()
 

@@ -39,6 +39,15 @@ class BranchSuite extends munit.FunSuite:
     assertEquals(atomic.explore(Set(3)), Seq(2, 4))
     assertEquals(atomic.explore(Set.empty), Seq(2, 4))
 
+  test("Branch#findSuccessLeaf"):
+    assertEquals(branch.findSuccessLeaf(Set(2)), Some(2))
+    assertEquals(branch.findSuccessLeaf(Set(1, 2, 3)), Some(3))
+    assertEquals(branch.findSuccessLeaf(Set(1)), None)
+    assertEquals(Succeed.findSuccessLeaf(_ => true), None)
+    assertEquals(atomic.findSuccessLeaf(Set(1, 2)), Some(2))
+    assertEquals(atomic.findSuccessLeaf(Set(1, 4)), None)
+    assertEquals(atomic.findSuccessLeaf(Set(4)), Some(4))
+
   test("Branch#map"):
     assertEquals(branch.map(_ * 2), Choice(Vector(LookAhead(true, Leaf(2), Leaf(4)), Leaf(6))))
 

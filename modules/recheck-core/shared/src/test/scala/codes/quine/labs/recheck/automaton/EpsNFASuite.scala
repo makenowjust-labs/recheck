@@ -262,7 +262,7 @@ class EpsNFASuite extends munit.FunSuite:
     )
     val d0 = Set.empty[Int]
     val q36: Branch[Stop[Int]] =
-      Branch.Choice(Seq(Branch.Leaf(Stop.Read(3, Set(terminator, normal))), Branch.Leaf(Stop.End)))
+      Branch.Choice(Seq(Branch.Leaf(Stop.Read(3, Set(terminator, normal))), Branch.Leaf(Stop.End(6))))
     assertEquals(
       nfa1.toOrderedNFA(false, Int.MaxValue, Int.MaxValue),
       OrderedNFA[CharSet, (CharKindState, Branch[Stop[Int]], Set[Int])](
@@ -304,7 +304,7 @@ class EpsNFASuite extends munit.FunSuite:
         Branch.Leaf(Stop.Read(5, Set(word))),
         Branch.Leaf(Stop.Read(4, Set(terminator, word, normal))),
         Branch.Leaf(Stop.Read(5, Set(terminator, word, normal))),
-        Branch.Leaf(Stop.End)
+        Branch.Leaf(Stop.End(10))
       )
     )
     assertEquals(
@@ -342,6 +342,7 @@ class EpsNFASuite extends munit.FunSuite:
     assertEquals(inits.map(_._1), Vector(CharKindState(CharKind.Boundary)))
     val lookBehind = EpsNFABuilder.build(
       ReDoS.parse("(?<=a)b", "", Dialect.JavaScript),
+      Set.empty,
       Int.MaxValue,
       Parameters.DefaultMaxBackReferenceStrings
     )

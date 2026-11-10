@@ -91,6 +91,62 @@ final case class EpsNFA[Q](
   def mapState[R](f: Q => R): EpsNFA[R] =
     EpsNFA(alphabet, stateSet.map(f), f(init), tau.map((q, t) => f(q) -> t.mapState(f)), lookBehind.map(_.mapState(f)))
 
+  /** Folds the marks into the states, each of which has the marks just before the last character and the ones since it.
+    *
+    * The [[toOrderedNFA]] of the result with the latter marks of the states tells the marks before each character and
+    * at the end of the input. The former marks tell apart the states after a character by the marks before it, so the
+    * marks of a transition depend only on its states. The inner expression of a look-around starts without marks.
+    *
+    * The marks keep the last ones on the begin and the end of each capture (see [[CaptureMark.append]]), which tell the
+    * captures, so an ε-loop does not add marks forever.
+    */
+  def foldCaptureMarks: EpsNFA[(Q, Seq[CaptureMark], Seq[CaptureMark])] =
+    type R = (Q, Seq[CaptureMark], Seq[CaptureMark])
+
+    val innerStateSet = lookBehind.fold(Set.empty[Q])(_.stateSet)
+    val innerTau = lookBehind.fold(Map.empty[Q, Transition[Q]])(_.tau)
+    val newTau = mutable.Map.empty[R, Transition[R]]
+    val newInit = (init, Seq.empty[CaptureMark], Seq.empty[CaptureMark])
+    val queue = mutable.Queue(newInit)
+    val visited = mutable.Set(newInit)
+
+    def visit(r: R): R =
+      if visited.add(r) then queue.enqueue(r)
+      r
+
+    while queue.nonEmpty do
+      val r @ (q, before, since) = queue.dequeue()
+      def same(q1: Q): R = visit((q1, before, since))
+
+      def fresh(q1: Q): R = visit((q1, Seq.empty, Seq.empty))
+
+      (if innerStateSet.contains(q) then innerTau.get(q) else tau.get(q)) match
+        case Some(Eps(qs))                       => newTau(r) = Eps(qs.map(same))
+        case Some(Assert(kind, q1))              => newTau(r) = Assert(kind, same(q1))
+        case Some(Consume(chs, q1, loc))         => newTau(r) = Consume(chs, visit((q1, since, Seq.empty)), loc)
+        case Some(LoopEnter(loop, q1))           => newTau(r) = LoopEnter(loop, same(q1))
+        case Some(LoopExit(loop, q1))            => newTau(r) = LoopExit(loop, same(q1))
+        case Some(IterationEnd(loop, q1, empty)) => newTau(r) = IterationEnd(loop, same(q1), empty.map(same))
+        case Some(MarkCapture(mark, q1))         =>
+          newTau(r) = Eps(Vector(visit((q1, before, CaptureMark.append(since, mark)))))
+        case Some(LookAheadAssert(negative, init, q1))  => newTau(r) = LookAheadAssert(negative, fresh(init), same(q1))
+        case Some(LookBehindAssert(negative, init, q1)) => newTau(r) = LookBehindAssert(negative, fresh(init), same(q1))
+        case Some(LookAroundAccept())                   => newTau(r) = LookAroundAccept()
+        case Some(AtomicEps(alternatives, last))        =>
+          newTau(r) = AtomicEps(alternatives.map((test, q1) => (fresh(test), same(q1))), same(last))
+        case None => ()
+
+    def isInner(r: R): Boolean = innerStateSet.contains(r._1)
+    val newLookBehind = lookBehind.map: _ =>
+      LookBehind(visited.toSet.filter(isInner), newTau.toMap.filter((r, _) => isInner(r)))
+    EpsNFA(
+      alphabet,
+      visited.toSet.filterNot(isInner),
+      newInit,
+      newTau.toMap.filterNot((r, _) => isInner(r)),
+      newLookBehind
+    )
+
   /** Restricts the input of the NFA renamed from [[toOrderedNFA]] to the strings where no low surrogate follows a high
     * surrogate, if the kinds tell them (see [[CharKind.high]]).
     */
@@ -111,8 +167,16 @@ final case class EpsNFA[Q](
     * With `isSimplified`, it converts a simplified ε-NFA (see [[EpsNFABuilder.buildSimplified]]) without telling
     * whether a look-around succeeds: a look-around is a choice of its inner expression, whose end may end the match,
     * and the continuation, and a choice in an atomic group is a choice of all its alternatives.
+    *
+    * `captureMarksOf` tells the marks of an ε-NFA state (see [[foldCaptureMarks]]), which the result has for its
+    * transitions.
     */
-  def toOrderedNFA(isSimplified: Boolean, maxNFASize: Int, maxDFASize: Int)(using
+  def toOrderedNFA(
+      isSimplified: Boolean,
+      maxNFASize: Int,
+      maxDFASize: Int,
+      captureMarksOf: Q => Seq[CaptureMark] = (_: Q) => Seq.empty
+  )(using
       ctx: Context
   ): OrderedNFA[CharSet, (CharKindState, Branch[Stop[Q]], Set[Int])] =
     ctx.interrupt:
@@ -162,7 +226,8 @@ final case class EpsNFA[Q](
           follow,
           baseKinds,
           inputTerminator,
-          charKinds
+          charKinds,
+          captureMarksOf
         )
 
       /** Builds an ordered NFA of the fragment from the initial states.
@@ -177,11 +242,14 @@ final case class EpsNFA[Q](
         val newAttemptsAtEnd = Map.newBuilder[R, Seq[Int]]
         val newDelta = Map.newBuilder[(R, CharSet), Branch[R]]
         val newSourcemap = mutable.Map.empty[(R, CharSet, R), Seq[SourceLocation]].withDefaultValue(Vector.empty)
+        val newCaptureMarks = mutable.Map.empty[(R, CharSet, R), Seq[CaptureMark]]
+        val newCaptureMarksAtEnd = Map.newBuilder[R, Seq[CaptureMark]]
 
         // Records the state that the character leads to, and returns it.
-        def visit(r0: R, ch: CharSet)(next: (R, Option[SourceLocation])): R =
-          val (r1, loc) = next
+        def visit(r0: R, ch: CharSet)(next: (R, Option[SourceLocation], Seq[CaptureMark])): R =
+          val (r1, loc, marks) = next
           newSourcemap((r0, ch, r1)) ++= loc
+          newCaptureMarks((r0, ch, r1)) = marks
           if newStateSet.add(r1) then queue.enqueue(r1)
           r1
 
@@ -190,6 +258,8 @@ final case class EpsNFA[Q](
             val r0 @ (s0, stops, d) = queue.dequeue()
             val end = stops.flatMap(fragment.atEnd(d))
             if end.succeeds(_ => false) then newAcceptSet.addOne(r0)
+            for case Stop.End(q) <- stops.findSuccessLeaf(fragment.atEnd(d)(_).succeeds(_ => false)) do
+              newCaptureMarksAtEnd.addOne(r0 -> captureMarksOf(q))
             val attemptsAtEnd = end.explore(_ => false)
             if attemptsAtEnd.nonEmpty then newAttemptsAtEnd.addOne(r0 -> attemptsAtEnd)
             for ch <- stops.allLeaves.flatMap(fragment.charsOf).distinct do
@@ -207,7 +277,9 @@ final case class EpsNFA[Q](
           inits,
           newAcceptSet.result(),
           newDelta.result(),
-          newSourcemap.toMap.filter(_._2.nonEmpty)
+          newSourcemap.toMap.filter(_._2.nonEmpty),
+          captureMarks = newCaptureMarks.toMap.filter(_._2.nonEmpty),
+          captureMarksAtEnd = newCaptureMarksAtEnd.result().filter(_._2.nonEmpty)
         )
         val attempts = newStateSet.iterator.flatMap(r => fragment.attemptInit(r).map(r -> _)).toMap
         (nfa, attempts, newAttemptsAtEnd.result())
@@ -344,10 +416,14 @@ object EpsNFA:
       follow: Boolean,
       baseKinds: Set[CharKind],
       inputTerminator: CharKindState,
-      charKinds: Map[CharSet, CharKind]
+      charKinds: Map[CharSet, CharKind],
+      captureMarksOf: Q => Seq[CaptureMark]
   )(using ctx: Context):
 
     private type R = (CharKindState, Branch[Stop[Q]], Set[Int])
+
+    /** A next state with the locations read and the capture marks before the character. */
+    private type Next = (R, Option[SourceLocation], Seq[CaptureMark])
 
     private val consumeMap: Map[Q, Consume[Q]] = transitions.collect { case (q, c @ Consume(_, _, _)) => q -> c }
 
@@ -362,7 +438,7 @@ object EpsNFA:
         else
           val (b, ok) = tryLookBehind(d, q, inputTerminator.kind)
           Branch.choice(Vector(Branch.Leaf(b), if ok then Branch.Succeed else Branch.Fail))
-      case Stop.End => Branch.Succeed
+      case Stop.End(_) => Branch.Succeed
 
     /** Returns the initial state of the NFA of the inner expression that the state tries, if the state is an attempt of
       * a look-behind assertion, which `step` makes.
@@ -376,12 +452,12 @@ object EpsNFA:
       case Stop.Read(q, _) => consumeMap(q).set.map(_._1)
       // An end of an inner expression and a look-behind succeed without consuming a character.
       case Stop.InnerEnd(_) | Stop.LookBehind(_, _) => charKinds.keySet
-      case Stop.End                                 => Set.empty
+      case Stop.End(_)                              => Set.empty
 
     /** Returns the transition of the leaf on the character at the state `d` of the DFA of `lookBehind`, as a branch of
-      * the next states with the locations read there.
+      * the next states.
       */
-    def step(s0: CharKindState, d: Set[Int], ch: CharSet)(stop: Stop[Q]): Branch[(R, Option[SourceLocation])] =
+    def step(s0: CharKindState, d: Set[Int], ch: CharSet)(stop: Stop[Q]): Branch[Next] =
       val d1 = lookBehind.fold(d)(_.next(d, ch))
       stop match
         case Stop.Read(q, ss) =>
@@ -390,7 +466,7 @@ object EpsNFA:
             for (c, k) <- chs.toSeq if c == ch; s <- advance(s0, k) if ss.contains(s)
             yield
               val s1 = s.forgetMarks
-              Branch.Leaf(((s1, closure(s1, q1), d1), loc))
+              Branch.Leaf(((s1, closure(s1, q1), d1), loc, captureMarksOf(q)))
         case Stop.InnerEnd(ss)      => successBefore(s0, ss, charKinds(ch), d1)
         case Stop.LookBehind(q, ss) =>
           val k = charKinds(ch)
@@ -401,32 +477,28 @@ object EpsNFA:
             val (_, ok) = tryLookBehind(d, q, k)
             // An attempt allows no next state, so it has no transitions.
             val attempt = (CharKindState(k), Branch.Leaf(Stop.LookBehind(q, Set.empty)), d)
+            val attempted = Branch.Leaf((attempt, None, Seq.empty))
             val tried =
-              if isSimplified then Branch.Leaf((attempt, None))
-              else Branch.choice(Vector(Branch.Leaf((attempt, None)), if ok then Branch.Succeed else Branch.Fail))
+              if isSimplified then attempted
+              else Branch.choice(Vector(attempted, if ok then Branch.Succeed else Branch.Fail))
             // The inner expression is tried only when the rest of the input confirms a guess that the assertions allow.
             // A look-ahead into the pending success of the guess tells it.
             if isSimplified || allowed.size == next.size then tried
             else Branch.choice(allowed.map(s => Branch.lookAhead(false, pending(s, d1), tried)))
-        case Stop.End => Branch.Fail
+        case Stop.End(_) => Branch.Fail
 
     /** Returns the next state pending the guess `s`, which is an end of an inner expression that the rest of the input
       * confirms.
       */
-    private def pending(s: CharKindState, d1: Set[Int]): Branch[(R, Option[SourceLocation])] =
+    private def pending(s: CharKindState, d1: Set[Int]): Branch[Next] =
       val s1 = s.forgetMarks
-      Branch.Leaf(((s1, Branch.Leaf(Stop.InnerEnd(nextStates(s1))), d1), None))
+      Branch.Leaf(((s1, Branch.Leaf(Stop.InnerEnd(nextStates(s1))), d1), None, Seq.empty))
 
     /** Returns a success before a character of the kind, where `ss` are the next states that the assertions allow.
       *
       * It is pending if the states of the character guess differently and the assertions allow only some of them.
       */
-    private def successBefore(
-        s0: CharKindState,
-        ss: Set[CharKindState],
-        k: CharKind,
-        d1: Set[Int]
-    ): Branch[(R, Option[SourceLocation])] =
+    private def successBefore(s0: CharKindState, ss: Set[CharKindState], k: CharKind, d1: Set[Int]): Branch[Next] =
       val next = advance(s0, k)
       val allowed = next.filter(ss.contains)
       if allowed.isEmpty then Branch.Fail
@@ -489,7 +561,7 @@ object EpsNFA:
               Branch.choice(Seq(buildClosure(s0, ss, init, loops), buildClosure(s0, ss, q1, loops)))
             case Some(LookBehindAssert(_, _, q1)) if isSimplified =>
               Branch.choice(Seq(Branch.Leaf(Stop.LookBehind(q, ss)), buildClosure(s0, ss, q1, loops)))
-            case Some(LookAroundAccept()) if isSimplified            => Branch.Leaf(Stop.End)
+            case Some(LookAroundAccept()) if isSimplified            => Branch.Leaf(Stop.End(q))
             case Some(AtomicEps(alternatives, last)) if isSimplified =>
               Branch.choice((alternatives.map(_._2) :+ last).map(buildClosure(s0, ss, _, loops)))
             case Some(LookAheadAssert(negative, init, q1)) =>
@@ -506,7 +578,7 @@ object EpsNFA:
               if chs.exists((_, k) => advance(s0, k).exists(ss.contains)) then Branch.Leaf(Stop.Read(q, ss))
               else Branch.Fail
             case None =>
-              if ss.contains(inputTerminator) then Branch.Leaf(Stop.End)
+              if ss.contains(inputTerminator) then Branch.Leaf(Stop.End(q))
               else Branch.Fail
 
     private val closureCache = mutable.Map.empty[(CharKindState, Q), Branch[Stop[Q]]]
@@ -529,8 +601,8 @@ object EpsNFA:
     /** LookBehind is a state trying a look-behind assertion, with the next states that the assertions allow. */
     case LookBehind(q: Q, allowed: Set[CharKindState])
 
-    /** End is the end of the pattern. */
-    case End
+    /** End is an accepting state, which has no transitions. */
+    case End(q: Q)
 
   /** AssertKind is assertion kind of this ε-NFA transition. */
   sealed abstract class AssertKind extends Serializable with Product:

@@ -109,6 +109,12 @@ class OrderedNFASuite extends munit.FunSuite:
   test("OrderedNFA#rename"):
     val nfa = OrderedNFA(Set('a', 'b'), Set('p', 'q'), Seq('p'), Set('q'), Map(('p', 'a') -> Branch.Leaf('q')))
     assertEquals(nfa.rename, OrderedNFA(Set('a', 'b'), Set(0, 1), Seq(0), Set(1), Map((0, 'a') -> Branch.Leaf(1))))
+    val marked = nfa.copy(
+      captureMarks = Map(('p', 'a', 'q') -> Seq(CaptureMark.Begin(1))),
+      captureMarksAtEnd = Map('q' -> Seq(CaptureMark.End(1)))
+    )
+    assertEquals(marked.rename.captureMarks, Map((0, 'a', 1) -> Seq(CaptureMark.Begin(1))))
+    assertEquals(marked.rename.captureMarksAtEnd, Map(1 -> Seq(CaptureMark.End(1))))
 
   test("OrderedNFA#mapAlphabet"):
     val nfa = OrderedNFA(Set('a', 'b'), Set(0, 1), Seq(0), Set(1), Map((0, 'a') -> Branch.Leaf(1)))
@@ -116,6 +122,8 @@ class OrderedNFASuite extends munit.FunSuite:
       nfa.mapAlphabet(_.toString),
       OrderedNFA(Set("a", "b"), Set(0, 1), Seq(0), Set(1), Map((0, "a") -> Branch.Leaf(1)))
     )
+    val marked = nfa.copy(captureMarks = Map((0, 'a', 1) -> Seq(CaptureMark.Begin(1))))
+    assertEquals(marked.mapAlphabet(_.toString).captureMarks, Map((0, "a", 1) -> Seq(CaptureMark.Begin(1))))
 
   test("OrderedNFA#toLookAheadDFA"):
     val nfa1 = OrderedNFA(Set('a', 'b'), Set(0, 1), Seq(0), Set(1), Map((0, 'a') -> Branch.Leaf(1)))
