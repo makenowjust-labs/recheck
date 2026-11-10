@@ -34,6 +34,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       else
         EpsNFABuilder.build(
           ir,
+          Set.empty,
           maxBackReferenceStrings = Parameters.DefaultMaxBackReferenceStrings,
           maxNFASize = Int.MaxValue
         )

@@ -16,6 +16,7 @@ class LookBehindProductSuite extends munit.FunSuite:
     val ir = ReDoS.parse(source, "", Dialect.JavaScript)
     val epsNFA = EpsNFABuilder.build(
       ir,
+      Set.empty,
       maxBackReferenceStrings = Parameters.DefaultMaxBackReferenceStrings,
       maxNFASize = Int.MaxValue
     )
