@@ -84,6 +84,13 @@ final case class EpsNFA[Q](
 
     sb.result()
 
+  /** Renames the states to integers. */
+  def rename: EpsNFA[Int] = mapState((stateSet ++ lookBehind.iterator.flatMap(_.stateSet)).zipWithIndex.toMap)
+
+  /** Maps the states by the function. */
+  def mapState[R](f: Q => R): EpsNFA[R] =
+    EpsNFA(alphabet, stateSet.map(f), f(init), tau.map((q, t) => f(q) -> t.mapState(f)), lookBehind.map(_.mapState(f)))
+
   /** Restricts the input of the NFA renamed from [[toOrderedNFA]] to the strings where no low surrogate follows a high
     * surrogate, if the kinds tell them (see [[CharKind.high]]).
     */
@@ -251,7 +258,21 @@ final case class EpsNFA[Q](
 object EpsNFA:
 
   /** Transition is a transition of ε-NFA. */
-  sealed abstract class Transition[Q] extends Serializable with Product
+  sealed abstract class Transition[Q] extends Serializable with Product:
+
+    /** Maps the states of this transition by the function. */
+    def mapState[R](f: Q => R): Transition[R] = this match
+      case Eps(qs)                             => Eps(qs.map(f))
+      case Assert(kind, q)                     => Assert(kind, f(q))
+      case Consume(set, q, loc)                => Consume(set, f(q), loc)
+      case LoopEnter(loop, q)                  => LoopEnter(loop, f(q))
+      case LoopExit(loop, q)                   => LoopExit(loop, f(q))
+      case MarkCapture(mark, q)                => MarkCapture(mark, f(q))
+      case IterationEnd(loop, q, empty)        => IterationEnd(loop, f(q), empty.map(f))
+      case LookAheadAssert(negative, init, q)  => LookAheadAssert(negative, f(init), f(q))
+      case LookBehindAssert(negative, init, q) => LookBehindAssert(negative, f(init), f(q))
+      case LookAroundAccept()                  => LookAroundAccept()
+      case AtomicEps(alternatives, last)       => AtomicEps(alternatives.map((test, q) => (f(test), f(q))), f(last))
 
   /** Eps is an ε-NFA transition without consuming a character. */
   final case class Eps[Q](to: Seq[Q]) extends Transition[Q]
@@ -298,7 +319,10 @@ object EpsNFA:
     * It does not nest: its transitions have no [[LookBehindAssert]], since a look-behind in an inner expression reads
     * the input in the same direction, and [[EpsNFABuilder]] builds it as a look-ahead of the reversed inner expression.
     */
-  final case class LookBehind[Q](stateSet: Set[Q], tau: Map[Q, Transition[Q]])
+  final case class LookBehind[Q](stateSet: Set[Q], tau: Map[Q, Transition[Q]]):
+
+    /** Maps the states by the function. */
+    def mapState[R](f: Q => R): LookBehind[R] = LookBehind(stateSet.map(f), tau.map((q, t) => f(q) -> t.mapState(f)))
 
   /** AtomicEps is an ε-NFA transition of a choice in an atomic group, which tries the alternatives `(test, to)` in
     * order, and commits to the first one whose `test` reaches a [[LookAroundAccept]], or else to `last`.

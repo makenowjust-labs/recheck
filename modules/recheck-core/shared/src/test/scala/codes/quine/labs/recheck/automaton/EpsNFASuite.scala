@@ -6,6 +6,7 @@ import scala.language.implicitConversions
 
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -203,6 +204,45 @@ class EpsNFASuite extends munit.FunSuite:
     assert(clue(polarities.toGraphviz).contains("\"0\" -> \"1\" [label=\"?=\"];"))
     assert(polarities.toGraphviz.contains("\"2\" -> \"1\" [label=\"?<!\"];"))
 
+  test("EpsNFA#mapState, EpsNFA#rename"):
+    val a = Set((CharSet.single('a'), CharKind.Normal))
+    val nfa = EpsNFA(
+      buildAlphabet(Seq(CharSet.single('a'))),
+      Set(0, 1, 2, 3, 4, 5, 6, 7),
+      0,
+      Map(
+        0 -> Eps(Seq(1)),
+        1 -> Assert(lineBegin, 2),
+        2 -> MarkCapture(CaptureMark.Begin(1), 3),
+        3 -> LoopEnter(0, 4),
+        4 -> Consume(a, 5),
+        5 -> IterationEnd(0, 4, Some(6)),
+        6 -> LookAheadAssert(false, 4, 7),
+        7 -> LookBehindAssert(true, 8, 9)
+      ),
+      Some(LookBehind(Set(8, 9), Map(8 -> AtomicEps(Seq((8, 9)), 9), 9 -> LookAroundAccept())))
+    )
+    val shifted = EpsNFA(
+      nfa.alphabet,
+      Set(10, 11, 12, 13, 14, 15, 16, 17),
+      10,
+      Map(
+        10 -> Eps(Seq(11)),
+        11 -> Assert(lineBegin, 12),
+        12 -> MarkCapture(CaptureMark.Begin(1), 13),
+        13 -> LoopEnter(0, 14),
+        14 -> Consume(a, 15),
+        15 -> IterationEnd(0, 14, Some(16)),
+        16 -> LookAheadAssert(false, 14, 17),
+        17 -> LookBehindAssert(true, 18, 19)
+      ),
+      Some(LookBehind(Set(18, 19), Map(18 -> AtomicEps(Seq((18, 19)), 19), 19 -> LookAroundAccept())))
+    )
+    assertEquals(nfa.mapState(_ + 10), shifted)
+    // The states of the look-behinds are renamed too.
+    val renamed = shifted.rename
+    assertEquals(renamed.stateSet ++ renamed.lookBehind.get.stateSet, (0 until 10).toSet)
+
   test("EpsNFA#toOrderedNFA"):
     val normal = CharKindState(CharKind.Normal)
     val terminator = CharKindState(CharKind.LineTerminator)
@@ -300,6 +340,10 @@ class EpsNFASuite extends munit.FunSuite:
     val nfa3 = nfa1.copy(tau = nfa1.tau.updated(4, Assert(begin, 0)))
     val inits = nfa3.toOrderedNFA(Int.MaxValue, Int.MaxValue, false).inits
     assertEquals(inits.map(_._1), Vector(CharKindState(CharKind.Boundary)))
-    val lookBehind = EpsNFABuilder.build(ReDoS.parse("(?<=a)b", "", Dialect.JavaScript))
+    val lookBehind = EpsNFABuilder.build(
+      ReDoS.parse("(?<=a)b", "", Dialect.JavaScript),
+      Int.MaxValue,
+      Parameters.DefaultMaxBackReferenceStrings
+    )
     interceptMessage[UnsupportedException]("look-ahead DFA size is too large"):
       lookBehind.toOrderedNFA(Int.MaxValue, 1, false)

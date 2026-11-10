@@ -7,6 +7,7 @@ import scala.util.Try
 
 import codes.quine.labs.recheck.automaton.Complexity.*
 import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.Hotspot.*
 import codes.quine.labs.resyntax.charset.CharSet
@@ -29,7 +30,11 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       ir <- Try(ReDoS.parse(source, flags, dialect))
       nfa =
         if isUpperBound then EpsNFABuilder.buildSimplified(ir, Int.MaxValue, false).orderedNFA
-        else EpsNFABuilder.build(ir).toOrderedNFA(Int.MaxValue, Int.MaxValue, false).rename
+        else
+          EpsNFABuilder
+            .build(ir, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
+            .toOrderedNFA(Int.MaxValue, Int.MaxValue, false)
+            .rename
       result <- Try(
         AutomatonChecker
           .check(nfa, Int.MaxValue, Int.MaxValue, isUpperBound)
@@ -182,7 +187,10 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     // The complexities of the inner expressions of the look-behinds merge into the others, from the worst.
     def degrees(source: String): Seq[Int] =
       val ir = ReDoS.parse(source, "", Dialect.JavaScript)
-      val nfa = EpsNFABuilder.build(ir).toOrderedNFA(Int.MaxValue, Int.MaxValue, false).rename
+      val nfa = EpsNFABuilder
+        .build(ir, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
+        .toOrderedNFA(Int.MaxValue, Int.MaxValue, false)
+        .rename
       AutomatonChecker.check(nfa, Int.MaxValue, Int.MaxValue, false).map(degree).toSeq
 
     assertEquals(degrees("^(?:b|b)*a+(?<=a*)$"), Seq(Int.MaxValue, Int.MaxValue, 2, 1, 0))

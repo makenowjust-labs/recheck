@@ -5,6 +5,7 @@ import scala.language.implicitConversions
 
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
@@ -30,7 +31,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     val ir = ReDoS.parse(source, flags, dialect)
     val nfa =
       if isSimplified then EpsNFABuilder.buildSimplified(ir, Int.MaxValue, lookBehindsAsLookAheads).epsNFA
-      else EpsNFABuilder.build(ir)
+      else EpsNFABuilder.build(ir, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
     def withoutLocations(tau: Map[Int, Transition[Int]]): Map[Int, Transition[Int]] =
       tau.view.mapValues {
         case t: Consume[Int] => t.copy(loc = None)
@@ -262,7 +263,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   test("EpsNFABuilder: marks"):
     def countMarks(source: String, marks: Set[Int], dialect: Dialect = Dialect.JavaScript): Map[CaptureMark, Int] =
       val ir = ReDoS.parse(source, "", dialect)
-      val nfa = new EpsNFABuilder(ir, PatternAlphabet.of(ir), false, false, marks, Int.MaxValue).build()
+      val nfa = new EpsNFABuilder(ir, PatternAlphabet.of(ir), false, false, marks, false, Int.MaxValue).build()
       nfa.tau.values.toSeq.collect { case MarkCapture(mark, _) => mark }.groupMapReduce(identity)(_ => 1)(_ + _)
 
     import CaptureMark.*

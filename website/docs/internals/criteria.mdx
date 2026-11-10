@@ -49,7 +49,8 @@ In practice, as shown in the following flowchart, the algorithm is assumed to be
   />
 </p>
 
-The algorithm based on automata theory also gives up on the constructs that it cannot model exactly (e.g. back-references).
+The algorithm based on automata theory models a back-reference exactly when the groups it refers to match at most `maxBackReferenceStrings` strings together (e.g. `("|')` in `/("|').*?\1/`): the states of the automaton record what the groups captured, and the back-reference reads it.
+It gives up on the other back-references and the constructs that it cannot model exactly.
 Then the fuzzing first builds an automaton that explores every path the backtracking may take: a look-around may or may not succeed, and a back-reference matches one of the strings that the groups it refers to may match, or the empty string.
 The matching time of this automaton bounds the one of the regular expression from above.
 If the bound is linear, the regular expression is safe without fuzzing (e.g. `/^([a-z]+)=\1$/`).

@@ -3,6 +3,7 @@ package automaton
 
 import codes.quine.labs.recheck.automaton.LookBehindProduct.ProductState
 import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.resyntax.dialect.Dialect
 
@@ -13,7 +14,8 @@ class LookBehindProductSuite extends munit.FunSuite:
   /** Builds the ordered NFA of the source and its NFA with look-ahead. */
   def build(source: String): (OrderedNFA[Int, Int], NFAwLA[Int, Int, Set[Int]]) =
     val ir = ReDoS.parse(source, "", Dialect.JavaScript)
-    val nfa = EpsNFABuilder.build(ir).toOrderedNFA(Int.MaxValue, Int.MaxValue, false).rename.mapAlphabet(_.head)
+    val epsNFA = EpsNFABuilder.build(ir, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
+    val nfa = epsNFA.toOrderedNFA(Int.MaxValue, Int.MaxValue, false).rename.mapAlphabet(_.head)
     (nfa, nfa.toNFAwLA(Int.MaxValue, Int.MaxValue, false))
 
   test("LookBehindProduct.build"):

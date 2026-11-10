@@ -30,8 +30,17 @@ import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 object EpsNFABuilder:
 
   /** Compiles RegExp IR into ε-NFA. */
-  def build(pattern: IRPattern)(using ctx: Context): EpsNFA[Int] =
-    build(pattern, Int.MaxValue, false, false)._1
+  def build(pattern: IRPattern, maxNFASize: Int, maxBackReferenceStrings: Int)(using ctx: Context): EpsNFA[Int] =
+    ctx.interrupt:
+      val expanded = BackReferenceExpansion.groups(pattern, maxBackReferenceStrings)
+      val groups = expanded.getOrElse(Set.empty)
+      val alphabet = PatternAlphabet.of(pattern, BackReferenceExpansion.refinements(pattern, groups))
+      val builder = new EpsNFABuilder(pattern, alphabet, false, false, groups, expanded.isDefined, maxNFASize)
+      val built = run(builder)
+      if builder.references.isEmpty then built
+      else
+        val unsetMatchesEmpty = pattern.backReference.unsetMatchesEmpty
+        BackReferenceExpansion.expand(built, builder.references.toMap, unsetMatchesEmpty, maxNFASize).rename
 
   /** A simplified ε-NFA, the ordered NFA converted from it, and whether their cost bounds the cost of the pattern from
     * above.
@@ -47,22 +56,20 @@ object EpsNFABuilder:
   def buildSimplified(pattern: IRPattern, maxNFASize: Int, lookBehindsAsLookAheads: Boolean)(using
       ctx: Context
   ): Simplified =
-    val (epsNFA, isUpperBound) = build(pattern, maxNFASize, true, lookBehindsAsLookAheads)
-    // The DFA of the look-behinds of the simplified ε-NFA has the single state.
-    Simplified(epsNFA, epsNFA.toOrderedNFA(maxNFASize, Int.MaxValue, true).rename, isUpperBound)
-
-  private def build(pattern: IRPattern, maxNFASize: Int, isSimplified: Boolean, lookBehindsAsLookAheads: Boolean)(using
-      ctx: Context
-  ): (EpsNFA[Int], Boolean) =
     ctx.interrupt:
       val alphabet = PatternAlphabet.of(pattern)
-      val builder = new EpsNFABuilder(pattern, alphabet, isSimplified, lookBehindsAsLookAheads, Set.empty, maxNFASize)
-      val epsNFA = builder.build()
-      ctx.log:
-        s"""|automaton: EpsNFA construction
-            |     state size: ${epsNFA.stateSet.size}
-            |  alphabet size: ${epsNFA.alphabet.pairs.size}""".stripMargin
-      (epsNFA, builder.isUpperBound)
+      val builder = new EpsNFABuilder(pattern, alphabet, true, lookBehindsAsLookAheads, Set.empty, false, maxNFASize)
+      val epsNFA = run(builder)
+      // The DFA of the look-behinds of the simplified ε-NFA has the single state.
+      Simplified(epsNFA, epsNFA.toOrderedNFA(maxNFASize, Int.MaxValue, true).rename, builder.isUpperBound)
+
+  private def run(builder: EpsNFABuilder)(using ctx: Context): EpsNFA[Int] =
+    val epsNFA = builder.build()
+    ctx.log:
+      s"""|automaton: EpsNFA construction
+          |     state size: ${epsNFA.stateSet.size}
+          |  alphabet size: ${epsNFA.alphabet.pairs.size}""".stripMargin
+    epsNFA
 
 private class EpsNFABuilder(
     private val pattern: IRPattern,
@@ -73,11 +80,17 @@ private class EpsNFABuilder(
       * marked capture or `\K` in the inner expression of a look-around is unsupported.
       */
     private val marks: Set[Int],
+    private val expandsBackReferences: Boolean,
     private val maxNFASize: Int
 )(using ctx: Context):
 
   /** Whether the cost of the simplified ε-NFA bounds the cost of the pattern from above. */
   var isUpperBound = true
+
+  /** The ε-transitions standing for the back-references, with the groups and the case equivalences, which
+    * [[BackReferenceExpansion.expand]] expands.
+    */
+  val references: mutable.Map[Int, (Seq[Int], IRCaseEquivalence)] = mutable.Map.empty
 
   /** A cached result of `IRPattern#needsInputTerminatorDistinction`. */
   private val needsInputTerminatorDistinction = pattern.needsInputTerminatorDistinction
@@ -323,6 +336,12 @@ private class EpsNFABuilder(
         buildNode(node.copy(data = IRNodeData.LookBehind(false, n, matching)))
       case IRNodeData.NonAtomicLookBehind(_, _) => throw new UnsupportedException("look-behind assertion")
       case IRNodeData.Atomic(n)                 => buildAtomic(n)
+      case IRNodeData.BackReference(indices, eq, _) if expandsBackReferences =>
+        val i = nextQ()
+        val a = nextQ()
+        emit(i -> Eps(Vector(a)))
+        references(i) = (indices, eq)
+        (i, a)
       case IRNodeData.BackReference(indices, equivalence, _) if isSimplified =>
         // It matches the strings equivalent to what the groups matched, which their bodies need not match.
         if equivalence != IRCaseEquivalence.Identity then isUpperBound = false

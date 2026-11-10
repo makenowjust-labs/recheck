@@ -236,6 +236,18 @@ properties:
     x-cli: "max-attack-string-size"
     x-since: "4.2.0"
 
+  maxBackReferenceStrings:
+    title: "Max Back-Reference Strings"
+    description: |-
+      The maximum number of strings that the groups referred by back-references match together, up to which the automaton checker expands the back-references.
+
+      With more strings, or back-references that it does not expand, the automaton checker bounds the complexity from above, and the fuzz checker decides it (see [Criteria](/docs/internals/criteria)).
+    type: integer
+    default: 100
+    x-scala-type: "Int"
+    x-cli: "max-back-reference-strings"
+    x-since: "5.0.0"
+
   maxDFASize:
     title: "Max DFA Size"
     description: "The maximum size of the DFA to determine which algorithm is used."

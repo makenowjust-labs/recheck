@@ -280,19 +280,45 @@ class ReDoSSuite extends munit.FunSuite:
     assertEquals(check("^(?*a+)b+$", PCRE).asInstanceOf[Diagnostics.Safe].complexity, AttackComplexity.Safe(true))
 
   test("ReDoS.check: upper bounds"):
+    // No back-reference is expanded, so the fuzz checker bounds them.
+    val bound = params.copy(maxBackReferenceStrings = 0)
     // The upper bound of a back-reference, a choice of the group's body and the empty string, is linear here.
-    assertBounded(check("^([a-z]+)=\\1$", JavaScript))
-    assertBounded(check("^(['\"])[^'\"]*\\1$", JavaScript))
+    assertBounded(ReDoS.check("^([a-z]+)=\\1$", "", bound))
+    assertBounded(ReDoS.check("^(['\"])[^'\"]*\\1$", "", bound))
     // A match ends at its first success, so the bound counts nothing after the end of the pattern.
     for source <- Seq("^a+", ".", "^\\w+@") do assertBounded(check(source, JavaScript, checker = Checker.Fuzz))
     // The fuzz checker bounds it alone too, while the automaton checker does not.
-    assertBounded(check("^([a-z]+)=\\1$", JavaScript, checker = Checker.Fuzz))
-    assert(clue(check("^([a-z]+)=\\1$", JavaScript, checker = Checker.Automaton)).isInstanceOf[Diagnostics.Unknown])
+    assertBounded(ReDoS.check("^([a-z]+)=\\1$", "", bound.copy(checker = Checker.Fuzz)))
+    val automaton = bound.copy(checker = Checker.Automaton)
+    assert(clue(ReDoS.check("^([a-z]+)=\\1$", "", automaton)).isInstanceOf[Diagnostics.Unknown])
     // The upper bound of `(a|aa)\1*` is exponential, so the fuzz checker decides it.
     // One iteration suffices, and the default ten may run into the timeout under coverage instrumentation.
-    assertSafe(ReDoS.check("^(a|aa)\\1*$", "", params.copy(maxIteration = 1)), Checker.Fuzz)
+    assertSafe(ReDoS.check("^(a|aa)\\1*$", "", bound.copy(maxIteration = 1)), Checker.Fuzz)
     // `\1` matches what `(\ba)` matched, even where `\b` does not hold, so each block parses in two ways.
-    assertVulnerable(check("^(?:-(\\ba)\\1|-aa)*$", JavaScript), AttackComplexity.Exponential(true), Checker.Fuzz)
+    assertVulnerable(ReDoS.check("^(?:-(\\ba)\\1|-aa)*$", "", bound), AttackComplexity.Exponential(true), Checker.Fuzz)
+
+  test("ReDoS.check: expanded back-references"):
+    // The referred groups match finite languages, so the automaton checker decides them exactly.
+    assertSafe(check("^(['\"])[^'\"]*\\1$", JavaScript), Checker.Automaton)
+    assertSafe(check("^(a|aa)\\1*$", JavaScript), Checker.Automaton)
+    assertVulnerable(check("^(?:-(\\ba)\\1|-aa)*$", JavaScript), AttackComplexity.Exponential(false), Checker.Automaton)
+    // Each `_` scans to the end for the same `_` after a non-space, which a space before each `_` prevents.
+    assertVulnerable(
+      check("(\\*|_)(?=\\S)([^\\r]*?\\S)\\1", JavaScript),
+      AttackComplexity.Polynomial(2, false),
+      Checker.Automaton
+    )
+    // `aA` matches `(a)\1` only case-insensitively.
+    assertSafe(check("^(?:(a)\\1|aA)*$", JavaScript), Checker.Automaton)
+    assertVulnerable(check("^(?:(a)\\1|aA)*$", JavaScript, "i"), AttackComplexity.Exponential(false), Checker.Automaton)
+    // A reference to an unset group matches the empty string in JavaScript, and fails in PCRE.
+    assertVulnerable(check("^(?:\\1a|a)*(b)$", JavaScript), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check("^(?:\\1a|a)*(b)$", PCRE), Checker.Automaton)
+    // The groups matching more strings than `maxBackReferenceStrings` are not expanded.
+    assertSafe(
+      ReDoS.check("^(a|aa)\\1*$", "", params.copy(maxBackReferenceStrings = 1, maxIteration = 1)),
+      Checker.Fuzz
+    )
 
   test("ReDoS.check: upper bounds in the diagnostics"):
     def upperBound(d: Diagnostics): Option[AttackComplexity] = d match
@@ -303,12 +329,13 @@ class ReDoSSuite extends munit.FunSuite:
     assertEquals(upperBound(check("^(?:a|a)*$", JavaScript)), None)
     assertEquals(upperBound(check("^([a-z]+)=\\1$", JavaScript)), Some(AttackComplexity.Linear))
     // The attack of the fuzz checker comes with the bound.
+    val bound = params.copy(maxBackReferenceStrings = 0)
     val exponential = Some(AttackComplexity.Exponential(false))
-    assertEquals(upperBound(check("^(?:-(\\ba)\\1|-aa)*$", JavaScript)), exponential)
+    assertEquals(upperBound(ReDoS.check("^(?:-(\\ba)\\1|-aa)*$", "", bound)), exponential)
     // An error while fuzzing reports the bound too.
     val source = new CancellationTokenSource
     val logger: Context.Logger = message => if message.startsWith("fuzz: start") then source.cancel()
-    val canceled = ReDoS.check("^(a|aa)\\1*$", "", params.copy(logger = Some(logger)), Some(source.token))
+    val canceled = ReDoS.check("^(a|aa)\\1*$", "", bound.copy(logger = Some(logger)), Some(source.token))
     assertEquals(clue(canceled).asInstanceOf[Diagnostics.Unknown].error, Diagnostics.ErrorKind.Cancel)
     assertEquals(upperBound(canceled), exponential)
 
