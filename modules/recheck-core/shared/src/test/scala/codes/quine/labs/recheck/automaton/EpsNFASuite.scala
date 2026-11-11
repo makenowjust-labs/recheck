@@ -210,7 +210,7 @@ class EpsNFASuite extends munit.FunSuite:
     val q36: Branch[Stop[Int]] =
       Branch.Choice(Seq(Branch.Leaf(Stop.Read(3, Set(terminator, normal))), Branch.Leaf(Stop.End)))
     assertEquals(
-      nfa1.toOrderedNFA,
+      nfa1.toOrderedNFA(Int.MaxValue, false),
       OrderedNFA[CharSet, (CharKindState, Branch[Stop[Int]], Set[Int])](
         Set(CharSet.single('\n'), CharSet.single('\n').complement(UnitMode.UTF16)),
         Set((terminator, q36, d0)),
@@ -255,7 +255,7 @@ class EpsNFASuite extends munit.FunSuite:
       )
     )
     assertEquals(
-      nfa2.toOrderedNFA,
+      nfa2.toOrderedNFA(Int.MaxValue, false),
       OrderedNFA(
         Set(
           CharSet.single('\n'),
@@ -281,8 +281,8 @@ class EpsNFASuite extends munit.FunSuite:
       )
     )
     interceptMessage[UnsupportedException]("OrderedNFA size is too large"):
-      nfa1.toOrderedNFA(maxNFASize = 1)
+      nfa1.toOrderedNFA(1, false)
     // The begin of the input is distinguished from a line terminator for an assertion seeing the difference.
     val begin = AssertKind.LineBegin(0, IRLineBeginAtEnd.InputBegin, false, false)
     val nfa3 = nfa1.copy(tau = nfa1.tau.updated(4, Assert(begin, 0)))
-    assertEquals(nfa3.toOrderedNFA.inits.map(_._1), Vector(CharKindState(CharKind.Boundary)))
+    assertEquals(nfa3.toOrderedNFA(Int.MaxValue, false).inits.map(_._1), Vector(CharKindState(CharKind.Boundary)))

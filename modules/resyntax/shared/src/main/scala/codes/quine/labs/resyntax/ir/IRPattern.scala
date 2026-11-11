@@ -2,6 +2,7 @@ package codes.quine.labs.resyntax.ir
 
 import scala.annotation.tailrec
 
+import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
@@ -57,19 +58,58 @@ final case class IRPattern(
     loop(node)
 
   /** Returns the sum of the counts of the repetitions other than `*`, `+` and `?` (e.g. `{2,3}` counts `3`). */
-  def repeatCount: Int =
-    def loop(node: IRNode): Int = node.data match
-      case Repeat(n, q) =>
-        val count = loop(n)
-        q match
-          case IRQuantifier.Exact(m)            => count + m
-          case IRQuantifier.Unbounded(0 | 1, _) => count
-          case IRQuantifier.Unbounded(min, _)   => count + min
-          case IRQuantifier.Bounded(0, 1, _)    => count
-          case IRQuantifier.Bounded(_, max, _)  => count + max
-      case _ => node.children.map(loop).sum
+  def repeatCount: Int = node.collect { case Repeat(_, q) => IRPattern.countOf(q) }.sum
 
-    loop(node)
+  /** Returns the pattern where repetitions become `*` or `+` from the largest count (the later first on a tie), until
+    * the sum of the counts of the rest is below `maxCount`, which has every path of this pattern.
+    */
+  def approximateRepeats(maxCount: Int): IRPattern =
+    // The counts of the repetitions in the pre-order, with whether each stays.
+    // A repetition whose body can match the empty string stays, since an empty iteration of `+` ends it.
+    // A repetition in a look-behind stays, since a look-behind matched forward starts where the counts tell.
+    def repeats(node: IRNode, inLookBehind: Boolean): Seq[(Int, Boolean)] =
+      val here = node.data match
+        case Repeat(n, q) => Seq((IRPattern.countOf(q), inLookBehind || n.canMatchEmpty))
+        case _            => Seq.empty
+      val children = node.data match
+        case LookBehind(_, n, _)                                   => Seq((n, true))
+        case NonAtomicLookBehind(n, _)                             => Seq((n, true))
+        case Conditional(IRCondition.LookBehind(_, n, _), yes, no) =>
+          Seq((n, true), (yes, inLookBehind), (no, inLookBehind))
+        case _ => node.children.map((_, inLookBehind))
+      here ++ children.flatMap((n, inLookBehind) => repeats(n, inLookBehind))
+
+    val counts = repeats(node, false).toIndexedSeq
+    val stays = counts.collect { case (count, true) => count }.sum
+    val order = counts.indices.filter(i => !counts(i)._2 && counts(i)._1 > 0).sortBy(i => (counts(i)._1, i))
+    val sums = order.scanLeft(stays)((sum, i) => sum + counts(i)._1).tail
+    val approximated = order.zip(sums).dropWhile(_._2 < maxCount).map(_._1).toSet
+
+    var index = -1
+    def loop(node: IRNode): IRNode =
+      val data = node.data match
+        case Repeat(n, q) =>
+          index += 1
+          val q1 = if approximated.contains(index) then IRPattern.approximate(q) else q
+          Repeat(loop(n), q1)
+        case Disjunction(ns)                   => Disjunction(ns.map(loop))
+        case Sequence(ns)                      => Sequence(ns.map(loop))
+        case Atomic(n)                         => Atomic(loop(n))
+        case LookAhead(negative, n)            => LookAhead(negative, loop(n))
+        case LookBehind(negative, n, matching) => LookBehind(negative, loop(n), matching)
+        case Capture(i, name, n)               => Capture(i, name, loop(n))
+        case NonAtomicLookAhead(n)             => NonAtomicLookAhead(loop(n))
+        case NonAtomicLookBehind(n, matching)  => NonAtomicLookBehind(loop(n), matching)
+        case Conditional(condition, yes, no)   =>
+          val c = condition match
+            case IRCondition.LookAhead(negative, n)            => IRCondition.LookAhead(negative, loop(n))
+            case IRCondition.LookBehind(negative, n, matching) => IRCondition.LookBehind(negative, loop(n), matching)
+            case captured: IRCondition.Captured                => captured
+          Conditional(c, loop(yes), loop(no))
+        case data => data
+      node.copy(data = data)
+
+    copy(node = loop(node))
 
   /** Checks whether the pattern has no unbounded repetition, nor an unsupported node, which may be a recursion. */
   def isBounded: Boolean =
@@ -221,6 +261,20 @@ final case class IRPattern(
     loop(node)
 
 object IRPattern:
+
+  /** Returns the count of a repetition other than `*`, `+` and `?`, or `0` for them. */
+  private def countOf(q: IRQuantifier): Int = q match
+    case IRQuantifier.Exact(m)            => m
+    case IRQuantifier.Unbounded(0 | 1, _) => 0
+    case IRQuantifier.Unbounded(min, _)   => min
+    case IRQuantifier.Bounded(0, 1, _)    => 0
+    case IRQuantifier.Bounded(_, max, _)  => max
+
+  /** Returns `*` for a repetition that may be skipped, and `+` for the others. */
+  private def approximate(q: IRQuantifier): IRQuantifier = q match
+    case IRQuantifier.Exact(_)                  => IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy)
+    case IRQuantifier.Unbounded(_, strategy)    => IRQuantifier.Unbounded(1, strategy)
+    case IRQuantifier.Bounded(min, _, strategy) => IRQuantifier.Unbounded(min.min(1), strategy)
 
   /** Checks whether the set is one character or the case variants of one character, as a literal is. */
   private def isOneCharUpToCase(set: CharSet): Boolean =

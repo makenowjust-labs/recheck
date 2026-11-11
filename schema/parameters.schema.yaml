@@ -283,7 +283,7 @@ properties:
 
   maxNFASize:
     title: "Max NFA Size"
-    description: "The maximum size of the NFA to determine which algorithm is used."
+    description: "The maximum size of the NFA to determine which algorithm is used, and of the NFA on `static` seeding."
     type: integer
     default: 35000
     x-scala-type: "Int"
@@ -331,9 +331,9 @@ properties:
 
   maxSimpleRepeatCount:
     title: "Max Simple Repeat Count"
-    description: "The maximum repeat count of each repetition quantifier on `static` seeding."
+    description: "The maximum sum of the repeat counts of the repetition quantifiers on `static` seeding."
     type: integer
-    default: 30
+    default: 100
     x-scala-type: "Int"
     x-cli: "max-simple-repeat-count"
     x-since: "4.2.0"

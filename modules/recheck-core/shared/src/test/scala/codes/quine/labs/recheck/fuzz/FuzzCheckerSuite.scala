@@ -129,6 +129,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
       random0,
       DefaultSeeder,
       DefaultMaxSimpleRepeatCount,
+      DefaultMaxNFASize,
       DefaultSeedingLimit,
       DefaultSeedingTimeout,
       DefaultIncubationLimit,

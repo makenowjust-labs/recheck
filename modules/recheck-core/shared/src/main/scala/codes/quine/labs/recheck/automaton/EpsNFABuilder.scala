@@ -29,8 +29,30 @@ object EpsNFABuilder:
 
   /** Compiles RegExp IR into ε-NFA. */
   def build(pattern: IRPattern)(using ctx: Context): EpsNFA[Int] =
+    build(pattern, Int.MaxValue, false, false)
+
+  /** A simplified ε-NFA, and the ordered NFA converted from it. */
+  final case class Simplified(epsNFA: EpsNFA[Int], orderedNFA: OrderedNFA[CharSet, Int])
+
+  /** Compiles RegExp IR into a simplified ε-NFA, which approximates the constructs that `build` does not support, and
+    * converts it into an ordered NFA without telling whether a look-around succeeds (see [[EpsNFA.toOrderedNFA]]).
+    *
+    * With `lookBehindsAsLookAheads`, a look-behind is a look-ahead of its inner expression. It throws
+    * [[UnsupportedException]] when the automata would be larger than `maxNFASize`.
+    */
+  def buildSimplified(pattern: IRPattern, maxNFASize: Int, lookBehindsAsLookAheads: Boolean)(using
+      ctx: Context
+  ): Simplified =
+    val epsNFA = build(pattern, maxNFASize, true, lookBehindsAsLookAheads)
+    Simplified(epsNFA, epsNFA.toOrderedNFA(maxNFASize, true).rename)
+
+  private def build(pattern: IRPattern, maxNFASize: Int, isSimplified: Boolean, lookBehindsAsLookAheads: Boolean)(using
+      ctx: Context
+  ): EpsNFA[Int] =
     ctx.interrupt:
-      val epsNFA = new EpsNFABuilder(pattern, PatternAlphabet.of(pattern)).build()
+      val epsNFA =
+        new EpsNFABuilder(pattern, PatternAlphabet.of(pattern), maxNFASize, isSimplified, lookBehindsAsLookAheads)
+          .build()
       ctx.log:
         s"""|automaton: EpsNFA construction
             |     state size: ${epsNFA.stateSet.size}
@@ -39,7 +61,10 @@ object EpsNFABuilder:
 
 private class EpsNFABuilder(
     private val pattern: IRPattern,
-    private val alphabet: PatternAlphabet
+    private val alphabet: PatternAlphabet,
+    private val maxNFASize: Int,
+    private val isSimplified: Boolean,
+    private val lookBehindsAsLookAheads: Boolean
 )(using ctx: Context):
 
   /** A cached result of `IRPattern#needsInputTerminatorDistinction`. */
@@ -50,10 +75,13 @@ private class EpsNFABuilder(
 
   private val refineCache: mutable.Map[CharSet, Set[(CharSet, CharKind)]] = mutable.Map.empty
 
-  /** Returns a next state number. */
+  /** Returns a next state number, and throws [[UnsupportedException]] if there are more than `maxNFASize` states. */
   def nextQ(): Int =
     val q = counterQ
     counterQ += 1
+    if counterQ > maxNFASize then
+      ctx.log("auto: exceed maxNFASize on EpsNFA construction")
+      throw new UnsupportedException("EpsNFA size is too large")
     if isBackward then innerStates.add(q)
     path.addOne(q)
     q
@@ -128,7 +156,9 @@ private class EpsNFABuilder(
       i1
     else first
 
-    val accept = if pattern.needsSigmaStarAtEnd then
+    // A match ends at its first success, which no priority tells in the simplified ε-NFA.
+    // So it does not read the rest of the input, where a path reaching the end of the pattern stops.
+    val accept = if pattern.needsSigmaStarAtEnd && !isSimplified then
       val loop = nextLoop()
       val a1 = nextQ()
       val a2 = nextQ()
@@ -235,12 +265,14 @@ private class EpsNFABuilder(
             () => buildSequence(s.iterator.toSeq.map(c => () => consume(refine(CharSet.single(c)), loc)))
         val chars = Option.when(set.chars.nonEmpty)(() => consume(refine(set.chars), loc))
         buildChoice(strings ++ chars)
-      case IRNodeData.ResetMatchStart =>
+      case IRNodeData.ResetMatchStart if ignoresAssertions => epsilon()
+      case IRNodeData.ResetMatchStart                      =>
         val (i, a) = (nextQ(), nextQ())
         emit(i -> Eps(Vector(a)))
         resetMatchStarts.add(i)
         (i, a)
       case IRNodeData.BacktrackControl(_: IRBacktrackControl.Mark) => epsilon()
+      case IRNodeData.BacktrackControl(_) if isSimplified          => epsilon()
       case IRNodeData.BacktrackControl(_)             => throw new UnsupportedException("backtracking control verb")
       case IRNodeData.Conditional(condition, yes, no) => buildNode(conditionalChoice(condition, yes, no))
       case IRNodeData.LookAhead(negative, n)          =>
@@ -250,7 +282,11 @@ private class EpsNFABuilder(
         emit(i -> LookAheadAssert(negative, i0, a))
         emit(a0 -> LookAroundAccept())
         (i, a)
-      case IRNodeData.NonAtomicLookAhead(_)             => throw new UnsupportedException("look-ahead assertion")
+      case IRNodeData.NonAtomicLookAhead(n) if isSimplified =>
+        buildNode(node.copy(data = IRNodeData.LookAhead(false, n)))
+      case IRNodeData.NonAtomicLookAhead(_) => throw new UnsupportedException("look-ahead assertion")
+      case IRNodeData.LookBehind(negative, n, _) if lookBehindsAsLookAheads =>
+        buildNode(node.copy(data = IRNodeData.LookAhead(negative, n)))
       case IRNodeData.LookBehind(negative, n, matching) =>
         validateLookBehindInner(n, matching)
         val wasBackward = isBackward
@@ -262,22 +298,59 @@ private class EpsNFABuilder(
         val a = nextQ()
         emit(i -> LookBehindAssert(negative, i0, a))
         (i, a)
+      case IRNodeData.NonAtomicLookBehind(n, matching) if isSimplified =>
+        buildNode(node.copy(data = IRNodeData.LookBehind(false, n, matching)))
       case IRNodeData.NonAtomicLookBehind(_, _) => throw new UnsupportedException("look-behind assertion")
       case IRNodeData.Atomic(n)                 => buildAtomic(n)
-      case IRNodeData.BackReference(_, _, _)    => throw new UnsupportedException("back-reference")
-      case IRNodeData.Unsupported(_)            => throw new UnsupportedException(node.unsupportedMessage)
+      case IRNodeData.BackReference(indices, _, _) if isSimplified => buildBackReference(indices)
+      case IRNodeData.BackReference(_, _, _)                       => throw new UnsupportedException("back-reference")
+      case IRNodeData.Unsupported(_) => throw new UnsupportedException(node.unsupportedMessage)
 
-  /** Returns a conditional on a look-around as a choice of the assertion followed by the yes-branch and its negation
-    * followed by the no-branch, exactly one of which goes on as the conditional does.
+  /** Returns a conditional as a choice of the assertion followed by the yes-branch and its negation followed by the
+    * no-branch, exactly one of which goes on as the conditional does. A conditional on a capture is a choice of the
+    * branches in the simplified ε-NFA.
     */
   private def conditionalChoice(condition: IRCondition, yes: IRNode, no: IRNode): IRNode =
-    val assertion: Boolean => IRNodeData = condition match
-      case IRCondition.LookAhead(negative, n)            => negated => IRNodeData.LookAhead(negative != negated, n)
+    def choice(assertion: Boolean => IRNodeData): IRNode =
+      def branch(negated: Boolean, n: IRNode): IRNode =
+        IRNode(IRNodeData.Sequence(Vector(IRNode(assertion(negated)), n)))
+      IRNode(IRNodeData.Disjunction(Vector(branch(false, yes), branch(true, no))))
+    condition match
+      case IRCondition.LookAhead(negative, n) => choice(negated => IRNodeData.LookAhead(negative != negated, n))
       case IRCondition.LookBehind(negative, n, matching) =>
-        negated => IRNodeData.LookBehind(negative != negated, n, matching)
-      case IRCondition.Captured(_) => throw new UnsupportedException("conditional")
-    def branch(negated: Boolean, n: IRNode): IRNode = IRNode(IRNodeData.Sequence(Vector(IRNode(assertion(negated)), n)))
-    IRNode(IRNodeData.Disjunction(Vector(branch(false, yes), branch(true, no))))
+        choice(negated => IRNodeData.LookBehind(negative != negated, n, matching))
+      case IRCondition.Captured(_) if isSimplified => IRNode(IRNodeData.Disjunction(Vector(yes, no)))
+      case IRCondition.Captured(_)                 => throw new UnsupportedException("conditional")
+
+  /** The bodies of the capture groups by the indices. */
+  private lazy val captureBodies: Map[Int, Seq[IRNode]] =
+    pattern.node.collect { case IRNodeData.Capture(index, _, n) => (index, n) }.groupMap(_._1)(_._2)
+
+  /** The indices of the groups whose bodies are being built for a back-reference. */
+  private var referredIndices: Set[Int] = Set.empty
+
+  /** Whether the builder builds the assertions and `\K` as ε, in a referred group for a back-reference. */
+  private var ignoresAssertions = false
+
+  /** Builds EpsNFA transitions for a back-reference to the indices in the simplified ε-NFA, a choice of the groups'
+    * bodies without assertions and the empty string.
+    */
+  private def buildBackReference(indices: Seq[Int]): (Int, Int) =
+    // A back-reference in the group it refers to would copy the group endlessly.
+    if indices.exists(referredIndices.contains) then epsilon()
+    else
+      // A back-reference matches a string that one of the groups matched, or the empty string for an unset group.
+      // The assertions in the group held where it matched, but they need not hold here.
+      // The IR has no body for a group in a skipped branch (e.g. PCRE's `(?(DEFINE)(a))`), which is always unset.
+      val bodies = for index <- indices; n <- captureBodies.getOrElse(index, Seq.empty) yield () =>
+        val (oldReferred, oldIgnores) = (referredIndices, ignoresAssertions)
+        referredIndices = referredIndices ++ indices
+        ignoresAssertions = true
+        val built = buildNode(if isBackward then reverseLookBehindInner(n) else n)
+        referredIndices = oldReferred
+        ignoresAssertions = oldIgnores
+        built
+      buildChoice(bodies :+ (() => epsilon()))
 
   /** Builds EpsNFA transitions for an atomic group.
     *
@@ -434,11 +507,14 @@ private class EpsNFABuilder(
       case IRAssertKind.NotBetweenCRLF => assert(AssertKind.NotBetweenCRLF)
 
   private def assert(kind: AssertKind): (Int, Int) =
-    if isBackward && !kind.looksOnlyAtKinds then throw new UnsupportedException("assertion in look-behind assertion")
-    val i = nextQ()
-    val a = nextQ()
-    emit(i -> Assert(kind, a))
-    (i, a)
+    val inLookBehind = isBackward && !kind.looksOnlyAtKinds
+    if ignoresAssertions || (inLookBehind && isSimplified) then epsilon()
+    else if inLookBehind then throw new UnsupportedException("assertion in look-behind assertion")
+    else
+      val i = nextQ()
+      val a = nextQ()
+      emit(i -> Assert(kind, a))
+      (i, a)
 
   /** Whether the builder builds the inner expression of a look-behind, which reads the input backward. */
   private var isBackward = false
@@ -448,7 +524,8 @@ private class EpsNFABuilder(
     * A nested look-behind assertion reads the input in the same direction as the inner expression, so it is a
     * look-ahead assertion of the reversed one.
     *
-    * It throws [[UnsupportedException]] on a look-ahead assertion in the inner expression.
+    * It throws [[UnsupportedException]] on a look-ahead assertion in the inner expression, which is ε in the simplified
+    * ε-NFA.
     */
   private def reverseLookBehindInner(node: IRNode): IRNode = ctx.interrupt:
     // An engine may match the inner expression forward from its starts (Java, PCRE, Perl and Python).
@@ -462,10 +539,14 @@ private class EpsNFABuilder(
       case IRNodeData.Strings(set)        =>
         val strings = set.strings.map(s => UString.from(s.iterator.toSeq.reverse))
         node.copy(data = IRNodeData.Strings(ClassSet(set.chars, strings)))
+      case IRNodeData.LookAhead(_, _) | IRNodeData.NonAtomicLookAhead(_) if isSimplified =>
+        node.copy(data = IRNodeData.Empty)
       case IRNodeData.LookAhead(_, _) => throw new UnsupportedException("look-ahead assertion in look-behind assertion")
       case IRNodeData.LookBehind(negative, n, matching) =>
         validateLookBehindInner(n, matching)
         node.copy(data = IRNodeData.LookAhead(negative, reverseLookBehindInner(n)))
+      case IRNodeData.NonAtomicLookBehind(n, matching) if isSimplified =>
+        node.copy(data = IRNodeData.LookAhead(false, reverseLookBehindInner(n)))
       case IRNodeData.Conditional(condition, yes, no) => reverseLookBehindInner(conditionalChoice(condition, yes, no))
       case _                                          => node
 
@@ -473,7 +554,7 @@ private class EpsNFABuilder(
     * the engine matches as `matching`.
     *
     * An inner expression matched forward with an unbounded repetition (e.g. Java's `(?<=a*b)`) or an atomic group is
-    * unsupported.
+    * unsupported, except in the simplified ε-NFA.
     */
   private def validateLookBehindInner(n: IRNode, matching: IRLookBehindMatch): Unit =
     // The engine tries it from each start in turn, which no backward path of the reversed one counts.
@@ -484,7 +565,7 @@ private class EpsNFABuilder(
       case IRNodeData.Repeat(_, _: IRQuantifier.Unbounded) => true
       case IRNodeData.Atomic(_)                            => true
       case _                                               => false
-    if unsupported && matching != IRLookBehindMatch.Backward then
+    if unsupported && matching != IRLookBehindMatch.Backward && !isSimplified then
       throw new UnsupportedException("look-behind assertion matched forward")
 
   private def epsilon(): (Int, Int) =

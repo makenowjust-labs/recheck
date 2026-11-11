@@ -39,6 +39,7 @@ object FuzzChecker:
       random: Random,
       seeder: Seeder = Parameters.DefaultSeeder,
       maxSimpleRepeatCount: Int = Parameters.DefaultMaxSimpleRepeatCount,
+      maxNFASize: Int = Parameters.DefaultMaxNFASize,
       seedingLimit: Int = Parameters.DefaultSeedingLimit,
       seedingTimeout: Duration = Parameters.DefaultSeedingTimeout,
       incubationLimit: Int,
@@ -64,6 +65,7 @@ object FuzzChecker:
         random,
         seeder,
         maxSimpleRepeatCount,
+        maxNFASize,
         seedingLimit,
         seedingTimeout,
         incubationLimit,
@@ -105,6 +107,7 @@ private[fuzz] final class FuzzChecker(
     val random: Random,
     val seeder: Seeder,
     val maxSimpleRepeatCount: Int,
+    val maxNFASize: Int,
     val seedingLimit: Int,
     val seedingTimeout: Duration,
     val incubationLimit: Int,
@@ -168,6 +171,7 @@ private[fuzz] final class FuzzChecker(
           StaticSeeder.seed(
             pattern,
             maxSimpleRepeatCount,
+            maxNFASize,
             maxInitialGenerationSize,
             incubationLimit,
             maxGeneStringSize

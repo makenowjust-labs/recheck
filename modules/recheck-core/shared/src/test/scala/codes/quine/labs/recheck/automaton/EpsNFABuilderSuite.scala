@@ -20,8 +20,17 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
   /** Builds an ε-NFA from the source, without the locations of transitions. */
-  def build(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): EpsNFA[Int] =
-    val nfa = EpsNFABuilder.build(ReDoS.parse(source, flags, dialect))
+  def build(
+      source: String,
+      flags: String = "",
+      dialect: Dialect = Dialect.JavaScript,
+      isSimplified: Boolean = false,
+      lookBehindsAsLookAheads: Boolean = false
+  ): EpsNFA[Int] =
+    val ir = ReDoS.parse(source, flags, dialect)
+    val nfa =
+      if isSimplified then EpsNFABuilder.buildSimplified(ir, Int.MaxValue, lookBehindsAsLookAheads).epsNFA
+      else EpsNFABuilder.build(ir)
     def withoutLocations(tau: Map[Int, Transition[Int]]): Map[Int, Transition[Int]] =
       tau.view.mapValues {
         case t: Consume[Int] => t.copy(loc = None)
@@ -295,6 +304,63 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       build("(?<=(?:(?<=a)bc|(?<!a)d))", "", Dialect.PCRE)
     )
 
+  test("EpsNFABuilder.buildSimplified"):
+    val PCRE = Dialect.PCRE
+    // A back-reference is a choice of the bodies of the referred groups and the empty string.
+    assertEquals(build("^(a)\\1$", isSimplified = true), build("^(a)(?:a|)$"))
+    assertEquals(build("^(a)\\1$", "i", isSimplified = true), build("^(a)(?:a|)$", "i"))
+    // The copy in a look-behind reads the input backward too.
+    assertEquals(build("(a)(?<=\\1b)", isSimplified = true), build("(a)(?<=(?:a|)b)", isSimplified = true))
+    // The copy has no assertions.
+    assertEquals(build("(\\ba)\\1", isSimplified = true), build("(\\ba)(?:(?:)a|)", isSimplified = true))
+    // A back-reference in the group that it refers to, which would copy the group endlessly, is ε.
+    assertEquals(build("(a\\1)", isSimplified = true), build("(a(?:a(?:)|))", isSimplified = true))
+    def consumes(nfa: EpsNFA[Int]): Int = nfa.tau.values.count(_.isInstanceOf[Consume[?]])
+    // A match ends at its first success, so the ε-NFA does not read the rest of the input after the pattern.
+    assertEquals(consumes(build("^a", isSimplified = true)), 1)
+    assertEquals(consumes(build("^a")), 2)
+    // Java's `\2` without the group refers to no group, so it reads nothing.
+    val missing = build("^(a)\\2$", "", Dialect.Java, isSimplified = true)
+    assertEquals(consumes(missing), consumes(build("^(a)$", "", Dialect.Java)))
+    // The IR drops the group in PCRE's skipped `(?(DEFINE)...)`, which is always unset.
+    val defined = build("^(?(DEFINE)(a))\\1$", "", PCRE, isSimplified = true)
+    assertEquals(consumes(defined), consumes(build("^$", "", PCRE)))
+    // A conditional on a capture is a choice of the branches.
+    assertEquals(
+      build("(a)?(?(1)b|c)", "", PCRE, isSimplified = true),
+      build("(a)?(?:b|c)", "", PCRE, isSimplified = true)
+    )
+    // A backtracking control verb is ε.
+    assertEquals(
+      build("a(*PRUNE)b", "", PCRE, isSimplified = true),
+      build("a(*MARK:x)b", "", PCRE, isSimplified = true)
+    )
+    // A non-atomic look-around is an atomic one.
+    assertEquals(build("(?*a)b", "", PCRE, isSimplified = true), build("(?=a)b", "", PCRE, isSimplified = true))
+    assertEquals(build("(?<*a)b", "", PCRE, isSimplified = true), build("(?<=a)b", "", PCRE, isSimplified = true))
+    // In a look-behind, a look-ahead and an assertion looking at more than the kinds of characters are ε.
+    assertEquals(build("(?<=(?=a)b)", isSimplified = true).lookBehind, build("(?<=(?:)b)").lookBehind)
+    assertEquals(
+      build("(?<=a$)", "", Dialect.DotNet, isSimplified = true).lookBehind,
+      build("(?<=a(?:))", "", Dialect.DotNet).lookBehind
+    )
+    // A look-behind matched forward with an unbounded repetition reads the input backward.
+    assertEquals(build("(?<=a*b)", "", Dialect.Java, isSimplified = true).lookBehind, build("(?<=a*b)").lookBehind)
+    // With `lookBehindsAsLookAheads`, a look-behind is a look-ahead of its inner expression, even if they nest.
+    def asLookAheads(source: String): EpsNFA[Int] =
+      build(source, isSimplified = true, lookBehindsAsLookAheads = true)
+    assertEquals(asLookAheads("(?<=a)b"), build("(?=a)b", isSimplified = true))
+    assertEquals(asLookAheads("(?<!a(?=b))c"), build("(?!a(?=b))c", isSimplified = true))
+    assertEquals(asLookAheads("(?=a(?<=b))c"), build("(?=a(?=b))c", isSimplified = true))
+    // An unsupported construct stays unsupported.
+    interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(
+      build("a(?R)?", "", PCRE, isSimplified = true)
+    )
+    // The copies of the referred groups make the ε-NFA large.
+    interceptMessage[UnsupportedException]("EpsNFA size is too large")(
+      EpsNFABuilder.buildSimplified(ReDoS.parse("(a{10})\\1\\1", "", Dialect.JavaScript), 30, false)
+    )
+
   test("EpsNFABuilder.build: unsupported"):
     interceptMessage[UnsupportedException]("back-reference")(build("(.)\\1"))
     interceptMessage[UnsupportedException]("back-reference")(build("(?<foo>.)\\k<foo>"))
@@ -352,7 +418,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
 
   /** Tests whether the automaton of the source accepts the input, i.e. the source matches in the input. */
   def searches(source: String, flags: String, dialect: Dialect, input: String | UString): Boolean =
-    val nfa = build(source, flags, dialect).toOrderedNFA
+    val nfa = build(source, flags, dialect).toOrderedNFA(Int.MaxValue, false)
     val units = input match
       case s: String  => ReDoS.parse(source, flags, dialect).mode.decode(s).iterator.toSeq
       case u: UString => u.iterator.toSeq
@@ -363,7 +429,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   /** Tests whether the automaton of the source accepts the input with its look-ahead assertions, by its look-ahead DFA.
     */
   def matches(source: String, flags: String, dialect: Dialect, input: String): Boolean =
-    val nfa = build(source, flags, dialect).toOrderedNFA
+    val nfa = build(source, flags, dialect).toOrderedNFA(Int.MaxValue, false)
     val dfa = nfa.toLookAheadDFA
     val units = ReDoS.parse(source, flags, dialect).mode.decode(input).iterator.toSeq
     val p = units.reverse.foldLeft(dfa.init)((p, c) => dfa.delta((p, nfa.alphabet.find(_.contains(c)).get)))

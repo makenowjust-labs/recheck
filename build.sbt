@@ -146,12 +146,13 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    source: String,
       |    flags: String,
       |    maxSimpleRepeatSize: Int = Parameters.DefaultMaxSimpleRepeatCount,
+      |    maxNFASize: Int = Parameters.DefaultMaxNFASize,
       |    maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
       |    limit: Int = Parameters.DefaultIncubationLimit,
       |    dialect: Dialect = Dialect.JavaScript
       |)(using ctx: Context): Set[FString] =
       |  val ir = parse(source, flags, dialect)
-      |  time("seed")(StaticSeeder.seed(ir, maxSimpleRepeatSize, maxInitialGenerationSize, limit))
+      |  time("seed")(StaticSeeder.seed(ir, maxSimpleRepeatSize, maxNFASize, maxInitialGenerationSize, limit))
       |
       |def verify(
       |    source: String,

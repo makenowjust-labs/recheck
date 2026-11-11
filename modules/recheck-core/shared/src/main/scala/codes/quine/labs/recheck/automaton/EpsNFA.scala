@@ -89,16 +89,16 @@ final case class EpsNFA[Q](
       val free = nfa.stateSet.maxOption.getOrElse(-1) + 1
       nfa.restrictInputs(highs, lows, free, free + 1)
 
-  /** Converts this ε-NFA to ordered NFA with ε-elimination. */
-  def toOrderedNFA(using ctx: Context): OrderedNFA[CharSet, (CharKindState, Branch[Stop[Q]], Set[Int])] =
-    toOrderedNFA(Int.MaxValue)
-
   /** Converts this ε-NFA to ordered NFA with ε-elimination.
     *
     * Its state is a [[CharKindState]], an ε-closure, whose leaves are the [[Stop]]s that the ε-transitions reach, and
     * the state of the DFA of the [[LookBehindAutomaton]] of [[lookBehind]].
+    *
+    * With `isSimplified`, it converts a simplified ε-NFA (see [[EpsNFABuilder.buildSimplified]]) without telling
+    * whether a look-around succeeds: a look-around is a choice of its inner expression, whose end may end the match,
+    * and the continuation, and a choice in an atomic group is a choice of all its alternatives.
     */
-  def toOrderedNFA(maxNFASize: Int)(using
+  def toOrderedNFA(maxNFASize: Int, isSimplified: Boolean)(using
       ctx: Context
   ): OrderedNFA[CharSet, (CharKindState, Branch[Stop[Q]], Set[Int])] =
     ctx.interrupt:
@@ -140,6 +140,7 @@ final case class EpsNFA[Q](
         Fragment(
           transitions,
           isBackward,
+          isSimplified,
           lookBehind,
           lookBehindInits,
           afterCRLF,
@@ -215,7 +216,9 @@ final case class EpsNFA[Q](
           s"""|automaton: look-behind NFA construction
               |     state size: ${nfa.stateSet.size}""".stripMargin
         val indexed = nfa.mapState(index)
-        LookBehindAutomaton(indexed, indexed.toLookAheadDFA, inits.map((init, r) => init -> index(r)).toMap)
+        // The simplified ε-NFA does not tell whether a look-behind succeeds.
+        val dfa = if isSimplified then DFA.universal(newAlphabet, Set.empty[Int]) else indexed.toLookAheadDFA
+        LookBehindAutomaton(indexed, dfa, inits.map((init, r) => init -> index(r)).toMap)
 
       val pattern = fragment(tau, false, lookBehindAutomaton)
       val (patternNFA, attempts, attemptsAtEnd) = build(
@@ -292,6 +295,7 @@ object EpsNFA:
   private[automaton] final class Fragment[Q](
       transitions: Map[Q, Transition[Q]],
       isBackward: Boolean,
+      isSimplified: Boolean,
       lookBehind: Option[LookBehindAutomaton[Q]],
       lookBehindInits: Map[Q, Q],
       afterCRLF: Boolean,
@@ -356,10 +360,12 @@ object EpsNFA:
             val (_, ok) = tryLookBehind(d, q, k)
             // An attempt allows no next state, so it has no transitions.
             val attempt = (CharKindState(k), Branch.Leaf(Stop.LookBehind(q, Set.empty)), d)
-            val tried = Branch.choice(Vector(Branch.Leaf((attempt, None)), if ok then Branch.Succeed else Branch.Fail))
+            val tried =
+              if isSimplified then Branch.Leaf((attempt, None))
+              else Branch.choice(Vector(Branch.Leaf((attempt, None)), if ok then Branch.Succeed else Branch.Fail))
             // The inner expression is tried only when the rest of the input confirms a guess that the assertions allow.
             // A look-ahead into the pending success of the guess tells it.
-            if allowed.size == next.size then tried
+            if isSimplified || allowed.size == next.size then tried
             else Branch.choice(allowed.map(s => Branch.lookAhead(false, pending(s, d1), tried)))
         case Stop.End => Branch.Fail
 
@@ -433,6 +439,13 @@ object EpsNFA:
             case Some(LoopExit(loop, q1)) =>
               if loops.contains(loop) then Branch.Fail // An ε-loop is detected.
               else buildClosure(s0, ss, q1, loops)
+            case Some(LookAheadAssert(_, init, q1)) if isSimplified =>
+              Branch.choice(Seq(buildClosure(s0, ss, init, loops), buildClosure(s0, ss, q1, loops)))
+            case Some(LookBehindAssert(_, _, q1)) if isSimplified =>
+              Branch.choice(Seq(Branch.Leaf(Stop.LookBehind(q, ss)), buildClosure(s0, ss, q1, loops)))
+            case Some(LookAroundAccept()) if isSimplified            => Branch.Leaf(Stop.End)
+            case Some(AtomicEps(alternatives, last)) if isSimplified =>
+              Branch.choice((alternatives.map(_._2) :+ last).map(buildClosure(s0, ss, _, loops)))
             case Some(LookAheadAssert(negative, init, q1)) =>
               Branch.lookAhead(negative, buildClosure(s0, ss, init, loops), buildClosure(s0, ss, q1, loops))
             case Some(LookBehindAssert(negative, _, q1)) =>

@@ -23,7 +23,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     for
       ir <- Try(ReDoS.parse(source, flags, dialect))
       epsNFA = EpsNFABuilder.build(ir)
-      nfa = epsNFA.toOrderedNFA.rename
+      nfa = epsNFA.toOrderedNFA(Int.MaxValue, false).rename
       result <- Try(AutomatonChecker.check(nfa, Int.MaxValue).nextOption().getOrElse(Complexity.Constant))
     yield result
 
@@ -169,7 +169,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       case Constant          => 0
     def degrees(source: String): Seq[Int] =
       val ir = ReDoS.parse(source, "", Dialect.JavaScript)
-      val nfa = EpsNFABuilder.build(ir).toOrderedNFA.rename
+      val nfa = EpsNFABuilder.build(ir).toOrderedNFA(Int.MaxValue, false).rename
       AutomatonChecker.check(nfa, Int.MaxValue).map(degree).toSeq
 
     assertEquals(degrees("^(?:b|b)*a+(?<=a*)$"), Seq(Int.MaxValue, Int.MaxValue, 2, 1, 0))

@@ -32,3 +32,10 @@ final case class DFA[A, Q](
     sb.append("}")
 
     sb.result()
+
+/** DFA utilities. */
+object DFA:
+
+  /** Builds the DFA accepting every string, whose single state is `q`. */
+  def universal[A, Q](alphabet: Set[A], q: Q): DFA[A, Q] =
+    DFA(alphabet, Set(q), q, Set(q), alphabet.iterator.map(a => (q, a) -> q).toMap)

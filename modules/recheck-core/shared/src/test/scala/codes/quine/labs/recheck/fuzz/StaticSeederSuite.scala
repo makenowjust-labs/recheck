@@ -12,10 +12,10 @@ class StaticSeederSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
   test("StaticSeeder.seed"):
-    def seed(source: String, flags: String): Set[String] =
+    def seed(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): Set[String] =
       val result =
-        for ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
-        yield StaticSeeder.seed(ir, limit = 25000, maxSimpleRepeatSize = 10)
+        for ir <- Try(ReDoS.parse(source, flags, dialect))
+        yield StaticSeeder.seed(ir, limit = 25000, maxSimpleRepeatSize = 10, maxNFASize = Int.MaxValue)
       result.get.map(_.toString)
 
     assertEquals(seed("^a+a+$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
@@ -25,15 +25,24 @@ class StaticSeederSuite extends munit.FunSuite:
       Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'")
     )
     assertEquals(seed("^a+(?=a+)$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
+    // A look-behind is a look-ahead of its inner expression, which reads the input forward.
     assertEquals(seed("^a+(?<=a+)$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
+    // The look-arounds may nest.
+    assertEquals(seed("^a+(?<=a(?=a+))$", ""), seed("^a+(?=a(?=a+))$", ""))
+    assert(seed("^a+(?=a(?<=a+))$", "").nonEmpty)
 
-    // A back-reference to an enclosing capture, or to one being expanded, matches the empty string.
-    assertEquals(seed("^(a+\\1)$", ""), seed("^(a+)$", ""))
-    assertEquals(seed("^(?<x>a+\\k<x>)$", ""), seed("^(?<x>a+)$", ""))
-    assertEquals(seed("^(a+\\2)(b+\\1)$", ""), seed("^(a+(?:b+|))(b+(?:a+|))$", ""))
+    // A back-reference in a referred group being copied matches the empty string.
+    assertEquals(seed("^(a+\\1)$", ""), seed("^(a+(?:a+|))$", ""))
+    assertEquals(seed("^(?<x>a+\\k<x>)$", ""), seed("^(?<x>a+(?:a+|))$", ""))
+    assertEquals(seed("^(a+\\2)(b+\\1)$", ""), seed("^(a+(?:b+(?:a+|)|))(b+(?:a+(?:b+|)|))$", ""))
     assertEquals(seed("^a{11,}a{11,}$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
 
     assertEquals(seed("^(fizz)*(fizz)*$", ""), Set("'fizz'.repeat(112) + 'i'"))
+    // An atomic group is a choice of its alternatives.
+    assertEquals(seed("^(?>a+)a+$", "", Dialect.PCRE), seed("^a+a+$", "", Dialect.PCRE))
+
+    // A dead suffix is not `,`, which lets the look-ahead succeed and the match end.
+    assertEquals(seed("^a+a+(?=,)", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
 
     assertEquals(seed("^a(?=a)$", ""), Set.empty[String])
     assertEquals(seed("^a(?<=a)$", ""), Set.empty[String])
