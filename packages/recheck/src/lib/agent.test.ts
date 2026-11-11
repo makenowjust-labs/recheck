@@ -1,6 +1,11 @@
 import { fileURLToPath } from "node:url";
 
-import { check as checkAgent, start as startAgent, Agent } from "./agent";
+import {
+  check as checkAgent,
+  repair as repairAgent,
+  start as startAgent,
+  Agent,
+} from "./agent";
 
 import type { StdioNull, StdioPipe } from "child_process";
 
@@ -80,6 +85,17 @@ test("check: with logger", async () => {
   await expect(checkAgent(agent, "test", "", { logger })).resolves.toEqual({
     status: "safe",
   });
+});
+
+test("repair", async () => {
+  const agent = await start("node", [testAgent]);
+  await expect(repairAgent(agent, "test", "")).resolves.toEqual({
+    status: "safe",
+    keep: null,
+  });
+  await expect(
+    repairAgent(agent, "test", "", { keep: ["year"] }),
+  ).resolves.toEqual({ status: "safe", keep: ["year"] });
 });
 
 test("check: with abort (1)", async () => {

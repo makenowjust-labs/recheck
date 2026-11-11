@@ -2,7 +2,13 @@ import { spawn } from "child_process";
 
 import type { ChildProcess, StdioNull, StdioPipe } from "child_process";
 
-import type { Diagnostics, HasAbortSignal, Parameters } from "../..";
+import type {
+  Diagnostics,
+  HasAbortSignal,
+  Parameters,
+  RepairParameters,
+  Rx,
+} from "../..";
 
 /** Ref is a pair of promise `resolve`/`reject` functions, and `subscribe` handler of request. */
 type Ref = {
@@ -190,6 +196,27 @@ export async function check(
   flags: string,
   params: Parameters & HasAbortSignal = {},
 ): Promise<Diagnostics> {
+  return await call(agent, "check", { source, flags }, params);
+}
+
+/** Repairs a given regular expression on the `agent`. */
+export async function repair(
+  agent: Agent,
+  source: string,
+  flags: string,
+  params: RepairParameters & HasAbortSignal = {},
+): Promise<Rx> {
+  const { keep, ...rest } = params;
+  return await call(agent, "repair", { source, flags, keep }, rest);
+}
+
+/** Sends a request of the method with the arguments and the parameters to the `agent`. */
+async function call(
+  agent: Agent,
+  method: string,
+  args: Record<string, unknown>,
+  params: Parameters & HasAbortSignal,
+): Promise<any> {
   const newParams = { ...params };
 
   // Drops `signal` parameter from `newParams`.
@@ -204,10 +231,10 @@ export async function check(
     newParams.logger = {} as any;
   }
 
-  // Sends `'check'` method request.
+  // Sends the method request.
   const { id, promise } = agent.request(
-    "check",
-    { source, flags, params: newParams },
+    method,
+    { ...args, params: newParams },
     logger,
   );
 

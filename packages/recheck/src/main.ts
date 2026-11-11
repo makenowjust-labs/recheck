@@ -1,6 +1,6 @@
 import { createSyncFn } from "synckit";
 
-import { check as checkAgent } from "./lib/agent";
+import { check as checkAgent, repair as repairAgent } from "./lib/agent";
 import * as env from "./lib/env";
 import { nodeRequire } from "./require";
 import * as java from "./lib/java";
@@ -8,7 +8,13 @@ import * as native from "./lib/native";
 import * as pure from "./lib/pure";
 import { WorkerPool } from "./lib/worker-pool";
 
-import type { Diagnostics, HasAbortSignal, Parameters } from "..";
+import type {
+  Diagnostics,
+  HasAbortSignal,
+  Parameters,
+  RepairParameters,
+  Rx,
+} from "..";
 import type { Agent } from "./lib/agent";
 
 /** A collection of variables to mock. */
@@ -122,11 +128,36 @@ export async function check(
   }
 }
 
-type SyncFn = (
+/** `repair` implementation. */
+export async function repair(
   source: string,
   flags: string,
-  params: Parameters,
-) => Diagnostics;
+  params: RepairParameters & HasAbortSignal = {},
+): Promise<Rx> {
+  validateArguments(source, flags);
+  const b = await selectBackend();
+  switch (b.type) {
+    case "agent":
+      return repairAgent(b.agent, source, flags, params);
+    case "pool":
+      return b.pool.repair(source, flags, params);
+    case "pure":
+      return pure.repair(source, flags, params);
+  }
+}
+
+type SyncFn = (
+  method: "check" | "repair",
+  source: string,
+  flags: string,
+  params: RepairParameters,
+) => Diagnostics | Rx;
+
+/** Runs the method of the pure implementation. */
+const pureSyncFn: SyncFn = (method, source, flags, params) =>
+  method === "repair"
+    ? pure.repair(source, flags, params)
+    : pure.check(source, flags, params);
 
 /** The function calling the synckit worker, which is created on the first use. */
 let synckitFn: SyncFn | null = null;
@@ -143,7 +174,7 @@ const selectSyncFn = (): SyncFn => {
       }
       return synckitFn;
     case "pure":
-      return pure.check;
+      return pureSyncFn;
   }
   throw new Error(`invalid sync backend: ${name}`);
 };
@@ -154,5 +185,14 @@ export const checkSync = (
   params: Parameters = {},
 ): Diagnostics => {
   validateArguments(source, flags);
-  return selectSyncFn()(source, flags, params);
+  return selectSyncFn()("check", source, flags, params) as Diagnostics;
+};
+
+export const repairSync = (
+  source: string,
+  flags: string,
+  params: RepairParameters = {},
+): Rx => {
+  validateArguments(source, flags);
+  return selectSyncFn()("repair", source, flags, params) as Rx;
 };

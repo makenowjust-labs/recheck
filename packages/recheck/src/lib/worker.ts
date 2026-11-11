@@ -17,7 +17,8 @@ port.onMessage((message) => {
       port.postMessage(JSON.stringify({ id: request.id, message }));
     };
   }
-  const result = pure.check(request.source, request.flags, {
+  const run = request.method === "repair" ? pure.repair : pure.check;
+  const result = run(request.source, request.flags, {
     ...request.params,
     logger,
   });

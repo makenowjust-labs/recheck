@@ -17,6 +17,25 @@ export function checkSync(
   params?: Parameters,
 ): Diagnostics;
 
+/**
+ * Repairs the given RegExp pattern into a better one, keeping what `keep` of the parameters tells of its matches (`"all"` by default).
+ * It takes an optional argument to specify parameters.
+ */
+export function repair(
+  source: string,
+  flags: string,
+  params?: RepairParameters & HasAbortSignal,
+): Promise<Rx>;
+
+/**
+ * Synchronous version of `repair`. Take care that it will block the Node.js process.
+ */
+export function repairSync(
+  source: string,
+  flags: string,
+  params?: RepairParameters,
+): Rx;
+
 export type {
   Dialect,
   DialectParameter,
@@ -223,7 +242,13 @@ export type Hotspot = {
  * Error is a possible error on analyzing.
  */
 export type Error =
-  Timeout | Cancel | Unsupported | Invalid | RuntimeAttacksRefuted | Unexpected;
+  | Timeout
+  | Cancel
+  | Unsupported
+  | Invalid
+  | InvalidKeep
+  | RuntimeAttacksRefuted
+  | Unexpected;
 
 /**
  * Timeout is a timeout error.
@@ -248,6 +273,15 @@ export type Invalid = {
   kind: "invalid";
   message: string;
 };
+
+/**
+ * InvalidKeep is an error reported when `keep` of `repair` refers to no capture of the RegExp.
+ */
+export type InvalidKeep = {
+  kind: "invalid-keep";
+  message: string;
+};
+
 /**
  * RuntimeAttacksRefuted is an error reported when the runtime-attack verification refutes `maxRefutedAttacks` attacks.
  */
@@ -259,6 +293,98 @@ export type RuntimeAttacksRefuted = { kind: "runtime-attacks-refuted" };
 export type Unexpected = {
   kind: "unexpected";
   message: string;
+};
+
+/**
+ * RepairParameters is the parameters of `repair`, with `keep`, which tells what the repair keeps of the matches:
+ *
+ * - `"all"`: The range of the match and every capture (the default).
+ * - `"named"`: The range of the match and the named captures.
+ * - `"match-range"`: The range of the match.
+ * - `"match"`: Only whether it matches.
+ * - An array of capture numbers and names: The range of the match and these captures.
+ *
+ * The captures that a back-reference or a conditional refers to are kept always.
+ */
+export type RepairParameters = Parameters & {
+  keep?: "all" | "named" | "match-range" | "match" | (number | string)[];
+};
+
+/**
+ * Rx is what `repair` reports about a RegExp: a better RegExp for it, and how their matches compare.
+ * It takes one of the following three statuses:
+ *
+ * - `safe`: The RegExp needs no repair.
+ * - `repaired`: The repair found a better RegExp, which is safe unless its `complexity` tells otherwise.
+ * - `unknown`: The repair found no better RegExp (`error` is `null`), or it could not finish because of an error.
+ */
+export type Rx = SafeRx | RepairedRx | UnknownRx;
+
+/**
+ * SafeRx is the result for a RegExp that needs no repair.
+ */
+export type SafeRx = {
+  source: string;
+  flags: string;
+  dialect: Dialect;
+  status: "safe";
+};
+
+/**
+ * RepairedRx is the result with a better RegExp, whose flags are the same.
+ */
+export type RepairedRx = {
+  source: string;
+  flags: string;
+  dialect: Dialect;
+  unitMode: UnitMode;
+  status: "repaired";
+  /**
+   * The source of the repaired RegExp.
+   */
+  repaired: string;
+  complexity: SafeComplexity | VulnerableComplexity;
+  /**
+   * The numbers of the captures kept, where `0` is the match.
+   */
+  kept: number[];
+  comparison: Comparison;
+};
+
+/**
+ * Comparison tells whether the repaired RegExp matches the same as the original on every input.
+ * If it does not, `input` is the shortest input on which they differ (in the same form as `AttackPattern`),
+ * and `original` and `repaired` are their matches on it, or `null` for no match.
+ * The comparison is `unknown` when the RegExps are not supported (e.g. for a back-reference).
+ */
+export type Comparison =
+  | { kind: "equivalent" }
+  | {
+      kind: "different";
+      input: string | number[];
+      original: Match | null;
+      repaired: Match | null;
+    }
+  | { kind: "unknown" };
+
+/**
+ * Match is a match on an input: the begin and the end of each kept capture in the order of `kept`, or `null` for an unset one.
+ * The positions are in the units of `unitMode`.
+ */
+export type Match = ([number, number] | null)[];
+
+/**
+ * UnknownRx is the result when the repair found no better RegExp, or it could not finish because of an error.
+ */
+export type UnknownRx = {
+  source: string;
+  flags: string;
+  dialect: Dialect;
+  status: "unknown";
+  /**
+   * The error, or `null` if the repair found no better RegExp.
+   */
+  error: Error | null;
 };
 
 /**

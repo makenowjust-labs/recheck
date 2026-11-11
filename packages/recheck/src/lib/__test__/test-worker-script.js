@@ -6,6 +6,13 @@ parentPort.on("message", (message) => {
   parentPort.postMessage(JSON.stringify({ id: -1, message: "message" }));
   parentPort.postMessage(JSON.stringify({ id, message: "message" }));
   setTimeout(() => {
+    // A fake `repair` returns its method and `keep`.
+    if (json.method === "repair") {
+      const keep = json.params.keep ?? null;
+      const result = { status: "safe", method: json.method, keep };
+      parentPort.postMessage(JSON.stringify({ id, result }));
+      return;
+    }
     parentPort.postMessage(
       JSON.stringify({
         id,

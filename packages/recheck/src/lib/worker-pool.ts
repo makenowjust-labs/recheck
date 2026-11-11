@@ -9,6 +9,8 @@ import type {
   Diagnostics,
   HasAbortSignal,
   Parameters,
+  RepairParameters,
+  Rx,
 } from "../..";
 
 /** The default settings of each dialect, read from the variants of `dialect` in the schema. */
@@ -40,9 +42,10 @@ const dialectOf = (dialect: DialectParameter = defaults.dialect): Dialect => {
   } as Dialect;
 };
 
-/** Ref is an object contains a check information to resolve or to cancel. */
+/** Ref is an object contains a check or repair information to resolve or to cancel. */
 type Ref = {
   id: number;
+  method: "check" | "repair";
   source: string;
   flags: string;
   params: Parameters;
@@ -82,6 +85,25 @@ export class WorkerPool {
     flags: string,
     params: Parameters & HasAbortSignal = {},
   ): Promise<Diagnostics> {
+    return this.request("check", source, flags, params);
+  }
+
+  /** Repairs a given regular expression using this pool. */
+  public repair(
+    source: string,
+    flags: string,
+    params: RepairParameters & HasAbortSignal = {},
+  ): Promise<Rx> {
+    return this.request("repair", source, flags, params);
+  }
+
+  /** Requests the method on a given regular expression using this pool. */
+  private request(
+    method: "check" | "repair",
+    source: string,
+    flags: string,
+    params: RepairParameters & HasAbortSignal,
+  ): Promise<any> {
     const id = this.nextID++;
 
     const newParams = { ...params };
@@ -102,6 +124,7 @@ export class WorkerPool {
       // Creates and registers a reference.
       const ref = {
         id,
+        method,
         source,
         flags,
         params: newParams,
@@ -167,6 +190,7 @@ export class WorkerPool {
       worker.postMessage(
         JSON.stringify({
           id: ref.id,
+          method: ref.method,
           source: ref.source,
           flags: ref.flags,
           params: ref.params,
@@ -223,16 +247,25 @@ export class WorkerPool {
 
   /** Cancels the given reference. */
   private cancelRef(ref: Ref): void {
-    const cancelled: Diagnostics = {
-      source: ref.source,
-      flags: ref.flags,
-      dialect: dialectOf(ref.params.dialect),
-      unitMode: null,
-      status: "unknown",
-      error: { kind: "cancel" },
-      upperBound: null,
-      refutedAttacks: [],
-    };
+    const cancelled: Diagnostics | Rx =
+      ref.method === "repair"
+        ? {
+            source: ref.source,
+            flags: ref.flags,
+            dialect: dialectOf(ref.params.dialect),
+            status: "unknown",
+            error: { kind: "cancel" },
+          }
+        : {
+            source: ref.source,
+            flags: ref.flags,
+            dialect: dialectOf(ref.params.dialect),
+            unitMode: null,
+            status: "unknown",
+            error: { kind: "cancel" },
+            upperBound: null,
+            refutedAttacks: [],
+          };
     ref.resolve(cancelled);
 
     this.unregisterRef(ref);
