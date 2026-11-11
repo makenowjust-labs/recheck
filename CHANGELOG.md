@@ -13,6 +13,7 @@ Fixes:
 - [#1972](https://github.com/makenowjust-labs/recheck/pull/1972) Read a{,} as a* in the python dialect ([@makenowjust](https://github.com/makenowjust))
 - [#1973](https://github.com/makenowjust-labs/recheck/pull/1973) Keep the value of a capture until it closes, which a back-reference in it sees ([@makenowjust](https://github.com/makenowjust))
 - [#1976](https://github.com/makenowjust-labs/recheck/pull/1976) Speed up the VM interpreter ([@makenowjust](https://github.com/makenowjust))
+- [#1984](https://github.com/makenowjust-labs/recheck/pull/1984) Make the interruption test of the exec platform deterministic ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
