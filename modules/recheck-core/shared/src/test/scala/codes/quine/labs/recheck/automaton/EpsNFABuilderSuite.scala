@@ -361,6 +361,25 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       EpsNFABuilder.buildSimplified(ReDoS.parse("(a{10})\\1\\1", "", Dialect.JavaScript), 30, false)
     )
 
+  test("EpsNFABuilder.buildSimplified: upper bound"):
+    def isUpperBound(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): Boolean =
+      EpsNFABuilder.buildSimplified(ReDoS.parse(source, flags, dialect), Int.MaxValue, false).isUpperBound
+    assert(isUpperBound("^(a)\\1$"))
+    assert(isUpperBound("(a)?(?(1)b|c)", "", Dialect.PCRE))
+    assert(isUpperBound("a(*PRUNE)b", "", Dialect.PCRE))
+    assert(isUpperBound("(?<=a$)", "", Dialect.DotNet))
+    // The approximations that may cost less bound nothing.
+    assert(!isUpperBound("(?*a)b", "", Dialect.PCRE))
+    assert(!isUpperBound("(?<*a)b", "", Dialect.PCRE))
+    assert(!isUpperBound("(a)\\1", "i"))
+    assert(!isUpperBound("(a\\1)"))
+    assert(!isUpperBound("(?<=(?=a)b)"))
+    assert(!isUpperBound("(?<=a*b)", "", Dialect.Java))
+    assert(isUpperBound("(?<=a)b"))
+    assert(
+      !EpsNFABuilder.buildSimplified(ReDoS.parse("(?<=a)b", "", Dialect.JavaScript), Int.MaxValue, true).isUpperBound
+    )
+
   test("EpsNFABuilder.build: unsupported"):
     interceptMessage[UnsupportedException]("back-reference")(build("(.)\\1"))
     interceptMessage[UnsupportedException]("back-reference")(build("(?<foo>.)\\k<foo>"))

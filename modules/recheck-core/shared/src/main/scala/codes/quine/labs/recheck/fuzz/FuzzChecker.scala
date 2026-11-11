@@ -5,10 +5,14 @@ import scala.collection.mutable
 import scala.concurrent.duration.Duration
 import scala.util.Random
 
+import codes.quine.labs.recheck.automaton.AutomatonChecker
+import codes.quine.labs.recheck.automaton.Complexity
+import codes.quine.labs.recheck.automaton.EpsNFABuilder
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.Seeder
+import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Hotspot
@@ -20,6 +24,7 @@ import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
 import codes.quine.labs.recheck.vm.Program
+import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.ir.IRPattern
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
@@ -27,7 +32,12 @@ import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 /** ReDoS vulnerable RegExp checker based on fuzzing. */
 object FuzzChecker:
 
-  /** Checks whether RegExp is ReDoS vulnerable or not.
+  /** Checks whether RegExp is ReDoS vulnerable or not, and returns the attacks it finds and the complexity of the
+    * safety once they run out.
+    *
+    * It bounds the complexity from above first (see [[upperBound]]). If the bound is linear, it proves the safety
+    * without fuzzing. Otherwise, the witnesses of the bound run first in the initial generation, and the attacks do not
+    * assume a complexity above the bound.
     *
     * `avoidsAttack` tells whether to avoid an attack of the complexity and the hotspot, which runtime-attack
     * verification refuted, and may change while iterating the results. Strings with an avoided attack rank below the
@@ -39,6 +49,7 @@ object FuzzChecker:
       random: Random,
       seeder: Seeder = Parameters.DefaultSeeder,
       maxSimpleRepeatCount: Int = Parameters.DefaultMaxSimpleRepeatCount,
+      maxRepeatCount: Int = Parameters.DefaultMaxRepeatCount,
       maxNFASize: Int = Parameters.DefaultMaxNFASize,
       seedingLimit: Int = Parameters.DefaultSeedingLimit,
       seedingTimeout: Duration = Parameters.DefaultSeedingTimeout,
@@ -57,33 +68,82 @@ object FuzzChecker:
       heatRatio: Double = Parameters.DefaultHeatRatio,
       accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode,
       avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
-  )(using ctx: Context): Iterator[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)] =
+  )(using ctx: Context): (Iterator[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)], AttackComplexity.Safe) =
     ctx.interrupt:
-      new FuzzChecker(
-        pattern,
-        fuzz,
-        random,
-        seeder,
-        maxSimpleRepeatCount,
-        maxNFASize,
-        seedingLimit,
-        seedingTimeout,
-        incubationLimit,
-        incubationTimeout,
-        maxGeneStringSize,
-        attackLimit,
-        attackTimeout,
-        crossoverSize,
-        mutationSize,
-        maxAttackStringSize,
-        maxInitialGenerationSize,
-        maxGenerationSize,
-        maxIteration,
-        maxDegree,
-        heatRatio,
-        accelerationMode,
-        avoidsAttack
-      ).check()
+      val bound = upperBound(pattern, maxRepeatCount, maxNFASize, maxInitialGenerationSize)
+      if bound.exists(_.isEmpty) then
+        ctx.log("fuzz: linear upper bound")
+        (Iterator.empty, AttackComplexity.Safe(false))
+      else
+        val attacks = new FuzzChecker(
+          pattern,
+          fuzz,
+          random,
+          seeder,
+          maxSimpleRepeatCount,
+          maxNFASize,
+          seedingLimit,
+          seedingTimeout,
+          incubationLimit,
+          incubationTimeout,
+          maxGeneStringSize,
+          attackLimit,
+          attackTimeout,
+          crossoverSize,
+          mutationSize,
+          maxAttackStringSize,
+          maxInitialGenerationSize,
+          maxGenerationSize,
+          maxIteration,
+          maxDegree,
+          heatRatio,
+          accelerationMode,
+          avoidsAttack,
+          bound
+        ).check()
+        (attacks, AttackComplexity.Safe(true))
+
+  /** Bounds the complexity from above with the simplified automata of the pattern whose largest repetitions become `*`
+    * or `+` until the sum of the counts of the rest is below `maxRepeatCount` (see [[EpsNFABuilder.buildSimplified]]
+    * and [[IRPattern.approximateRepeats]]).
+    *
+    * It returns the vulnerable complexities of the bound from the worst, at most `maxInitialGenerationSize` but at
+    * least one if any, so the first one tells the complexity of the bound. They are empty if the bound is linear. It
+    * returns `None` if the automata bound nothing or would be larger than `maxNFASize`, or if the repetitions that stay
+    * sum to `maxRepeatCount` or more, whose bound may hide a large constant (e.g. `(a?){50}`, whose `2^50` paths
+    * through the copies of `a?` the length of the input does not tell).
+    */
+  private[fuzz] def upperBound(
+      pattern: IRPattern,
+      maxRepeatCount: Int,
+      maxNFASize: Int,
+      maxInitialGenerationSize: Int
+  )(using ctx: Context): Option[Seq[Complexity.Vulnerable[UChar]]] =
+    val approximated = pattern.approximateRepeats(maxRepeatCount)
+    if approximated.repeatCount >= maxRepeatCount then
+      ctx.log("fuzz: no upper bound for too many repeats")
+      None
+    else
+      try
+        val simplified = EpsNFABuilder.buildSimplified(approximated, maxNFASize, false)
+        Option.when(simplified.isUpperBound):
+          val orderedNFA = simplified.epsNFA.restrictInputs(simplified.orderedNFA)
+          AutomatonChecker
+            .check(orderedNFA.mapAlphabet(_.representative), maxNFASize, true)
+            .collect { case v: Complexity.Vulnerable[UChar] => v }
+            .take(maxInitialGenerationSize.max(1))
+            .toVector
+      catch case _: UnsupportedException => None
+
+  /** Builds a seed from a witness of the upper bound, which repeats the pumps as many times as the complexity needs to
+    * reach `limit` steps.
+    */
+  private[fuzz] def buildSeed(complexity: Complexity.Vulnerable[UChar], limit: Int, maxSize: Int): FString =
+    val witness = complexity.witness
+    val seq = witness.pumps.flatMap: (prefix, pump) =>
+      prefix.map(FString.Wrap(_)) ++ (FString.Repeat(0, pump.size) +: pump.map(FString.Wrap(_)))
+    val n = complexity.bestRepeatCount(limit, maxSize).max(1)
+    FString(n, (seq ++ witness.suffix.map(FString.Wrap(_))).toIndexedSeq)
 
   /** Trace is a summary of IR execution. */
   private[fuzz] final case class Trace(
@@ -124,10 +184,20 @@ private[fuzz] final class FuzzChecker(
     val maxDegree: Int,
     val heatRatio: Double,
     val accelerationMode: AccelerationMode,
-    val avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
+    val avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean,
+    val upperBound: Option[Seq[Complexity.Vulnerable[UChar]]]
 )(using val ctx: Context):
 
   import ctx.*
+
+  /** Whether an attack may be exponential, which the upper bound tells. */
+  val triesExponential: Boolean = upperBound.forall(_.exists(_.isInstanceOf[Complexity.Exponential[?]]))
+
+  /** The maximum degree of a polynomial attack, which the upper bound limits. */
+  val maxTriedDegree: Int = upperBound match
+    case Some(vulnerable) if !triesExponential =>
+      vulnerable.collect { case p: Complexity.Polynomial[?] => p.degree }.max.min(maxDegree)
+    case _ => maxDegree
 
   /** A set that holds strings once executed. */
   val inputs: mutable.Set[UString] = mutable.Set.empty
@@ -164,8 +234,18 @@ private[fuzz] final class FuzzChecker(
 
   /** Creates the initial generation from the seed set. */
   def init(): (Iterator[AttackResult], Population) = interrupt:
+    val seed = this.seed()
+    val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty)
+    (seed.iterator.flatMap(pop.execute), pop)
+
+  /** Computes the seed set, where the witnesses of the upper bound come first. */
+  def seed(): Seq[FString] = interrupt:
     log(s"fuzz: seeding start (seeder: $seeder)")
-    val seed: Set[FString] = seeder match
+    val upperBoundSeed = upperBound.toSeq.flatten
+      .map(buildSeed(_, incubationLimit, maxGeneStringSize))
+      .distinct
+      .take(maxInitialGenerationSize)
+    val seederSeed: Set[FString] = seeder match
       case Seeder.Static =>
         val staticSeed =
           StaticSeeder.seed(
@@ -188,12 +268,11 @@ private[fuzz] final class FuzzChecker(
         else staticSeed
       case Seeder.Dynamic =>
         DynamicSeeder.seed(fuzz, seedingLimit, seedingTimeout, maxInitialGenerationSize, accelerationMode)
+    val seed = upperBoundSeed ++ (seederSeed -- upperBoundSeed).take(maxInitialGenerationSize - upperBoundSeed.size)
 
     log(s"""|fuzz: seeding finish
             |  size: ${seed.size}""".stripMargin)
-
-    val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty)
-    (seed.iterator.flatMap(pop.execute), pop)
+    seed
 
   /** Iterates a generation. */
   def iterate(i: Int, gen: Generation): (Iterator[AttackResult], Population) = interrupt:
@@ -349,8 +428,8 @@ private[fuzz] final class FuzzChecker(
 
   /** Constructs an attack string. */
   def tryAttack(str: FString): Iterator[AttackResult] = interrupt:
-    val exponential = tryAttackExponential(str).iterator
-    val polynomials = (maxDegree to 2 by -1).iterator.flatMap(tryAttackPolynomial(str, _))
+    val exponential = if triesExponential then tryAttackExponential(str).iterator else Iterator.empty
+    val polynomials = (maxTriedDegree to 2 by -1).iterator.flatMap(tryAttackPolynomial(str, _))
 
     (exponential ++ polynomials)
 

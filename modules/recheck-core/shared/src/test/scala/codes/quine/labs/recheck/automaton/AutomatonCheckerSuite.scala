@@ -19,13 +19,26 @@ class AutomatonCheckerSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
   /** Runs a checker against the RegExp. */
-  def check(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): Try[Complexity[CharSet]] =
+  def check(
+      source: String,
+      flags: String,
+      dialect: Dialect = Dialect.JavaScript,
+      isUpperBound: Boolean = false
+  ): Try[Complexity[CharSet]] =
     for
       ir <- Try(ReDoS.parse(source, flags, dialect))
-      epsNFA = EpsNFABuilder.build(ir)
-      nfa = epsNFA.toOrderedNFA(Int.MaxValue, false).rename
-      result <- Try(AutomatonChecker.check(nfa, Int.MaxValue).nextOption().getOrElse(Complexity.Constant))
+      nfa =
+        if isUpperBound then EpsNFABuilder.buildSimplified(ir, Int.MaxValue, false).orderedNFA
+        else EpsNFABuilder.build(ir).toOrderedNFA(Int.MaxValue, false).rename
+      result <- Try(AutomatonChecker.check(nfa, Int.MaxValue, isUpperBound).nextOption().getOrElse(Complexity.Constant))
     yield result
+
+  /** Returns the degree of the complexity, where an exponential one is the largest. */
+  def degree(c: Complexity[?]): Int = c match
+    case Constant          => 0
+    case Linear            => 1
+    case p: Polynomial[?]  => p.degree
+    case _: Exponential[?] => Int.MaxValue
 
   test("AutomatonChecker.check: constant"):
     assertEquals(check("^$", ""), Success(Constant))
@@ -162,15 +175,10 @@ class AutomatonCheckerSuite extends munit.FunSuite:
 
   test("AutomatonChecker.check: complexities of look-behinds"):
     // The complexities of the inner expressions of the look-behinds merge into the others, from the worst.
-    def degree(c: Complexity[?]): Int = c match
-      case _: Exponential[?] => Int.MaxValue
-      case p: Polynomial[?]  => p.degree
-      case Linear            => 1
-      case Constant          => 0
     def degrees(source: String): Seq[Int] =
       val ir = ReDoS.parse(source, "", Dialect.JavaScript)
       val nfa = EpsNFABuilder.build(ir).toOrderedNFA(Int.MaxValue, false).rename
-      AutomatonChecker.check(nfa, Int.MaxValue).map(degree).toSeq
+      AutomatonChecker.check(nfa, Int.MaxValue, false).map(degree).toSeq
 
     assertEquals(degrees("^(?:b|b)*a+(?<=a*)$"), Seq(Int.MaxValue, Int.MaxValue, 2, 1, 0))
     assertEquals(degrees("c?a+(?<=ba*)$"), Seq(3, 3) ++ Seq.fill(9)(2) ++ Seq(1, 0))
@@ -253,3 +261,27 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         Exponential(Witness(Seq((Seq.empty, Seq(a))), Seq.empty), Hotspot(Seq(Spot(7, 8, Hot), Spot(9, 10, Hot))))
       )
     )
+
+  test("AutomatonChecker.check: upper bound"):
+    // The upper bound explores every path, even after the first success of a look-ahead or an atomic group.
+    assert(clue(check("^(?=(?:a|a)*)c", "", isUpperBound = true)).get.isInstanceOf[Exponential[?]])
+    assert(clue(check("^(?>(?:a|a)*)b", "", Dialect.PCRE, isUpperBound = true)).get.isInstanceOf[Exponential[?]])
+    assertEquals(check("^(?:(?<=a)b|a)*$", "", isUpperBound = true), Success(Linear))
+    // A back-reference is a choice of the group's body and the empty string.
+    assertEquals(check("^([a-z]+)=\\1$", "", isUpperBound = true), Success(Linear))
+    assert(clue(check("^(a+)\\1*$", "", isUpperBound = true)).get.isInstanceOf[Exponential[?]])
+    // It bounds the exact complexity from above.
+    for (source, dialect) <- Seq(
+        ("^(?:(?=a)a)*$", Dialect.JavaScript),
+        ("^a+(?!a*b)", Dialect.JavaScript),
+        ("^(?=(?:a|a)*$)", Dialect.JavaScript),
+        ("^(?:a|(?<=a)a)*$", Dialect.JavaScript),
+        ("c?a+(?<=ba*)$", Dialect.JavaScript),
+        ("^(?:a(?<=^a*))*$", Dialect.JavaScript),
+        ("^a*$(?<=a*)", Dialect.JavaScript),
+        ("a*$(?<=ba*)", Dialect.JavaScript),
+        ("(?>a*)a*b", Dialect.PCRE),
+        ("^(?:(?>a)|a)*b", Dialect.PCRE),
+        ("^(?(?=a)a*|b*)a*$", Dialect.PCRE)
+      )
+    do assert(degree(check(source, "", dialect, true).get) >= degree(check(source, "", dialect).get), source)

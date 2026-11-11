@@ -132,11 +132,14 @@ final case class OrderedNFA[A, Q](
   /** Converts this into [[NFAwLA]].
     *
     * With [[inputStates]], a look-ahead that none of them has is of no input, which the result does not have.
+    *
+    * With `isUpperBound`, the look-ahead DFA has the single state of no success, and the result has every leaf of the
+    * transitions, which bounds the explored paths from above.
     */
-  def toNFAwLA(maxNFASize: Int)(using ctx: Context): NFAwLA[A, Q, Set[Q]] =
+  def toNFAwLA(maxNFASize: Int, isUpperBound: Boolean)(using ctx: Context): NFAwLA[A, Q, Set[Q]] =
     ctx.interrupt:
-      val lookAheadDFA = toLookAheadDFA
-      def isInput(p: Set[Q]): Boolean = inputStates.isEmpty || p.exists(inputStates.contains)
+      val lookAheadDFA = if isUpperBound then DFA.universal(alphabet, Set.empty[Q]) else toLookAheadDFA
+      def isInput(p: Set[Q]): Boolean = isUpperBound || inputStates.isEmpty || p.exists(inputStates.contains)
 
       val reverseDelta = ctx.interrupt:
         lookAheadDFA.delta
@@ -159,7 +162,7 @@ final case class OrderedNFA[A, Q](
           for (p1, p2) <- reverseDelta(a) do
             // The ordered NFA has `q1 --(a)-> b`, and the look-ahead DFA has `p1 <-(a)-- p2`.
             // So the result has `(q1, p1) --(a)-> (q2, p2)` exactly when a matcher explores `q2` in `b` while `p2` succeeds.
-            val qp2s = b.explore(p2.contains).map((_, p2))
+            val qp2s = (if isUpperBound then b.leaves else b.explore(p2.contains)).map((_, p2))
             newDelta(((q1, p1), (a, p2))) = newDelta(((q1, p1), (a, p2))) ++ MultiSet.from(qp2s)
             for (q2, p2) <- qp2s do
               newSourcemap(((q1, p1), (a, p2), (q2, p2))) ++= sourcemap.getOrElse((q1, a, q2), Vector.empty)

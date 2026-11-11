@@ -12,11 +12,16 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 /** ReDoS vulnerable RegExp checker based on automata theory. */
 object AutomatonChecker:
 
-  /** Checks a match time complexity of the NFA. */
-  def check[A, Q](nfa: OrderedNFA[A, Q], maxNFASize: Int)(using ctx: Context): Iterator[Complexity[A]] =
+  /** Checks a match time complexity of the NFA.
+    *
+    * With `isUpperBound`, it bounds the complexity from above by exploring every path (see [[OrderedNFA.toNFAwLA]]).
+    */
+  def check[A, Q](nfa: OrderedNFA[A, Q], maxNFASize: Int, isUpperBound: Boolean)(using
+      ctx: Context
+  ): Iterator[Complexity[A]] =
     ctx.interrupt:
-      val nfaWLA = nfa.toNFAwLA(maxNFASize)
-      val complexities = new AutomatonChecker(nfaWLA, false).check()
+      val nfaWLA = nfa.toNFAwLA(maxNFASize, isUpperBound)
+      val complexities = new AutomatonChecker(nfaWLA, false, isUpperBound).check()
       nfa.lookBehind match
         case None => complexities
         // A look-behind whose inner expression has no cycle costs at most a constant on each attempt, which is less
@@ -24,7 +29,7 @@ object AutomatonChecker:
         case Some(lookBehind) if !hasCycle(lookBehind.inner) => complexities
         case Some(lookBehind)                                =>
           val product = LookBehindProduct.build(nfaWLA, lookBehind, maxNFASize)
-          val lookBehindComplexities = new AutomatonChecker(product, true).check().map(dropInputEnds)
+          val lookBehindComplexities = new AutomatonChecker(product, true, isUpperBound).check().map(dropInputEnds)
           merge(complexities, lookBehindComplexities).distinct
 
   /** Merges the complexities, each ordered from the worst as [[AutomatonChecker#check]] gives them, into one ordered
@@ -66,10 +71,14 @@ object AutomatonChecker:
   *
   * Without `countsAcceptedPaths`, it counts the paths over all prefixes, which is the backtracking cost. With it, it
   * counts the paths into the accepting states, where every state of the NFA must reach them.
+  *
+  * With `isUpperBound`, the look-ahead DFA of [[nfaWLA]] tells no failure, so the suffix of a witness is a character
+  * that the last state cannot read, if any.
   */
 private final class AutomatonChecker[A, Q, P](
     private val nfaWLA: NFAwLA[A, Q, P],
-    private val countsAcceptedPaths: Boolean
+    private val countsAcceptedPaths: Boolean,
+    private val isUpperBound: Boolean
 )(using private val ctx: Context):
 
   // Introduces `ctx` methods into the scope.
@@ -291,7 +300,12 @@ private final class AutomatonChecker[A, Q, P](
           (pumpPaths :+ (prefix.map(_._2._1), path.map(_._1)), Set(q2), newSpots)
     val (tail, last) = graph.path(qs, witnessEnds).get
     val tailSpots = this.spots(tail, last).map { case SourceLocation(s, e) => Hotspot.Spot(s, e, Hotspot.Warm) }
-    val suffix = nfaWLA.lookAheadDFA.toGraph.path(Set(nfaWLA.lookAheadDFA.init), last._2).get._1.map(_._2).reverse
+    val suffix =
+      if isUpperBound then
+        val read = graph.neighbors.getOrElse(last, Vector.empty).map(_._1._1).toSet
+        // The look-ahead DFA has every character, while the NFA has only the characters that it reads.
+        nfaWLA.lookAheadDFA.alphabet.find(a => !read.contains(a)).toVector
+      else nfaWLA.lookAheadDFA.toGraph.path(Set(nfaWLA.lookAheadDFA.init), last._2).get._1.map(_._2).reverse
     (Witness(pumpPaths, tail.map(_._2._1) ++ suffix), Hotspot(spots ++ tailSpots))
 
   /** Gets hotspots positions from a path. */

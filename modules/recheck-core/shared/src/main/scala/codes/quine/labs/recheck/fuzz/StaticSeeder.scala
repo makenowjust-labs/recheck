@@ -15,11 +15,8 @@ import codes.quine.labs.resyntax.ir.IRPattern
 /** StaticSeeder computes an initial generation for the pattern with static analysis. */
 object StaticSeeder:
 
-  /** Computes an initial generation of the pattern.
-    *
-    * It uses the simplified automata (see [[EpsNFABuilder.buildSimplified]]) of the pattern whose repetitions become
-    * `*` or `+` until the sum of the counts of the rest is below `maxSimpleRepeatSize` (see
-    * [[IRPattern.approximateRepeats]]), where the look-behinds are look-aheads. It is empty if the automata would be
+  /** Computes an initial generation of the pattern from the ambiguities of its simplified automata (see
+    * [[EpsNFABuilder.buildSimplified]] and [[IRPattern.approximateRepeats]]), which is empty if the automata would be
     * larger than `maxNFASize`.
     */
   def seed(
@@ -33,6 +30,7 @@ object StaticSeeder:
       ctx: Context
   ): Set[FString] = ctx.interrupt:
     try
+      // The inner expressions of the look-behinds read forward as look-aheads, on the paths where the ambiguities are.
       val simplified = EpsNFABuilder.buildSimplified(
         pattern.approximateRepeats(maxSimpleRepeatSize),
         maxNFASize,

@@ -63,6 +63,12 @@ class ReDoSSuite extends munit.FunSuite:
       case s: Diagnostics.Safe => assertEquals(s.checker, checker)
       case d                   => fail(s"not safe: $d")
 
+  /** Asserts the safety by a linear upper bound, which the fuzz checker finds before fuzzing. */
+  def assertBounded(d: Diagnostics)(using loc: munit.Location): Unit =
+    d match
+      case s: Diagnostics.Safe => assertEquals((s.checker, s.complexity), (Checker.Fuzz, AttackComplexity.Safe(false)))
+      case d                   => fail(s"not safe: $d")
+
   test("ReDoS.check"):
     assertEquals(
       ReDoS.check("^foo$", ""),
@@ -95,7 +101,7 @@ class ReDoSSuite extends munit.FunSuite:
         "",
         Dialect.JavaScript,
         UnitMode.UTF16,
-        AttackComplexity.Safe(true),
+        AttackComplexity.Safe(false),
         Seq.empty,
         Checker.Fuzz
       )
@@ -242,7 +248,8 @@ class ReDoSSuite extends munit.FunSuite:
     // PCRE2 doubles its time for each `a` (0.37 s at n = 22).
     assertVulnerable(check("^(?(?=a)(?:a|a)*$|b)", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
     assertSafe(check("^(?(?=a)a+|b+)$", PCRE), Checker.Automaton)
-    assertSafe(check("^(a)?(?(1)b+|c)$", Python()), Checker.Fuzz)
+    // The upper bound, a choice of the branches, is linear.
+    assertBounded(check("^(a)?(?(1)b+|c)$", Python()))
 
   test("ReDoS.check: backtracking control verbs"):
     // `(*FAIL)` is the empty set, which makes the match fail after the repetition (0.35 s at n = 22).
@@ -260,6 +267,29 @@ class ReDoSSuite extends munit.FunSuite:
     // Backtracking enters the look-ahead again (0.45 s at n = 22), which an atomic one does not (0.004 ms).
     assertVulnerable(check("^(?*(?:a|a)*)c", PCRE), AttackComplexity.Exponential(true), Checker.Fuzz)
     assertSafe(check("^(?=(?:a|a)*)c", PCRE), Checker.Automaton)
+    // The simplified automata of a non-atomic look-around bound nothing, though their cost is linear here.
+    assertEquals(check("^(?*a+)b+$", PCRE).asInstanceOf[Diagnostics.Safe].complexity, AttackComplexity.Safe(true))
+
+  test("ReDoS.check: upper bounds"):
+    // The upper bound of a back-reference, a choice of the group's body and the empty string, is linear here.
+    assertBounded(check("^([a-z]+)=\\1$", JavaScript))
+    assertBounded(check("^(['\"])[^'\"]*\\1$", JavaScript))
+    // A match ends at its first success, so the bound counts nothing after the end of the pattern.
+    for source <- Seq("^a+", ".", "^\\w+@") do assertBounded(check(source, JavaScript, checker = Checker.Fuzz))
+    // The fuzz checker bounds it alone too, while the automaton checker does not.
+    assertBounded(check("^([a-z]+)=\\1$", JavaScript, checker = Checker.Fuzz))
+    assert(clue(check("^([a-z]+)=\\1$", JavaScript, checker = Checker.Automaton)).isInstanceOf[Diagnostics.Unknown])
+    // The upper bound of `(a|aa)\1*` is exponential, so the fuzz checker decides it.
+    // One iteration suffices, and the default ten may run into the timeout under coverage instrumentation.
+    assertSafe(ReDoS.check("^(a|aa)\\1*$", "", params.copy(maxIteration = 1)), Checker.Fuzz)
+    // `\1` matches what `(\ba)` matched, even where `\b` does not hold, so each block parses in two ways.
+    assertVulnerable(check("^(?:-(\\ba)\\1|-aa)*$", JavaScript), AttackComplexity.Exponential(true), Checker.Fuzz)
+
+  test("ReDoS.check: too many repeats"):
+    // The upper bound of `^[a-z]+@[a-z]+$` is linear.
+    assertBounded(check("^[a-z]{1,64}@[a-z]{1,255}$", JavaScript))
+    // The upper bound of `^(?:a|a)+$` is exponential, so the fuzz checker decides it.
+    assertVulnerable(check("^(?:a|a){1,40}$", JavaScript), AttackComplexity.Exponential(true), Checker.Fuzz)
 
   test("ReDoS.check: look-behinds matched forward"):
     // PCRE matches the inner expression forward from the starts of its widths, which succeeds as matching it backward.
@@ -572,7 +602,7 @@ class ReDoSSuite extends munit.FunSuite:
           "",
           Dialect.JavaScript,
           UnitMode.UTF16,
-          AttackComplexity.Safe(true),
+          AttackComplexity.Safe(false),
           Seq.empty,
           Checker.Fuzz
         )
@@ -656,7 +686,7 @@ class ReDoSSuite extends munit.FunSuite:
           "",
           Dialect.JavaScript,
           UnitMode.UTF16,
-          AttackComplexity.Safe(true),
+          AttackComplexity.Safe(false),
           Seq.empty,
           Checker.Fuzz
         )

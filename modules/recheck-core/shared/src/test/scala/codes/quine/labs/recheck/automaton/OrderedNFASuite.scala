@@ -23,7 +23,7 @@ class OrderedNFASuite extends munit.FunSuite:
         (1, 'b') -> Branch.Leaf(1)
       )
     )
-    val nfaWLA = nfa.toNFAwLA(Int.MaxValue)
+    val nfaWLA = nfa.toNFAwLA(Int.MaxValue, false)
     assertEquals(
       nfaWLA,
       NFAwLA(
@@ -41,7 +41,7 @@ class OrderedNFASuite extends munit.FunSuite:
       )
     )
     interceptMessage[UnsupportedException]("NFAwLA size is too large") {
-      nfa.toNFAwLA(maxNFASize = 1)
+      nfa.toNFAwLA(1, false)
     }
 
     // It corresponds to `^(?!ab)a[ab]*$`.
@@ -60,12 +60,16 @@ class OrderedNFASuite extends munit.FunSuite:
         (3, 'b') -> Branch.Succeed
       )
     )
-    val nfaWLA2 = nfa2.toNFAwLA(Int.MaxValue)
+    val nfaWLA2 = nfa2.toNFAwLA(Int.MaxValue, false)
     assertEquals(nfaWLA2.delta(((0, Set(2, 3)), ('a', Set(1, 2, 3)))), MultiSet((1, Set(1, 2, 3))))
     assertEquals(
       nfaWLA2.delta(((0, Set(0, 2, 3)), ('a', Set(0, 2, 3)))),
       MultiSet((1, Set(0, 2, 3)), (2, Set(0, 2, 3)))
     )
+    // The upper bound has the single look-ahead state, and every leaf.
+    val upperBound = nfa2.toNFAwLA(Int.MaxValue, true)
+    assertEquals(upperBound.lookAheadDFA.stateSet, Set(Set.empty[Int]))
+    assertEquals(upperBound.delta(((0, Set.empty), ('a', Set.empty))), MultiSet((1, Set.empty), (2, Set.empty)))
 
   test("OrderedNFA#restrictInputs"):
     val nfa =
@@ -89,8 +93,8 @@ class OrderedNFASuite extends munit.FunSuite:
       )
     )
     // A look-ahead of no input, such as that of `hl` (`{0}`), is not in the NFAwLA.
-    assert(nfa.toNFAwLA(Int.MaxValue).stateSet.contains((0, Set(0))))
-    val nfaWLA = restricted.toNFAwLA(Int.MaxValue)
+    assert(nfa.toNFAwLA(Int.MaxValue, false).stateSet.contains((0, Set(0))))
+    val nfaWLA = restricted.toNFAwLA(Int.MaxValue, false)
     assert(clue(nfaWLA.stateSet).forall((q, p) => q == 0 && p.exists(Set(1, 2).contains)))
     assertEquals(nfaWLA.stateSet.size, 2)
 

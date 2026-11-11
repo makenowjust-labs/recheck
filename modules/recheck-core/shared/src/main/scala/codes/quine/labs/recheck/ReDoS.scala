@@ -193,7 +193,7 @@ object ReDoS:
         val epsNFA = EpsNFABuilder.build(ir)
         val orderedNFA =
           epsNFA.restrictInputs(epsNFA.toOrderedNFA(maxNFASize, false).rename).mapAlphabet(_.representative)
-        AutomatonChecker.check(orderedNFA, maxNFASize)
+        AutomatonChecker.check(orderedNFA, maxNFASize, false)
 
     // The safe complexities follow the vulnerable ones.
     lazy val (vulnerable, rest) = complexities.span(_.isInstanceOf[Complexity.Vulnerable[?]])
@@ -239,15 +239,15 @@ object ReDoS:
   )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
     import params.*
 
-    def diagnose: Iterator[Diagnostics.Vulnerable] =
-      val random = new Random(randomSeed)
+    lazy val (results, safeComplexity) =
       val fuzz = FuzzProgram.from(ir)
-      val results = FuzzChecker.check(
+      FuzzChecker.check(
         ir,
         fuzz,
-        random,
+        new Random(randomSeed),
         seeder,
         maxSimpleRepeatCount,
+        maxRepeatCount,
         maxNFASize,
         seedingLimit,
         seedingTimeout,
@@ -268,6 +268,7 @@ object ReDoS:
         avoidsAttack
       )
 
+    def diagnose: Iterator[Diagnostics.Vulnerable] =
       results.map:
         case (complexity, attack, hotspot) =>
           val adjusted = attack.adjust(complexity, runtimeAttackLimit, maxRuntimeAttackStringSize, ir.mode)
@@ -285,8 +286,7 @@ object ReDoS:
           )
 
     val diagnostics = diagnose.withChecker(Checker.Fuzz)
-    val safe = () =>
-      Diagnostics.Safe(source, flags, params.dialect, ir.mode, AttackComplexity.Safe(true), Seq.empty, Checker.Fuzz)
+    val safe = () => Diagnostics.Safe(source, flags, params.dialect, ir.mode, safeComplexity, Seq.empty, Checker.Fuzz)
     (diagnostics, safe)
 
   /** Runs the automaton checker, or the fuzz checker if the automaton checker gives up, and returns the vulnerable
