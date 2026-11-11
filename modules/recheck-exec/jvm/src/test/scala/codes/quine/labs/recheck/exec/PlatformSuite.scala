@@ -44,8 +44,9 @@ class PlatformSuite extends munit.FunSuite:
     intercept[CancelException]:
       sh("sleep 5", None)(using Context(token = Some(source.token)))
     // A descendant holding the standard output after the process exits does not keep it waiting.
+    // The process exits after the reader blocks, since the JDK ends the stream at the exit unless a read is blocked.
     intercept[TimeoutException]:
-      sh("sleep 5 & echo foo", None)(using Context(timeout = 200.millis))
+      sh("sleep 5 & sleep 0.1", None)(using Context(timeout = 200.millis))
 
   test("Platform.run: missing command"):
     intercept[UnexpectedException]:
