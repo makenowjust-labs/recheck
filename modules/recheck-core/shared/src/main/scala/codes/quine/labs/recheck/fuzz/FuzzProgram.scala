@@ -22,4 +22,4 @@ object FuzzProgram:
   /** Builds a program from the pattern, which runs as the engine of its dialect. */
   def from(pattern: IRPattern)(using ctx: Context): FuzzProgram =
     ctx.interrupt:
-      FuzzProgram(ProgramBuilder.build(pattern), PatternAlphabet.of(pattern), pattern.parts)
+      FuzzProgram(ProgramBuilder.build(pattern, true), PatternAlphabet.of(pattern), pattern.parts)

@@ -29,9 +29,13 @@ import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 /** ProgramBuilder is a builder of a program from a RegExp pattern. */
 object ProgramBuilder:
 
-  /** Builds a corresponding program from the RegExp pattern, which runs as the engine of its dialect. */
-  def build(pattern: IRPattern)(using ctx: Context): Program =
-    new ProgramBuilder(pattern, pattern.captureCount).build()
+  /** Builds a corresponding program from the RegExp pattern, which runs as the engine of its dialect.
+    *
+    * With `omitsCaptures`, the program does not record the captures of the groups unless the pattern reads them, which
+    * change neither the steps nor the match then.
+    */
+  def build(pattern: IRPattern, omitsCaptures: Boolean)(using ctx: Context): Program =
+    new ProgramBuilder(pattern, pattern.captureCount, omitsCaptures).build()
 
 /** AcceptScope is what `(*ACCEPT)` ends successfully. */
 private[vm] enum AcceptScope:
@@ -47,7 +51,8 @@ private[vm] enum AcceptScope:
 
 private[vm] class ProgramBuilder(
     private val pattern: IRPattern,
-    private val capturesSize: Int
+    private val capturesSize: Int,
+    private val omitsCaptures: Boolean
 )(using ctx: Context):
 
   import ctx.*
@@ -62,6 +67,9 @@ private[vm] class ProgramBuilder(
     case _: IRNodeData.BackReference                           => true
     case IRNodeData.Conditional(_: IRCondition.Captured, _, _) => true
     case _                                                     => false
+
+  /** Whether the program records the captures of the groups. */
+  private val emitsCaptures = !omitsCaptures || readsCaptures
 
   /** Whether backtracking keeps the captures of the failed matching, which back-references and capture tests only see.
     */
@@ -475,13 +483,15 @@ private[vm] class ProgramBuilder(
 
   /** A builder for a capture node. */
   def buildCapture(index: Int, children: IRNode): Unit =
-    if unsetsOpenCaptures then emitInst(Inst.CapReset(index, index))
-    emitInst(Inst.CapOpen(index))
-    val saved = openCaptures
-    openCaptures = index :: openCaptures
-    build(children)
-    openCaptures = saved
-    emitInst(if back then Inst.CapBegin(index) else Inst.CapEnd(index))
+    if !emitsCaptures then build(children)
+    else
+      if unsetsOpenCaptures then emitInst(Inst.CapReset(index, index))
+      emitInst(Inst.CapOpen(index))
+      val saved = openCaptures
+      openCaptures = index :: openCaptures
+      build(children)
+      openCaptures = saved
+      emitInst(if back then Inst.CapBegin(index) else Inst.CapEnd(index))
 
   /** A builder for `x*` node. */
   def buildStar(
@@ -670,7 +680,7 @@ private[vm] class ProgramBuilder(
 
   /** Emits a `cap-reset` if captures are reset on each iteration, and then runs `run`. */
   def wrapReset(child: IRNode)(run: => Unit): Unit =
-    if resetsCaptures then for (min, max) <- child.captureRange do emitInst(Inst.CapReset(min, max))
+    if resetsCaptures && emitsCaptures then for (min, max) <- child.captureRange do emitInst(Inst.CapReset(min, max))
     run
 
   /** A builder for an atomic group, which commits the first match of the child. */
