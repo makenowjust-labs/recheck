@@ -611,7 +611,19 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     ("[^]", "e", "\n"),
     ("[^]a]", "e", "\na"),
     ("[]a]", "e", "]"),
-    ("[a-[^]]", "e", "a")
+    ("[a-[^]]", "e", "a"),
+    // A lazy repetition whose body matches the empty string, which .NET 11 fixes (dotnet/runtime#120872).
+    (".(|)+?b..", "", "a1b{a,1}#"),
+    ("a()+?a?", "", "aab"),
+    ("(b?)+?b?|", "", "aab"),
+    ("(b?)+?b?|", "", "baaaba"),
+    ("()+?a.+.|", "", "a1b{a,1}#"),
+    ("..|()+?.", "", "a"),
+    (".()+?b", "", "aab"),
+    ("^(.)+()+?b", "", "wtfb"),
+    ("(.)()+?b", "", "wtfb"),
+    ("(?:(?:0?)+?(?:a?)+?)?", "", "0a"),
+    ("(?<!a*(?:a?)+?)", "", "x")
   )
 
   /** Returns recheck's results of .NET's cases: the spans of the groups of the first match, `none` or `error`. */

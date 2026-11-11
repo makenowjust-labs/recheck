@@ -735,6 +735,19 @@ class InterpreterSuite extends munit.FunSuite:
     check("(?:x|\\G)a", "ab", PCRE, Perl(), Ruby(), Java, DotNet)(Seq(g(0, 1)))
     check("(?:a|\\G)b", "xb", PCRE, Perl(), Ruby(), Java, DotNet)(NoMatch)
 
+  test("Interpreter.run: lazy repetitions of an empty body"):
+    // .NET 10 got these wrong, and .NET 11 fixes them (dotnet/runtime#120872).
+    check("a()+?a?", "aab", DotNet)(Seq(g(0, 2), g(1, 1)))
+    check(".()+?b", "aab", DotNet)(Seq(g(1, 3), g(2, 2)))
+    check(".(|)+?b..", "a1b{a,1}#", DotNet)(Seq(g(1, 5), g(2, 2)))
+    check("(b?)+?b?|", "aab", DotNet)(Seq(g(0, 0), g(0, 0)))
+    check("()+?a.+.|", "a1b{a,1}#", DotNet)(Seq(g(0, 9), g(0, 0)))
+    check("..|()+?.", "a", DotNet)(Seq(g(0, 1), g(0, 0)))
+    check("^(.)+()+?b", "wtfb", DotNet)(Seq(g(0, 4), g(2, 3), g(3, 3)))
+    check("(.)()+?b", "wtfb", DotNet)(Seq(g(2, 4), g(2, 3), g(3, 3)))
+    check("(?:(?:0?)+?(?:a?)+?)?", "0a", DotNet)(Seq(g(0, 2)))
+    check("(?<!a*(?:a?)+?)", "x", DotNet)(NoMatch)
+
   test("Interpreter.run: conditionals"):
     check("^(a)?(?(1)b|c)$", "ab", PCRE, Perl(), Python(), Ruby(), DotNet)(Seq(g(0, 2), g(0, 1)))
     check("^(a)?(?(1)b|c)$", "c", PCRE, Perl(), Python(), Ruby(), DotNet)(Seq(g(0, 1)))
@@ -947,7 +960,7 @@ class InterpreterSuite extends munit.FunSuite:
     check("^(?:()|a){1,2}\\1$", "a", Java, Perl(), DotNet)(Seq(g(0, 1), g(1, 1)))
     check("^(?:()|a){1,2}\\1$", "a", PCRE, Python())(Seq(g(0, 1), g(0, 0)))
     check("^(?:()|a){2,}\\1$", "a", Java, PCRE, Perl(), Python(), DotNet)(Seq(g(0, 1), g(1, 1)))
-    check("^(?:()|a)*?\\1$", "a", Java, PCRE, Perl(), Python())(Seq(g(0, 1), g(1, 1)))
+    check("^(?:()|a)*?\\1$", "a", Java, PCRE, Perl(), Python(), DotNet)(Seq(g(0, 1), g(1, 1)))
     check("^(?:()|a)+\\1$", "a", Java, PCRE, Perl(), Python(), DotNet)(Seq(g(0, 1), g(1, 1)))
     check("^(?:()|a)+\\1$", "a", JavaScript)(Seq(g(0, 1)))
     check("^(?:()|a){3}\\1$", "aa", Java, Perl())(Seq(g(0, 2), g(2, 2)))
