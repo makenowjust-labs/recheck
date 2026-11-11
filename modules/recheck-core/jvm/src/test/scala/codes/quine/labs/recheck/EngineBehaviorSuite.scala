@@ -302,7 +302,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
           |""".stripMargin
     assertEquals(cases(RubyExecutor, script), extendedModel(extendedCases, "x", Dialect.Ruby()))
 
-  // Checked with .NET 10.0.14.
+  // Checked with .NET 11.0.0.
   runtimeTest(".NET: the extended mode", "dotnet"):
     val style = AttackPatternStyle.CSharp
     val runs = extendedCases.map: (source, subjects) =>
@@ -510,7 +510,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
           |""".stripMargin
     assertEquals(cases(JavaExecutor(SourceFile("Main.java", program))), openCaptureModel(all, Dialect.Java))
 
-  // Checked with .NET 10.0.14.
+  // Checked with .NET 11.0.0.
   runtimeTest(".NET: back-references in an open capture", "dotnet"):
     val style = AttackPatternStyle.CSharp
     val all = openCaptureCases ++ openCaptureBacktrackCases ++ openCaptureTestCases ++ openCaptureLookBehindCases

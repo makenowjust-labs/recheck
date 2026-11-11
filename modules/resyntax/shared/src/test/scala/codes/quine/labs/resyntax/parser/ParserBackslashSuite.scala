@@ -75,7 +75,7 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   // Java reads `\uD83D\ uDE00` as a surrogate pair, which recheck does not reproduce.
   check("\\uD83D\\ uDE00", "x", Java):
     Sequence((Seq(Backslash(Escape(UnicodeHex4, 0xd83d)), Backslash(Unknown(' '))) ++ "uDE00".map(c => Literal(c)))*)
-  // .NET rejects an unknown escape of a character of `RegexCharClass.IsBoundaryWordChar` (checked with .NET 10.0.14).
+  // .NET rejects an unknown escape of a character of `RegexCharClass.IsBoundaryWordChar` (checked with .NET 11.0.0).
   error("\\\u0301", "", DotNet)("Invalid backslash escape at 1")
   check("\\\u2160", "", DotNet)(Backslash(Unknown(0x2160)))
   // It reads a UTF-16 unit, so a supplementary letter is not one.

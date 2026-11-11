@@ -416,7 +416,7 @@ class InterpreterSuite extends munit.FunSuite:
     assertEquals(Interpreter.Status.Limit.toString, "limit")
     assertEquals(Interpreter.Status.Timeout.toString, "timeout")
 
-  // The expected results are checked on Node 26, Python 3.15, Ruby 4.0, Java 27, .NET 10, Perl 5.44 and PHP 8.5 with
+  // The expected results are checked on Node 26, Python 3.15, Ruby 4.0, Java 27, .NET 11, Perl 5.44 and PHP 8.5 with
   // PCRE2.
 
   test("Interpreter.run: atomic groups and possessive repeats"):
@@ -703,7 +703,7 @@ class InterpreterSuite extends munit.FunSuite:
     val ir = ReDoS.parse("a(?R)?", "", PCRE)
     interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(ProgramBuilder.build(ir, false))
 
-  // The expected spans are checked on Ruby 4.0, Java 27, .NET 10, Perl 5.44 and PHP 8.5 with PCRE2 10.49 without JIT.
+  // The expected spans are checked on Ruby 4.0, Java 27, .NET 11, Perl 5.44 and PHP 8.5 with PCRE2 10.49 without JIT.
 
   test("Interpreter.run: \\K"):
     check("a\\Kb", "ab", PCRE, Perl(), Ruby())(Seq(g(1, 2)))
