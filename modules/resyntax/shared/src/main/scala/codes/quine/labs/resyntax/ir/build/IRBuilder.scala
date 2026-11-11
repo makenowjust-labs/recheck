@@ -581,6 +581,11 @@ private[build] class IRBuilder(
   def buildConditional(node: Node, test: ConditionalTest, yes: Node, no: Option[Node]): Either[IRNodeData, IRNode] =
     def branch(node: Option[Node]): IRNode = node.fold(IRNode(IRNodeData.Empty))(n => scoped(build(n)))
 
+    // .NET's inline flags in the yes branch reach the no branch, as they reach the next alternatives of a group.
+    def branches: (IRNode, IRNode) =
+      if featureSet.carriesFlagsIntoNoBranch then scoped((build(yes), branch(no)))
+      else (branch(Some(yes)), branch(no))
+
     def captured(indices: Seq[Int]): Either[Boolean, IRCondition] =
       // .NET's group `0` is the whole match, which is not set yet.
       val set = indices.filter(_ != 0)
@@ -616,9 +621,11 @@ private[build] class IRBuilder(
       case ConditionalTest.CalloutLookAround(_, _) => None
     condition match
       case Some(Left(true))       => Right(branch(Some(yes)))
-      case Some(Left(false))      => Right(branch(no))
-      case Some(Right(condition)) => Left(IRNodeData.Conditional(condition, branch(Some(yes)), branch(no)))
-      case None                   => Left(IRNodeData.Unsupported(node.data))
+      case Some(Left(false))      => Right(if featureSet.carriesFlagsIntoNoBranch then branches._2 else branch(no))
+      case Some(Right(condition)) =>
+        val (yesNode, noNode) = branches
+        Left(IRNodeData.Conditional(condition, yesNode, noNode))
+      case None => Left(IRNodeData.Unsupported(node.data))
 
   /** Builds a look-around condition, where .NET reads a bare group name as a capture test (e.g. `(?(x)a|b)`). */
   def buildLookAroundCondition(kind: Option[GroupKind.LookAround], body: Node): IRCondition =

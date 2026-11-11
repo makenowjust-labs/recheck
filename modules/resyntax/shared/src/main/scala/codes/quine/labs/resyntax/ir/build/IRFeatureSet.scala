@@ -73,6 +73,8 @@ final case class IRFeatureSet(
     readsNumericNameAsIndex: Boolean,
     // .NET
     ignoresGroupAfterLookAroundCondition: Boolean,
+    // .NET
+    carriesFlagsIntoNoBranch: Boolean,
     // Ruby
     ignoresUnnamedCaptureWithNamedCapture: Boolean,
     // PCRE
@@ -524,6 +526,7 @@ object IRFeatureSet:
       sharesIndexOfName = isPythonRegex,
       readsNumericNameAsIndex = isDotNet || isPythonRegex,
       ignoresGroupAfterLookAroundCondition = isDotNet,
+      carriesFlagsIntoNoBranch = isDotNet,
       ignoresUnnamedCaptureWithNamedCapture = isRuby,
       rejectsMismatchedNameAndIndex = isPCRE,
       unsetBackReferenceMatchesEmpty = isJavaScript,
