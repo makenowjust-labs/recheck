@@ -593,8 +593,8 @@ private[fuzz] final class FuzzChecker(
       val visited: mutable.Set[CoverageItem]
   ):
 
-    /** The strings that reach `incubationLimit`, one for each sequence. */
-    val candidates: mutable.LinkedHashMap[IndexedSeq[FString.FChar], FString] = mutable.LinkedHashMap.empty
+    /** The strings that reach `incubationLimit`, one for each skeleton whose attacks have not failed. */
+    val candidates: mutable.LinkedHashMap[UString, FString] = mutable.LinkedHashMap.empty
 
     /** Executes the string and adds its result, and a candidate of an attack if it reaches `incubationLimit`. */
     def execute(str: FString): Unit =
@@ -612,7 +612,8 @@ private[fuzz] final class FuzzChecker(
         log:
           s"""|fuzz: candidate (status: ${result.status})
               |  string: $str""".stripMargin
-        if !candidates.contains(str.seq) then candidates(str.seq) = str
+        val skeleton = str.skeleton
+        if !failedSkeletons.contains(skeleton) && !candidates.contains(skeleton) then candidates(skeleton) = str
 
     /** Records the execution result. */
     def add(str: FString, input: UString, result: Result): Unit =

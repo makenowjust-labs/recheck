@@ -289,7 +289,8 @@ class FuzzCheckerSuite extends munit.FunSuite:
     val same = FString(15, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'), FString.Repeat(0, 1), FString.Wrap('a')))
     assertEquals(checker.attack(Iterator(str, same)).toSeq, Seq.empty)
     assertEquals(checker.failedSkeletons.toSet, Set(str.skeleton))
-    assert(!check("[a-z0-9]{100,}", "", quick = true))
+    // The quadratic steps of 30 characters stay below the attack limit of the quick check.
+    assert(!check("[a-z0-9]{30,}", "", quick = true))
 
   test("FuzzChecker#Population#execute: candidates"):
     val ir = ReDoS.parse("^(?:a|a)*$", "", Dialect.JavaScript)
@@ -297,13 +298,23 @@ class FuzzCheckerSuite extends munit.FunSuite:
     val pop = new checker.Population(0, mutable.Set.empty, mutable.Set.empty)
     val max = Parameters.DefaultMaxAttackCandidates
     val strs = (1 to max + 1).map: k =>
-      FString(30, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a')) ++ IndexedSeq.fill(k)(FString.Wrap('!')))
-    // The same sequence is one candidate, and no string runs after `maxAttackCandidates` candidates.
+      FString(30, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'), FString.Wrap('a' + k)))
+    // The same skeleton is one candidate, and no string runs after `maxAttackCandidates` candidates.
     pop.execute(strs(0))
     pop.execute(strs(0).copy(n = 31))
+    pop.execute(strs(0).copy(seq = FString.Repeat(2, 1) +: strs(0).seq.tail))
     strs.foreach(pop.execute)
     assertEquals(pop.candidates.values.toSeq, strs.take(max))
-    assertEquals(checker.inputs.size, max + 1)
+    assertEquals(checker.inputs.size, max + 2)
+
+  test("FuzzChecker#Population#execute: no candidate of a skeleton whose attack failed"):
+    val ir = ReDoS.parse("^(?:a|a)*$", "", Dialect.JavaScript)
+    val checker = checkerOf(ir)
+    val pop = new checker.Population(0, mutable.Set.empty, mutable.Set.empty)
+    val str = FString(30, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'), FString.Wrap('!')))
+    checker.failedSkeletons.add(str.skeleton)
+    pop.execute(str)
+    assert(pop.candidates.isEmpty)
 
   test("FuzzChecker#Population#toGeneration: strings with an avoided attack rank last"):
     val ir = ReDoS.parse("^(a|a)*$", "", Dialect.JavaScript)
