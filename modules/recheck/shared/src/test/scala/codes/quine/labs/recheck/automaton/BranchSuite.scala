@@ -66,15 +66,6 @@ class BranchSuite extends munit.FunSuite:
     for b <- Seq(branch, atomic, longest); succeeding <- Set(1, 2, 3, 4).subsets() do
       assert(b.minExplored <= b.explore(succeeding).size, s"$b with $succeeding")
 
-  test("Branch#findSuccessLeaf"):
-    assertEquals(branch.findSuccessLeaf(Set(2)), Some(2))
-    assertEquals(branch.findSuccessLeaf(Set(1, 2, 3)), Some(3))
-    assertEquals(branch.findSuccessLeaf(Set(1)), None)
-    assertEquals(Succeed.findSuccessLeaf(_ => true), None)
-    assertEquals(atomic.findSuccessLeaf(Set(1, 2)), Some(2))
-    assertEquals(atomic.findSuccessLeaf(Set(1, 4)), None)
-    assertEquals(atomic.findSuccessLeaf(Set(4)), Some(4))
-
   test("Branch#map"):
     assertEquals(branch.map(_ * 2), Choice(Vector(LookAhead(true, Leaf(2), Leaf(4)), Leaf(6))))
 

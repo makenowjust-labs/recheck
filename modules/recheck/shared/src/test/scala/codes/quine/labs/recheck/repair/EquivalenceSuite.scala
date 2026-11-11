@@ -121,6 +121,48 @@ class EquivalenceSuite extends munit.FunSuite:
     assertEquals(counterexample("(?:(?!(a)b)\\w)*$", "(?:(?!ab)\\w)*$(x)?", Seq((0, 0), (1, 1))), None)
     assertEquals(counterexample("(?<!(a))b", "(?<!a)b", Seq((0, 0))), None)
 
+  test("Equivalence.findCounterexample: captures in positive look-ahead assertions"):
+    val captures = Seq((0, 0), (1, 1))
+    // A look-ahead sets its captures when it is tried, at the positions after it.
+    assertEquals(counterexample("(?=(a))a", "(a)", captures), None)
+    assertEquals(counterexample("(?=(a*))a*", "(a*)", captures), None)
+    assertEquals(counterexample("(?=(ab))a", "(?=a(b))a", Seq((1, 1))), Some("ab"))
+    assertEquals(counterexample("(?=a(?=(b)))ab", "(?=a(b))ab", captures), None)
+    // The look-aheads of the iterations overlap, and the last one tried sets the capture.
+    assertEquals(counterexample("^(?:(?=([ab]))[ab])+$", "^[ab]*(?=([ab]))[ab]$", captures), None)
+    assertEquals(counterexample("^(?:(?=(a*b))a)*b$", "^(?:(?=(a+b))a)*b$", captures), None)
+    assertEquals(counterexample("^(?:(?=(a*b))a)*b$", "^(?:a(?=(a*b)))*b$", captures), Some("ab"))
+    // A capture set after a look-ahead at its position is set later than the look-ahead sets it.
+    val dotNet = Dialect.DotNet
+    assertEquals(
+      counterexample(Pattern("(?=(?<x>ab))(?<x>a)", dotNet), Pattern("(?<x>a)(?=b)", dotNet), captures),
+      None
+    )
+    assertEquals(
+      counterexample(Pattern("(?<x>)(?=(?<x>ab))a", dotNet), Pattern("(?=(?<x>ab))a", dotNet), captures),
+      None
+    )
+    // The look-aheads in an atomic group set their captures as they do outside it.
+    val pcre = Dialect.PCRE
+    assertEquals(counterexample(Pattern("(?>(?=(a))a)b", pcre), Pattern("(?=(a))ab", pcre), captures), None)
+
+  test("Equivalence.findCounterexample: captures in positive look-behind assertions"):
+    val captures = Seq((0, 0), (1, 1))
+    // A look-behind sets its captures when it is tried, at the positions before it.
+    assertEquals(counterexample("(?<=(a))b", "(a)b", Seq((1, 1))), None)
+    assertEquals(counterexample("a(?<=(a))", "(a)", captures), None)
+    assertEquals(counterexample("(?<=(ab))c", "(?<=a(b))c", Seq((1, 1))), Some("abc"))
+    assertEquals(counterexample("(?<=(a+))b", "(?<=(a))b", Seq((1, 1))), Some("aab"))
+    // It reads the input backward, so the last capture that it sets is the first in the input.
+    assertEquals(counterexample("(?<=(a)*)b", "(?<=(?:(a)a*)?)b", captures), None)
+    assertEquals(counterexample("^(?:a(?<=(a))b)+$", "^(?:(a)b)+$", captures), None)
+    assertEquals(counterexample("(?=a(?<=(a)))a", "(?=(a))a", captures), None)
+    // A nested look-behind reads the input backward too, and the marks before it go with it.
+    assertEquals(counterexample("(?<=(?<=a)(a))b", "(?<=a(a))b", captures), None)
+    assertEquals(counterexample("(?<=(?<=a)(a))b", "(?<=(a))b", Seq((1, 1))), Some("ab"))
+    val java = Dialect.Java
+    assertEquals(counterexample(Pattern("(?<=(a)b)c", java), Pattern("(?<=(a))bc", java), Seq((1, 1))), None)
+
   test("Equivalence.findCounterexample: atomic groups"):
     val perl = Dialect.Perl()
     assertEquals(counterexample(Pattern("(?>a|ab)c", perl), Pattern("ac", perl), Seq((0, 0))), None)
