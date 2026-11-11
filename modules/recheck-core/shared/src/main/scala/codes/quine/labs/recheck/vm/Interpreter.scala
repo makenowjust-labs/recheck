@@ -41,6 +41,9 @@ object Interpreter:
     */
   type UCode = Int
 
+  /** The lookups of the memoization table between the tests of its hits, a power of two. */
+  private val MemoProbeSize = 4096
+
   /** Runs a program on a given input.
     *
     * Note that we assume an input string is normalized here.
@@ -313,10 +316,23 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     clock += 1
     clock
 
-  /** Whether it memoizes the failed states. */
-  private val memoizes: Boolean = options.usesAcceleration
+  /** Whether it memoizes the failed states, which it stops when the memoization table rarely hits. */
+  private var memoizes: Boolean = options.usesAcceleration
 
   require(!memoizes || program.meta.allowsMemoization, "The program does not allow memoization")
+
+  /** The lookups of the memoization table, and the hits of them. */
+  private var memoLookups: Int = 0
+  private var memoHits: Int = 0
+
+  /** Counts a lookup of the memoization table, and stops memoizing if the hits are less than 1% of the lookups.
+    *
+    * The steps stay the same without memoizing, which only saves the time of running the states memoized.
+    */
+  private def countMemoLookup(hits: Boolean): Unit =
+    memoLookups += 1
+    if hits then memoHits += 1
+    if (memoLookups & (Interpreter.MemoProbeSize - 1)) == 0 && memoHits * 100 < memoLookups then memoizes = false
 
   /** Constructs a result of matching. */
   private[vm] def result(status: Status, captures: Option[Seq[Int]]): Result =
@@ -371,7 +387,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         var memoizedCaptures: Option[Vector[Int]] = None
         if memoizes && program.meta.predecessors(frame.label.index).size >= 2 then
           val state = frame.toState
-          memoTable.get(state) match
+          val diff = memoTable.get(state)
+          countMemoLookup(diff.isDefined)
+          diff match
             case Some(diff) =>
               memoized = true
               memoizedCaptures = Some(diff.failedCaptures)
