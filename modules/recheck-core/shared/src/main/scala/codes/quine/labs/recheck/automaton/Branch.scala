@@ -80,18 +80,6 @@ enum Branch[+Q]:
       val (bLeaves, succeeds) = rest.headOption.fold(last)(_._2).exploreAndSucceed(p)
       (failedLeaves ++ bLeaves, succeeds)
 
-  /** Returns the leaf of the path that a backtracking matcher succeeds by, when exactly the leaves satisfying `p`
-    * succeed.
-    */
-  def findSuccessLeaf(p: Q => Boolean): Option[Q] = this match
-    case Leaf(q)                          => Option.when(p(q))(q)
-    case Succeed                          => None
-    case Choice(bs)                       => bs.find(_.succeeds(p)).flatMap(_.findSuccessLeaf(p))
-    case LookAhead(negative, inner, cont) =>
-      if inner.succeeds(p) != negative then cont.findSuccessLeaf(p) else None
-    case AtomicChoice(alternatives, last) =>
-      alternatives.find(_._1.succeeds(p)).fold(last)(_._2).findSuccessLeaf(p)
-
   /** Applies the function to the leaves. */
   def map[R](f: Q => R): Branch[R] = flatMap(q => Leaf(f(q)))
 

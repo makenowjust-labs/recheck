@@ -260,11 +260,14 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     // Strings are tried from the longest, and then the characters.
     assertEquals(build("^[\\q{ab|c}d]$", "v"), build("^(?:ab|[cd])$", "u"))
 
-  test("EpsNFABuilder: marks"):
-    def countMarks(source: String, marks: Set[Int], dialect: Dialect = Dialect.JavaScript): Map[CaptureMark, Int] =
+  test("EpsNFABuilder.build: marks"):
+    def buildMarked(source: String, marks: Set[Int], dialect: Dialect = Dialect.JavaScript): EpsNFA[Int] =
       val ir = ReDoS.parse(source, "", dialect)
-      val nfa = new EpsNFABuilder(ir, PatternAlphabet.of(ir), false, false, marks, false, Int.MaxValue).build()
-      nfa.tau.values.toSeq.collect { case MarkCapture(mark, _) => mark }.groupMapReduce(identity)(_ => 1)(_ + _)
+      EpsNFABuilder.build(ir, marks, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
+    def countMarks(source: String, marks: Set[Int], dialect: Dialect = Dialect.JavaScript): Map[CaptureMark, Int] =
+      val nfa = buildMarked(source, marks, dialect)
+      val transitions = nfa.tau.values.toSeq ++ nfa.lookBehind.toSeq.flatMap(_.tau.values)
+      transitions.collect { case MarkCapture(mark, _) => mark }.groupMapReduce(identity)(_ => 1)(_ + _)
 
     import CaptureMark.*
     assertEquals(countMarks("^(a)(b)$", Set(0, 2)), Map(Begin(0) -> 1, End(0) -> 1, Begin(2) -> 1, End(2) -> 1))
@@ -275,17 +278,30 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     )
     assertEquals(countMarks("^(?:(a)|b)*$", Set(1), Dialect.Perl()), Map(Begin(1) -> 1, End(1) -> 1))
     assertEquals(countMarks("a\\Kb", Set(0), Dialect.PCRE), Map(Begin(0) -> 2, End(0) -> 1))
-    // The copies for `(*NOTEMPTY)` have the marks too, but the tests of an atomic group do not.
+    // The copy for `(*NOTEMPTY)` has the marks too, but the tests of an atomic group do not.
     assertEquals(countMarks("(*NOTEMPTY)(a)", Set(1), Dialect.PCRE), Map(Begin(1) -> 2, End(1) -> 2))
     assertEquals(countMarks("(?>(a))", Set(1), Dialect.PCRE), Map(Begin(1) -> 1, End(1) -> 1))
     // The captures and `\K` in a negative look-around never take effect.
     assertEquals(countMarks("(?!(a))(?<!(?:(b)|c)*)", Set(1, 2)), Map.empty)
     assertEquals(countMarks("(?=(?!(a)))(?!(?<=(b)))", Set(1, 2)), Map.empty)
     assertEquals(countMarks("^(?!a\\K)", Set(0), Dialect.Ruby()), Map(Begin(0) -> 1, End(0) -> 1))
-    interceptMessage[UnsupportedException]("capture in positive look-around assertion")(countMarks("(?=(a))", Set(1)))
-    interceptMessage[UnsupportedException]("capture in positive look-around assertion")(
-      countMarks("(?<=(a))", Set(1))
+    assertEquals(countMarks("(?=(a))(?<=(b))", Set(1, 2)), Map(Begin(1) -> 1, End(1) -> 1, Begin(2) -> 1, End(2) -> 1))
+    // The inner expression of a look-behind reads the input backward, so it meets the end of a capture first.
+    val lookBehind = buildMarked("(?<=(a))", Set(1))
+    val inner = lookBehind.tau.values.collectFirst { case LookBehindAssert(_, inner, _) => inner }
+    val innerTau = lookBehind.lookBehind.fold(Map.empty[Int, Transition[Int]])(_.tau)
+    assertEquals(inner.flatMap(innerTau.get).collect { case MarkCapture(mark, _) => mark }, Some(End(1)))
+    interceptMessage[UnsupportedException]("capture in nested look-behind assertion")(
+      countMarks("(?<=a(?<=(b)))", Set(1))
     )
+    assertEquals(countMarks("(?<=(a)(?<=b))", Set(1)), Map(Begin(1) -> 1, End(1) -> 1))
+    // An engine matching a look-behind forward from several starts may set other captures than matching it backward.
+    interceptMessage[UnsupportedException]("capture in look-behind assertion matched forward")(
+      countMarks("(?<=(a??)(a|aa))", Set(1), Dialect.Java)
+    )
+    assertEquals(countMarks("(?<=(a??)(a|aa))", Set.empty, Dialect.Java), Map.empty)
+    assertEquals(countMarks("(?<!(a??)(a|aa))", Set(1), Dialect.Java), Map.empty)
+    assertEquals(countMarks("(?<=(a)b)", Set(1), Dialect.Java), Map(Begin(1) -> 1, End(1) -> 1))
     assertEquals(countMarks("(?=a\\K)", Set.empty, Dialect.Ruby()), Map.empty)
     interceptMessage[UnsupportedException]("\\K in positive look-around assertion")(
       countMarks("(?=a\\K)", Set(0), Dialect.Ruby())

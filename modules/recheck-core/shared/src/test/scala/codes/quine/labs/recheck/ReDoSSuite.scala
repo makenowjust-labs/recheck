@@ -114,17 +114,17 @@ class ReDoSSuite extends munit.FunSuite:
     // No edit around the hotspot makes this better.
     val notFound = "^[^*]*(?:\\*(?!/)[^*]*)*@[^*]*(?:\\*(?!/)[^*]*)*$"
     assertEquals(ReDoS.repair(notFound, ""), Rx.Unknown(notFound, "", Dialect.JavaScript, None))
-    // Equivalence does not support a capture in a positive look-behind.
+    // Equivalence does not support a capture in a look-behind that Java matches forward from several starts.
     assertEquals(
-      ReDoS.repair("(?<=(a))(?:b|b)*$", ""),
+      ReDoS.repair("(?<=(a??)(a|aa))(?:b|b)*$", "", java),
       Rx.Repaired(
-        "(?<=(a))(?:b|b)*$",
+        "(?<=(a??)(a|aa))(?:b|b)*$",
         "",
-        Dialect.JavaScript,
-        UnitMode.UTF16,
-        "(?<=(a))(?:b)*$",
+        Dialect.Java,
+        UnitMode.UTF16CodePoint,
+        "(?<=(a??)(a|aa))(?:b)*$",
         AttackComplexity.Linear,
-        Seq(0, 1),
+        Seq(0, 1, 2),
         Rx.Comparison.Unknown
       )
     )

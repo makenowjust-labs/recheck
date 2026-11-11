@@ -20,8 +20,9 @@ import codes.quine.labs.resyntax.ast.SourceLocation
   *
   * `lookBehind` has the inner expressions of the look-behind assertions, if any.
   *
-  * `captureMarks` and `captureMarksAtEnd` are the marks of the captures before a transition and at the end of the
-  * input, on the path that a backtracking matcher succeeds by (see [[EpsNFA.foldCaptureMarks]]).
+  * `markedDelta` and `markedDeltaAtEnd` are the transitions and the successes at the end of the input with the marks of
+  * the captures (see [[EpsNFA.foldCaptureMarks]]), where a success regardless of the rest of the input is a
+  * [[MarkedStep.End]] or a [[MarkedStep.LookBehind]] instead of `Succeed`.
   */
 final case class OrderedNFA[A, Q](
     alphabet: Set[A],
@@ -32,8 +33,8 @@ final case class OrderedNFA[A, Q](
     sourcemap: Map[(Q, A, Q), Seq[SourceLocation]] = Map.empty[(Q, A, Q), Seq[SourceLocation]],
     inputStates: Set[Q] = Set.empty[Q],
     lookBehind: Option[OrderedNFA.LookBehind[A, Q]] = None,
-    captureMarks: Map[(Q, A, Q), Seq[CaptureMark]] = Map.empty[(Q, A, Q), Seq[CaptureMark]],
-    captureMarksAtEnd: Map[Q, Seq[CaptureMark]] = Map.empty[Q, Seq[CaptureMark]]
+    markedDelta: Map[(Q, A), Branch[MarkedStep[Q]]] = Map.empty[(Q, A), Branch[MarkedStep[Q]]],
+    markedDeltaAtEnd: Map[Q, Branch[MarkedStep[Q]]] = Map.empty[Q, Branch[MarkedStep[Q]]]
 ):
 
   /** Renames its states as integers. */
@@ -50,8 +51,8 @@ final case class OrderedNFA[A, Q](
       sourcemap.map { case ((q1, a, q2), pos) => (f(q1), a, f(q2)) -> pos },
       inputStates.map(f),
       lookBehind.map(_.mapState(f)),
-      captureMarks.map { case ((q1, a, q2), ms) => (f(q1), a, f(q2)) -> ms },
-      captureMarksAtEnd.map((q, ms) => f(q) -> ms)
+      markedDelta.map { case (q1, a) -> b => (f(q1), a) -> b.map(_.map(f)) },
+      markedDeltaAtEnd.map((q, b) => f(q) -> b.map(_.map(f)))
     )
 
   /** Converts this NFA's alphabet by the function. */
@@ -65,8 +66,8 @@ final case class OrderedNFA[A, Q](
       sourcemap.map { case ((q1, a, q2), pos) => ((q1, f(a), q2), pos) },
       inputStates,
       lookBehind.map(_.mapAlphabet(f)),
-      captureMarks.map { case ((q1, a, q2), ms) => (q1, f(a), q2) -> ms },
-      captureMarksAtEnd
+      markedDelta.map { case ((q1, a), b) => ((q1, f(a)), b) },
+      markedDeltaAtEnd
     )
 
   /** Restricts the input to the strings in which no character of `seconds` follows one of `firsts` (e.g. a low

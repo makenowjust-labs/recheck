@@ -243,6 +243,38 @@ class EpsNFASuite extends munit.FunSuite:
     val renamed = shifted.rename
     assertEquals(renamed.stateSet ++ renamed.lookBehind.get.stateSet, (0 until 10).toSet)
 
+  test("EpsNFA#foldCaptureMarks"):
+    import CaptureMark.*
+    val a = Set((CharSet.single('a'), CharKind.Normal))
+    val nfa = EpsNFA(
+      buildAlphabet(Seq(CharSet.single('a'))),
+      Set(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+      0,
+      Map(
+        0 -> MarkCapture(Begin(1), 1),
+        1 -> LookAheadAssert(false, 9, 2),
+        2 -> MarkCapture(End(1), 3),
+        3 -> LookAheadAssert(true, 9, 4),
+        4 -> LookBehindAssert(false, 9, 5),
+        5 -> MarkCapture(Begin(1), 6),
+        6 -> LookBehindAssert(true, 9, 7),
+        7 -> Consume(a, 8),
+        9 -> LookAroundAccept()
+      )
+    )
+    val folded = nfa.foldCaptureMarks
+    val none = Seq.empty[CaptureMark]
+    assertEquals(folded.init, (0, none))
+    assertEquals(folded.tau((0, none)), Eps(Vector((1, Seq(Begin(1))))))
+    // The marks before a positive look-around go with it, and the continuation starts without them.
+    assertEquals(folded.tau((1, Seq(Begin(1)))), LookAheadAssert(false, (9, Seq(Begin(1))), (2, none)))
+    assertEquals(folded.tau((4, Seq(End(1)))), LookBehindAssert(false, (9, none), (5, none)))
+    // The inner expression of a negative look-around starts without marks, and the continuation keeps them.
+    assertEquals(folded.tau((3, Seq(End(1)))), LookAheadAssert(true, (9, none), (4, Seq(End(1)))))
+    assertEquals(folded.tau((6, Seq(Begin(1)))), LookBehindAssert(true, (9, none), (7, Seq(Begin(1)))))
+    // A character starts without marks.
+    assertEquals(folded.tau((7, Seq(Begin(1)))), Consume(a, (8, none)))
+
   test("EpsNFA#toOrderedNFA"):
     val normal = CharKindState(CharKind.Normal)
     val terminator = CharKindState(CharKind.LineTerminator)
