@@ -112,7 +112,7 @@ final case class EpsNFA[Q](
     * whether a look-around succeeds: a look-around is a choice of its inner expression, whose end may end the match,
     * and the continuation, and a choice in an atomic group is a choice of all its alternatives.
     */
-  def toOrderedNFA(maxNFASize: Int, maxDFASize: Int, isSimplified: Boolean)(using
+  def toOrderedNFA(isSimplified: Boolean, maxNFASize: Int, maxDFASize: Int)(using
       ctx: Context
   ): OrderedNFA[CharSet, (CharKindState, Branch[Stop[Q]], Set[Int])] =
     ctx.interrupt:

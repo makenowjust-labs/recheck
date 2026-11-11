@@ -29,15 +29,15 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     for
       ir <- Try(ReDoS.parse(source, flags, dialect))
       nfa =
-        if isUpperBound then EpsNFABuilder.buildSimplified(ir, Int.MaxValue, false).orderedNFA
+        if isUpperBound then EpsNFABuilder.buildSimplified(ir, false, Int.MaxValue).orderedNFA
         else
           EpsNFABuilder
             .build(ir, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
-            .toOrderedNFA(Int.MaxValue, Int.MaxValue, false)
+            .toOrderedNFA(false, Int.MaxValue, Int.MaxValue)
             .rename
       result <- Try(
         AutomatonChecker
-          .check(nfa, Int.MaxValue, Int.MaxValue, isUpperBound)
+          .check(nfa, isUpperBound, Int.MaxValue, Int.MaxValue)
           .nextOption()
           .getOrElse(Complexity.Constant)
       )
@@ -189,9 +189,9 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       val ir = ReDoS.parse(source, "", Dialect.JavaScript)
       val nfa = EpsNFABuilder
         .build(ir, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
-        .toOrderedNFA(Int.MaxValue, Int.MaxValue, false)
+        .toOrderedNFA(false, Int.MaxValue, Int.MaxValue)
         .rename
-      AutomatonChecker.check(nfa, Int.MaxValue, Int.MaxValue, false).map(degree).toSeq
+      AutomatonChecker.check(nfa, false, Int.MaxValue, Int.MaxValue).map(degree).toSeq
 
     assertEquals(degrees("^(?:b|b)*a+(?<=a*)$"), Seq(Int.MaxValue, Int.MaxValue, 2, 1, 0))
     assertEquals(degrees("c?a+(?<=ba*)$"), Seq(3, 3) ++ Seq.fill(9)(2) ++ Seq(1, 0))

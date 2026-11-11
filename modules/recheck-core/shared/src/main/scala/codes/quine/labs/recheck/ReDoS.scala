@@ -198,12 +198,12 @@ object ReDoS:
         throw UnsupportedException("The pattern is too large")
       else
         val epsNFA = EpsNFABuilder.build(ir, maxNFASize, maxBackReferenceStrings)
-        val orderedNFA = epsNFA.toOrderedNFA(maxNFASize, maxDFASize, false).rename
+        val orderedNFA = epsNFA.toOrderedNFA(false, maxNFASize, maxDFASize).rename
         AutomatonChecker.check(
           epsNFA.restrictInputs(orderedNFA).mapAlphabet(_.representative),
+          false,
           maxNFASize,
-          maxDFASize,
-          false
+          maxDFASize
         )
 
     // The safe complexities follow the vulnerable ones.

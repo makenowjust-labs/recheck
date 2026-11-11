@@ -30,7 +30,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   ): EpsNFA[Int] =
     val ir = ReDoS.parse(source, flags, dialect)
     val nfa =
-      if isSimplified then EpsNFABuilder.buildSimplified(ir, Int.MaxValue, lookBehindsAsLookAheads).epsNFA
+      if isSimplified then EpsNFABuilder.buildSimplified(ir, lookBehindsAsLookAheads, Int.MaxValue).epsNFA
       else EpsNFABuilder.build(ir, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
     def withoutLocations(tau: Map[Int, Transition[Int]]): Map[Int, Transition[Int]] =
       tau.view.mapValues {
@@ -395,12 +395,12 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     )
     // The copies of the referred groups make the ε-NFA large.
     interceptMessage[UnsupportedException]("EpsNFA size is too large")(
-      EpsNFABuilder.buildSimplified(ReDoS.parse("(a{10})\\1\\1", "", Dialect.JavaScript), 30, false)
+      EpsNFABuilder.buildSimplified(ReDoS.parse("(a{10})\\1\\1", "", Dialect.JavaScript), false, 30)
     )
 
   test("EpsNFABuilder.buildSimplified: upper bound"):
     def isUpperBound(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): Boolean =
-      EpsNFABuilder.buildSimplified(ReDoS.parse(source, flags, dialect), Int.MaxValue, false).isUpperBound
+      EpsNFABuilder.buildSimplified(ReDoS.parse(source, flags, dialect), false, Int.MaxValue).isUpperBound
     assert(isUpperBound("^(a)\\1$"))
     assert(isUpperBound("(a)?(?(1)b|c)", "", Dialect.PCRE))
     assert(isUpperBound("a(*PRUNE)b", "", Dialect.PCRE))
@@ -414,7 +414,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     assert(!isUpperBound("(?<=a*b)", "", Dialect.Java))
     assert(isUpperBound("(?<=a)b"))
     assert(
-      !EpsNFABuilder.buildSimplified(ReDoS.parse("(?<=a)b", "", Dialect.JavaScript), Int.MaxValue, true).isUpperBound
+      !EpsNFABuilder.buildSimplified(ReDoS.parse("(?<=a)b", "", Dialect.JavaScript), true, Int.MaxValue).isUpperBound
     )
 
   test("EpsNFABuilder.build: unsupported"):
@@ -474,7 +474,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
 
   /** Tests whether the automaton of the source accepts the input, i.e. the source matches in the input. */
   def searches(source: String, flags: String, dialect: Dialect, input: String | UString): Boolean =
-    val nfa = build(source, flags, dialect).toOrderedNFA(Int.MaxValue, Int.MaxValue, false)
+    val nfa = build(source, flags, dialect).toOrderedNFA(false, Int.MaxValue, Int.MaxValue)
     val units = input match
       case s: String  => ReDoS.parse(source, flags, dialect).mode.decode(s).iterator.toSeq
       case u: UString => u.iterator.toSeq
@@ -485,7 +485,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   /** Tests whether the automaton of the source accepts the input with its look-ahead assertions, by its look-ahead DFA.
     */
   def matches(source: String, flags: String, dialect: Dialect, input: String): Boolean =
-    val nfa = build(source, flags, dialect).toOrderedNFA(Int.MaxValue, Int.MaxValue, false)
+    val nfa = build(source, flags, dialect).toOrderedNFA(false, Int.MaxValue, Int.MaxValue)
     val dfa = nfa.toLookAheadDFA(Int.MaxValue)
     val units = ReDoS.parse(source, flags, dialect).mode.decode(input).iterator.toSeq
     val p = units.reverse.foldLeft(dfa.init)((p, c) => dfa.delta((p, nfa.alphabet.find(_.contains(c)).get)))

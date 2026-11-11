@@ -141,7 +141,7 @@ final case class OrderedNFA[A, Q](
     * With `isUpperBound`, the result has every leaf of the transitions, as no look-ahead prunes them, so its paths
     * include every explored path.
     */
-  def toNFAwLA(maxNFASize: Int, maxDFASize: Int, isUpperBound: Boolean)(using ctx: Context): NFAwLA[A, Q, Set[Q]] =
+  def toNFAwLA(isUpperBound: Boolean, maxNFASize: Int, maxDFASize: Int)(using ctx: Context): NFAwLA[A, Q, Set[Q]] =
     ctx.interrupt:
       val lookAheadDFA = if isUpperBound then DFA.universal(alphabet, Set.empty[Q]) else toLookAheadDFA(maxDFASize)
       def isInput(p: Set[Q]): Boolean = isUpperBound || inputStates.isEmpty || p.exists(inputStates.contains)

@@ -23,7 +23,7 @@ class OrderedNFASuite extends munit.FunSuite:
         (1, 'b') -> Branch.Leaf(1)
       )
     )
-    val nfaWLA = nfa.toNFAwLA(Int.MaxValue, Int.MaxValue, false)
+    val nfaWLA = nfa.toNFAwLA(false, Int.MaxValue, Int.MaxValue)
     assertEquals(
       nfaWLA,
       NFAwLA(
@@ -41,10 +41,10 @@ class OrderedNFASuite extends munit.FunSuite:
       )
     )
     interceptMessage[UnsupportedException]("NFAwLA size is too large") {
-      nfa.toNFAwLA(1, Int.MaxValue, false)
+      nfa.toNFAwLA(false, 1, Int.MaxValue)
     }
     interceptMessage[UnsupportedException]("look-ahead DFA size is too large"):
-      nfa.toNFAwLA(Int.MaxValue, 1, false)
+      nfa.toNFAwLA(false, Int.MaxValue, 1)
 
     // It corresponds to `^(?!ab)a[ab]*$`.
     // The state `1` is in the inner expression of the look-ahead, and the state `3` is its end.
@@ -62,14 +62,14 @@ class OrderedNFASuite extends munit.FunSuite:
         (3, 'b') -> Branch.Succeed
       )
     )
-    val nfaWLA2 = nfa2.toNFAwLA(Int.MaxValue, Int.MaxValue, false)
+    val nfaWLA2 = nfa2.toNFAwLA(false, Int.MaxValue, Int.MaxValue)
     assertEquals(nfaWLA2.delta(((0, Set(2, 3)), ('a', Set(1, 2, 3)))), MultiSet((1, Set(1, 2, 3))))
     assertEquals(
       nfaWLA2.delta(((0, Set(0, 2, 3)), ('a', Set(0, 2, 3)))),
       MultiSet((1, Set(0, 2, 3)), (2, Set(0, 2, 3)))
     )
     // The upper bound has the single look-ahead state, and every leaf.
-    val upperBound = nfa2.toNFAwLA(Int.MaxValue, Int.MaxValue, true)
+    val upperBound = nfa2.toNFAwLA(true, Int.MaxValue, Int.MaxValue)
     assertEquals(upperBound.lookAheadDFA.stateSet, Set(Set.empty[Int]))
     assertEquals(upperBound.delta(((0, Set.empty), ('a', Set.empty))), MultiSet((1, Set.empty), (2, Set.empty)))
 
@@ -95,8 +95,8 @@ class OrderedNFASuite extends munit.FunSuite:
       )
     )
     // A look-ahead of no input, such as that of `hl` (`{0}`), is not in the NFAwLA.
-    assert(nfa.toNFAwLA(Int.MaxValue, Int.MaxValue, false).stateSet.contains((0, Set(0))))
-    val nfaWLA = restricted.toNFAwLA(Int.MaxValue, Int.MaxValue, false)
+    assert(nfa.toNFAwLA(false, Int.MaxValue, Int.MaxValue).stateSet.contains((0, Set(0))))
+    val nfaWLA = restricted.toNFAwLA(false, Int.MaxValue, Int.MaxValue)
     assert(clue(nfaWLA.stateSet).forall((q, p) => q == 0 && p.exists(Set(1, 2).contains)))
     assertEquals(nfaWLA.stateSet.size, 2)
 

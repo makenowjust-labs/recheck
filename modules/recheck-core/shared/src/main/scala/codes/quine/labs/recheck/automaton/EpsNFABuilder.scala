@@ -53,7 +53,7 @@ object EpsNFABuilder:
     * With `lookBehindsAsLookAheads`, a look-behind is a look-ahead of its inner expression. It throws
     * [[UnsupportedException]] when the automata would be larger than `maxNFASize`.
     */
-  def buildSimplified(pattern: IRPattern, maxNFASize: Int, lookBehindsAsLookAheads: Boolean)(using
+  def buildSimplified(pattern: IRPattern, lookBehindsAsLookAheads: Boolean, maxNFASize: Int)(using
       ctx: Context
   ): Simplified =
     ctx.interrupt:
@@ -61,7 +61,7 @@ object EpsNFABuilder:
       val builder = new EpsNFABuilder(pattern, alphabet, true, lookBehindsAsLookAheads, Set.empty, false, maxNFASize)
       val epsNFA = run(builder)
       // The DFA of the look-behinds of the simplified ε-NFA has the single state.
-      Simplified(epsNFA, epsNFA.toOrderedNFA(maxNFASize, Int.MaxValue, true).rename, builder.isUpperBound)
+      Simplified(epsNFA, epsNFA.toOrderedNFA(true, maxNFASize, Int.MaxValue).rename, builder.isUpperBound)
 
   private def run(builder: EpsNFABuilder)(using ctx: Context): EpsNFA[Int] =
     val epsNFA = builder.build()

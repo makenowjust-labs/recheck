@@ -33,8 +33,8 @@ object StaticSeeder:
       // The inner expressions of the look-behinds read forward as look-aheads, on the paths where the ambiguities are.
       val simplified = EpsNFABuilder.buildSimplified(
         pattern.approximateRepeats(maxSimpleRepeatSize),
-        maxNFASize,
-        lookBehindsAsLookAheads = true
+        lookBehindsAsLookAheads = true,
+        maxNFASize
       )
       val orderedNFA = simplified.orderedNFA.mapAlphabet(_.representative)
       val pairs = simplified.epsNFA.alphabet.pairs

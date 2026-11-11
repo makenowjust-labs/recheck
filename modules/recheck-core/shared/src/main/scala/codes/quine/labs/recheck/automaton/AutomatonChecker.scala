@@ -17,11 +17,11 @@ object AutomatonChecker:
     * With `isUpperBound`, it checks an upper bound of the complexity, where every path is explored (see
     * [[OrderedNFA.toNFAwLA]]).
     */
-  def check[A, Q](nfa: OrderedNFA[A, Q], maxNFASize: Int, maxDFASize: Int, isUpperBound: Boolean)(using
+  def check[A, Q](nfa: OrderedNFA[A, Q], isUpperBound: Boolean, maxNFASize: Int, maxDFASize: Int)(using
       ctx: Context
   ): Iterator[Complexity[A]] =
     ctx.interrupt:
-      val nfaWLA = nfa.toNFAwLA(maxNFASize, maxDFASize, isUpperBound)
+      val nfaWLA = nfa.toNFAwLA(isUpperBound, maxNFASize, maxDFASize)
       val complexities = new AutomatonChecker(nfaWLA, false, isUpperBound).check()
       nfa.lookBehind match
         case None => complexities
