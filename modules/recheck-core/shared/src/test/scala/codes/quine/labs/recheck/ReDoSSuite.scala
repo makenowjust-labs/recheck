@@ -240,7 +240,8 @@ class ReDoSSuite extends munit.FunSuite:
 
   test("ReDoS.check: conditionals"):
     // PCRE2 doubles its time for each `a` (0.37 s at n = 22).
-    assertVulnerable(check("^(?(?=a)(?:a|a)*$|b)", PCRE), AttackComplexity.Exponential(true), Checker.Fuzz)
+    assertVulnerable(check("^(?(?=a)(?:a|a)*$|b)", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check("^(?(?=a)a+|b+)$", PCRE), Checker.Automaton)
     assertSafe(check("^(a)?(?(1)b+|c)$", Python()), Checker.Fuzz)
 
   test("ReDoS.check: backtracking control verbs"):

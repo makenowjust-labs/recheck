@@ -14,6 +14,7 @@ import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRAssertKind
 import codes.quine.labs.resyntax.ir.IRBacktrackControl
+import codes.quine.labs.resyntax.ir.IRCondition
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
@@ -240,9 +241,9 @@ private class EpsNFABuilder(
         resetMatchStarts.add(i)
         (i, a)
       case IRNodeData.BacktrackControl(_: IRBacktrackControl.Mark) => epsilon()
-      case IRNodeData.BacktrackControl(_)    => throw new UnsupportedException("backtracking control verb")
-      case IRNodeData.Conditional(_, _, _)   => throw new UnsupportedException("conditional")
-      case IRNodeData.LookAhead(negative, n) =>
+      case IRNodeData.BacktrackControl(_)             => throw new UnsupportedException("backtracking control verb")
+      case IRNodeData.Conditional(condition, yes, no) => buildNode(conditionalChoice(condition, yes, no))
+      case IRNodeData.LookAhead(negative, n)          =>
         val ((i0, a0), _) = withPath(buildNode(n))
         val i = nextQ()
         val a = nextQ()
@@ -265,6 +266,18 @@ private class EpsNFABuilder(
       case IRNodeData.Atomic(n)                 => buildAtomic(n)
       case IRNodeData.BackReference(_, _, _)    => throw new UnsupportedException("back-reference")
       case IRNodeData.Unsupported(_)            => throw new UnsupportedException(node.unsupportedMessage)
+
+  /** Returns a conditional on a look-around as a choice of the assertion followed by the yes-branch and its negation
+    * followed by the no-branch, exactly one of which goes on as the conditional does.
+    */
+  private def conditionalChoice(condition: IRCondition, yes: IRNode, no: IRNode): IRNode =
+    val assertion: Boolean => IRNodeData = condition match
+      case IRCondition.LookAhead(negative, n)            => negated => IRNodeData.LookAhead(negative != negated, n)
+      case IRCondition.LookBehind(negative, n, matching) =>
+        negated => IRNodeData.LookBehind(negative != negated, n, matching)
+      case IRCondition.Captured(_) => throw new UnsupportedException("conditional")
+    def branch(negated: Boolean, n: IRNode): IRNode = IRNode(IRNodeData.Sequence(Vector(IRNode(assertion(negated)), n)))
+    IRNode(IRNodeData.Disjunction(Vector(branch(false, yes), branch(true, no))))
 
   /** Builds EpsNFA transitions for an atomic group.
     *
@@ -453,7 +466,8 @@ private class EpsNFABuilder(
       case IRNodeData.LookBehind(negative, n, matching) =>
         validateLookBehindInner(n, matching)
         node.copy(data = IRNodeData.LookAhead(negative, reverseLookBehindInner(n)))
-      case _ => node
+      case IRNodeData.Conditional(condition, yes, no) => reverseLookBehindInner(conditionalChoice(condition, yes, no))
+      case _                                          => node
 
   /** Throws [[UnsupportedException]] unless the automaton checker supports the inner expression of a look-behind that
     * the engine matches as `matching`.

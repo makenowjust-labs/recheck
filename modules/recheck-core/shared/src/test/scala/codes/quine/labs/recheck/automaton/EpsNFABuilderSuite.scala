@@ -284,6 +284,17 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     // The inner expression of a look-behind reads the input backward, where the assertions can look only at the kinds of characters.
     interceptMessage[UnsupportedException]("assertion in look-behind assertion")(build("(?<=a$)", "", Dialect.DotNet))
 
+  test("EpsNFABuilder.build: conditionals on look-arounds"):
+    // A conditional is a choice of the assertion followed by the yes-branch and its negation followed by the no-branch.
+    assertEquals(build("(?(?=a)b|c)", "", Dialect.PCRE), build("(?:(?=a)b|(?!a)c)", "", Dialect.PCRE))
+    assertEquals(build("(?(?!a)b|c)", "", Dialect.PCRE), build("(?:(?!a)b|(?=a)c)", "", Dialect.PCRE))
+    assertEquals(build("(?(?<=a)b|c)", "", Dialect.PCRE), build("(?:(?<=a)b|(?<!a)c)", "", Dialect.PCRE))
+    // In a look-behind, the branches read the input backward before the assertion.
+    assertEquals(
+      build("(?<=(?(?<=a)bc|d))", "", Dialect.PCRE),
+      build("(?<=(?:(?<=a)bc|(?<!a)d))", "", Dialect.PCRE)
+    )
+
   test("EpsNFABuilder.build: unsupported"):
     interceptMessage[UnsupportedException]("back-reference")(build("(.)\\1"))
     interceptMessage[UnsupportedException]("back-reference")(build("(?<foo>.)\\k<foo>"))
