@@ -31,7 +31,8 @@ class DynamicSeederSuite extends munit.FunSuite:
     assertEquals(seed("^[^ab]$", ""), Set("''", "'\\x00'"))
     assertEquals(seed("^(a)\\1$", ""), Set("''", "'a'", "'aa'"))
     assertEquals(seed("^a*$", ""), Set("''", "'\\x00'", "'a'"))
-    assertEquals(seed("^a{2}$", ""), Set("''", "'a'", "'aa'", "'a'.repeat(2)"))
+    // A counted repetition of a read has no loop, so it makes no repeated part.
+    assertEquals(seed("^a{2}$", ""), Set("''", "'a'", "'aa'"))
     assertEquals(seed("^(a?){50}a{50}$", ""), Set("''", "'a'", "'aa'", "'a'.repeat(2)"))
     // A high surrogate followed by a low surrogate is one code point with `u`, so the patch inserting it is discarded.
     assertEquals(seed("^[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]$", "u"), Set("''", "'\\uD800'"))

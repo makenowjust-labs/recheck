@@ -518,6 +518,39 @@ private[vm] class ProgramBuilder(
 
   /** A builder for `x{n,m}` node. */
   def buildRepeat(quantifier: IRQuantifier, child: IRNode): Unit =
+    child.data match
+      // A read takes no choice in an iteration, so it repeats without a counter.
+      case IRNodeData.Chars(set) if !back => buildReadRepeat(quantifier, child, readKind(set))
+      case _                              => buildCountedRepeat(quantifier, child)
+
+  /** A builder for `x{n,m}` node of a read, whose mandatory iterations are a `read_repeat` and whose greedy optional
+    * iterations are a `try-read-repeat`.
+    */
+  def buildReadRepeat(quantifier: IRQuantifier, child: IRNode, kind: ReadKind): Unit =
+    val loc = child.loc.toOption
+    def mandatory(n: Int): Unit =
+      if n == 1 then emitRead(kind, loc)
+      else if n > 1 then emitInst(Inst.ReadRepeat(kind, n, loc))
+
+    quantifier match
+      case IRQuantifier.Exact(n)                                         => mandatory(n)
+      case IRQuantifier.Bounded(n, m, BacktrackStrategy.Greedy) if m > n =>
+        mandatory(n)
+        val next = allocateLabel("next")
+        val retry = allocateLabel("retry")
+        emitTerminator(Inst.TryReadRepeat(kind, m - n, loc, next, retry))
+        enterBlock(retry)
+        emitTerminator(Inst.Jmp(next))
+        enterBlock(next)
+      case IRQuantifier.Unbounded(n, strategy) =>
+        mandatory(n)
+        buildCountedRepeat(IRQuantifier.Unbounded(0, strategy), child)
+      case IRQuantifier.Bounded(n, m, strategy) =>
+        mandatory(n)
+        buildCountedRepeat(IRQuantifier.Bounded(0, m - n, strategy), child)
+
+  /** A builder for `x{n,m}` node with counters. */
+  def buildCountedRepeat(quantifier: IRQuantifier, child: IRNode): Unit =
     def isLazy(strategy: BacktrackStrategy): Boolean = strategy == BacktrackStrategy.Lazy
 
     val empty = if child.canMatchEmpty then emptyIteration(quantifier) else IREmptyIteration.Ignore

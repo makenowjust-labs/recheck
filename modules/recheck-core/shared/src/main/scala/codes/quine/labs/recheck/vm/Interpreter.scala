@@ -446,6 +446,19 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                 // $COVERAGE-OFF$
                 case Rollback.Fallback(_, _) => sys.error("unreachable")
               // $COVERAGE-ON$
+            case inst: Inst.TryReadRepeat =>
+              // Each character read leaves a backtracking point before it, as `try-la` in the loop of `x{0,max}` does.
+              var n = 0
+              while n < inst.max && read(frame.currentCode, inst.kind) do
+                val fallbackFrame = frame.clone()
+                fallbackFrame.label = inst.fallback
+                frame.fallback = Some(fallbackFrame)
+                frame.pos += 1
+                n += 1
+              countReads(frame, inst, inst.kind, n, n == inst.max)
+              if n < inst.max then failedCaptures = frame.captures
+              frame.label = inst.next
+              false
             case Inst.TryLA(read, next, fallback) =>
               val oldPos = frame.pos
               if instRead(frame, read) then
@@ -672,8 +685,15 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             !(0 < frame.pos && frame.pos < input.length && input(frame.pos - 1) == 0x0d && input(frame.pos) == 0x0a)
         if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         ok
-      case read: Inst.Read     => instRead(frame, read)
-      case read: Inst.ReadBack => instReadBack(frame, read)
+      case read: Inst.Read       => instRead(frame, read)
+      case read: Inst.ReadBack   => instReadBack(frame, read)
+      case read: Inst.ReadRepeat =>
+        var n = 0
+        while n < read.n && this.read(frame.currentCode, read.kind) do
+          frame.pos += 1
+          n += 1
+        countReads(frame, read, read.kind, n, n == read.n)
+        n == read.n
       case Inst.CapOpen(index) =>
         frame.capOpen(index)
         true
@@ -861,6 +881,19 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, None)
           failedPoints.add(point)
         false
+
+  /** Counts `n` characters that a repeated read reads, each of which is a step, and records whether it reads all of
+    * them, or the failure on the next one.
+    *
+    * The coverage tells how many characters it reads, as the counter of the loop of a repetition did, so that a seeder
+    * sees the progress of a string in it.
+    */
+  private def countReads(frame: Frame, inst: Inst.HeatSource, kind: ReadKind, n: Int, ok: Boolean): Unit =
+    if options.needsHeatmap && inst.heatIndex >= 0 then heats(inst.heatIndex) += n
+    steps = Math.addExact(steps, n)
+    lazy val loc = CoverageLocation(inst.id, frame.counters :+ n)
+    if options.needsCoverage then coverage.add(CoverageItem(loc, ok))
+    if !ok && options.needsFailedPoints then failedPoints.add(FailedPoint(loc, frame.pos, kind, None))
 
   /** Runs a given `read-back` instruction. */
   private def instReadBack(frame: Frame, inst: Inst.ReadBack): Boolean = inst match

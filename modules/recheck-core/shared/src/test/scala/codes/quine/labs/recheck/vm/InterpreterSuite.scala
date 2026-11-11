@@ -430,6 +430,23 @@ class InterpreterSuite extends munit.FunSuite:
     // An atomic group keeps the captures in it.
     accepts("^(?>(a))\\1$", Java, "aa")
 
+  test("Interpreter.run: counted repetitions of a read"):
+    // A repetition of a read runs without a counter, and a repetition of a capture with it, in the same steps.
+    def run(source: String, input: String, opts: Options): (Status, Int, Int) =
+      val result = matches(source, "", input, opts)
+      (result.status, result.steps, result.heatmap.values.sum)
+    val cases = Seq(
+      ("^[ab]{3}c", Seq("abac", "abc", "ab", "abbbc")),
+      ("^[ab]{2,5}c", Seq("abc", "ababac", "abababc", "a", "abd")),
+      ("^[ab]{0,3}b", Seq("aab", "ab", "b", "aaab", "aaa")),
+      ("^.{1,4}x.*y", Seq("abxcy", "axxxxy", "abcdey", "xy")),
+      ("^[ab]{2,}c", Seq("abc", "ababc", "ac")),
+      ("^[ab]{1,3}?c", Seq("abc", "aaac", "aaaac"))
+    )
+    for (source, inputs) <- cases; input <- inputs; opts <- Seq(Options(needsHeatmap = true), Options()) do
+      val captured = source.replaceFirst("(\\[ab\\]|\\.)", "($1)")
+      assertEquals(run(source, input, opts), run(captured, input, opts), clue((source, input)))
+
   test("Interpreter.run: back-references to unset captures"):
     accepts("^(?:(a)|b)\\1$", JavaScript, "b")
     for dialect <- Seq(Java, Python(), PCRE, Ruby(), DotNet, Perl()) do refutes("^(?:(a)|b)\\1$", dialect, "b")
