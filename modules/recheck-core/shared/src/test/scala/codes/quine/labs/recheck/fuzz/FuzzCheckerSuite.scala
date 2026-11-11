@@ -307,6 +307,27 @@ class FuzzCheckerSuite extends munit.FunSuite:
     assertEquals(pop.candidates.values.toSeq, strs.take(max))
     assertEquals(checker.inputs.size, max + 2)
 
+  test("FuzzChecker#Population#execute: climbing"):
+    val seq = IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'), FString.Wrap('!'))
+    def inputsOf(source: String, strs: FString*): (Set[Int], Seq[FString]) =
+      val checker = checkerOf(ReDoS.parse(source, "", Dialect.JavaScript))
+      val pop = new checker.Population(0, mutable.Set.empty, mutable.Set.empty)
+      strs.foreach(pop.execute)
+      (checker.inputs.map(_.length - 1).toSet, pop.candidates.values.toSeq)
+
+    // The quadratic steps climb to a candidate.
+    assertEquals(inputsOf("^a*a*$", FString(1, seq)), (Set(1, 2, 4, 8, 16, 32, 64, 128, 256), Seq(FString(256, seq))))
+    // The linear steps do not climb.
+    assertEquals(inputsOf("^a*$", FString(1, seq)), (Set(1, 2, 4), Seq.empty))
+    // The growth is checked on the smaller counts first.
+    assertEquals(inputsOf("^a*$", FString(64, seq)), (Set(64, 16, 32), Seq.empty))
+    assertEquals(inputsOf("^a*a*$", FString(8, seq)), (Set(8, 2, 4, 16, 32, 64, 128, 256), Seq(FString(256, seq))))
+    // A sequence climbs once, even after the run of its input.
+    assertEquals(
+      inputsOf("^a*a*$", FString(UString('a', '!')), FString(1, seq), FString(3, seq))._1,
+      Set(1, 2, 4, 8, 16, 32, 64, 128, 256, 3)
+    )
+
   test("FuzzChecker#Population#execute: no candidate of a skeleton whose attack failed"):
     val ir = ReDoS.parse("^(?:a|a)*$", "", Dialect.JavaScript)
     val checker = checkerOf(ir)

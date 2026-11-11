@@ -172,6 +172,16 @@ object FuzzChecker:
       coverage: Set[CoverageItem]
   )
 
+  /** Run is a run of a string that ends, with the size of its input and its steps. */
+  private[fuzz] final case class Run(str: FString, size: Int, steps: Int)
+
+  /** The least ratio of the steps per character that two doublings of the repeat count add, for a string to climb.
+    *
+    * It is the ratio of the steps of the log-log slope 1.5, below which [[FuzzChecker.estimate]] takes the steps as
+    * less than quadratic.
+    */
+  private[fuzz] val ClimbGrowth: Double = Math.sqrt(2)
+
   /** Generation is an immutable generation. */
   private[fuzz] final case class Generation(
       minRate: Double,
@@ -221,6 +231,9 @@ private[fuzz] final class FuzzChecker(
 
   /** A set that holds strings once executed. */
   val inputs: mutable.Set[UString] = mutable.Set.empty
+
+  /** The sequences of the strings that climbed (see [[Population.climb]]). */
+  val climbed: mutable.Set[IndexedSeq[FString.FChar]] = mutable.Set.empty
 
   /** The complexities and the hotspots of the attacks from each string. */
   val attacks: mutable.Map[FString, List[(AttackComplexity.Vulnerable, Hotspot)]] = mutable.Map.empty
@@ -596,24 +609,71 @@ private[fuzz] final class FuzzChecker(
     /** The strings that reach `incubationLimit`, one for each skeleton whose attacks have not failed. */
     val candidates: mutable.LinkedHashMap[UString, FString] = mutable.LinkedHashMap.empty
 
-    /** Executes the string and adds its result, and a candidate of an attack if it reaches `incubationLimit`. */
+    /** Executes the string and adds its result, and a candidate of an attack if it reaches `incubationLimit`.
+      *
+      * A string with repetitions climbs once for its sequence (see [[climb]]).
+      */
     def execute(str: FString): Unit =
-      if candidates.size >= maxAttackCandidates then return
-      if str.countRepeat >= maxDegree || !str.admitsAnyRepeatCount(pattern.mode) then return
+      val climbs = !str.isConstant && !climbed.contains(str.seq)
+      for run <- run(str, climbs) if climbs do
+        climbed.add(str.seq)
+        climb(run)
+
+    /** Executes the strings of the repeat count doubled again and again, while the steps grow more than linearly.
+      *
+      * A string of a few steps per character may grow to an attack on more repetitions, which its rate does not tell.
+      * The growth is checked on the smaller counts first if any, whose runs are shorter.
+      */
+    private def climb(run: Run): Unit =
+      def next(run: Run): Option[Run] = this.run(run.str.mapN(_ * 2), true)
+
+      var runs =
+        if run.str.n < 4 then
+          next(run) match
+            case Some(twice) => (run, twice)
+            case None        => return
+        else
+          (this.run(run.str.mapN(_ / 4), true), this.run(run.str.mapN(_ / 2), true)) match
+            case (Some(quarter), Some(half)) if grows(quarter, half, run) => (half, run)
+            case _                                                        => return
+      while true do
+        next(runs._2) match
+          case Some(run) if grows(runs._1, runs._2, run) => runs = (runs._2, run)
+          case _                                         => return
+
+    /** Whether the steps of the runs grow more than linearly, by the steps per character added between them. */
+    private def grows(run0: Run, run1: Run, run2: Run): Boolean =
+      val growth0 = (run1.steps - run0.steps).toDouble / (run1.size - run0.size)
+      val growth1 = (run2.steps - run1.steps).toDouble / (run2.size - run1.size)
+      growth1 > 0 && growth1 >= ClimbGrowth * growth0
+
+    /** Runs the string, and returns the run unless it stops on the limit or the timeout.
+      *
+      * On the first run of its input, it adds the result, and a candidate of an attack if it reaches
+      * `incubationLimit`. It runs the input again only if `reruns`.
+      */
+    private def run(str: FString, reruns: Boolean): Option[Run] =
+      if candidates.size >= maxAttackCandidates then return None
+      if str.countRepeat >= maxDegree || !str.admitsAnyRepeatCount(pattern.mode) then return None
 
       val input = str.toUString
-      if inputs.contains(input) || input.length >= maxGeneStringSize then return
+      if input.length >= maxGeneStringSize then return None
+      val isFirst = !inputs.contains(input)
+      if !isFirst && !reruns then return None
 
-      val opts =
-        Options(incubationLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode), needsCoverage = true)
+      val usesAcceleration = fuzz.usesAcceleration(accelerationMode)
+      val opts = Options(incubationLimit, usesAcceleration = usesAcceleration, needsCoverage = isFirst)
       val result = Interpreter.runWithTimeout(program, input, opts, incubationTimeout)
-      add(str, input, result)
-      if result.status == Status.Limit || result.status == Status.Timeout then
-        log:
-          s"""|fuzz: candidate (status: ${result.status})
-              |  string: $str""".stripMargin
-        val skeleton = str.skeleton
-        if !failedSkeletons.contains(skeleton) && !candidates.contains(skeleton) then candidates(skeleton) = str
+      val stops = result.status == Status.Limit || result.status == Status.Timeout
+      if isFirst then
+        add(str, input, result)
+        if stops then
+          log:
+            s"""|fuzz: candidate (status: ${result.status})
+                |  string: $str""".stripMargin
+          val skeleton = str.skeleton
+          if !failedSkeletons.contains(skeleton) && !candidates.contains(skeleton) then candidates(skeleton) = str
+      Option.unless(stops)(Run(str, input.length, result.steps))
 
     /** Records the execution result. */
     def add(str: FString, input: UString, result: Result): Unit =
