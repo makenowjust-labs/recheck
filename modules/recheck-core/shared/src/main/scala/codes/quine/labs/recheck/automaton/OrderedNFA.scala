@@ -102,6 +102,12 @@ final case class OrderedNFA[A, Q](
           .collect { case ((q1, a), b) if b.succeeds(_ => false) => (a, q1) }
           .groupMapReduce(_._1)(p => Set(p._2))(_ | _)
           .withDefaultValue(Set.empty)
+      // A branch of choices alone succeeds if one of its leaves does, as each of the states joined below does.
+      def isChoices(b: Branch[Q]): Boolean = b match
+        case Branch.Leaf(_) | Branch.Succeed => true
+        case Branch.Choice(bs)               => bs.forall(isChoices)
+        case _                               => false
+      val tested = ctx.interrupt(delta.keysIterator.filterNot(key => isChoices(delta(key))).toSet)
 
       val queue = mutable.Queue.empty[Set[Q]]
       val newStateSet = mutable.Set.empty[Set[Q]]
@@ -123,7 +129,7 @@ final case class OrderedNFA[A, Q](
           if inits.exists(p2.contains) then newAcceptSet.addOne(p2)
           for a <- alphabet do
             val p1 = (p2.flatMap(q2 => reverseLeaves((q2, a))) | unconditional(a))
-              .filter(q1 => delta((q1, a)).succeeds(p2.contains))
+              .filter(q1 => !tested.contains((q1, a)) || delta((q1, a)).succeeds(p2.contains))
             newDelta.addOne((p2, a) -> p1)
             if !newStateSet.contains(p1) then add(p1)
 
