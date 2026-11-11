@@ -76,9 +76,56 @@ describe("makeSnapshot", () => {
         { start: 4, end: 5, temperature: "warm" },
       ],
       runtimeAttack: null,
+      upperBound: null,
       refutedAttacks: [],
     };
     expect(snapshot("/^(a|a)*$/", diagnostics)).toEqual(vulnerable);
+  });
+
+  test("keeps the upper bound, with the temperatures of the permalinks", () => {
+    const diagnostics: Diagnostics = {
+      source: "^(a|aa)\\1*$",
+      flags: "",
+      dialect: { name: "javascript" },
+      unitMode: "utf16",
+      status: "safe",
+      checker: "fuzz",
+      complexity: { type: "safe", summary: "safe (fuzz)", isFuzz: true },
+      upperBound: {
+        complexity: {
+          type: "exponential",
+          summary: "exponential",
+          isFuzz: false,
+        },
+        hotspot: [{ start: 2, end: 3, temperature: "hot" }],
+      },
+      refutedAttacks: [],
+    };
+    expect(snapshot("/^(a|aa)\\1*$/", diagnostics).result).toEqual({
+      status: "safe",
+      source: "^(a|aa)\\1*$",
+      flags: "",
+      checker: "fuzz",
+      upperBound: {
+        complexity: { type: "exponential", summary: "exponential" },
+        hotspot: [{ start: 2, end: 3, temperature: "heat" }],
+      },
+    });
+  });
+
+  test("records no upper bound for the diagnostics of an older release, which lack it", () => {
+    const { upperBound: _, ...older } = {
+      source: "a",
+      flags: "",
+      dialect: { name: "javascript" },
+      unitMode: "utf16",
+      status: "safe",
+      checker: "automaton",
+      complexity: { type: "safe", summary: "safe", isFuzz: false },
+      upperBound: null,
+      refutedAttacks: [],
+    } satisfies Diagnostics;
+    expect(snapshot("/a/", older as unknown as Diagnostics)).toEqual(safe);
   });
 
   test("keeps the source, the flags and the checker of a safe result", () => {
@@ -90,6 +137,7 @@ describe("makeSnapshot", () => {
       status: "safe",
       checker: "automaton",
       complexity: { type: "safe", summary: "safe", isFuzz: false },
+      upperBound: null,
       refutedAttacks: [],
     };
     expect(snapshot("/a/", diagnostics)).toEqual(safe);
@@ -110,6 +158,7 @@ describe("makeSnapshot", () => {
       unitMode: null,
       status: "unknown",
       error: { kind: "timeout" },
+      upperBound: null,
       refutedAttacks: [],
     };
     expect(snapshot("/a/", unknown).result).toEqual({
@@ -117,6 +166,26 @@ describe("makeSnapshot", () => {
       source: "a",
       flags: "",
       error: { kind: "timeout" },
+    });
+    expect(
+      snapshot("/a/", {
+        ...unknown,
+        checker: "fuzz",
+        upperBound: {
+          complexity: { type: "linear", summary: "linear", isFuzz: false },
+          hotspot: [],
+        },
+      }).result,
+    ).toEqual({
+      status: "unknown",
+      source: "a",
+      flags: "",
+      checker: "fuzz",
+      error: { kind: "timeout" },
+      upperBound: {
+        complexity: { type: "linear", summary: "linear" },
+        hotspot: [],
+      },
     });
     expect(
       snapshot("/a/", {
@@ -209,6 +278,9 @@ describe("hotspotOf", () => {
       { start: 2, end: 3, temperature: "hot" },
       { start: 4, end: 5, temperature: "warm" },
     ]);
+    expect(
+      hotspotOf({ hotspot: [{ start: 0, end: 1, temperature: "normal" }] }),
+    ).toEqual([{ start: 0, end: 1, temperature: "warm" }]);
   });
 });
 

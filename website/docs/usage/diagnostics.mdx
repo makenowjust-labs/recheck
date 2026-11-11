@@ -50,7 +50,7 @@ There are five `complexity` varieties.
 - `exponential` is a vulnerable matching time complexity.
 
 Every complexity has the `isFuzz` field.
-It is `true` when the fuzz checker estimated the complexity by running the matching, which may be wrong, and `false` when the automaton checker analysed it.
+It is `true` when the fuzz checker estimated the complexity by running the matching, which may be wrong, and `false` when the automaton checker analysed it, or when the fuzz checker proved the safety by a linear upper bound (see [Upper Bound](#upper-bound)).
 
 :::caution
 
@@ -58,6 +58,18 @@ If the complexity is exponential, you must fix the regular expression as soon as
 It may invoke a matching time explosion against too little string (`length < 100`).
 
 :::
+
+## Upper Bound
+
+The upper bound is a complexity that the matching time of the regular expression never exceeds.
+The fuzz checker finds it before fuzzing, and the diagnostics have it in the `upperBound` field, or `null` if there is none.
+
+- `complexity` is `linear`, `polynomial` or `exponential`.
+  If it is `linear`, the regular expression is safe.
+- `hotspot` is where the matching time may explode (see [Hotspot](#hotspot)).
+
+A vulnerable upper bound may be higher than the actual complexity, so it is not the evidence of a vulnerability.
+It shows where to look when the fuzz checker finds no attack string or the checking cannot finish.
 
 ## Attack String
 

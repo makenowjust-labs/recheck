@@ -20,6 +20,7 @@ import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.*
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.RefutedAttack
+import codes.quine.labs.recheck.diagnostics.UpperBound
 import codes.quine.labs.recheck.fuzz.FuzzChecker
 import codes.quine.labs.recheck.fuzz.FuzzProgram
 import codes.quine.labs.recheck.verification.RuntimeAttackVerifier
@@ -60,16 +61,19 @@ object ReDoS:
     def diagnose(ir: IRPattern): Diagnostics =
       val refutedAttacks = mutable.ArrayBuffer.empty[RefutedAttack]
       val avoidsAttack = (c: AttackComplexity.Vulnerable, h: Hotspot) => isRefuted(refutedAttacks, c, h)
-      try
-        val (candidates, safe) = params.checker match
-          case Checker.Automaton => checkAutomaton(source, flags, ir, params)
-          case Checker.Fuzz      => checkFuzz(source, flags, ir, params, avoidsAttack)
-          case Checker.Auto      => checkAuto(source, flags, ir, params, avoidsAttack)
-        val verify = runRuntimeAttack(source, flags, params.dialect, ir.mode, params.runtimeAttackTimeout)
-        verifyCandidates(candidates, safe, verify, refutedAttacks, params.maxRefutedAttacks)
-      catch
-        case ex: ReDoSException =>
-          Diagnostics.Unknown.from(source, flags, params.dialect, Some(ir.mode), refutedAttacks.toSeq, ex)
+      // The checkers run lazily on iterating the candidates, so that the errors of the checking are caught below.
+      val (candidates, safe, upperBound) = params.checker match
+        case Checker.Automaton => checkAutomaton(source, flags, ir, params)
+        case Checker.Fuzz      => checkFuzz(source, flags, ir, params, avoidsAttack)
+        case Checker.Auto      => checkAuto(source, flags, ir, params, avoidsAttack)
+      val diagnostics =
+        try
+          val verify = runRuntimeAttack(source, flags, params.dialect, ir.mode, params.runtimeAttackTimeout)
+          verifyCandidates(candidates, safe, verify, refutedAttacks, params.maxRefutedAttacks)
+        catch
+          case ex: ReDoSException =>
+            Diagnostics.Unknown.from(source, flags, params.dialect, Some(ir.mode), refutedAttacks.toSeq, ex)
+      diagnostics.withUpperBound(upperBound())
 
     try diagnose(parse(source, flags, params.dialect))
     catch case ex: ReDoSException => Diagnostics.Unknown.from(source, flags, params.dialect, None, Seq.empty, ex)
@@ -166,15 +170,17 @@ object ReDoS:
         case AttackComplexity.Exponential(_)        => None
       AttackKey(degree, hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Hot) => (s, e) })
 
-  /** Runs the automaton checker, and returns the vulnerable diagnostics it finds and a function giving the safe
-    * diagnostics once they run out.
+  /** Runs the automaton checker, and returns the vulnerable diagnostics it finds, a function giving the safe
+    * diagnostics once they run out, and a function giving the upper bound, which is always `None`.
     */
   private[recheck] def checkAutomaton(
       source: String,
       flags: String,
       ir: IRPattern,
       params: Parameters
-  )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
+  )(using
+      ctx: Context
+  ): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound]) =
     import params.*
     val maxNFASize = if checker == Checker.Auto then params.maxNFASize else Int.MaxValue
     val maxDFASize = if checker == Checker.Auto then params.maxDFASize else Int.MaxValue
@@ -227,10 +233,10 @@ object ReDoS:
         case _                           => AttackComplexity.Safe(false)
       Diagnostics.Safe(source, flags, params.dialect, ir.mode, complexity, Seq.empty, Checker.Automaton)
 
-    (diagnostics, safe)
+    (diagnostics, safe, () => None)
 
-  /** Runs the fuzz checker, and returns the vulnerable diagnostics it finds and a function giving the safe diagnostics
-    * once they run out.
+  /** Runs the fuzz checker, and returns the vulnerable diagnostics it finds, a function giving the safe diagnostics
+    * once they run out, and a function giving the upper bound found before fuzzing.
     *
     * `avoidsAttack` tells whether the fuzz checker avoids an attack of the complexity and the hotspot, which a runtime
     * attack refuted.
@@ -241,12 +247,17 @@ object ReDoS:
       ir: IRPattern,
       params: Parameters,
       avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
-  )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
+  )(using
+      ctx: Context
+  ): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound]) =
     import params.*
 
+    var upperBound = Option.empty[UpperBound]
+
+    // It runs on the first iteration in `withChecker`, which marks its errors as of the fuzz checker.
     lazy val (results, safeComplexity) =
       val fuzz = FuzzProgram.from(ir)
-      FuzzChecker.check(
+      val (results, safeComplexity, checkedUpperBound) = FuzzChecker.check(
         ir,
         fuzz,
         new Random(randomSeed),
@@ -272,6 +283,8 @@ object ReDoS:
         accelerationMode,
         avoidsAttack
       )
+      upperBound = checkedUpperBound
+      (results, safeComplexity)
 
     def diagnose: Iterator[Diagnostics.Vulnerable] =
       results.map:
@@ -292,10 +305,10 @@ object ReDoS:
 
     val diagnostics = diagnose.withChecker(Checker.Fuzz)
     val safe = () => Diagnostics.Safe(source, flags, params.dialect, ir.mode, safeComplexity, Seq.empty, Checker.Fuzz)
-    (diagnostics, safe)
+    (diagnostics, safe, () => upperBound)
 
   /** Runs the automaton checker, or the fuzz checker if the automaton checker gives up, and returns the vulnerable
-    * diagnostics they find and a function giving the safe diagnostics of the checker that ran last.
+    * diagnostics they find, and functions giving the safe diagnostics and the upper bound of the checker that ran last.
     */
   private[recheck] def checkAuto(
       source: String,
@@ -303,15 +316,19 @@ object ReDoS:
       ir: IRPattern,
       params: Parameters,
       avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
-  )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
-    val (automaton, automatonSafe) = checkAutomaton(source, flags, ir, params)
+  )(using
+      ctx: Context
+  ): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound]) =
+    val (automaton, automatonSafe, automatonUpperBound) = checkAutomaton(source, flags, ir, params)
     var safe = automatonSafe
+    var upperBound = automatonUpperBound
     val diagnostics = automaton.recoverWith:
       case _: UnsupportedException =>
-        val (fuzz, fuzzSafe) = checkFuzz(source, flags, ir, params, avoidsAttack)
+        val (fuzz, fuzzSafe, fuzzUpperBound) = checkFuzz(source, flags, ir, params, avoidsAttack)
         safe = fuzzSafe
+        upperBound = fuzzUpperBound
         fuzz
-    (diagnostics, () => safe())
+    (diagnostics, () => safe(), () => upperBound())
 
   /** Runs the attack in the vulnerable diagnostics on the runtime of the dialect, and records the result in them. */
   private[recheck] def runRuntimeAttack(

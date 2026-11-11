@@ -4,6 +4,7 @@ import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.language.implicitConversions
 
+import codes.quine.labs.recheck.common.CancellationTokenSource
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
@@ -17,6 +18,7 @@ import codes.quine.labs.recheck.diagnostics.Hotspot.*
 import codes.quine.labs.recheck.diagnostics.RefutedAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
+import codes.quine.labs.recheck.diagnostics.UpperBound
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.Dialect.*
@@ -28,9 +30,12 @@ class ReDoSSuite extends munit.FunSuite:
   /** A default context. */
   given ctx: Context = Context()
 
-  /** Returns the vulnerable diagnostics of a checker followed by its safe diagnostics. */
-  def concat(result: (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe)): Iterator[Diagnostics] =
-    result._1 ++ Iterator(result._2())
+  /** Returns the vulnerable diagnostics of a checker followed by its safe diagnostics, with its upper bound. */
+  def concat(
+      result: (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound])
+  ): Iterator[Diagnostics] =
+    val (vulnerable, safe, upperBound) = result
+    (vulnerable ++ Iterator(safe())).map(_.withUpperBound(upperBound()))
 
   def checkAutomaton(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
     val ir = ReDoS.parse(source, flags, params.dialect)
@@ -45,6 +50,9 @@ class ReDoSSuite extends munit.FunSuite:
     concat(ReDoS.checkAuto(source, flags, ir, params, (_, _) => false))
 
   val params: Parameters = Parameters(randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
+
+  /** The linear upper bound, which has no hotspot. */
+  val linearBound: UpperBound = UpperBound(AttackComplexity.Linear, Hotspot.empty)
 
   def check(source: String, dialect: Dialect, flags: String = "", checker: Checker = Checker.Auto): Diagnostics =
     ReDoS.check(source, flags, params.copy(dialect = dialect, checker = checker))
@@ -103,7 +111,8 @@ class ReDoSSuite extends munit.FunSuite:
         UnitMode.UTF16,
         AttackComplexity.Safe(false),
         Seq.empty,
-        Checker.Fuzz
+        Checker.Fuzz,
+        Some(linearBound)
       )
     )
     assertEquals(
@@ -284,6 +293,24 @@ class ReDoSSuite extends munit.FunSuite:
     assertSafe(ReDoS.check("^(a|aa)\\1*$", "", params.copy(maxIteration = 1)), Checker.Fuzz)
     // `\1` matches what `(\ba)` matched, even where `\b` does not hold, so each block parses in two ways.
     assertVulnerable(check("^(?:-(\\ba)\\1|-aa)*$", JavaScript), AttackComplexity.Exponential(true), Checker.Fuzz)
+
+  test("ReDoS.check: upper bounds in the diagnostics"):
+    def upperBound(d: Diagnostics): Option[AttackComplexity] = d match
+      case d: Diagnostics.Safe       => d.upperBound.map(_.complexity)
+      case d: Diagnostics.Vulnerable => d.upperBound.map(_.complexity)
+      case d: Diagnostics.Unknown    => d.upperBound.map(_.complexity)
+    // The automaton checker finds no bound.
+    assertEquals(upperBound(check("^(?:a|a)*$", JavaScript)), None)
+    assertEquals(upperBound(check("^([a-z]+)=\\1$", JavaScript)), Some(AttackComplexity.Linear))
+    // The attack of the fuzz checker comes with the bound.
+    val exponential = Some(AttackComplexity.Exponential(false))
+    assertEquals(upperBound(check("^(?:-(\\ba)\\1|-aa)*$", JavaScript)), exponential)
+    // An error while fuzzing reports the bound too.
+    val source = new CancellationTokenSource
+    val logger: Context.Logger = message => if message.startsWith("fuzz: start") then source.cancel()
+    val canceled = ReDoS.check("^(a|aa)\\1*$", "", params.copy(logger = Some(logger)), Some(source.token))
+    assertEquals(clue(canceled).asInstanceOf[Diagnostics.Unknown].error, Diagnostics.ErrorKind.Cancel)
+    assertEquals(upperBound(canceled), exponential)
 
   test("ReDoS.check: too many repeats"):
     // The upper bound of `^[a-z]+@[a-z]+$` is linear.
@@ -474,9 +501,10 @@ class ReDoSSuite extends munit.FunSuite:
       Parameters(checker = Checker.Fuzz, maxGeneStringSize = 1000, maxAttackStringSize = 1000, maxIteration = 2)
     val ir = ReDoS.parse("^(?:a|a)*$", "", params.dialect)
     val refutedAttacks = mutable.ArrayBuffer.empty[RefutedAttack]
-    val (candidates, fuzzSafe) =
+    val (candidates, fuzzSafe, fuzzUpperBound) =
       ReDoS.checkFuzz("^(?:a|a)*$", "", ir, params, ReDoS.isRefuted(refutedAttacks, _, _))
-    ReDoS.verifyCandidates(candidates, fuzzSafe, _.copy(runtimeAttack = finish), refutedAttacks, 100) match
+    val result = ReDoS.verifyCandidates(candidates, fuzzSafe, _.copy(runtimeAttack = finish), refutedAttacks, 100)
+    result.withUpperBound(fuzzUpperBound()) match
       case d: Diagnostics.Safe =>
         assertEquals(
           d.copy(refutedAttacks = Seq.empty),
@@ -487,7 +515,8 @@ class ReDoSSuite extends munit.FunSuite:
             UnitMode.UTF16,
             AttackComplexity.Safe(true),
             Seq.empty,
-            Checker.Fuzz
+            Checker.Fuzz,
+            Some(UpperBound(AttackComplexity.Exponential(false), Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot)))))
           )
         )
         assert(d.refutedAttacks.nonEmpty)
@@ -613,7 +642,8 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Safe(false),
           Seq.empty,
-          Checker.Fuzz
+          Checker.Fuzz,
+          Some(linearBound)
         )
       )
     )
@@ -661,7 +691,9 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Safe(true),
           Seq.empty,
-          Checker.Fuzz
+          Checker.Fuzz,
+          // The bound of `^(?:a|a)+$` is exponential, though the fuzz checker finds no attack on the three repetitions.
+          Some(UpperBound(AttackComplexity.Exponential(false), Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot)))))
         )
       )
     )
@@ -697,7 +729,8 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Safe(false),
           Seq.empty,
-          Checker.Fuzz
+          Checker.Fuzz,
+          Some(linearBound)
         )
       )
     )

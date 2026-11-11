@@ -16,6 +16,7 @@ import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Hotspot
+import codes.quine.labs.recheck.diagnostics.UpperBound
 import codes.quine.labs.recheck.fuzz.FuzzChecker.*
 import codes.quine.labs.recheck.util.RepeatUtil
 import codes.quine.labs.recheck.vm.Interpreter
@@ -32,12 +33,11 @@ import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 /** ReDoS vulnerable RegExp checker based on fuzzing. */
 object FuzzChecker:
 
-  /** Checks whether RegExp is ReDoS vulnerable or not, and returns the attacks it finds and the complexity of the
-    * safety once they run out.
+  /** Checks whether RegExp is ReDoS vulnerable or not, and returns the attacks it finds, the complexity of the safety
+    * once they run out, and the upper bound, if any.
     *
-    * It bounds the complexity from above first (see [[upperBound]]). If the bound is linear, it proves the safety
-    * without fuzzing. Otherwise, the witnesses of the bound run first in the initial generation, and the attacks do not
-    * assume a complexity above the bound.
+    * It checks the upper bound first (see [[upperBound]]), and it fuzzes only if the bound is not linear, from the
+    * witnesses of the bound and with no attack above it.
     *
     * `avoidsAttack` tells whether to avoid an attack of the complexity and the hotspot, which runtime-attack
     * verification refuted, and may change while iterating the results. Strings with an avoided attack rank below the
@@ -68,14 +68,21 @@ object FuzzChecker:
       heatRatio: Double = Parameters.DefaultHeatRatio,
       accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode,
       avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
-  )(using ctx: Context): (Iterator[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)], AttackComplexity.Safe) =
+  )(using
+      ctx: Context
+  ): (Iterator[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)], AttackComplexity.Safe, Option[UpperBound]) =
     ctx.interrupt:
       val bound = upperBound(pattern, maxRepeatCount, maxNFASize, maxInitialGenerationSize)
+      // The first complexity is the worst.
+      val reported = bound.map:
+        _.headOption.fold(UpperBound(AttackComplexity.Linear, Hotspot.empty))(v =>
+          UpperBound(v.toAttackComplexity, v.hotspot)
+        )
       if bound.exists(_.isEmpty) then
         ctx.log("fuzz: linear upper bound")
-        (Iterator.empty, AttackComplexity.Safe(false))
+        (Iterator.empty, AttackComplexity.Safe(false), reported)
       else
-        val attacks = new FuzzChecker(
+        lazy val checker = new FuzzChecker(
           pattern,
           fuzz,
           random,
@@ -100,18 +107,15 @@ object FuzzChecker:
           accelerationMode,
           avoidsAttack,
           bound
-        ).check()
-        (attacks, AttackComplexity.Safe(true))
+        )
+        // The fuzzing starts on the first iteration, after the bound returns, so an error in it can report the bound.
+        (Iterator(()).flatMap(_ => checker.check()), AttackComplexity.Safe(true), reported)
 
-  /** Bounds the complexity from above with the simplified automata of the pattern whose largest repetitions become `*`
-    * or `+` until the sum of the counts of the rest is below `maxRepeatCount` (see [[EpsNFABuilder.buildSimplified]]
-    * and [[IRPattern.approximateRepeats]]).
+  /** Checks the upper bound of the complexity of the pattern by the automaton checker on its simplified automata (see
+    * [[EpsNFABuilder.buildSimplified]] and [[IRPattern.approximateRepeats]]).
     *
     * It returns the vulnerable complexities of the bound from the worst, at most `maxInitialGenerationSize` but at
-    * least one if any, so the first one tells the complexity of the bound. They are empty if the bound is linear. It
-    * returns `None` if the automata bound nothing or would be larger than `maxNFASize`, or if the repetitions that stay
-    * sum to `maxRepeatCount` or more, whose bound may hide a large constant (e.g. `(a?){50}`, whose `2^50` paths
-    * through the copies of `a?` the length of the input does not tell).
+    * least one if any, which are empty if the bound is linear, or `None` if there is no bound.
     */
   private[fuzz] def upperBound(
       pattern: IRPattern,
@@ -120,6 +124,7 @@ object FuzzChecker:
       maxInitialGenerationSize: Int
   )(using ctx: Context): Option[Seq[Complexity.Vulnerable[UChar]]] =
     val approximated = pattern.approximateRepeats(maxRepeatCount)
+    // The repetitions left may hide a large constant in a linear bound (e.g. the `2^50` paths of `(a?){50}`).
     if approximated.repeatCount >= maxRepeatCount then
       ctx.log("fuzz: no upper bound for too many repeats")
       None
@@ -191,10 +196,10 @@ private[fuzz] final class FuzzChecker(
 
   import ctx.*
 
-  /** Whether an attack may be exponential, which the upper bound tells. */
+  /** Whether to try an exponential attack, which the upper bound may rule out. */
   val triesExponential: Boolean = upperBound.forall(_.exists(_.isInstanceOf[Complexity.Exponential[?]]))
 
-  /** The maximum degree of a polynomial attack, which the upper bound limits. */
+  /** The maximum degree of the polynomial attacks to try, which the upper bound may lower. */
   val maxTriedDegree: Int = upperBound match
     case Some(vulnerable) if !triesExponential =>
       vulnerable.collect { case p: Complexity.Polynomial[?] => p.degree }.max.min(maxDegree)

@@ -22,6 +22,7 @@ import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.RefutedAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
+import codes.quine.labs.recheck.diagnostics.UpperBound
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -34,7 +35,7 @@ package object codec
 /** An `Encoder` for `Diagnostics`. */
 given encodeDiagnostics: Encoder[Diagnostics] with
   def apply(d: Diagnostics): Json = d match
-    case Diagnostics.Safe(source, flags, dialect, unitMode, complexity, refutedAttacks, checker) =>
+    case Diagnostics.Safe(source, flags, dialect, unitMode, complexity, refutedAttacks, checker, upperBound) =>
       Json.obj(
         "source" := source,
         "flags" := flags,
@@ -42,6 +43,7 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "unitMode" := unitMode,
         "status" := "safe",
         "complexity" := complexity.asInstanceOf[AttackComplexity],
+        "upperBound" := upperBound,
         "refutedAttacks" := refutedAttacks.map(encodeRefutedAttack(dialect, unitMode)(_)),
         "checker" := checker
       )
@@ -55,7 +57,8 @@ given encodeDiagnostics: Encoder[Diagnostics] with
           hotspot,
           runtimeAttack,
           refutedAttacks,
-          checker
+          checker,
+          upperBound
         ) =>
       Json.obj(
         "source" := source,
@@ -67,10 +70,11 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "attack" -> encodeAttackPattern(dialect, unitMode)(attack),
         "hotspot" := hotspot,
         "runtimeAttack" := runtimeAttack,
+        "upperBound" := upperBound,
         "refutedAttacks" := refutedAttacks.map(encodeRefutedAttack(dialect, unitMode)(_)),
         "checker" := (checker: Checker)
       )
-    case Diagnostics.Unknown(source, flags, dialect, unitMode, error, refutedAttacks, checker) =>
+    case Diagnostics.Unknown(source, flags, dialect, unitMode, error, refutedAttacks, checker, upperBound) =>
       Json.obj(
         "source" := source,
         "flags" := flags,
@@ -78,6 +82,7 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "unitMode" := unitMode,
         "status" := "unknown",
         "error" := error,
+        "upperBound" := upperBound,
         "refutedAttacks" := refutedAttacks.map(encodeRefutedAttack(dialect, unitMode.get)(_)),
         "checker" := checker
       )
@@ -199,6 +204,10 @@ def encodeRefutedAttack(dialect: Dialect, mode: UnitMode): Encoder[RefutedAttack
       "hotspot" := r.hotspot,
       "runtimeAttack" := r.runtimeAttack
     )
+
+/** An `Encoder` for `UpperBound`. */
+given encodeUpperBound: Encoder[UpperBound] with
+  def apply(b: UpperBound): Json = Json.obj("complexity" := b.complexity, "hotspot" := b.hotspot)
 
 /** An `Encoder` for `Hotspot`. */
 given encodeHotspot: Encoder[Hotspot] with
