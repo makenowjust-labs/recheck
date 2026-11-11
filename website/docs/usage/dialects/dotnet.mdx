@@ -53,14 +53,25 @@ The matching unit is `utf16` (see [Matching Units](../dialects.mdx#matching-unit
 `recheck` supports the following `RegexOptions`, written as the letters of their inline options.
 An option without an inline option has a letter of `recheck`'s own.
 
-| Flag | `RegexOptions`            | Inline | Notes                                                                                                      |
-| ---- | ------------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
-| `i`  | `IgnoreCase`              | `(?i)` | In the invariant culture.                                                                                  |
-| `l`  | `AnyNewLine`              |        | `^`, `$`, `\Z` and `.` see `\r\n`, `\n`, `\v`, `\f`, `\r`, U+0085, U+2028 and U+2029 as line terminators. |
-| `m`  | `Multiline`               | `(?m)` |                                                                                                            |
-| `n`  | `ExplicitCapture`         | `(?n)` |                                                                                                            |
-| `s`  | `Singleline`              | `(?s)` |                                                                                                            |
-| `x`  | `IgnorePatternWhitespace` | `(?x)` |                                                                                                            |
+| Flag | `RegexOptions`            | Inline | Notes                                                                                                                        |
+| ---- | ------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `e`  | `ECMAScript`              |        | ECMAScript-compliant behavior (see below). An error with `l`, `n`, `s` or `x`.                                               |
+| `i`  | `IgnoreCase`              | `(?i)` | In the invariant culture.                                                                                                    |
+| `l`  | `AnyNewLine`              |        | `^`, `$`, `\Z` and `.` see `\r\n`, `\n`, `\v`, `\f`, `\r`, U+0085, U+2028 and U+2029 as line terminators. An error with `e`. |
+| `m`  | `Multiline`               | `(?m)` |                                                                                                                              |
+| `n`  | `ExplicitCapture`         | `(?n)` |                                                                                                                              |
+| `s`  | `Singleline`              | `(?s)` |                                                                                                                              |
+| `x`  | `IgnorePatternWhitespace` | `(?x)` |                                                                                                                              |
+
+`e` makes the following differences, as .NET's `ECMAScript` does.
+
+- `\d`, `\s` and `\w` are `[0-9]`, `[\t\n\v\f\r ]` and `[0-9A-Z_a-zİ]`, and `\b` and `\B` see the characters of `\w` as word characters.
+  In a class, `i` closes them as the other characters (e.g. `[\W]` matches `k`, since U+212A KELVIN SIGN is not in `\w`).
+- An unknown escape is the character (e.g. `\q` is `q`).
+- `\N` is a back-reference by the most digits that make the number of a group opened before it, followed by the rest of the digits (e.g. `(a)\10` is `\1` and `0`, and `\2` of `(?<n>a)\2(b)` is a back-reference to `n`, the second group by .NET's numbering).
+  Without such a group, it is an octal escape below `\400` or the digit (e.g. `\1(a)` is U+0001, and `\8` is `8`).
+- A back-reference to an unset group matches the empty string.
+- `[^]` matches any character, while `[]` still starts a class with `]`.
 
 ## Syntax Limitations
 
@@ -69,10 +80,11 @@ The following constructs are not supported, and they are reported as `unsupporte
 - Balancing groups (e.g. `(?<close-open>...)`).
 - Internal property names (e.g. `\p{_xmlI}`).
 
-The `RegexOptions` `RightToLeft`, `ECMAScript` and `NonBacktracking` have no flag letter, so they cannot be given.
+The `RegexOptions` `RightToLeft` and `NonBacktracking` have no flag letter, so they cannot be given.
 
 ## Approximations
 
+- With `e`, .NET drops the digits after a back-reference `\N` while the number is not above the largest group number plus one (e.g. `\13` after twelve groups is `\1` without `3`), which `recheck` does not reproduce: it reads the rest of the digits as characters, as .NET's documentation says.
 - `\G` matches only at the start of the input, since `recheck` models a search from there, not one from a later position (e.g. `Match.NextMatch`).
 - Case-insensitive matching follows the invariant culture, not the current culture (e.g. `(?i)i` does not match `İ` as it does in the Turkish culture).
 

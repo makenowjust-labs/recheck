@@ -387,6 +387,11 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
       )
     )
   check("[a-[^b]]", "", DotNet)(Class(false, ClassDiff(ClassLiteral('a'), ClassNest(true, ClassLiteral('b')))))
+  // .NET's `e` reads `[^]` as an empty negated class, but `[]` is still not empty (.NET 11.0.0).
+  check("[^]a]", "", DotNet)(Class(true, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  check("[^]a]", "e", DotNet)(Sequence(Class(true, ClassUnion()), Literal('a'), Literal(']')))
+  check("[]a]", "e", DotNet)(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  check("[a-[^]]", "e", DotNet)(Class(false, ClassDiff(ClassLiteral('a'), ClassNest(true, ClassUnion()))))
   check("[\\w-[\\d]]", "", DotNet):
     Class(false, ClassDiff(ClassBackslashClass(Word), ClassNest(false, ClassBackslashClass(Digit))))
   check("[]-[a]]", "", DotNet)(Class(false, ClassDiff(ClassLiteral(']'), ClassNest(false, ClassLiteral('a')))))

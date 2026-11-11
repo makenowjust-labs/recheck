@@ -146,10 +146,39 @@ object Parser:
   private def parseText(source: String, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): Node =
     val prescan = SourcePrescan.from(source)
     val featureSet = FeatureSet.from(prescan, dialect, flagSet, mode)
-    val parser = new Parser(source, prescan, featureSet)
+    val parser = new Parser(source, prescan, featureSet, Map.empty)
     // python-regex parses the pattern again in `V1` from the start, when it meets a `V1` inline flag.
-    try parser.parse()
+    try
+      val node = parser.parse()
+      // .NET's `e` reads `\N` by the numbers of the groups opened before it, which depend on the groups after it.
+      if featureSet.reference.readsBackReferenceDigitsByOpenedGroupNumbers then
+        new Parser(source, prescan, featureSet, numberDotNetCaptures(parser.captureOpenings.toSeq)).parse()
+      else node
     catch case _: Version1Restart => parseText(source, flagSet.copy(version1 = true), dialect, mode)
+
+  /** Returns the offsets where the capture groups of .NET's numbers open first, from the offsets and the names of the
+    * groups in their order.
+    *
+    * .NET numbers the unnamed groups in order, a group of a number name (e.g. `(?<2>...)`) by its name, and then the
+    * other names in the order of their first groups by the numbers not taken yet.
+    */
+  private def numberDotNetCaptures(openings: Seq[(Int, Option[String])]): Map[Int, Int] =
+    val starts = mutable.Map.empty[Int, Int]
+    val names = mutable.LinkedHashMap.empty[String, Int]
+    var next = 1
+    def note(n: Int, start: Int): Unit = if !starts.contains(n) then starts(n) = start
+
+    for (start, name) <- openings do
+      name match
+        case None =>
+          note(next, start)
+          next += 1
+        case Some(name) if name.forall(_.isDigit) => name.toIntOption.foreach(note(_, start))
+        case Some(name)                           => if !names.contains(name) then names(name) = start
+    for start <- names.values do
+      while starts.contains(next) do next += 1
+      note(next, start)
+    starts.toMap
 
   /** Version1Restart is thrown at a `V1` inline flag of a python-regex pattern parsed in `V0`. */
   private[parser] final class Version1Restart extends Exception("V1 inline flag")
@@ -189,7 +218,9 @@ object Parser:
 private[parser] final class Parser(
     private val source: String,
     private val prescan: SourcePrescan,
-    private val featureSet: FeatureSet
+    private val featureSet: FeatureSet,
+    /** The offsets where the capture groups of the numbers open first, which .NET's `e` reads `\N` by. */
+    private val captureStarts: Map[Int, Int]
 ):
 
   private var offset: Int = 0
@@ -214,6 +245,9 @@ private[parser] final class Parser(
 
   /** The number of the capture groups opened so far, where a branch reset counts its alternative with the most. */
   private var previousCaptureCount: Int = 0
+
+  /** The offsets and the names of the capture groups opened so far, in their order. */
+  private val captureOpenings: mutable.ArrayBuffer[(Int, Option[String])] = mutable.ArrayBuffer.empty
 
   /** The offset of the first reference by a group number, which Ruby rejects in a pattern with named captures. */
   private var numberedReferenceOffset: Option[Int] = None
@@ -1692,11 +1726,15 @@ private[parser] final class Parser(
     false
 
   private def parseGroupBody(stack: mutable.Stack[Node], kind: GroupKind, start: Int): Unit =
-    kind match
-      case GroupKind.IndexedCapture if !context.explicitCapture => previousCaptureCount += 1
-      case _: GroupKind.NamedCapture | _: GroupKind.PNamedCapture | GroupKind.Balance(_, Some(_), _) =>
-        previousCaptureCount += 1
-      case _ => ()
+    val capture = kind match
+      case GroupKind.IndexedCapture if !context.explicitCapture => Some(None)
+      case GroupKind.NamedCapture(_, name)                      => Some(Some(name))
+      case GroupKind.PNamedCapture(name)                        => Some(Some(name))
+      case GroupKind.Balance(_, Some(name), _)                  => Some(Some(name))
+      case _                                                    => None
+    for name <- capture do
+      previousCaptureCount += 1
+      captureOpenings += ((start, name))
     val node = nest(start)(protectContext(parseDisjunction()))
     closeGroup()
     validateGroupBody(kind, node, start)
@@ -2920,6 +2958,7 @@ private[parser] final class Parser(
 
   private def parseBackslashBackReference(): BackslashKind =
     if context.inClass then return parseBackslashOctal()
+    if featureSet.reference.readsBackReferenceDigitsByOpenedGroupNumbers then return parseBackReferenceToOpenedGroup()
 
     val save = offset
 
@@ -2957,6 +2996,27 @@ private[parser] final class Parser(
 
     markNumberedReference(save)
     BackslashKind.EscapeBackReference(BackReferenceStyle.BareBackReference, Reference.IndexedReference(n))
+
+  /** Parses `\N` of .NET's `e`, which is a back-reference by the most digits that make the number of a group opened
+    * before it, followed by the rest of the digits.
+    *
+    * Without such a group, it is an octal escape or the digit (e.g. `\1` of `\1(a)` is U+0001).
+    */
+  private def parseBackReferenceToOpenedGroup(): BackslashKind =
+    val start = offset
+    val maxNumber = captureStarts.keysIterator.maxOption.getOrElse(0)
+    var value = 0L
+    var found: Option[(Int, Int)] = None
+    var i = start
+    while i < source.length && isDigit(source.charAt(i)) && value * 10 + (source.charAt(i) - '0') <= maxNumber do
+      value = value * 10 + (source.charAt(i) - '0')
+      i += 1
+      if captureStarts.get(value.toInt).exists(_ < start - 1) then found = Some((value.toInt, i))
+    found match
+      case Some((n, end)) =>
+        reset(end)
+        BackslashKind.EscapeBackReference(BackReferenceStyle.BareBackReference, Reference.IndexedReference(n))
+      case None => if isOctalDigit then parseBackslashOctal() else parseBackslashUnknown()
 
   /** Returns the next characters up to `count`, between which Java and python-regex skip comments in the extended mode.
     */
@@ -3065,12 +3125,16 @@ private[parser] final class Parser(
       val invert = currentChar == '^'
       if invert then next() else reset(save)
 
-      val item = nest(start)(parseClassItem(!featureSet.charClass.allowsClassEmpty))
+      val item = nest(start)(parseClassItem(!allowsClassEmpty(invert)))
       expect(']', "Unclosed ']'")
       validateNegatedClassSet(invert, item, start)
 
       val end = offset
       stack.push(Node(NodeData.Class(invert, item), SourceLocation(start, end)))
+
+  /** Tests whether a class, which `invert` tells is negated, may be empty (e.g. `[^]` of .NET's `e`). */
+  private def allowsClassEmpty(invert: Boolean): Boolean =
+    featureSet.charClass.allowsClassEmpty || invert && featureSet.charClass.allowsNegatedClassEmpty
 
   private def parseClassItem(first: Boolean): ClassItem =
     val start = offset
@@ -3110,7 +3174,7 @@ private[parser] final class Parser(
         val nestStart = offset - 1
         val invert = currentChar == '^'
         if invert then next()
-        val inner = nest(nestStart)(parseClassItem(true))
+        val inner = nest(nestStart)(parseClassItem(!allowsClassEmpty(invert)))
         expect(']', "Unclosed ']'")
         val nested = ClassItem(ClassItemData.ClassNest(invert, inner), SourceLocation(nestStart, offset))
         assert(isEnd || currentChar == ']', "Class subtraction must be last")
@@ -3364,7 +3428,7 @@ private[parser] final class Parser(
       next()
       val invert = currentChar == '^'
       if invert then next()
-      val item = nest(start)(parseClassItem(!featureSet.charClass.allowsClassEmpty))
+      val item = nest(start)(parseClassItem(!allowsClassEmpty(invert)))
       expect(']', "Unclosed ']'")
       validateNegatedClassSet(invert, item, start)
       val end = offset

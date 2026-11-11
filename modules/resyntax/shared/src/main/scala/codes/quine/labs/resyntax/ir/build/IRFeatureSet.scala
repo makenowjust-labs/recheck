@@ -79,7 +79,7 @@ final case class IRFeatureSet(
     ignoresUnnamedCaptureWithNamedCapture: Boolean,
     // PCRE
     rejectsMismatchedNameAndIndex: Boolean,
-    // JavaScript
+    // .NET (with `e`), JavaScript
     unsetBackReferenceMatchesEmpty: Boolean,
     // Ruby: LastMatching, the others: FirstSet
     backReferenceChoice: IRBackReferenceChoice,
@@ -145,7 +145,7 @@ final case class IRFeatureSet(
     joinsLiteralsAsUTF16: Boolean,
     // Ruby
     readsByteEscapesAsUTF8: Boolean,
-    // .NET: DotNet, Boost.Regex: BoostRegex, ICU: ICU, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, Python: Python, python-regex: PythonRegex, Ruby: Ruby
+    // .NET: DotNet (DotNetECMAScript with `e`), Boost.Regex: BoostRegex, ICU: ICU, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, Python: Python, python-regex: PythonRegex, Ruby: Ruby
     classLookupKind: IRClassLookupKind,
     // .NET: DotNet, Boost.Regex: BoostRegex, ICU: ICU, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, python-regex: PythonRegex, Ruby: Ruby, Python: none
     propertyLookupKind: Option[IRPropertyLookupKind],
@@ -153,6 +153,8 @@ final case class IRFeatureSet(
     caselessPropertyKind: IRCaselessPropertyKind,
     // python-regex, Ruby
     closesCaselessClassPOSIX: Boolean,
+    // .NET (with `e`)
+    closesCaselessClassEscape: Boolean,
     // Boost.Regex, ICU
     hasPropertyClassPOSIX: Boolean,
     // Boost.Regex
@@ -378,6 +380,9 @@ enum IRClassLookupKind:
   /** DotNet has classes of Unicode. */
   case DotNet
 
+  /** DotNetECMAScript has the classes of .NET's `ECMAScript`, which are of ASCII with `İ` in `\w`. */
+  case DotNetECMAScript
+
   /** PCRE has classes of Unicode in UCP mode, except the ones that `a` restricts. */
   case PCRE
 
@@ -530,7 +535,7 @@ object IRFeatureSet:
       carriesFlagsIntoNoBranch = isDotNet,
       ignoresUnnamedCaptureWithNamedCapture = isRuby,
       rejectsMismatchedNameAndIndex = isPCRE,
-      unsetBackReferenceMatchesEmpty = isJavaScript,
+      unsetBackReferenceMatchesEmpty = isDotNet && flagSet.evaluate || isJavaScript,
       backReferenceChoice = if isRuby then IRBackReferenceChoice.LastMatching else IRBackReferenceChoice.FirstSet,
       allowsBackReferenceToMissingGroup = isJava,
       requiresClosedGroupReference = isPython,
@@ -600,16 +605,17 @@ object IRFeatureSet:
       joinsLiteralsAsUTF16 = isICU,
       readsByteEscapesAsUTF8 = isRuby,
       classLookupKind = dialect match
-        case Dialect.DotNet         => IRClassLookupKind.DotNet
-        case Dialect.Java           => IRClassLookupKind.Java
-        case Dialect.JavaScript     => IRClassLookupKind.JavaScript
-        case Dialect.PCRE           => IRClassLookupKind.PCRE
-        case _: Dialect.Perl        => IRClassLookupKind.Perl
-        case _: Dialect.Python      => IRClassLookupKind.Python
-        case _: Dialect.PythonRegex => IRClassLookupKind.PythonRegex
-        case _: Dialect.Ruby        => IRClassLookupKind.Ruby
-        case Dialect.ICU            => IRClassLookupKind.ICU
-        case _: Dialect.BoostRegex  => IRClassLookupKind.BoostRegex,
+        case Dialect.DotNet if flagSet.evaluate => IRClassLookupKind.DotNetECMAScript
+        case Dialect.DotNet                     => IRClassLookupKind.DotNet
+        case Dialect.Java                       => IRClassLookupKind.Java
+        case Dialect.JavaScript                 => IRClassLookupKind.JavaScript
+        case Dialect.PCRE                       => IRClassLookupKind.PCRE
+        case _: Dialect.Perl                    => IRClassLookupKind.Perl
+        case _: Dialect.Python                  => IRClassLookupKind.Python
+        case _: Dialect.PythonRegex             => IRClassLookupKind.PythonRegex
+        case _: Dialect.Ruby                    => IRClassLookupKind.Ruby
+        case Dialect.ICU                        => IRClassLookupKind.ICU
+        case _: Dialect.BoostRegex              => IRClassLookupKind.BoostRegex,
       propertyLookupKind = dialect match
         case Dialect.DotNet         => Some(IRPropertyLookupKind.DotNet)
         case Dialect.Java           => Some(IRPropertyLookupKind.Java)
@@ -629,6 +635,7 @@ object IRFeatureSet:
         else if isICU || isRuby then IRCaselessPropertyKind.ClosedBeforeNegation
         else IRCaselessPropertyKind.Unchanged,
       closesCaselessClassPOSIX = isPythonRegex || isRuby,
+      closesCaselessClassEscape = isDotNet && flagSet.evaluate,
       hasPropertyClassPOSIX = isBoostRegex || isICU,
       matchesClassByFoldedInput = isBoostRegex,
       collatesClassRange = isBoostRegex && flagSet.continue,

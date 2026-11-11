@@ -190,6 +190,8 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     assert(programFile(program).content.contains("\nCultureInfo.CurrentCulture = CultureInfo.InvariantCulture;\n"))
     assertEquals(generate("", "ilmnsx", Dialect.DotNet).script.linesIterator.next(), "ilmnsx")
     assert(programFile(program).content.contains("'l' => RegexOptions.AnyNewLine,"))
+    assertEquals(generate("", "eim", Dialect.DotNet).script.linesIterator.next(), "eim")
+    assert(programFile(program).content.contains("'e' => RegexOptions.ECMAScript,"))
 
   test("RuntimeAttackProgram.generate: ICU"):
     val program = generate("f\"oo\\d\r", "dimswx", Dialect.ICU)

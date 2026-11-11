@@ -566,7 +566,52 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     (".", "l", "\r"),
     (".", "l", "\u000c"),
     (".", "ls", "\r"),
-    ("(?-s:.)", "ls", 0x2029.toChar.toString)
+    ("(?-s:.)", "ls", 0x2029.toChar.toString),
+    // `e` (ECMAScript) allows only `i` and `m` with it, and has classes of ASCII with `İ` in `\w`, which a class closes
+    // under `i`.
+    ("a", "es", "a"),
+    ("a", "el", "a"),
+    ("a", "eim", "A"),
+    ("^\\w$", "e", 0x130.toChar.toString),
+    ("^\\w$", "e", 0xe9.toChar.toString),
+    ("^\\w$", "ei", 0x212a.toChar.toString),
+    ("^[\\w]$", "ei", 0x212a.toChar.toString),
+    ("^[^\\w]$", "ei", 0x212a.toChar.toString),
+    ("^[\\W]$", "ei", "k"),
+    ("^\\d$", "e", 0x660.toChar.toString),
+    ("^\\s$", "e", "\u000b"),
+    ("^\\s$", "e", 0xa0.toChar.toString),
+    ("a\\b", "e", s"a${0xe9.toChar}"),
+    ("a\\B", "e", s"a${0x130.toChar}"),
+    ("\\p{L}", "e", "a"),
+    ("(?s).", "e", "\n"),
+    // `e` reads an unknown escape as the character, and `\N` by the most digits that make a group opened before it, or
+    // as an octal escape below 0o400 or the character.
+    ("\\q", "e", "q"),
+    ("\\q", "", "q"),
+    ("\\8", "e", "8"),
+    ("[\\8]", "e", "8"),
+    ("\\1(a)", "e", "\u0001a"),
+    ("(a)\\10", "e", "aa0"),
+    ("(a)\\10", "", "a\b"),
+    ("(?<n>a)\\2(b)", "e", "aab"),
+    ("(?<n>a)(b)\\2", "e", "aba"),
+    ("(a)(?<n>b)\\2(c)", "e", s"ab${2.toChar}c"),
+    ("(a)(?<n>b)\\3", "e", "abb"),
+    ("\\400", "e", " 0"),
+    ("[\\400]", "e", "0"),
+    // `e` matches a back-reference to an unset group with the empty string.
+    ("(a)|\\1b", "e", "b"),
+    ("(a)|\\1b", "", "b"),
+    ("(a\\1)", "e", "a"),
+    ("(?<x>\\k<x>a)", "e", "a"),
+    ("((a+)(\\1) ?)+", "e", "aa aaaa aaaaaa "),
+    ("((a+)(\\1) ?)+", "", "aa aaaa aaaaaa "),
+    // `e` reads `[^]` as an empty negated class, but not `[]`.
+    ("[^]", "e", "\n"),
+    ("[^]a]", "e", "\na"),
+    ("[]a]", "e", "]"),
+    ("[a-[^]]", "e", "a")
   )
 
   /** Returns recheck's results of .NET's cases: the spans of the groups of the first match, `none` or `error`. */
@@ -605,6 +650,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
          |    {
          |        options |= c switch
          |        {
+         |            'e' => RegexOptions.ECMAScript,
          |            'i' => RegexOptions.IgnoreCase,
          |            'l' => RegexOptions.AnyNewLine,
          |            'm' => RegexOptions.Multiline,

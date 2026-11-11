@@ -325,7 +325,7 @@ object RuntimeAttackProgram:
     * culture.
     */
   private def dotnet(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
-    val options = flags.distinct.filter(c => "ilmnsx".contains(c))
+    val options = flags.distinct.filter(c => "eilmnsx".contains(c))
     RuntimeAttackProgram(DotNetExecutor(DotNetSource), encodeData(options, pattern, attack, utf16Units(mode)))
 
   /** The C# program, which reads the data of [[encodeData]] from the standard input. */
@@ -355,6 +355,7 @@ object RuntimeAttackProgram:
         |{
         |    options |= c switch
         |    {
+        |        'e' => RegexOptions.ECMAScript,
         |        'i' => RegexOptions.IgnoreCase,
         |        'l' => RegexOptions.AnyNewLine,
         |        'm' => RegexOptions.Multiline,

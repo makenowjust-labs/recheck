@@ -357,6 +357,8 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("\\Z", "", Python())(Assert(IRAssertKind.TextEnd))
   check("\\b", "", JavaScript, PCRE)(Assert(IRAssertKind.WordBoundary(ASCIIWord)))
   check("\\B", "", JavaScript, PCRE)(Assert(IRAssertKind.NotWordBoundary(ASCIIWord)))
+  // .NET's `e` takes `İ` as a word character too.
+  check("\\b", "e", DotNet)(Assert(IRAssertKind.WordBoundary(ASCIIWord.union(CharSet.single(0x130)))))
   // Java's `\b` without `U` takes a non-spacing mark after a letter or a digit as a word character.
   locally:
     val marks = IRClassLookup.javaWordMarks
@@ -471,6 +473,9 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   )
   // `(?:(a)|b)\1c` matches `bc` only in JavaScript.
   checkPattern("", "", JavaScript): pattern =>
+    assertEquals(pattern.backReference, IRBackReferenceSemantics(true, IRBackReferenceChoice.FirstSet))
+  // .NET's `e` matches `(?:(a)|b)\1c` to `bc` too.
+  checkPattern("", "e", DotNet): pattern =>
     assertEquals(pattern.backReference, IRBackReferenceSemantics(true, IRBackReferenceChoice.FirstSet))
   checkPattern("", "", DotNet, Java, PCRE, Perl(), Python()): pattern =>
     assertEquals(pattern.backReference, IRBackReferenceSemantics(false, IRBackReferenceChoice.FirstSet))

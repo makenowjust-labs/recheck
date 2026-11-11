@@ -52,7 +52,7 @@ final case class FlagSet(
     continue: Boolean = false,
     // `d` (ICU, Java, JavaScript, Perl, Ruby)
     hasIndices: Boolean = false,
-    // `e` (Perl, python-regex)
+    // `e` (.NET, Perl, python-regex)
     evaluate: Boolean = false,
     // `f` (python-regex)
     fullCase: Boolean = false,
@@ -214,7 +214,7 @@ object FlagSet:
         validateFlag(isICU || dialect.isJava || dialect.isJavaScript || dialect.isPerl || dialect.isRuby)
         rubyCharset(flagSet).copy(hasIndices = true)
       case 'e' =>
-        validateFlag(dialect.isPerl || isPythonRegex)
+        validateFlag(dialect.isDotNet || dialect.isPerl || isPythonRegex)
         flagSet.copy(evaluate = true)
       case 'f' =>
         validateFlag(isPythonRegex)
@@ -284,6 +284,9 @@ object FlagSet:
       throw new FlagSetException(s"Incompatible flags '$c1' and '$c2'", None)
 
     dialect match
+      // `RegexOptions.ECMAScript` allows only `IgnoreCase` and `Multiline` among the options with a letter.
+      case Dialect.DotNet =>
+        if flagSet.evaluate then flags.find("lnsx".contains).foreach(incompatible('e', _))
       case Dialect.JavaScript =>
         if flagSet.unicode && flagSet.unicodeSets then incompatible('u', 'v')
       case _: Dialect.Python =>

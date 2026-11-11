@@ -459,6 +459,13 @@ class IRCharResolverSuite extends munit.FunSuite:
   chars("\\V", "", PCRE)(IRClassLookup.Vertical.complement(UnitMode.Byte))
   chars("\\H", "", Ruby())(of("0123456789abcdefABCDEF").complement(Scalars))
   chars("\\s", "", DotNet)(gc("Zs").union(gc("Zl")).union(gc("Zp")).union(of("\t\n\u000b\f\r\u0085")))
+  // .NET's `e` has classes of ASCII, where `\w` has `İ` too, and a class closes them under `i` (.NET 11.0.0).
+  chars("\\s", "e", DotNet)(of("\t\n\u000b\f\r "))
+  chars("\\d", "e", DotNet)(of("0123456789"))
+  chars("\\w", "ei", DotNet)(IRClassLookup.ASCIIWord.union(CharSet.single(0x130)))
+  chars("[\\w]", "ei", DotNet)(IRClassLookup.ASCIIWord.union(CharSet.of(0x130, 0x212a)))
+  chars("[\\W]", "ei", DotNet):
+    IRClassLookup.ASCIIWord.union(CharSet.single(0x130)).complement(UnitMode.UTF16).union(of("Kk"))
   // `\C` is a byte, which IR has no unit for in UTF mode.
   chars("\\C", "", PCRE)(UnitMode.Byte.universe)
   unsupported("(*UTF)\\C", "", PCRE)
