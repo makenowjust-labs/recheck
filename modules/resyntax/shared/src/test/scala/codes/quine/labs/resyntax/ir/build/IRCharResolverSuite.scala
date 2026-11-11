@@ -562,6 +562,7 @@ class IRCharResolverSuite extends munit.FunSuite:
   chars("\\p{IsLatin}", "", Java)(PropertyTable.Script.value("Latin").get.set)
   chars("\\p{InGreek}", "", Java, Perl())(PropertyTable.Block.value("Greek_And_Coptic").get.set)
   chars("\\p{IsGreek}", "", DotNet)(CharSet.range(0x370, 0x3ff))
+  chars("\\p{IsCoptic}", "", DotNet)(CharSet.range(0x2c80, 0x2cff))
   chars("\\p{Lower}", "", Java)(of("abcdefghijklmnopqrstuvwxyz"))
   chars("\\p{Lower}", "U", Java)(PropertyTable.binary("Lowercase").get.set)
   chars("\\p{Age=6.0}", "", Ruby())(

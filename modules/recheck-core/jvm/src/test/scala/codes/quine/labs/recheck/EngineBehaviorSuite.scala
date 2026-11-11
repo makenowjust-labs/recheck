@@ -92,26 +92,35 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     val model = options.map((flags, _) => marks(candidates, chars("\\w", flags, Dialect.Ruby())))
     assertEquals(cases(RubyExecutor, script), model)
 
-  // Checked with .NET 10.0.14.
+  // Checked with .NET 11.0.0.
   runtimeTest(".NET: the named blocks", "dotnet"):
     val names =
-      """|AlphabeticPresentationForms Arabic ArabicPresentationForms-A ArabicPresentationForms-B Armenian Arrows
-         |BasicLatin Bengali BlockElements Bopomofo BopomofoExtended BoxDrawing BraillePatterns Buhid CJKCompatibility
-         |CJKCompatibilityForms CJKCompatibilityIdeographs CJKRadicalsSupplement CJKSymbolsandPunctuation
-         |CJKUnifiedIdeographs CJKUnifiedIdeographsExtensionA Cherokee CombiningDiacriticalMarks
-         |CombiningDiacriticalMarksforSymbols CombiningHalfMarks CombiningMarksforSymbols ControlPictures CurrencySymbols
-         |Cyrillic CyrillicSupplement Devanagari Dingbats EnclosedAlphanumerics EnclosedCJKLettersandMonths Ethiopic
-         |GeneralPunctuation GeometricShapes Georgian Greek GreekExtended GreekandCoptic Gujarati Gurmukhi
-         |HalfwidthandFullwidthForms HangulCompatibilityJamo HangulJamo HangulSyllables Hanunoo Hebrew
-         |HighPrivateUseSurrogates HighSurrogates Hiragana IPAExtensions IdeographicDescriptionCharacters Kanbun
-         |KangxiRadicals Kannada Katakana KatakanaPhoneticExtensions Khmer KhmerSymbols Lao Latin-1Supplement
-         |LatinExtended-A LatinExtended-B LatinExtendedAdditional LetterlikeSymbols Limbu LowSurrogates Malayalam
-         |MathematicalOperators MiscellaneousMathematicalSymbols-A MiscellaneousMathematicalSymbols-B
-         |MiscellaneousSymbols MiscellaneousSymbolsandArrows MiscellaneousTechnical Mongolian Myanmar NumberForms Ogham
-         |OpticalCharacterRecognition Oriya PhoneticExtensions PrivateUse PrivateUseArea Runic Sinhala
-         |SmallFormVariants SpacingModifierLetters Specials SuperscriptsandSubscripts SupplementalArrows-A
-         |SupplementalArrows-B SupplementalMathematicalOperators Syriac Tagalog Tagbanwa TaiLe Tamil Telugu Thaana Thai
-         |Tibetan UnifiedCanadianAboriginalSyllabics VariationSelectors YiRadicals YiSyllables YijingHexagramSymbols
+      """|AlphabeticPresentationForms Arabic ArabicExtended-A ArabicExtended-B ArabicPresentationForms-A
+         |ArabicPresentationForms-B ArabicSupplement Armenian Arrows Balinese Bamum BasicLatin Batak Bengali
+         |BlockElements Bopomofo BopomofoExtended BoxDrawing BraillePatterns Buginese Buhid CJKCompatibility
+         |CJKCompatibilityForms CJKCompatibilityIdeographs CJKRadicalsSupplement CJKStrokes CJKSymbolsandPunctuation
+         |CJKUnifiedIdeographs CJKUnifiedIdeographsExtensionA Cham Cherokee CherokeeSupplement CombiningDiacriticalMarks
+         |CombiningDiacriticalMarksExtended CombiningDiacriticalMarksSupplement CombiningDiacriticalMarksforSymbols
+         |CombiningHalfMarks CombiningMarksforSymbols CommonIndicNumberForms ControlPictures Coptic CurrencySymbols
+         |Cyrillic CyrillicExtended-A CyrillicExtended-B CyrillicExtended-C CyrillicSupplement Devanagari
+         |DevanagariExtended Dingbats EnclosedAlphanumerics EnclosedCJKLettersandMonths Ethiopic EthiopicExtended
+         |EthiopicExtended-A EthiopicSupplement GeneralPunctuation GeometricShapes Georgian GeorgianExtended
+         |GeorgianSupplement Glagolitic Greek GreekExtended GreekandCoptic Gujarati Gurmukhi HalfwidthandFullwidthForms
+         |HangulCompatibilityJamo HangulJamo HangulJamoExtended-A HangulJamoExtended-B HangulSyllables Hanunoo Hebrew
+         |HighPrivateUseSurrogates HighSurrogates Hiragana IPAExtensions IdeographicDescriptionCharacters Javanese
+         |Kanbun KangxiRadicals Kannada Katakana KatakanaPhoneticExtensions KayahLi Khmer KhmerSymbols Lao
+         |Latin-1Supplement LatinExtended-A LatinExtended-B LatinExtended-C LatinExtended-D LatinExtended-E
+         |LatinExtendedAdditional Lepcha LetterlikeSymbols Limbu Lisu LowSurrogates Malayalam Mandaic
+         |MathematicalOperators MeeteiMayek MeeteiMayekExtensions MiscellaneousMathematicalSymbols-A
+         |MiscellaneousMathematicalSymbols-B MiscellaneousSymbols MiscellaneousSymbolsandArrows MiscellaneousTechnical
+         |ModifierToneLetters Mongolian Myanmar MyanmarExtended-A MyanmarExtended-B NKo NewTaiLue NumberForms Ogham
+         |OlChiki OpticalCharacterRecognition Oriya Phags-pa PhoneticExtensions PhoneticExtensionsSupplement PrivateUse
+         |PrivateUseArea Rejang Runic Samaritan Saurashtra Sinhala SmallFormVariants SpacingModifierLetters Specials
+         |Sundanese SundaneseSupplement SuperscriptsandSubscripts SupplementalArrows-A SupplementalArrows-B
+         |SupplementalMathematicalOperators SupplementalPunctuation SylotiNagri Syriac SyriacSupplement Tagalog Tagbanwa
+         |TaiLe TaiTham TaiViet Tamil Telugu Thaana Thai Tibetan Tifinagh UnifiedCanadianAboriginalSyllabics
+         |UnifiedCanadianAboriginalSyllabicsExtended Vai VariationSelectors VedicExtensions VerticalForms YiRadicals
+         |YiSyllables YijingHexagramSymbols
          |""".stripMargin.split("\\s+").toSeq
     val program =
       s"""|using System;
