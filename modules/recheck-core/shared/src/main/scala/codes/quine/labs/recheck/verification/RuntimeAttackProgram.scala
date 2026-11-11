@@ -321,11 +321,11 @@ object RuntimeAttackProgram:
         |}
         |""".stripMargin
 
-  /** Returns the data for the C# program for `dotnet` (.NET 10 SDK or later), using `Regex.Match` in the invariant
+  /** Returns the data for the C# program for `dotnet` (.NET 11 SDK or later), using `Regex.Match` in the invariant
     * culture.
     */
   private def dotnet(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
-    val options = flags.distinct.filter(c => "imnsx".contains(c))
+    val options = flags.distinct.filter(c => "ilmnsx".contains(c))
     RuntimeAttackProgram(DotNetExecutor(DotNetSource), encodeData(options, pattern, attack, utf16Units(mode)))
 
   /** The C# program, which reads the data of [[encodeData]] from the standard input. */
@@ -356,6 +356,7 @@ object RuntimeAttackProgram:
         |    options |= c switch
         |    {
         |        'i' => RegexOptions.IgnoreCase,
+        |        'l' => RegexOptions.AnyNewLine,
         |        'm' => RegexOptions.Multiline,
         |        'n' => RegexOptions.ExplicitCapture,
         |        's' => RegexOptions.Singleline,

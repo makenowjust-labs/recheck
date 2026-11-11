@@ -28,7 +28,7 @@ class FlagSetSuite extends munit.FunSuite:
   check("e", Perl())(_.evaluate)
   check("g", JavaScript, Perl())(_.global)
   check("i", DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())(_.ignoreCase)
-  check("l", Perl())(_.localeLower)
+  check("l", DotNet, Perl())(_.localeLower)
   check("m", DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())(_.multiline)
   check("n", DotNet, PCRE, Perl(), Ruby())(_.explicitCapture)
   check("o", Perl(), Ruby())(_.once)

@@ -51,14 +51,16 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.DotNet))
 The matching unit is `utf16` (see [Matching Units](../dialects.mdx#matching-units)).
 
 `recheck` supports the following `RegexOptions`, written as the letters of their inline options.
+An option without an inline option has a letter of `recheck`'s own.
 
-| Flag | `RegexOptions`            | Inline | Notes                     |
-| ---- | ------------------------- | ------ | ------------------------- |
-| `i`  | `IgnoreCase`              | `(?i)` | In the invariant culture. |
-| `m`  | `Multiline`               | `(?m)` |                           |
-| `n`  | `ExplicitCapture`         | `(?n)` |                           |
-| `s`  | `Singleline`              | `(?s)` |                           |
-| `x`  | `IgnorePatternWhitespace` | `(?x)` |                           |
+| Flag | `RegexOptions`            | Inline | Notes                                                                                                      |
+| ---- | ------------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
+| `i`  | `IgnoreCase`              | `(?i)` | In the invariant culture.                                                                                  |
+| `l`  | `AnyNewLine`              |        | `^`, `$`, `\Z` and `.` see `\r\n`, `\n`, `\v`, `\f`, `\r`, U+0085, U+2028 and U+2029 as line terminators. |
+| `m`  | `Multiline`               | `(?m)` |                                                                                                            |
+| `n`  | `ExplicitCapture`         | `(?n)` |                                                                                                            |
+| `s`  | `Singleline`              | `(?s)` |                                                                                                            |
+| `x`  | `IgnorePatternWhitespace` | `(?x)` |                                                                                                            |
 
 ## Syntax Limitations
 
@@ -86,7 +88,7 @@ The `RegexOptions` `RightToLeft`, `ECMAScript` and `NonBacktracking` have no fla
 - Engine errors: `OutOfMemoryException`, `InsufficientExecutionStackException`.
 - Environment variable: `RECHECK_DOTNET`.
 
-`dotnet` builds the program as a file-based app, which needs a .NET 10 SDK or later.
+`dotnet` builds the program as a file-based app, which needs a .NET 11 SDK or later for `RegexOptions.AnyNewLine`.
 `RECHECK_DOTNET` replaces `dotnet` in both commands.
 `dotnet` builds it with the latest SDK installed, since `global.json` in the current directory does not apply.
 `recheck` builds the program once for each command line and set of the SDKs and the runtimes that `dotnet` lists, and the next runs reuse the build.

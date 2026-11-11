@@ -188,6 +188,8 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     assertEquals(programFile(program).name, "RecheckRuntimeAttack.cs")
     assertEquals(program.script, "in\n0066006f006f\n1:0078\n2:0079\n1:007a\n")
     assert(programFile(program).content.contains("\nCultureInfo.CurrentCulture = CultureInfo.InvariantCulture;\n"))
+    assertEquals(generate("", "ilmnsx", Dialect.DotNet).script.linesIterator.next(), "ilmnsx")
+    assert(programFile(program).content.contains("'l' => RegexOptions.AnyNewLine,"))
 
   test("RuntimeAttackProgram.generate: ICU"):
     val program = generate("f\"oo\\d\r", "dimswx", Dialect.ICU)

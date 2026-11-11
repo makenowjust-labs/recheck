@@ -23,7 +23,7 @@ final case class IRFeatureSet(
     upperEndSkipsLineTerminators: Boolean,
     // .NET, Boost.Regex, JavaScript, Python, python-regex: AfterTerminator, Java: Never, the others: InputBegin
     lineBeginAtEnd: IRLineBeginAtEnd,
-    // Boost.Regex: three or six characters with atomic `\r\n`, ICU: eight characters with atomic `\r\n`, JavaScript: LineTerminator, Java: six characters with atomic `\r\n`, PCRE: `(*CR)` and so on, the others: `\n`
+    // .NET (with `l`), ICU: eight characters with atomic `\r\n`, Boost.Regex: three or six characters with atomic `\r\n`, JavaScript: LineTerminator, Java: six characters with atomic `\r\n`, PCRE: `(*CR)` and so on, the others: `\n`
     lineTerminators: LineTerminatorSet,
     // Boost.Regex
     multilineAndDotAllByDefault: Boolean,
@@ -497,6 +497,7 @@ object IRFeatureSet:
       lineTerminators =
         if isBoostRegexChar then LineTerminatorSet.BoostRegexChar
         else if isBoostRegex then LineTerminatorSet.BoostRegexU32
+        else if isDotNet && flagSet.localeLower then LineTerminatorSet.DotNetAnyNewLine
         else if isICU then LineTerminatorSet.ICU
         else if isJavaScript then LineTerminatorSet.JavaScript
         else if isJava then LineTerminatorSet.Java

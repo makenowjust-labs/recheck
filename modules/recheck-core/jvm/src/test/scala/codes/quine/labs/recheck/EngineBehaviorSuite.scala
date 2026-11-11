@@ -545,7 +545,28 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     ("(?(a)(?i)AB|c)", "", "ab"),
     ("(?(a)(?i)A|b)", "", "B"),
     ("(?(a)(?i)A|b)C", "", "ac"),
-    ("(?(a)b|(?i)C)d", "", "cD")
+    ("(?(a)b|(?i)C)d", "", "cD"),
+    // `l` (AnyNewLine) makes `\r\n`, `\n`, VT, FF, `\r`, U+0085, U+2028 and U+2029 line terminators for `^`, `$`, `\Z` and
+    // `.`, where no line assertion matches between `\r` and `\n`.
+    ("a$", "", "a\r"),
+    ("a$", "l", "a\r"),
+    ("a$", "l", "a\r\n"),
+    ("a$", "l", "a\u000b"),
+    ("a$", "l", "a\n\n"),
+    ("a\\r$", "l", "a\r\n"),
+    ("a\\Z", "lm", "a\u0085"),
+    ("a$", "lm", "a\r\nb"),
+    ("a\\r$", "lm", "a\r\nb"),
+    ("a$", "lm", s"a${0x2028.toChar}b"),
+    ("^b", "lm", "a\rb"),
+    ("^\\n", "lm", "a\r\n"),
+    ("^$", "lm", "a\n"),
+    ("(?m)^$", "l", "a\r"),
+    ("\\Z", "lm", "\r\n"),
+    (".", "l", "\r"),
+    (".", "l", "\u000c"),
+    (".", "ls", "\r"),
+    ("(?-s:.)", "ls", 0x2029.toChar.toString)
   )
 
   /** Returns recheck's results of .NET's cases: the spans of the groups of the first match, `none` or `error`. */
@@ -585,6 +606,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
          |        options |= c switch
          |        {
          |            'i' => RegexOptions.IgnoreCase,
+         |            'l' => RegexOptions.AnyNewLine,
          |            'm' => RegexOptions.Multiline,
          |            'n' => RegexOptions.ExplicitCapture,
          |            's' => RegexOptions.Singleline,

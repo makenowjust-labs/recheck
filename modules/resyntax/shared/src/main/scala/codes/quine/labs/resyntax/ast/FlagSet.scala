@@ -60,7 +60,7 @@ final case class FlagSet(
     global: Boolean = false,
     // `i` (.NET, Boost.Regex, ICU, Java, JavaScript, PCRE, Perl, Python, python-regex, Ruby)
     ignoreCase: Boolean = false,
-    // `l` (Perl)
+    // `l` (.NET, Perl)
     localeLower: Boolean = false,
     // `m` (.NET, ICU, Java, JavaScript, PCRE, Perl, Python, python-regex, Ruby)
     multiline: Boolean = false,
@@ -225,7 +225,7 @@ object FlagSet:
       case 'i' =>
         flagSet.copy(ignoreCase = true)
       case 'l' =>
-        validateFlag(dialect.isPerl)
+        validateFlag(dialect.isDotNet || dialect.isPerl)
         flagSet.copy(localeLower = true)
       // Boost.Regex's `^` and `$` are multi-line by default, which `M` turns off.
       case 'm' =>
