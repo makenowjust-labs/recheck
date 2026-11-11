@@ -323,10 +323,22 @@ class FuzzCheckerSuite extends munit.FunSuite:
     assertEquals(inputsOf("^a*$", FString(64, seq)), (Set(64, 16, 32), Seq.empty))
     assertEquals(inputsOf("^a*a*$", FString(8, seq)), (Set(8, 2, 4, 16, 32, 64, 128, 256), Seq(FString(256, seq))))
     // A sequence climbs once, even after the run of its input.
+    // The first string also runs as `(a!){n}` of 3 and 7 characters before `!`.
     assertEquals(
       inputsOf("^a*a*$", FString(UString('a', '!')), FString(1, seq), FString(3, seq))._1,
-      Set(1, 2, 4, 8, 16, 32, 64, 128, 256, 3)
+      Set(1, 2, 4, 8, 16, 32, 64, 128, 256, 3, 7)
     )
+
+  test("FuzzChecker#Population#execute: a string reaching a new coverage item repeats as a whole"):
+    val checker = checkerOf(ReDoS.parse("foo.+bar", "", Dialect.JavaScript))
+    val pop = new checker.Population(0, mutable.Set.empty, mutable.Set.empty)
+    val str = FString(UString('f', 'o', 'o', 'x', 'x'))
+    val whole = FString.Repeat(0, 5) +: str.seq
+    pop.execute(str)
+    assertEquals(pop.candidates.values.toSeq, Seq(FString(128, whole)))
+    // The string reaches no new coverage item.
+    pop.execute(FString(UString('f', 'o', 'o', 'x', 'x', 'x')))
+    assertEquals(checker.climbed.toSet, Set(whole))
 
   test("FuzzChecker#Population#execute: no candidate of a skeleton whose attack failed"):
     val ir = ReDoS.parse("^(?:a|a)*$", "", Dialect.JavaScript)

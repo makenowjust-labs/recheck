@@ -172,8 +172,10 @@ object FuzzChecker:
       coverage: Set[CoverageItem]
   )
 
-  /** Run is a run of a string that ends, with the size of its input and its steps. */
-  private[fuzz] final case class Run(str: FString, size: Int, steps: Int)
+  /** Run is a run of a string that ends, with the size of its input, its steps, and whether it reaches a new coverage
+    * item.
+    */
+  private[fuzz] final case class Run(str: FString, size: Int, steps: Int, reachesNew: Boolean)
 
   /** The least ratio of the steps per character that two doublings of the repeat count add, for a string to climb.
     *
@@ -612,12 +614,18 @@ private[fuzz] final class FuzzChecker(
     /** Executes the string and adds its result, and a candidate of an attack if it reaches `incubationLimit`.
       *
       * A string with repetitions climbs once for its sequence (see [[climb]]).
+      *
+      * A string without repetitions that reaches a new coverage item is also executed as the one repeating it as a
+      * whole, which climbs. The matching goes as far as the item from each of the starts that the repetition makes.
       */
     def execute(str: FString): Unit =
       val climbs = !str.isConstant && !climbed.contains(str.seq)
-      for run <- run(str, climbs) if climbs do
-        climbed.add(str.seq)
-        climb(run)
+      for run <- run(str, climbs) do
+        if climbs then
+          climbed.add(str.seq)
+          climb(run)
+        if run.reachesNew && str.isConstant && !str.isEmpty then
+          execute(FString(1, FString.Repeat(0, str.size) +: str.seq))
 
     /** Executes the strings of the repeat count doubled again and again, while the steps grow more than linearly.
       *
@@ -649,8 +657,8 @@ private[fuzz] final class FuzzChecker(
 
     /** Runs the string, and returns the run unless it stops on the limit or the timeout.
       *
-      * On the first run of its input, it adds the result, and a candidate of an attack if it reaches
-      * `incubationLimit`. It runs the input again only if `reruns`.
+      * On the first run of its input, it adds the result, and a candidate of an attack if it reaches `incubationLimit`.
+      * It runs the input again only if `reruns`.
       */
     private def run(str: FString, reruns: Boolean): Option[Run] =
       if candidates.size >= maxAttackCandidates then return None
@@ -665,6 +673,7 @@ private[fuzz] final class FuzzChecker(
       val opts = Options(incubationLimit, usesAcceleration = usesAcceleration, needsCoverage = isFirst)
       val result = Interpreter.runWithTimeout(program, input, opts, incubationTimeout)
       val stops = result.status == Status.Limit || result.status == Status.Timeout
+      val reachesNew = isFirst && !result.coverage.subsetOf(visited)
       if isFirst then
         add(str, input, result)
         if stops then
@@ -673,7 +682,7 @@ private[fuzz] final class FuzzChecker(
                 |  string: $str""".stripMargin
           val skeleton = str.skeleton
           if !failedSkeletons.contains(skeleton) && !candidates.contains(skeleton) then candidates(skeleton) = str
-      Option.unless(stops)(Run(str, input.length, result.steps))
+      Option.unless(stops)(Run(str, input.length, result.steps, reachesNew))
 
     /** Records the execution result. */
     def add(str: FString, input: UString, result: Result): Unit =
