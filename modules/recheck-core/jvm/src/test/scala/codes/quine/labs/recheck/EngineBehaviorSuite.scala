@@ -539,6 +539,82 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
           |""".stripMargin
     assertEquals(cases(DotNetExecutor(SourceFile("Main.cs", program))), openCaptureModel(all, Dialect.DotNet))
 
+  /** The cases of .NET's syntax and matching: the pattern, the flags and the subject. */
+  val dotNetCases: Seq[(String, String, String)] = Seq(
+    // An inline option in a branch of a conditional reaches the other branch, but not the rest.
+    ("(?(a)(?i)AB|c)", "", "ab"),
+    ("(?(a)(?i)A|b)", "", "B"),
+    ("(?(a)(?i)A|b)C", "", "ac"),
+    ("(?(a)b|(?i)C)d", "", "cD")
+  )
+
+  /** Returns recheck's results of .NET's cases: the spans of the groups of the first match, `none` or `error`. */
+  def dotNetModel(patterns: Seq[(String, String, String)]): Seq[String] =
+    patterns.map: (source, flags, subject) =>
+      try
+        val ir = ReDoS.parse(source, flags, Dialect.DotNet)
+        val result = Interpreter.run(ProgramBuilder.build(ir, false), ir.mode.decode(subject), Interpreter.Options())
+        result.captures.filter(_ => result.status == Interpreter.Status.Ok) match
+          case Some(captures) => captures.grouped(2).map(g => s"${g(0)},${g(1)}").mkString(" ")
+          case None           => "none"
+      catch case _: InvalidRegExpException => "error"
+
+  // Checked with .NET 11.0.0.
+  runtimeTest(".NET: the syntax and the matching", "dotnet"):
+    val program =
+      """|using System;
+         |using System.Text;
+         |using System.Text.RegularExpressions;
+         |
+         |static string Decode(string hex)
+         |{
+         |    var s = new StringBuilder();
+         |    if (hex == "-") return "";
+         |    for (var i = 0; i < hex.Length; i += 4) s.Append((char)Convert.ToUInt16(hex.Substring(i, 4), 16));
+         |    return s.ToString();
+         |}
+         |
+         |string flags;
+         |while ((flags = Console.ReadLine()) != null)
+         |{
+         |    var pattern = Decode(Console.ReadLine());
+         |    var subject = Decode(Console.ReadLine());
+         |    var options = RegexOptions.None;
+         |    foreach (var c in flags)
+         |    {
+         |        options |= c switch
+         |        {
+         |            'i' => RegexOptions.IgnoreCase,
+         |            'm' => RegexOptions.Multiline,
+         |            'n' => RegexOptions.ExplicitCapture,
+         |            's' => RegexOptions.Singleline,
+         |            'x' => RegexOptions.IgnorePatternWhitespace,
+         |            _ => throw new ArgumentException(flags),
+         |        };
+         |    }
+         |    Match m;
+         |    try
+         |    {
+         |        m = new Regex(pattern, options).Match(subject);
+         |    }
+         |    catch (ArgumentException)
+         |    {
+         |        Console.WriteLine("case:error");
+         |        continue;
+         |    }
+         |    var spans = new string[m.Groups.Count];
+         |    for (var i = 0; i < spans.Length; i++)
+         |    {
+         |        var g = m.Groups[i];
+         |        spans[i] = g.Success ? g.Index + "," + (g.Index + g.Length) : "-1,-1";
+         |    }
+         |    Console.WriteLine("case:" + (m.Success ? string.Join(" ", spans) : "none"));
+         |}
+         |""".stripMargin
+    val input =
+      dotNetCases.map((source, flags, subject) => s"$flags\n${utf16Hex(source)}\n${utf16Hex(subject)}\n").mkString
+    assertEquals(cases(DotNetExecutor(SourceFile("Cases.cs", program)), input), dotNetModel(dotNetCases))
+
   // Checked with Ruby 4.0.9.
   runtimeTest("Ruby: back-references in an open capture", "ruby"):
     val style = AttackPatternStyle.Ruby(bytes = false)
