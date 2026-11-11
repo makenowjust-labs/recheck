@@ -69,6 +69,29 @@ test("check: with abort (3)", async () => {
   });
 });
 
+test("repair", async () => {
+  const pool = start();
+
+  const rx = await pool.repair("^(a+)+$", "", { keep: "match" });
+  expect(rx).toEqual({ status: "safe", method: "repair", keep: "match" });
+});
+
+test("repair: with abort", async () => {
+  const pool = start();
+
+  const controller = new AbortController();
+  const signal = controller.signal;
+  controller.abort();
+  const rx = await pool.repair("^(a+)+$", "", { signal });
+  expect(rx).toEqual({
+    source: "^(a+)+$",
+    flags: "",
+    dialect: { name: "javascript" },
+    status: "unknown",
+    error: { kind: "cancel" },
+  });
+});
+
 test("check: parallel", async () => {
   const pool = start(2);
 

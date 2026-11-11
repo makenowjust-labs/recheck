@@ -73,7 +73,7 @@ const expectDiagnostics = (diagnostics: Diagnostics, expected: Case): void => {
 
 describe.each(entries)(
   `backend: ${backend}, entry: %s`,
-  (_, { check, checkSync }) => {
+  (_, { check, checkSync, repair, repairSync }) => {
     for (const expected of cases) {
       const title = `/${expected.source}/${expected.flags}`;
 
@@ -91,5 +91,29 @@ describe.each(entries)(
         expectDiagnostics(diagnostics, expected);
       });
     }
+
+    const repaired = {
+      source: "^(a+)+$",
+      flags: "",
+      dialect: { name: "javascript" },
+      unitMode: "utf16",
+      status: "repaired",
+      repaired: "^(a+)$",
+      complexity: { type: "linear", summary: "linear", isFuzz: false },
+      kept: [0],
+      comparison: { kind: "equivalent" },
+    };
+
+    test("repair", async () => {
+      await expect(
+        repair("^(a+)+$", "", { keep: "match-range" }),
+      ).resolves.toEqual(repaired);
+    });
+
+    test("repairSync", () => {
+      expect(repairSync("^(a+)+$", "", { keep: "match-range" })).toEqual(
+        repaired,
+      );
+    });
   },
 );

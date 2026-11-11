@@ -141,17 +141,30 @@ test("check: invalid", async () => {
   );
 });
 
-// The synckit function is created once per module, so this is the only test using it.
+// The synckit function is created once per module, so the synckit tests share this one.
+const synckitFn = jest.fn((method: unknown, ..._: unknown[]) =>
+  method === "check" ? { status: "vulnerable" } : { status: "safe" },
+);
+
 test("checkSync: synckit", () => {
   syncBackend.mockReturnValueOnce("synckit");
-  const syncFn = jest.fn((..._: unknown[]) => ({ status: "vulnerable" }));
-  const createSyncFn = jest.mocked(synckit.createSyncFn);
-  createSyncFn.mockReturnValueOnce(syncFn as any);
+  jest.mocked(synckit.createSyncFn).mockReturnValue(synckitFn as any);
 
   const diagnostics = main.checkSync("^(a|a)+$", "");
   expect(diagnostics.status).toBe("vulnerable");
-  expect(createSyncFn).toHaveBeenCalledTimes(1);
-  expect(syncFn).toHaveBeenCalledWith("^(a|a)+$", "", {});
+  expect(synckitFn).toHaveBeenCalledWith("check", "^(a|a)+$", "", {});
+});
+
+test("repairSync: synckit", () => {
+  syncBackend.mockReturnValueOnce("synckit");
+  jest.mocked(synckit.createSyncFn).mockReturnValue(synckitFn as any);
+
+  const rx = main.repairSync("^(a+)+$", "", { keep: "match" });
+  expect(rx.status).toBe("safe");
+  expect(synckitFn).toHaveBeenCalledWith("repair", "^(a+)+$", "", {
+    keep: "match",
+  });
+  expect(synckit.createSyncFn).toHaveBeenCalledTimes(1);
 });
 
 test("checkSync: pure", () => {
@@ -159,6 +172,49 @@ test("checkSync: pure", () => {
 
   const diagnostics = main.checkSync("^(a|a)+$", "");
   expect(diagnostics.status).toBe("vulnerable");
+});
+
+test("repair: java", async () => {
+  backend.mockReturnValueOnce("java");
+  javaEnsure.mockImplementationOnce(() =>
+    agent.start("java", ["-jar", RECHECK_JAR, "agent"]),
+  );
+
+  const rx = await main.repair("^(a+)+$", "", { keep: "match-range" });
+  expect(rx).toMatchObject({
+    status: "repaired",
+    repaired: "^(a+)$",
+    kept: [0],
+  });
+});
+
+test("repair: worker", async () => {
+  backend.mockReturnValueOnce("worker");
+
+  const rx = await main.repair("^(a+)+$", "", { keep: "match" });
+  expect(rx).toEqual({ status: "safe", method: "repair", keep: "match" });
+});
+
+test("repair: pure", async () => {
+  backend.mockReturnValueOnce("pure");
+
+  const rx = await main.repair("^(a+)+$", "");
+  expect(rx).toMatchObject({
+    status: "repaired",
+    repaired: "^(a+)$",
+    kept: [0, 1],
+  });
+});
+
+test("repairSync: pure", () => {
+  syncBackend.mockReturnValueOnce("pure");
+
+  const rx = main.repairSync("^(a+)+$", "", { keep: "match" });
+  expect(rx).toMatchObject({
+    status: "repaired",
+    repaired: "^(a+)$",
+    kept: [],
+  });
 });
 
 test("checkSync: invalid", () => {

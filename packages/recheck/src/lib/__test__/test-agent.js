@@ -67,6 +67,16 @@ process.stdin.on("data", (data) => {
           delete checks[json.id];
         }, 100);
         break;
+      // A fake `repair` implementation, which returns `keep`.
+      case "repair":
+        console.log(
+          JSON.stringify({
+            jsonrpc: "2.0+push",
+            id: json.id,
+            result: { status: "safe", keep: json.params.keep ?? null },
+          }),
+        );
+        break;
       case "cancel":
         console.log(
           JSON.stringify({
