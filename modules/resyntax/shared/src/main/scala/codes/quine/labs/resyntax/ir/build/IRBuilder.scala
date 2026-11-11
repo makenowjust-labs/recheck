@@ -581,7 +581,8 @@ private[build] class IRBuilder(
   def buildConditional(node: Node, test: ConditionalTest, yes: Node, no: Option[Node]): Either[IRNodeData, IRNode] =
     def branch(node: Option[Node]): IRNode = node.fold(IRNode(IRNodeData.Empty))(n => scoped(build(n)))
 
-    // .NET's inline flags in the yes branch reach the no branch, as they reach the next alternatives of a group.
+    // The inline flags in the yes branch reach the no branch in .NET, PCRE and Perl, as they reach the next alternatives
+    // of a group.
     def branches: (IRNode, IRNode) =
       if featureSet.carriesFlagsIntoNoBranch then scoped((build(yes), branch(no)))
       else (branch(Some(yes)), branch(no))
@@ -620,8 +621,9 @@ private[build] class IRBuilder(
       case ConditionalTest.LookAround(kind, body)  => Some(Right(buildLookAroundCondition(kind, body)))
       case ConditionalTest.CalloutLookAround(_, _) => None
     condition match
-      case Some(Left(true))       => Right(branch(Some(yes)))
-      case Some(Left(false))      => Right(if featureSet.carriesFlagsIntoNoBranch then branches._2 else branch(no))
+      case Some(Left(true))  => Right(branch(Some(yes)))
+      case Some(Left(false)) =>
+        Right(if featureSet.carriesFlagsIntoNoBranch && no.nonEmpty then branches._2 else branch(no))
       case Some(Right(condition)) =>
         val (yesNode, noNode) = branches
         Left(IRNodeData.Conditional(condition, yesNode, noNode))

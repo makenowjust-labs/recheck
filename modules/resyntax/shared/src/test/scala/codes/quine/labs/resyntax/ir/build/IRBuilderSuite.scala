@@ -237,8 +237,8 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("(?(?<=x)a|b)", "", DotNet)(
     Conditional(IRCondition.LookBehind(false, char('x')), char('a'), char('b'))
   )
-  // .NET's inline option in a branch lasts until the end of the conditional, also in the next branch.
-  check("(?(x)(?i)a|b)c", "", DotNet)(
+  // An inline flag in a branch lasts until the end of the conditional, also in the next branch.
+  check("(?(?=x)(?i)a|b)c", "", DotNet, PCRE, Perl())(
     Sequence(
       Conditional(
         IRCondition.LookAhead(false, char('x')),

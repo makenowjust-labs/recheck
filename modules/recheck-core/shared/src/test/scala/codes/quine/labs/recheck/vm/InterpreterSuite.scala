@@ -749,6 +749,10 @@ class InterpreterSuite extends munit.FunSuite:
     check("(?<!a*(?:a?)+?)", "x", DotNet)(NoMatch)
 
   test("Interpreter.run: conditionals"):
+    // An inline flag in the yes branch reaches the no branch, but Ruby reads all after `(?i)` as the yes branch.
+    check("^(a)?(?(1)(?i)A|b)$", "B", PCRE, Perl(), DotNet)(Seq(g(0, 1)))
+    check("^(a)?(?(1)(?i)A|b)$", "B", Ruby())(NoMatch)
+    check("^(?(?=a)(?i)A|b)C$", "bC", PCRE, Perl(), DotNet)(Seq(g(0, 2)))
     check("^(a)?(?(1)b|c)$", "ab", PCRE, Perl(), Python(), Ruby(), DotNet)(Seq(g(0, 2), g(0, 1)))
     check("^(a)?(?(1)b|c)$", "c", PCRE, Perl(), Python(), Ruby(), DotNet)(Seq(g(0, 1)))
     check("^(a)?(?(1)b|c)$", "b", PCRE, Perl(), Python(), Ruby(), DotNet)(NoMatch)
