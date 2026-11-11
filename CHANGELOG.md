@@ -29,6 +29,7 @@ Misc:
 - [#1965](https://github.com/makenowjust-labs/recheck/pull/1965) Show the dialects by their names in the Playground ([@makenowjust](https://github.com/makenowjust))
 - [#1962](https://github.com/makenowjust-labs/recheck/pull/1962) Update dependency @playwright/test to v1.65.0 ([@renovate[bot]](https://github.com/apps/renovate))
 - [#1971](https://github.com/makenowjust-labs/recheck/pull/1971) Look up mise's Perl versions in relocatable-perl, and wait a day for a release ([@makenowjust](https://github.com/makenowjust))
+- [#1985](https://github.com/makenowjust-labs/recheck/pull/1985) Update dependency jdx/mise to v2026.11.6 ([@renovate[bot]](https://github.com/apps/renovate))
 
 # 4.6.2 (2026-10-26)
 
