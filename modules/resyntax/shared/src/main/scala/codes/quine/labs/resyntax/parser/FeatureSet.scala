@@ -947,7 +947,7 @@ object FeatureSet:
       skipsCommentInQuantifier: Boolean,
       // Boost.Regex
       skipsSpaceInQuantifier: Boolean,
-      // Boost.Regex, ICU, Java, PCRE, Perl, Python, python-regex
+      // Boost.Regex, .NET, ICU, Java, PCRE, Perl, Python, python-regex
       skipsVerticalTab: Boolean,
       // ICU, PCRE, Perl
       skipsPatternWhiteSpace: Boolean,
@@ -984,7 +984,7 @@ object FeatureSet:
         skipsCommentInGroupOpening = isICU || isJava,
         skipsCommentInQuantifier = isICU || isPythonRegex,
         skipsSpaceInQuantifier = isBoostRegex,
-        skipsVerticalTab = isBoostRegex || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex,
+        skipsVerticalTab = isBoostRegex || isDotNet || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex,
         skipsPatternWhiteSpace = isICU || isPCRE || isPerl,
         skipsPythonSpace = (isBoostRegex && !isByte) || isPythonRegex,
         endsCommentAtNUL = isJava,

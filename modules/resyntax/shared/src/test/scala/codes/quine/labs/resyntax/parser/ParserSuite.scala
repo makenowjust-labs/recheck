@@ -32,12 +32,12 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   check("# \\\nfoo", "x", Python())(Blank("# \\\nfoo"))
   // Checked with Python 3.15.2.
   error("#\\", "x", Python())("Invalid backslash escape at 1")
-  // The whitespace and the comment ends are checked with .NET 10.0.14, Java 27.0.1, PHP 8.5.12 with PCRE2 10.49,
+  // The whitespace and the comment ends are checked with .NET 11.0.0, Java 27.0.1, PHP 8.5.12 with PCRE2 10.49,
   // Perl 5.44.0, Python 3.15.2 and Ruby 4.0.9.
   check("a\t\n\f\r b", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby()):
     Sequence(Literal('a'), Blank("\t\n\f\r "), Literal('b'))
-  check("a\u000bb", "x", Java, PCRE, Perl(), Python())(Sequence(Literal('a'), Blank("\u000b"), Literal('b')))
-  check("a\u000bb", "x", DotNet, Ruby())(Sequence(Literal('a'), Literal(0x0b), Literal('b')))
+  check("a\u000bb", "x", DotNet, Java, PCRE, Perl(), Python())(Sequence(Literal('a'), Blank("\u000b"), Literal('b')))
+  check("a\u000bb", "x", Ruby())(Sequence(Literal('a'), Literal(0x0b), Literal('b')))
   check("\u00a0*", "x", DotNet, Java, Perl(), Python(), Ruby())(Repeat(Literal(0xa0), Star(Greedy)))
   check("\u00a0*", "xu", PCRE)(Repeat(Literal(0xa0), Star(Greedy)))
   check("a\u0085\u200e\u200f\u2028\u2029b", "x", Perl()):
