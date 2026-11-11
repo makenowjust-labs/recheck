@@ -294,8 +294,22 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** A loop map table from block ID to positions. */
   private val loops: mutable.Map[Int, Seq[Int]] = mutable.Map.empty[Int, Seq[Int]].withDefaultValue(Seq.empty)
 
-  /** A coverage set. */
+  // TODO: Record the coverage items with counters by numbers too, as [[coveredInsts]] does the ones without counters.
+  /** A coverage set, of the items that [[coveredInsts]] does not have. */
   private val coverage: mutable.Set[CoverageItem] = mutable.Set.empty
+
+  /** Whether [[coveredInsts]] records the coverage, which it does for a program without counters. */
+  private val coversByInsts: Boolean = options.needsCoverage && program.meta.countersSize == 0
+
+  /** The coverage items without counters, by `2 * id + 1` for the instruction ID if it succeeds or else `2 * id`, which
+    * spares hashing them on every read.
+    */
+  private val coveredInsts: mutable.BitSet = mutable.BitSet.empty
+
+  /** Adds a coverage item of the instruction with the counters. */
+  private def cover(inst: Inst, counters: Vector[Int], ok: Boolean): Unit =
+    if coversByInsts then coveredInsts.addOne(inst.id * 2 + (if ok then 1 else 0))
+    else coverage.add(CoverageItem(CoverageLocation(inst.id, counters), ok))
 
   /** A failed points set. */
   private val failedPoints: mutable.Set[FailedPoint] = mutable.Set.empty
@@ -342,7 +356,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       .toSeq
     val heatmap =
       heats.indices.iterator.collect { case k if heats(k) > 0 => program.heatLocations(k) -> heats(k) }.toMap
-    Result(status, captures, steps, loops, failedPoints.toSet, coverage.toSet, heatmap.withDefaultValue(0))
+    val covered = coveredInsts.iterator.map(k => CoverageItem(CoverageLocation(k / 2, Vector.empty), k % 2 == 1))
+    val coverage = this.coverage.toSet ++ covered
+    Result(status, captures, steps, loops, failedPoints.toSet, coverage, heatmap.withDefaultValue(0))
 
   /** Runs matching from the start of the input. */
   def run(): Result =
@@ -683,7 +699,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             frame.pos == frame.counters(end.index)
           case AssertKind.NotBetweenCRLF =>
             !(0 < frame.pos && frame.pos < input.length && input(frame.pos - 1) == 0x0d && input(frame.pos) == 0x0a)
-        if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
+        if options.needsCoverage then cover(inst, frame.counters, ok)
         ok
       case read: Inst.Read       => instRead(frame, read)
       case read: Inst.ReadBack   => instReadBack(frame, read)
@@ -852,7 +868,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         case None => width = Some(0)
     val ok = width.isDefined
 
-    if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
+    if options.needsCoverage then cover(inst, frame.counters, ok)
     if ok then
       if options.needsHeatmap && inst.heatIndex >= 0 then heats(inst.heatIndex) += 1
       frame.pos += (if back then -width.get else width.get)
@@ -870,7 +886,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     case Inst.Read(kind, _)              =>
       val c = frame.currentCode
       val ok = read(c, kind)
-      if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
+      if options.needsCoverage then cover(inst, frame.counters, ok)
       if ok then
         if options.needsHeatmap && inst.heatIndex >= 0 then heats(inst.heatIndex) += 1
         steps = Math.addExact(steps, 1)
@@ -901,7 +917,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     case Inst.ReadBack(kind, _)              =>
       val c = frame.previousCode
       val ok = read(c, kind)
-      if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
+      if options.needsCoverage then cover(inst, frame.counters, ok)
       if ok then
         if options.needsHeatmap && inst.heatIndex >= 0 then heats(inst.heatIndex) += 1
         steps = Math.addExact(steps, 1)
