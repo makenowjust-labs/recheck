@@ -39,7 +39,7 @@ Based on these pros and cons, we will consider the criteria for deciding an appr
 
 If it is likely to be detected correctly by the algorithm based on automata theory, we should use that, otherwise, or if detection is impossible, we should use the fuzzing algorithm.
 
-In practice, as shown in the following flowchart, the algorithm is assumed to be based on automata theory at first and performs NFA conversion, etc., and then falls back to the fuzzing if the size of the NFA exceeds the threshold.
+In practice, as shown in the following flowchart, the algorithm is assumed to be based on automata theory at first and performs NFA conversion, etc., and then falls back to the fuzzing if the size of the NFA, or of the DFA built from it, exceeds the threshold.
 
 <p className="text--center">
   <Image
@@ -48,6 +48,15 @@ In practice, as shown in the following flowchart, the algorithm is assumed to be
     width="900px"
   />
 </p>
+
+The algorithm based on automata theory models a back-reference exactly when the groups it refers to match at most `maxBackReferenceStrings` strings together (e.g. `("|')` in `/("|').*?\1/`): the states of the automaton record what the groups captured, and the back-reference reads it.
+It gives up on the other back-references and the constructs that it cannot model exactly.
+Then the fuzzing first builds an automaton that explores every path the backtracking may take: a look-around may or may not succeed, and a back-reference matches one of the strings that the groups it refers to may match, or the empty string.
+The matching time of this automaton bounds the one of the regular expression from above.
+If the bound is linear, the regular expression is safe without fuzzing (e.g. `/^([a-z]+)=\1$/`).
+Otherwise, the fuzzing starts from the attack strings of the bound (see [Seeding](fuzzing.mdx#seeding)).
+The repetitions of the largest counts become `*` or `+` in the bound until the sum of the rest is below the threshold of the repeat counts (e.g. `/^[a-z]{1,64}@[a-z]{1,255}$/` is safe, as the bound of `/^[a-z]+@[a-z]+$/` is linear).
+As the bound is a part of the fuzzing, the `fuzz` checker bounds a regular expression too, while the `automaton` checker does not.
 
 ## Notes
 

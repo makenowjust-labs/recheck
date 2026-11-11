@@ -2,6 +2,8 @@ package codes.quine.labs.resyntax.parser
 
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
+import codes.quine.labs.resyntax.ast.CaseCommandKind
+import codes.quine.labs.resyntax.ast.CaseRegionEnd
 import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.CommandKind
@@ -10,29 +12,17 @@ import codes.quine.labs.resyntax.ast.EscapeClassKind
 import codes.quine.labs.resyntax.ast.EscapeStyle
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.Node
-import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.Dialect.*
 
-class ParserEncodingSuite extends munit.FunSuite:
+class ParserEncodingSuite extends munit.FunSuite with ParserHelper:
 
   def parse(s: String, flags: String, dialect: Dialect): Node =
     val flagSet = FlagSet.parse(flags, dialect)
     Parser.parse(s, flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
-
-  def check(s: String, flags: String, dialect: Dialect)(expected: NodeData)(using loc: munit.Location): Unit =
-    test(s"Parser.parse: /$s/$flags in $dialect"):
-      val result = parse(s, flags, dialect)
-      assert(result.equalsWithoutLoc(Node(expected)), result)
-
-  def error(s: String, flags: String, dialect: Dialect)(message: String)(using loc: munit.Location): Unit =
-    test(s"Parser.parse: /$s/$flags in $dialect with error \"$message\""):
-      interceptMessage[ParsingException](message)(parse(s, flags, dialect))
-
-  def bytes(s: String): Seq[NodeData] = s.getBytes("UTF-8").toSeq.map(b => Literal(b & 0xff))
 
   // Python's bytes pattern has no Unicode escape, and its characters are bytes of Latin-1.
   val PythonBytes: Dialect = Python(Python.Type.Bytes)
@@ -49,6 +39,15 @@ class ParserEncodingSuite extends munit.FunSuite:
   // PCRE reads UTF-8 by `u` or `(*UTF)`, and bytes otherwise.
   check("\u00e9+", "", PCRE)(Sequence(Literal(0xc3), Repeat(Literal(0xa9), Plus(Greedy))))
   check("\u00e9+", "u", PCRE)(Repeat(Literal(0xe9), Plus(Greedy)))
+  check("\\Q\u00e9\\E*", "", PCRE):
+    CaseRegion(
+      CaseCommandKind.QuoteCommand,
+      Seq(part(Literal(0xc3), "\u00c3"), part(Repeat(Literal(0xa9), Star(Greedy)), "\u00a9")),
+      CaseRegionEnd.ClosedBeforeQuantifier
+    )
+  check("[\\Q\u00e9\\E]", "", PCRE):
+    val parts = Seq(classPart(ClassLiteral(0xc3), "\u00c3"), classPart(ClassLiteral(0xa9), "\u00a9"))
+    Class(false, ClassCaseRegion(CaseCommandKind.QuoteCommand, parts, CaseRegionEnd.Closed))
   check("[\uD834\uDF06-\uD834\uDF08a-z]", "", PCRE)(
     Class(
       false,
@@ -109,7 +108,12 @@ class ParserEncodingSuite extends munit.FunSuite:
   )
   error("[\u00e9-\u00e0]", "", Perl())("Out of order class range at 1")
   // The case commands do not change non-ASCII bytes.
-  check("\\U\u00e9a", "", PerlBytes)(Sequence((bytes("\u00e9") :+ Literal('A'))*))
+  check("\\U\u00e9a", "", PerlBytes):
+    CaseRegion(
+      CaseCommandKind.UpperCommand,
+      Seq(part(Literal(0xc3), "\u00c3"), part(Literal(0xa9), "\u00a9"), part(Literal('A'), "a")),
+      CaseRegionEnd.Unclosed
+    )
 
   // Ruby's ASCII-8BIT regexp reads the UTF-8 bytes of the source (as `Regexp.new(source.b, Regexp::NOENCODING)`).
   val RubyBytes: Dialect = Ruby(Ruby.Encoding.ASCII8Bit)
@@ -124,9 +128,15 @@ class ParserEncodingSuite extends munit.FunSuite:
     error("\\u00e9", flags, dialect)("Incompatible character encoding at 1")
     error("\\u{41 e9}", flags, dialect)("Incompatible character encoding at 6")
     check("\\u0041", flags, dialect)(Backslash(Escape(EscapeStyle.UnicodeHex4, 0x41)))
-    check("\\xff", flags, dialect)(Backslash(Escape(EscapeStyle.Hex2, 0xff)))
+    check("\\xff", flags, dialect)(Backslash(Escape(EscapeStyle.Hex2, 0xff, Some("ff"))))
+    check("é\\u{41 42}[\\u{41 42}-z]", flags, dialect):
+      val escapes = Seq(0x41, 0x42).map(value => Escape(EscapeStyle.UnicodeBracket, value))
+      val list = UnicodeList(escapes.map(escape => Node(Backslash(escape))))
+      val Seq(a, b) = escapes.map(escape => ClassItem.Value(ClassBackslashValue(escape)))
+      val range = ClassItem(ClassRange(b, ClassItem.Value(ClassLiteral('z'))))
+      Sequence(Literal(0xc3), Literal(0xa9), list, Class(false, ClassUnicodeList(Seq(a, range))))
   check("a\u00e9", "", Ruby())(Sequence(Literal('a'), Literal(0xe9)))
-  check("\\u00e9", "", Ruby())(Backslash(Escape(EscapeStyle.UnicodeHex4, 0xe9)))
+  check("\\u00e9", "", Ruby())(Backslash(Escape(EscapeStyle.UnicodeHex4, 0xe9, Some("00e9"))))
 
   test("Parser.parse: the locations of bytes in conditionals and branch resets point to their characters"):
     val Command(CommandKind.Conditional(ConditionalTest.LookAround(_, look), yes, Some(no))) =
@@ -159,3 +169,7 @@ class ParserEncodingSuite extends munit.FunSuite:
     val ClassItem.NonValue(ClassNest(false, digit), nest) = right: @unchecked
     assertEquals(nest, SourceLocation(4, 8))
     assertEquals(digit.loc, SourceLocation(5, 7))
+    val Sequence(Seq(_, _, Node(Class(false, ClassItem.NonValue(ClassUnicodeList(Seq(_, range), _), list)), _))) =
+      parse("é[\\u{41 42}-z]", "", RubyBytes).data: @unchecked
+    assertEquals(list, SourceLocation(2, 13))
+    assertEquals(range.loc, SourceLocation(2, 13))

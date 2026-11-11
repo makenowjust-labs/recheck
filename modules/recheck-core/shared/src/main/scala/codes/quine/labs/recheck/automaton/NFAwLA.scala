@@ -9,25 +9,25 @@ import codes.quine.labs.recheck.data.MultiSet
 import codes.quine.labs.recheck.util.GraphvizUtil.escape
 import codes.quine.labs.resyntax.ast.SourceLocation
 
-/** NFAwLA is an NFA with a look-ahead DFA.
+/** NFAwLA is an NFA with a look-ahead DFA (see [[OrderedNFA.toLookAheadDFA]]).
   *
-  * This NFA uses a multi-set instead of a set for duplicated transitions. A look-ahead DFA is a DFA which is
-  * constructed from the reversed original NFA. A state of this NFA is a pair of the original NFA state and the
-  * look-ahead DFA state, and the transition function must be pruned along with the backtrack behavior.
+  * This NFA uses a multi-set instead of a set for duplicated transitions. A state of this NFA is a pair of the original
+  * NFA state and the look-ahead DFA state `P`, and the transition function must be pruned along with the backtrack
+  * behavior.
   */
-final case class NFAwLA[A, Q](
-    alphabet: Set[(A, Set[Q])],
-    stateSet: Set[(Q, Set[Q])],
-    initSet: MultiSet[(Q, Set[Q])],
-    acceptSet: Set[(Q, Set[Q])],
-    delta: Map[((Q, Set[Q]), (A, Set[Q])), MultiSet[(Q, Set[Q])]],
-    lookAheadDFA: DFA[A, Set[Q]],
-    sourcemap: Map[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[SourceLocation]] =
-      Map.empty[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[SourceLocation]]
+final case class NFAwLA[A, Q, P](
+    alphabet: Set[(A, P)],
+    stateSet: Set[(Q, P)],
+    initSet: MultiSet[(Q, P)],
+    acceptSet: Set[(Q, P)],
+    delta: Map[((Q, P), (A, P)), MultiSet[(Q, P)]],
+    lookAheadDFA: DFA[A, P],
+    sourcemap: Map[((Q, P), (A, P), (Q, P)), Seq[SourceLocation]] =
+      Map.empty[((Q, P), (A, P), (Q, P)), Seq[SourceLocation]]
 ):
 
   /** Exports this transition function as a graph. */
-  def toGraph(using ctx: Context): Graph[(Q, Set[Q]), (A, Set[Q])] =
+  def toGraph(using ctx: Context): Graph[(Q, P), (A, P)] =
     ctx.interrupt:
       Graph.from(delta.iterator.flatMap { case (q1, a) -> qs =>
         qs.iterator.map((q1, a, _))
@@ -37,9 +37,7 @@ final case class NFAwLA[A, Q](
   def toGraphviz: String =
     val sb = new mutable.StringBuilder
 
-    def showQ(qps: (Q, Set[Q])): String =
-      val (q, ps) = qps
-      escape(s"($q, ${ps.map(_.toString).toSeq.sorted.mkString("{", ",", "}")})")
+    def showQ(qp: (Q, P)): String = escape(s"(${qp._1}, ${qp._2})")
 
     sb.append("digraph {\n")
     sb.append(s"  ${escape("")} [shape=point];\n")

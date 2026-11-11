@@ -12,7 +12,13 @@ import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 
 /** Diagnostics is what `ReDoS.check` reports: the evidence for judging the ReDoS risk of a RegExp, not a verdict. */
-sealed abstract class Diagnostics extends Product with Serializable
+sealed abstract class Diagnostics extends Product with Serializable:
+
+  /** Returns these diagnostics with the upper bound. */
+  def withUpperBound(upperBound: Option[UpperBound]): Diagnostics = this match
+    case d: Diagnostics.Safe       => d.copy(upperBound = upperBound)
+    case d: Diagnostics.Vulnerable => d.copy(upperBound = upperBound)
+    case d: Diagnostics.Unknown    => d.copy(upperBound = upperBound)
 
 /** Diagnostics types. */
 object Diagnostics:
@@ -25,7 +31,8 @@ object Diagnostics:
       unitMode: UnitMode,
       complexity: AttackComplexity.Safe,
       refutedAttacks: Seq[RefutedAttack],
-      checker: Checker
+      checker: Checker,
+      upperBound: Option[UpperBound] = None
   ) extends Diagnostics:
 
     override def toString: String =
@@ -33,7 +40,8 @@ object Diagnostics:
           |Dialect   : ${show(dialect)}
           |Status    : safe
           |Complexity: $complexity
-          |Checker   : $checker""".stripMargin + showRefutedAttacks(dialect, unitMode, refutedAttacks)
+          |Checker   : $checker""".stripMargin + showUpperBound(source, flags, upperBound) +
+        showRefutedAttacks(dialect, unitMode, refutedAttacks)
 
   /** Vulnerable is the type of the diagnostics with the attack string that the checking found. */
   final case class Vulnerable(
@@ -46,7 +54,8 @@ object Diagnostics:
       hotspot: Hotspot,
       runtimeAttack: Option[RuntimeAttack],
       refutedAttacks: Seq[RefutedAttack],
-      checker: Checker.Used
+      checker: Checker.Used,
+      upperBound: Option[UpperBound] = None
   ) extends Diagnostics:
 
     override def toString: String =
@@ -58,7 +67,8 @@ object Diagnostics:
         s"Attack string : ${attack.toString(AttackPatternStyle.of(dialect, unitMode))}",
         s"Hotspot       : /${hotspot.highlight(source)}/$flags"
       ) ++ runtimeAttack.map(r => s"Runtime attack: $r") :+ s"Checker       : $checker"
-      lines.mkString("\n") + showRefutedAttacks(dialect, unitMode, refutedAttacks)
+      lines.mkString("\n") + showUpperBound(source, flags, upperBound) +
+        showRefutedAttacks(dialect, unitMode, refutedAttacks)
 
   /** Unknown is the type of the diagnostics of a checking that could not finish because of an error. */
   final case class Unknown(
@@ -69,7 +79,8 @@ object Diagnostics:
       unitMode: Option[UnitMode],
       error: ErrorKind,
       refutedAttacks: Seq[RefutedAttack],
-      checker: Option[Checker]
+      checker: Option[Checker],
+      upperBound: Option[UpperBound] = None
   ) extends Diagnostics:
 
     require(refutedAttacks.isEmpty || unitMode.isDefined, "refuted attacks without the unit mode")
@@ -80,7 +91,7 @@ object Diagnostics:
           |Status : unknown
           |Error  : $error
           |Checker: ${checker.map(_.toString).getOrElse("(none)")}""".stripMargin +
-        unitMode.fold("")(showRefutedAttacks(dialect, _, refutedAttacks))
+        showUpperBound(source, flags, upperBound) + unitMode.fold("")(showRefutedAttacks(dialect, _, refutedAttacks))
 
   /** Unknown utilities. */
   object Unknown:
@@ -101,6 +112,19 @@ object Diagnostics:
         case ex: InvalidRegExpException => ErrorKind.InvalidRegExp(ex.getMessage)
         case ex: UnexpectedException    => ErrorKind.Unexpected(ex.getMessage)
       Unknown(source, flags, dialect, unitMode, kind, refutedAttacks, ex.checker)
+
+  /** Returns the section of the upper bound after a blank line, or an empty string if there is none.
+    *
+    * {{{
+    * Upper bound:
+    * - Complexity: exponential
+    *   Hotspot   : /^(a|aa)\1*$/
+    * }}}
+    */
+  private def showUpperBound(source: String, flags: String, upperBound: Option[UpperBound]): String =
+    upperBound.fold(""): b =>
+      val hotspot = Option.when(b.hotspot.spots.nonEmpty)(s"\n  Hotspot   : /${b.hotspot.highlight(source)}/$flags")
+      s"\n\nUpper bound:\n- Complexity: ${b.complexity}${hotspot.getOrElse("")}"
 
   /** Returns the section listing the refuted attacks after a blank line, or an empty string if there is none.
     *

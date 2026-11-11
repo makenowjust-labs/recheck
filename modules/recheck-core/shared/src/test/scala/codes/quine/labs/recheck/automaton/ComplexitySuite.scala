@@ -19,6 +19,13 @@ class ComplexitySuite extends munit.FunSuite {
     )
   }
 
+  test("Complexity.Vulnerable#bestRepeatCount") {
+    val w = Witness(Seq((Seq('a'.toInt), Seq('a'.toInt))), Seq('b'.toInt))
+    assertEquals(Exponential(w).bestRepeatCount(100_000, 4_000), 17)
+    assertEquals(Polynomial(2, w).bestRepeatCount(100_000, 4_000), 448)
+    assertEquals(Polynomial(2, w).bestRepeatCount(100_000, 100), 98)
+  }
+
   test("Complexity.Vulnerable#buildAttackPattern") {
     val w = Witness(Seq((Seq('a'.toInt), Seq('a'.toInt))), Seq('\u0000'.toInt))
     assertEquals(Exponential(w).buildAttackPattern(100_000, 4_000, UnitMode.UTF16).asUString.length, 19)

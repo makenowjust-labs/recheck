@@ -38,6 +38,14 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("(?:)(?:)", "", All*)(Sequence(Empty, Empty))
   check("ab", "", All*)(Sequence(char('a'), char('b')))
 
+  // Blank
+  check(" ", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Empty)
+  check(" a # b", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(char('a'))
+  check("a b", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Sequence(char('a'), char('b')))
+  check("[ a]", "x", Java)(char('a'))
+  check("[a b]", "x", Java)(Chars(CharSet.of('a', 'b')))
+  check("[a&& ]", "x", Java)(Chars(CharSet.empty))
+
   // Repeat
   check("(?:)*", "", All*)(Repeat(Empty, Unbounded(0, Greedy)))
   check("(?:)*?", "", All*)(Repeat(Empty, Unbounded(0, Lazy)))
@@ -383,6 +391,16 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   checkWith("(a)\\1", "", Perl(utf8 = false))(d =>
     Sequence(Capture(1, None, char('a')), referenceOf(d, unicode = false))
   )
+  // A back-reference just after a look-ahead of its capture reads what it has captured, as an atomic group does.
+  check("x(?=(a+))\\1", "", All*)(
+    Sequence(char('x'), Atomic(Capture(1, None, Repeat(char('a'), Unbounded(1, Greedy)))))
+  )
+  checkWith("(?=(a))\\1\\1", "", All*)(d =>
+    Sequence(LookAhead(false, Capture(1, None, char('a'))), referenceOf(d), referenceOf(d))
+  )
+  checkWith("(?=(a))(?=\\1)", "", All*)(d =>
+    Sequence(LookAhead(false, Capture(1, None, char('a'))), LookAhead(false, referenceOf(d)))
+  )
   checkPattern("(a)(?i)\\1", "", Perl(), Ruby()): pattern =>
     val Sequence(Seq(_, _, IRNode(BackReference(_, _, folding), _))) = pattern.node.data: @unchecked
     assertEquals(folding, IRBackReferenceFolding.Full(0))
@@ -400,11 +418,26 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
     )
   )
 
-  // Quoting command
-  check("\\Qa\\E", "", Java, PCRE)(Sequence(Empty, char('a'), Empty))
-  // Perl's lexer rewrites a regex literal, so its commands leave no nodes.
+  // Ruby's `\u{...}` of several code points is their escapes, and a quantifier after it repeats the last one.
+  check("x\\u{41 42}*", "", Ruby())(Sequence(char('x'), char('A'), Repeat(char('B'), Unbounded(0, Greedy))))
+  check("(\\u{41 42})", "", Ruby())(Capture(1, None, Sequence(char('A'), char('B'))))
+  check("[x\\u{41 42}]", "", Ruby())(Chars(CharSet.of('A', 'B', 'x')))
+  check("[\\u{41 42}-D]", "", Ruby())(Chars(CharSet.range('A', 'D')))
+  check("[\\u{30 31}-\\u{41 42}&&\\u{31 32}]", "", Ruby())(Chars(CharSet.of('1', '2')))
+  // The escapes of bytes make a character with the escapes of `\u{...}` beside them (e.g. `é-é` and `ê`).
+  check("[\\xC3\\xA9-\\u{E9 EA}]", "", Ruby())(Chars(CharSet.range(0xe9, 0xea)))
+
+  // Quoting and case commands are their nodes, and a quantifier after `\E` repeats the last one.
+  check("\\Qa\\E", "", Java, PCRE, Perl())(char('a'))
+  check("x\\Qab\\E*", "", Java, PCRE, Perl())(Sequence(char('x'), char('a'), Repeat(char('b'), Unbounded(0, Greedy))))
+  check("a\\Q\\Eb", "", Java, PCRE)(Sequence(char('a'), char('b')))
   check("\\Ua\\E", "", Perl())(char('A'))
-  check("\\Qa\\E", "", Perl())(char('a'))
+  check("\\Uab\\E", "", Perl())(Sequence(char('A'), char('B')))
+  check("[\\Qa\\E]", "", Java, PCRE, Perl())(char('a'))
+  check("[\\Qab\\E]", "", Java, PCRE, Perl())(Chars(CharSet.of('a', 'b')))
+  check("[x\\Qab\\E]", "", Java, PCRE, Perl())(Chars(CharSet.of('a', 'b', 'x')))
+  check("[\\Qa\\E-\\Qc\\E]", "", Java, PCRE, Perl())(Chars(CharSet.range('a', 'c')))
+  check("[A-\\LC\\E]", "", Perl())(Chars(CharSet.range('A', 'c')))
 
   // Java's CANON_EQ makes a character-level node unsupported.
   check("a(?c)b", "", Java)(Sequence(char('a'), Empty, Unsupported(NodeData.Literal('b'))))

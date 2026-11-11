@@ -29,9 +29,13 @@ import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 /** ProgramBuilder is a builder of a program from a RegExp pattern. */
 object ProgramBuilder:
 
-  /** Builds a corresponding program from the RegExp pattern, which runs as the engine of its dialect. */
-  def build(pattern: IRPattern)(using ctx: Context): Program =
-    new ProgramBuilder(pattern, pattern.captureCount).build()
+  /** Builds a corresponding program from the RegExp pattern, which runs as the engine of its dialect.
+    *
+    * With `omitsCaptures`, the program does not record the captures of the groups unless the pattern reads them, which
+    * change neither the steps nor the match then.
+    */
+  def build(pattern: IRPattern, omitsCaptures: Boolean)(using ctx: Context): Program =
+    new ProgramBuilder(pattern, pattern.captureCount, omitsCaptures).build()
 
 /** AcceptScope is what `(*ACCEPT)` ends successfully. */
 private[vm] enum AcceptScope:
@@ -47,7 +51,8 @@ private[vm] enum AcceptScope:
 
 private[vm] class ProgramBuilder(
     private val pattern: IRPattern,
-    private val capturesSize: Int
+    private val capturesSize: Int,
+    private val omitsCaptures: Boolean
 )(using ctx: Context):
 
   import ctx.*
@@ -62,6 +67,9 @@ private[vm] class ProgramBuilder(
     case _: IRNodeData.BackReference                           => true
     case IRNodeData.Conditional(_: IRCondition.Captured, _, _) => true
     case _                                                     => false
+
+  /** Whether the program records the captures of the groups. */
+  private val emitsCaptures = !omitsCaptures || readsCaptures
 
   /** Whether backtracking keeps the captures of the failed matching, which back-references and capture tests only see.
     */
@@ -475,13 +483,15 @@ private[vm] class ProgramBuilder(
 
   /** A builder for a capture node. */
   def buildCapture(index: Int, children: IRNode): Unit =
-    if unsetsOpenCaptures then emitInst(Inst.CapReset(index, index))
-    emitInst(Inst.CapOpen(index))
-    val saved = openCaptures
-    openCaptures = index :: openCaptures
-    build(children)
-    openCaptures = saved
-    emitInst(if back then Inst.CapBegin(index) else Inst.CapEnd(index))
+    if !emitsCaptures then build(children)
+    else
+      if unsetsOpenCaptures then emitInst(Inst.CapReset(index, index))
+      emitInst(Inst.CapOpen(index))
+      val saved = openCaptures
+      openCaptures = index :: openCaptures
+      build(children)
+      openCaptures = saved
+      emitInst(if back then Inst.CapBegin(index) else Inst.CapEnd(index))
 
   /** A builder for `x*` node. */
   def buildStar(
@@ -518,6 +528,39 @@ private[vm] class ProgramBuilder(
 
   /** A builder for `x{n,m}` node. */
   def buildRepeat(quantifier: IRQuantifier, child: IRNode): Unit =
+    child.data match
+      // A read takes no choice in an iteration, so it repeats without a counter.
+      case IRNodeData.Chars(set) if !back => buildReadRepeat(quantifier, child, readKind(set))
+      case _                              => buildCountedRepeat(quantifier, child)
+
+  /** A builder for `x{n,m}` node of a read, whose mandatory iterations are a `read_repeat` and whose greedy optional
+    * iterations are a `try-read-repeat`.
+    */
+  def buildReadRepeat(quantifier: IRQuantifier, child: IRNode, kind: ReadKind): Unit =
+    val loc = child.loc.toOption
+    def mandatory(n: Int): Unit =
+      if n == 1 then emitRead(kind, loc)
+      else if n > 1 then emitInst(Inst.ReadRepeat(kind, n, loc))
+
+    quantifier match
+      case IRQuantifier.Exact(n)                                         => mandatory(n)
+      case IRQuantifier.Bounded(n, m, BacktrackStrategy.Greedy) if m > n =>
+        mandatory(n)
+        val next = allocateLabel("next")
+        val retry = allocateLabel("retry")
+        emitTerminator(Inst.TryReadRepeat(kind, m - n, loc, next, retry))
+        enterBlock(retry)
+        emitTerminator(Inst.Jmp(next))
+        enterBlock(next)
+      case IRQuantifier.Unbounded(n, strategy) =>
+        mandatory(n)
+        buildCountedRepeat(IRQuantifier.Unbounded(0, strategy), child)
+      case IRQuantifier.Bounded(n, m, strategy) =>
+        mandatory(n)
+        buildCountedRepeat(IRQuantifier.Bounded(0, m - n, strategy), child)
+
+  /** A builder for `x{n,m}` node with counters. */
+  def buildCountedRepeat(quantifier: IRQuantifier, child: IRNode): Unit =
     def isLazy(strategy: BacktrackStrategy): Boolean = strategy == BacktrackStrategy.Lazy
 
     val empty = if child.canMatchEmpty then emptyIteration(quantifier) else IREmptyIteration.Ignore
@@ -637,7 +680,7 @@ private[vm] class ProgramBuilder(
 
   /** Emits a `cap-reset` if captures are reset on each iteration, and then runs `run`. */
   def wrapReset(child: IRNode)(run: => Unit): Unit =
-    if resetsCaptures then for (min, max) <- child.captureRange do emitInst(Inst.CapReset(min, max))
+    if resetsCaptures && emitsCaptures then for (min, max) <- child.captureRange do emitInst(Inst.CapReset(min, max))
     run
 
   /** A builder for an atomic group, which commits the first match of the child. */

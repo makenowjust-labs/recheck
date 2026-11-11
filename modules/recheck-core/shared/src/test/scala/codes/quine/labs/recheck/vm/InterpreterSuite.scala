@@ -43,7 +43,7 @@ class InterpreterSuite extends munit.FunSuite:
   def matches(source: String, flags: String, input: String, opts: Options): Result =
     val t = for
       ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
-      program = ProgramBuilder.build(ir)
+      program = ProgramBuilder.build(ir, false)
       result = Interpreter.run(program, ir.mode.decode(input), opts)
     yield result
     t.get
@@ -85,7 +85,7 @@ class InterpreterSuite extends munit.FunSuite:
       usesAcceleration: Boolean
   ): Status =
     val ir = ReDoS.parse(source, flags, dialect)
-    val program = ProgramBuilder.build(ir)
+    val program = ProgramBuilder.build(ir, false)
     val u = input match
       case s: String  => ir.mode.decode(s)
       case u: UString => u
@@ -123,7 +123,7 @@ class InterpreterSuite extends munit.FunSuite:
 
   def runSpans(source: String, dialect: Dialect, input: String, usesAcceleration: Boolean): Spans =
     val ir = ReDoS.parse(source, "", dialect)
-    val program = ProgramBuilder.build(ir)
+    val program = ProgramBuilder.build(ir, false)
     val result =
       Interpreter.run(program, ir.mode.decode(input), options(program, usesAcceleration))
     // The spans drop the unset groups at the end, which Perl does not report.
@@ -380,7 +380,7 @@ class InterpreterSuite extends munit.FunSuite:
     )(using ctx: Context): Result =
       val t = for
         ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
-        program = ProgramBuilder.build(ir)
+        program = ProgramBuilder.build(ir, false)
         result = Interpreter.runWithTimeout(program, ir.mode.decode(input), opts, timeout)
       yield result
       t.get
@@ -429,6 +429,37 @@ class InterpreterSuite extends munit.FunSuite:
     accepts("^(?:a|ab)c$", Java, "abc")
     // An atomic group keeps the captures in it.
     accepts("^(?>(a))\\1$", Java, "aa")
+
+  test("Interpreter.run: counted repetitions of a read"):
+    // A repetition of a read runs without a counter, and a repetition of a capture with it, in the same steps.
+    def run(source: String, input: String, opts: Options): (Status, Int, Int) =
+      val result = matches(source, "", input, opts)
+      (result.status, result.steps, result.heatmap.values.sum)
+    val cases = Seq(
+      ("^[ab]{3}c", Seq("abac", "abc", "ab", "abbbc")),
+      ("^[ab]{2,5}c", Seq("abc", "ababac", "abababc", "a", "abd")),
+      ("^[ab]{0,3}b", Seq("aab", "ab", "b", "aaab", "aaa")),
+      ("^.{1,4}x.*y", Seq("abxcy", "axxxxy", "abcdey", "xy")),
+      ("^[ab]{2,}c", Seq("abc", "ababc", "ac")),
+      ("^[ab]{1,3}?c", Seq("abc", "aaac", "aaaac"))
+    )
+    for (source, inputs) <- cases; input <- inputs; opts <- Seq(Options(needsHeatmap = true), Options()) do
+      val captured = source.replaceFirst("(\\[ab\\]|\\.)", "($1)")
+      assertEquals(run(source, input, opts), run(captured, input, opts), clue((source, input)))
+
+  test("Interpreter.run: captures omitted"):
+    // A program omitting the captures that the pattern does not read runs in the same steps.
+    def run(source: String, input: String, omitsCaptures: Boolean): Result =
+      val ir = ReDoS.parse(source, "", Dialect.JavaScript)
+      Interpreter.run(ProgramBuilder.build(ir, omitsCaptures), ir.mode.decode(input), Options())
+    for (source, input) <- Seq(("^(a|ab)(c|bcd)(d*)$", "abcd"), ("^((a)|b)*(?:(c)|d)+$", "abacdc"), ("(x(y))?z", "xyz"))
+    do
+      val (recorded, omitted) = (run(source, input, false), run(source, input, true))
+      assertEquals((omitted.status, omitted.steps), (recorded.status, recorded.steps))
+      assertEquals(omitted.captures.map(_.take(2)), recorded.captures.map(_.take(2)))
+      assert(clue(omitted.captures).forall(_.drop(2).forall(_ == -1)))
+    // A back-reference reads the captures, so they are recorded.
+    assertEquals(run("^(a+)\\1$", "aa", true).captures, Some(Seq(0, 2, 0, 1)))
 
   test("Interpreter.run: back-references to unset captures"):
     accepts("^(?:(a)|b)\\1$", JavaScript, "b")
@@ -656,13 +687,13 @@ class InterpreterSuite extends munit.FunSuite:
     accepts("(*UTF)^.$", PCRE, "é")
 
   test("Interpreter.run: acceleration on a program not allowing memoization"):
-    val program = ProgramBuilder.build(ReDoS.parse("a(*PRUNE)b", "", PCRE))
+    val program = ProgramBuilder.build(ReDoS.parse("a(*PRUNE)b", "", PCRE), false)
     interceptMessage[IllegalArgumentException]("requirement failed: The program does not allow memoization"):
       Interpreter.run(program, UString.empty, Options(usesAcceleration = true))
 
   test("ProgramBuilder.build: unsupported"):
     val ir = ReDoS.parse("a(?R)?", "", PCRE)
-    interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(ProgramBuilder.build(ir))
+    interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(ProgramBuilder.build(ir, false))
 
   // The expected spans are checked on Ruby 4.0, Java 27, .NET 10, Perl 5.44 and PHP 8.5 with PCRE2 10.49 without JIT.
 

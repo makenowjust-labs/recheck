@@ -34,7 +34,7 @@ tester.run("no-vulnerable", rule, {
       code: `const x = NotRegExp('^(a|a)*$');`,
     },
     {
-      code: `const x = /^(?=a*)$/; // ignoreErrors: true`,
+      code: `const x = /^(a+)\\1*$/; // ignoreErrors: true`,
       options: [{ checker: "automaton", ignoreErrors: true }],
     },
     { code: `const x = RegExp();` },
@@ -53,6 +53,7 @@ tester.run("no-vulnerable", rule, {
           incubationLimit: 25000,
           incubationTimeout: 250,
           maxAttackStringSize: 300000,
+          maxDFASize: 10000,
           maxDegree: 4,
           maxGeneStringSize: 2400,
           maxGenerationSize: 100,
@@ -89,12 +90,12 @@ tester.run("no-vulnerable", rule, {
       ],
     },
     {
-      code: `const x = /^(?=a*)$/; // ignoreErrors: false`,
+      code: `const x = /^(a+)\\1*$/; // ignoreErrors: false`,
       options: [{ checker: "automaton", ignoreErrors: false }],
       errors: [
         {
           message:
-            "Error on ReDoS vulnerability check: look-ahead assertion (unsupported)",
+            "Error on ReDoS vulnerability check: back-reference (unsupported)",
         },
       ],
     },

@@ -134,4 +134,9 @@ So `recheck` reports `^(a|a)*$` as vulnerable in every dialect, but the attack i
 The following approximations are common to the dialects.
 
 - The Unicode data (properties, case mappings) is of Unicode 18.0, while the engines use Unicode 16 or 17.
-- Look-arounds (including non-atomic ones), back-references, atomic groups, possessive quantifiers, conditionals and the backtracking control verbs other than `(*FAIL)` and `(*MARK)` are handled by the fuzz checker, not by the automaton checker.
+- The automaton checker handles look-aheads, look-behinds, atomic groups, possessive quantifiers and conditionals on look-arounds.
+  It handles back-references too, when the groups they refer to match at most `maxBackReferenceStrings` strings together, the pattern has no look-behind, and no look-around, atomic group or conditional has the groups (not in Perl, and in Ruby, neither a reference to a name shared by groups nor a case-insensitive one).
+  The following are handled by the fuzz checker, which may show that the pattern is safe by an upper bound of its matching time without fuzzing:
+  - non-atomic look-arounds, the other back-references, conditionals on groups, and the backtracking control verbs other than `(*FAIL)` and `(*MARK)`,
+  - in a look-behind, an assertion that looks at more than the kinds of the characters next to it (e.g. Java's `\b`, and `$` in .NET and Python) and a look-ahead, and
+  - in a look-behind that the engine matches forward from its possible starts (Java, PCRE, Perl and Python), an atomic group, a possessive quantifier, and an unbounded repetition (only Java allows it, e.g. `(?<=a*b)`).

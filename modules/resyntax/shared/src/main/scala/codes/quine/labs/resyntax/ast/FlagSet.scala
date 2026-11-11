@@ -72,7 +72,43 @@ final case class FlagSet(
     verboseMore: Boolean = false,
     // `y` (JavaScript)
     sticky: Boolean = false
-)
+):
+
+  /** Returns the letters of the flags in the order of the fields (e.g. `im` for `i` and `m`). */
+  def letters: String =
+    Seq(
+      anchored -> "A",
+      dollarEndOnly -> "D",
+      dupNames -> "J",
+      localeUpper -> "L",
+      analyze -> "S",
+      ungreedy -> "U",
+      extra -> "X",
+      (ascii && !asciiRestrict) -> "a",
+      asciiRestrict -> "aa",
+      asciiDigit -> "aD",
+      asciiPOSIX -> "aP",
+      asciiSpace -> "aS",
+      asciiPOSIXDigit -> "aT",
+      asciiWord -> "aW",
+      continue -> "c",
+      hasIndices -> "d",
+      evaluate -> "e",
+      global -> "g",
+      ignoreCase -> "i",
+      localeLower -> "l",
+      multiline -> "m",
+      explicitCapture -> "n",
+      once -> "o",
+      preserve -> "p",
+      nonDestructive -> "r",
+      dotAll -> "s",
+      unicode -> "u",
+      unicodeSets -> "v",
+      (verbose && !verboseMore) -> "x",
+      verboseMore -> "xx",
+      sticky -> "y"
+    ).collect { case (true, letters) => letters }.mkString
 
 object FlagSet:
 

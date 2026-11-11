@@ -1,6 +1,27 @@
 package codes.quine.labs.resyntax.ast
 
-sealed abstract class EscapeStyle extends Product with Serializable
+sealed abstract class EscapeStyle extends Product with Serializable:
+
+  /** Returns the plain text of the value after the letters of an escape in the style (e.g. `7F` after `\x`). */
+  def plainText(value: Int): String = this match
+    case EscapeStyle.Single(_)     => ""
+    case EscapeStyle.Control(char) => char.toString
+    // Ruby takes `?` after `\C-` as DEL, also as `\x3F`, and the value of any other character without its bits 0x60.
+    case EscapeStyle.ControlDash => if value == 0x7f then "\\x3F" else f"\\x$value%02X"
+    case EscapeStyle.Meta        => f"\\x${value & 0x7f}%02X"
+    case EscapeStyle.Octal       => s"{${Integer.toOctalString(value)}}"
+    // Three digits keep a following digit apart.
+    case EscapeStyle.BareOctal       => f"$value%03o"
+    case EscapeStyle.UnicodeHex4     => f"$value%04X"
+    case EscapeStyle.UnicodeHex4Pair =>
+      f"${Character.highSurrogate(value).toInt}%04X\\u${Character.lowSurrogate(value).toInt}%04X"
+    case EscapeStyle.UnicodeHex8    => f"$value%08X"
+    case EscapeStyle.UnicodeBracket => f"{$value%X}"
+    case EscapeStyle.NamedHex       => f"{U+$value%X}"
+    case EscapeStyle.Hex2           => f"$value%02X"
+    case EscapeStyle.Hex1           => f"$value%X"
+    case EscapeStyle.Hex0           => ""
+    case EscapeStyle.HexBracket     => f"{$value%X}"
 
 object EscapeStyle:
 

@@ -5,6 +5,7 @@ import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
+import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
@@ -32,7 +33,8 @@ object IRBuilder:
     *
     * The unit mode is the one that `Parser.determineUnitMode` determines for the source of the node.
     */
-  def build(node: Node, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): IRPattern =
+  def build(parsed: Node, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): IRPattern =
+    val node = stripSource(parsed)
     val starts = startOptions(node)
     val featureSet = IRFeatureSet.from(flagSet, dialect, starts)
     if featureSet.validatesCharsetFlags then
@@ -78,6 +80,82 @@ object IRBuilder:
       mode,
       notEmpty(starts)
     )
+
+  /** Returns the node without what only its source has: the blanks of the extended mode are removed, and Ruby's
+    * `\u{...}` of several code points and the case regions become their nodes.
+    *
+    * A sequence or a class union left with one item becomes the item, and a blank alone becomes an empty one.
+    */
+  private def stripSource(node: Node): Node = node.data match
+    case NodeData.Sequence(nodes) =>
+      expandNodes(nodes) match
+        case Seq(child) if nodes.size > 1 => stripSource(child)
+        case children                     => node.copy(data = NodeData.Sequence(children.map(stripSource)))
+    case NodeData.UnicodeList(nodes, _)   => node.copy(data = NodeData.Sequence(nodes.map(stripSource)))
+    case NodeData.CaseRegion(_, parts, _) =>
+      expandNodes(parts.map(_.value)) match
+        case Seq(child) => stripSource(child)
+        case children   => node.copy(data = NodeData.Sequence(children.map(stripSource)))
+    case NodeData.Blank(_)            => node.copy(data = NodeData.Sequence(Seq.empty))
+    case NodeData.Disjunction(nodes)  => node.copy(data = NodeData.Disjunction(nodes.map(stripSource)))
+    case data: NodeData.Repeat        => node.copy(data = data.copy(node = stripSource(data.node)))
+    case NodeData.Group(kind, child)  => node.copy(data = NodeData.Group(kind, stripSource(child)))
+    case NodeData.Command(kind)       => node.copy(data = NodeData.Command(stripCommandSource(kind)))
+    case NodeData.Class(invert, item) => node.copy(data = NodeData.Class(invert, stripClassSource(item)))
+    case _                            => node
+
+  /** Returns the nodes where Ruby's `\u{...}` and a case region are their nodes, without the blanks. */
+  private def expandNodes(nodes: Seq[Node]): Seq[Node] = nodes.flatMap: node =>
+    node.data match
+      case NodeData.UnicodeList(nodes, _)   => nodes
+      case NodeData.CaseRegion(_, parts, _) => expandNodes(parts.map(_.value))
+      case NodeData.Blank(_)                => Seq.empty
+      case _                                => Seq(node)
+
+  private def stripCommandSource(kind: CommandKind): CommandKind = kind match
+    case CommandKind.BranchReset(nodes)         => CommandKind.BranchReset(nodes.map(stripSource))
+    case CommandKind.Conditional(test, yes, no) =>
+      val stripped = test match
+        case test: ConditionalTest.LookAround                 => test.copy(node = stripSource(test.node))
+        case ConditionalTest.CalloutLookAround(callout, test) =>
+          ConditionalTest.CalloutLookAround(callout, test.copy(node = stripSource(test.node)))
+        case test => test
+      CommandKind.Conditional(stripped, stripSource(yes), no.map(stripSource))
+    case CommandKind.AbsenceExpression(absent, exp) =>
+      CommandKind.AbsenceExpression(stripSource(absent), stripSource(exp))
+    case CommandKind.AbsenceStopper(absent) => CommandKind.AbsenceStopper(stripSource(absent))
+    case kind                               => kind
+
+  private def stripClassSource(item: ClassItem): ClassItem = item.data match
+    case ClassItemData.ClassUnion(items) =>
+      expandClassItems(items) match
+        case Seq(child) if items.size > 1 => stripClassSource(child)
+        case children => ClassItem(ClassItemData.ClassUnion(children.map(stripClassSource)), item.loc)
+    case ClassItemData.ClassUnicodeList(items, _)   => ClassItem(ClassItemData.ClassUnion(items), item.loc)
+    case ClassItemData.ClassCaseRegion(_, parts, _) =>
+      expandClassItems(parts.map(_.value)) match
+        case Seq(child) => stripClassSource(child)
+        case children   => ClassItem(ClassItemData.ClassUnion(children.map(stripClassSource)), item.loc)
+    case ClassItemData.ClassBlank(_)                  => ClassItem(ClassItemData.ClassUnion(Seq.empty), item.loc)
+    case ClassItemData.ClassIntersection(left, right) =>
+      ClassItem(ClassItemData.ClassIntersection(stripClassSource(left), stripClassSource(right)), item.loc)
+    case ClassItemData.ClassDiff(left, right) =>
+      ClassItem(ClassItemData.ClassDiff(stripClassSource(left), stripClassSource(right)), item.loc)
+    case ClassItemData.ClassNest(invert, inner) =>
+      ClassItem(ClassItemData.ClassNest(invert, stripClassSource(inner)), item.loc)
+    case _ => item
+
+  /** Returns the items where Ruby's `\u{...}` and a case region are their items, without the blanks.
+    *
+    * The escapes of Ruby's `\u{...}` are among the items beside it, with which Ruby's escapes of bytes make a character
+    * (e.g. `\xC3\xA9` of `[\xC3\xA9-\u{E9 EA}]`).
+    */
+  private def expandClassItems(items: Seq[ClassItem]): Seq[ClassItem] = items.flatMap: item =>
+    item.data match
+      case ClassItemData.ClassUnicodeList(items, _)   => items
+      case ClassItemData.ClassCaseRegion(_, parts, _) => expandClassItems(parts.map(_.value))
+      case ClassItemData.ClassBlank(_)                => Seq.empty
+      case _                                          => Seq(item)
 
   /** Checks whether Perl takes the full case folding of the character under the flags (e.g. `ß` as `ss`). */
   private def perlFoldsMulti(value: Int, flags: IRCharFlagSet, perlUTF8Pattern: Boolean): Boolean =
@@ -146,7 +224,7 @@ object IRBuilder:
               node.data match
                 case _ if nodes.size > 1 =>
                   val bytes = nodes.collect:
-                    case Node(NodeData.Backslash(BackslashKind.Escape(_, b)), _) => b
+                    case Node(NodeData.Backslash(BackslashKind.Escape(_, b, _)), _) => b
                   single(fold(UTF8Encoding.decode(bytes)))
                 case NodeData.Literal(value)                                 => single(fold(value))
                 case NodeData.Backslash(value: BackslashKind.BackslashValue) => single(fold(value.value))
@@ -181,8 +259,8 @@ object IRBuilder:
   private def usesPerlUnicodeSyntax(node: Node): Boolean =
     deepExists(node):
       case AssertKind.Boundary(Some(_)) | AssertKind.NonBoundary(Some(_)) => true
-      case BackslashKind.Escape(EscapeStyle.NamedHex, _)                  => true
-      case BackslashKind.Escape(_, value)                                 => value > 0xff
+      case BackslashKind.Escape(EscapeStyle.NamedHex, _, _)               => true
+      case BackslashKind.Escape(_, value, _)                              => value > 0xff
       case _: EscapeClassKind.CharName                                    => true
       case _: EscapeClassKind.UnicodeProperty | _: EscapeClassKind.UnicodeBareProperty |
           _: EscapeClassKind.UnicodePropertyValue | _: EscapeClassKind.NonUnicodeProperty |
@@ -251,19 +329,28 @@ private[build] class IRBuilder(
 
   private val featureSet = initial.featureSet
 
+  /** The number of the back-references and the conditionals that refer to each capture. */
+  private val referenceCounts: Map[Int, Int] =
+    backReferences.values.toSeq.flatten.groupMapReduce(identity)(_ => 1)(_ + _)
+
   var context: BuildingContext = initial
 
   def build(node: Node): IRNode =
     val result = node.data match
       case NodeData.Disjunction(children)                            => Left(buildDisjunction(children))
       case NodeData.Sequence(children)                               => buildSequence(children)
-      case NodeData.Repeat(child, quantifier)                        => Left(buildRepeat(node, child, quantifier))
+      case NodeData.Repeat(child, quantifier, _)                     => Left(buildRepeat(node, child, quantifier))
       case NodeData.Group(kind, child)                               => buildGroup(node, kind, child)
       case NodeData.Command(kind)                                    => buildCommand(node, kind)
       case NodeData.Caret                                            => Left(buildCaret())
       case NodeData.Dollar                                           => Left(buildDollar())
       case NodeData.Backslash(kind)                                  => Left(buildBackslash(node, kind))
       case NodeData.Dot | NodeData.Class(_, _) | NodeData.Literal(_) => Left(buildCharacter(node))
+      // `IRBuilder.build` removes the blanks and expands Ruby's `\u{...}` and the case regions.
+      // $COVERAGE-OFF$
+      case NodeData.Blank(_) | NodeData.UnicodeList(_, _) | NodeData.CaseRegion(_, _, _) =>
+        throw new IllegalStateException(s"Unexpected source node: $node")
+      // $COVERAGE-ON$
     result match
       case Left(data) => IRNode(data, node.loc)
       case Right(ir)  => ir
@@ -304,9 +391,23 @@ private[build] class IRBuilder(
             nodes += build(children(i))
             i += 1
         // A part resolved together may become one node (e.g. `ss` under Ruby's case folding).
-        nodes.result() match
+        atomicCaptures(nodes.result()) match
           case Seq(node) => Right(node)
           case nodes     => Left(IRNodeData.Sequence(nodes))
+
+  /** Replaces `(?=(D))\1` with `(?>(D))`, which matches the same, when the capture has no other reference.
+    *
+    * The back-reference reads what the look-ahead has just captured, so the pair is an atomic group of the capture,
+    * which the checkers support.
+    */
+  def atomicCaptures(nodes: Seq[IRNode]): Seq[IRNode] =
+    nodes.foldRight(List.empty[IRNode]):
+      case (
+            IRNode(IRNodeData.LookAhead(false, capture @ IRNode(IRNodeData.Capture(i, _, _), _)), loc),
+            IRNode(IRNodeData.BackReference(Seq(j), _, _), next) :: rest
+          ) if i == j && referenceCounts(i) == 1 =>
+        IRNode(IRNodeData.Atomic(capture), SourceLocation(loc.start, next.end)) :: rest
+      case (node, rest) => node :: rest
 
   def buildRepeat(node: Node, child: Node, quantifier: Quantifier): IRNodeData =
     val ir = build(child)
@@ -334,7 +435,7 @@ private[build] class IRBuilder(
     case CommandKind.InlineFlag(diff) =>
       context = context.update(diff)
       Left(IRNodeData.Empty)
-    case CommandKind.ResetFlag(flagSet) =>
+    case CommandKind.ResetFlag(flagSet, _) =>
       context = context.reset(flagSet)
       Left(IRNodeData.Empty)
     case CommandKind.PBackReference(_)  => Left(buildBackReference(node))
@@ -458,7 +559,7 @@ private[build] class IRBuilder(
       Right(scoped:
         context = context.update(diff)
         build(child))
-    case GroupKind.ResetFlag(flagSet) =>
+    case GroupKind.ResetFlag(flagSet, _) =>
       Right(scoped:
         context = context.reset(flagSet)
         build(child))

@@ -17,6 +17,10 @@ final case class DFA[A, Q](
     delta: Map[(Q, A), Q]
 ):
 
+  /** Maps the states by the function. */
+  def mapState[R](f: Q => R): DFA[A, R] =
+    DFA(alphabet, stateSet.map(f), f(init), acceptSet.map(f), delta.map { case ((q1, a), q2) => ((f(q1), a), f(q2)) })
+
   /** Exports this transition function as a graph. */
   def toGraph: Graph[Q, A] = Graph.from(delta.iterator.map { case (q1, a) -> q2 => (q1, a, q2) }.toIndexedSeq)
 
@@ -32,3 +36,10 @@ final case class DFA[A, Q](
     sb.append("}")
 
     sb.result()
+
+/** DFA utilities. */
+object DFA:
+
+  /** Builds the DFA accepting every string, whose single state is `q`. */
+  def universal[A, Q](alphabet: Set[A], q: Q): DFA[A, Q] =
+    DFA(alphabet, Set(q), q, Set(q), alphabet.iterator.map(a => (q, a) -> q).toMap)

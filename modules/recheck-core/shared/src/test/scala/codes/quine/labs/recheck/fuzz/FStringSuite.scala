@@ -7,6 +7,7 @@ import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.fuzz.FString.*
+import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
 class FStringSuite extends munit.FunSuite:
@@ -99,6 +100,18 @@ class FStringSuite extends munit.FunSuite:
     intercept[IllegalArgumentException] {
       FString(1, IndexedSeq(Repeat(0, 2), Wrap('a'), Repeat(0, 1))).toUString
     }
+
+  test("FString#skeleton"):
+    def skeleton(n: Int, seq: FChar*): String = FString(n, seq.toIndexedSeq).skeleton.toString
+    assertEquals(skeleton(9, Repeat(0, 1), Wrap('0')), skeleton(4, Repeat(0, 1), Wrap('0'), Repeat(0, 1), Wrap('0')))
+    assertEquals(skeleton(9, Wrap('0'), Repeat(0, 1), Wrap('0')), skeleton(1, Repeat(0, 1), Wrap('0')))
+    assertNotEquals(skeleton(9, Repeat(0, 1), Wrap('0'), Wrap('!')), skeleton(9, Repeat(0, 1), Wrap('0')))
+    assertEquals(
+      skeleton(3, Wrap('_'), Repeat(0, 3), Wrap('*'), Wrap('a'), Wrap('\t')),
+      FString(1, IndexedSeq('_', '*', 'a', '\t').map(Wrap(_))).toUString.toString
+    )
+    // A constant string has no runs to merge.
+    assertEquals(skeleton(1, Wrap('a'), Wrap('a')), UString('a', 'a').toString)
 
   test("FString#admitsAnyRepeatCount"):
     val (high, low) = (Wrap(0xd800), Wrap(0xdc00))

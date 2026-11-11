@@ -26,11 +26,15 @@ object Complexity:
     /** A witness for this complexity. */
     def witness: Witness[A]
 
+    /** The best repetition count of the pumps of the witness to take `limit` steps in at most `maxSize` characters. */
+    def bestRepeatCount(limit: Int, maxSize: Int): Int
+
     /** Builds an attack string pattern of this, whose units are of the mode.
       *
       * It throws [[common.UnexpectedException]] as [[diagnostics.AttackPattern.build]] does.
       */
-    def buildAttackPattern(attackLimit: Int, maxSize: Int, mode: UnitMode)(using ev: A =:= UChar): AttackPattern
+    def buildAttackPattern(attackLimit: Int, maxSize: Int, mode: UnitMode)(using ev: A =:= UChar): AttackPattern =
+      witness.buildAttackPattern(bestRepeatCount(attackLimit, maxSize), mode)
 
     /** Converts this into the complexity of the diagnostics. */
     def toAttackComplexity: AttackComplexity.Vulnerable
@@ -54,15 +58,13 @@ object Complexity:
 
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Polynomial(degree, false)
 
-    def buildAttackPattern(attackLimit: Int, maxSize: Int, mode: UnitMode)(using ev: A =:= UChar): AttackPattern =
-      val bestRepeatCount = RepeatUtil.polynomial(degree, attackLimit, witness.fixedSize, witness.repeatSize, maxSize)
-      witness.buildAttackPattern(bestRepeatCount, mode)
+    def bestRepeatCount(limit: Int, maxSize: Int): Int =
+      RepeatUtil.polynomial(degree, limit, witness.fixedSize, witness.repeatSize, maxSize)
 
   /** Exponential is the complexity of a RegExp that checks a match in exponential time. */
   final case class Exponential[A](witness: Witness[A], hotspot: Hotspot = Hotspot.empty) extends Vulnerable[A]:
 
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Exponential(false)
 
-    def buildAttackPattern(attackLimit: Int, maxSize: Int, mode: UnitMode)(using ev: A =:= UChar): AttackPattern =
-      val bestRepeatCount = RepeatUtil.exponential(attackLimit, witness.fixedSize, witness.repeatSize, maxSize)
-      witness.buildAttackPattern(bestRepeatCount, mode)
+    def bestRepeatCount(limit: Int, maxSize: Int): Int =
+      RepeatUtil.exponential(limit, witness.fixedSize, witness.repeatSize, maxSize)

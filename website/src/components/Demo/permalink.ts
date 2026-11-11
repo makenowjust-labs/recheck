@@ -5,7 +5,7 @@ import {
 
 import { parseParams } from "./params";
 
-import type { Diagnostics, Hotspot } from "recheck";
+import type { Diagnostics, Hotspot, UpperBound } from "recheck";
 import type { Build } from "./builds";
 import type { CheckParams } from "./params";
 
@@ -13,11 +13,33 @@ export type InvalidInput = { status: "invalid" };
 
 type Checker = "automaton" | "fuzz";
 
+// The permalinks keep the temperatures of 4.x (`heat` and `normal`), which are now `hot` and `warm`.
+type HotspotSnapshot = {
+  start: number;
+  end: number;
+  temperature: "heat" | "normal";
+}[];
+
+// The permalinks recorded before the upper bound lack it.
+export type UpperBoundSnapshot = {
+  complexity: {
+    type: "linear" | "polynomial" | "exponential";
+    summary: string;
+  };
+  hotspot: HotspotSnapshot;
+};
+
 // Only what the result card shows is recorded.
 // It keeps the permalink format apart from changes of `Diagnostics` and leaves out the expanded attack string.
 export type DiagnosticsSnapshot =
   | { status: "invalid"; input: string }
-  | { status: "safe"; source: string; flags: string; checker: Checker }
+  | {
+      status: "safe";
+      source: string;
+      flags: string;
+      checker: Checker;
+      upperBound?: UpperBoundSnapshot;
+    }
   | {
       status: "vulnerable";
       source: string;
@@ -25,8 +47,8 @@ export type DiagnosticsSnapshot =
       checker: Checker;
       complexity: { type: "polynomial" | "exponential"; summary: string };
       attackPattern: string;
-      // The permalinks keep the temperatures of 4.x (`heat` and `normal`), which are now `hot` and `warm`.
-      hotspot: { start: number; end: number; temperature: "heat" | "normal" }[];
+      hotspot: HotspotSnapshot;
+      upperBound?: UpperBoundSnapshot;
     }
   | {
       status: "unknown";
@@ -34,6 +56,7 @@ export type DiagnosticsSnapshot =
       flags: string;
       checker?: Checker;
       error: { kind: string; message?: string };
+      upperBound?: UpperBoundSnapshot;
     };
 
 /** A result and everything needed to reproduce it, as stored in a permalink. */
@@ -49,6 +72,28 @@ export type Snapshot = {
 
 const PREFIX = "r=";
 
+const makeSnapshotHotspot = (hotspot: Hotspot[]): HotspotSnapshot =>
+  hotspot.map(({ start, end, temperature }) => ({
+    start,
+    end,
+    temperature: temperature === "hot" ? "heat" : "normal",
+  }));
+
+// A missing upper bound is left out, so that the permalink stays short.
+// The diagnostics of the releases before the upper bound lack the field.
+const makeSnapshotUpperBound = (
+  upperBound: UpperBound | null | undefined,
+): { upperBound?: UpperBoundSnapshot } => {
+  if (upperBound === null || upperBound === undefined) return {};
+  const { type, summary } = upperBound.complexity;
+  return {
+    upperBound: {
+      complexity: { type, summary },
+      hotspot: makeSnapshotHotspot(upperBound.hotspot),
+    },
+  };
+};
+
 const makeSnapshotDiagnostics = (
   input: string,
   result: Diagnostics | InvalidInput,
@@ -62,6 +107,7 @@ const makeSnapshotDiagnostics = (
         source: result.source,
         flags: result.flags,
         checker: result.checker,
+        ...makeSnapshotUpperBound(result.upperBound),
       };
     case "vulnerable":
       return {
@@ -74,11 +120,8 @@ const makeSnapshotDiagnostics = (
           summary: result.complexity.summary,
         },
         attackPattern: result.attack.pattern,
-        hotspot: result.hotspot.map(({ start, end, temperature }) => ({
-          start,
-          end,
-          temperature: temperature === "hot" ? "heat" : "normal",
-        })),
+        hotspot: makeSnapshotHotspot(result.hotspot),
+        ...makeSnapshotUpperBound(result.upperBound),
       };
     case "unknown":
       return {
@@ -90,6 +133,7 @@ const makeSnapshotDiagnostics = (
           "message" in result.error
             ? { kind: result.error.kind, message: result.error.message }
             : { kind: result.error.kind },
+        ...makeSnapshotUpperBound(result.upperBound),
       };
   }
 };
@@ -162,11 +206,9 @@ export const decode = (hash: string): Snapshot | null => {
   }
 };
 
-/** Returns the hotspot of the snapshot with the temperatures of `Diagnostics`. */
-export const hotspotOf = (
-  result: Extract<DiagnosticsSnapshot, { status: "vulnerable" }>,
-): Hotspot[] =>
-  result.hotspot.map(({ start, end, temperature }) => ({
+/** Returns the hotspot of the snapshot, or of its upper bound, with the temperatures of `Diagnostics`. */
+export const hotspotOf = (snapshot: { hotspot: HotspotSnapshot }): Hotspot[] =>
+  snapshot.hotspot.map(({ start, end, temperature }) => ({
     start,
     end,
     temperature: temperature === "heat" ? "hot" : "warm",

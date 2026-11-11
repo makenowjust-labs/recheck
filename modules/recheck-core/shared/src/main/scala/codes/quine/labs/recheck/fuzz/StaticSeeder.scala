@@ -1,109 +1,59 @@
 package codes.quine.labs.recheck.fuzz
 
+import scala.annotation.tailrec
+import scala.collection.mutable
+
 import codes.quine.labs.recheck.automaton.EpsNFABuilder
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.data.Graph
 import codes.quine.labs.recheck.util.RepeatUtil
-import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.charset.UChar
-import codes.quine.labs.resyntax.ir.IRNode
-import codes.quine.labs.resyntax.ir.IRNodeData
-import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.IRPattern
-import codes.quine.labs.resyntax.ir.IRQuantifier
 
 /** StaticSeeder computes an initial generation for the pattern with static analysis. */
 object StaticSeeder:
 
-  /** Computes an initial generation of the pattern. */
+  /** Computes an initial generation of the pattern from the ambiguities of its simplified automata (see
+    * [[EpsNFABuilder.buildSimplified]] and [[IRPattern.approximateRepeats]]), which is empty if the automata would be
+    * larger than `maxNFASize`.
+    */
   def seed(
       pattern: IRPattern,
       maxSimpleRepeatSize: Int,
+      maxNFASize: Int,
       maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
       limit: Int,
       maxSize: Int = Parameters.DefaultMaxGeneStringSize
   )(using
       ctx: Context
   ): Set[FString] = ctx.interrupt:
-    val epsNFA = EpsNFABuilder.build(simplify(pattern, maxSimpleRepeatSize))
-    val orderedNFA = epsNFA.toOrderedNFA.rename.mapAlphabet(_.representative)
-    val highs = epsNFA.alphabet.pairs.collect { case (c, k) if k.high => c.representative }.toSet
-    val lows = epsNFA.alphabet.pairs.collect { case (c, k) if k.low => c.representative }.toSet
-    val seeder = new StaticSeeder(
-      orderedNFA.alphabet,
-      orderedNFA.stateSet,
-      orderedNFA.inits.toSet,
-      orderedNFA.acceptSet,
-      orderedNFA.toGraph,
-      highs,
-      lows
-    )
-    seeder.seed(maxInitialGenerationSize, limit, maxSize)
-
-  /** Returns a simplified pattern, which the ε-NFA can handle. */
-  private[fuzz] def simplify(pattern: IRPattern, maxSimpleRepeatSize: Int)(using ctx: Context): IRPattern =
-    ctx.interrupt:
-      val backRefs = extractBackRefs(pattern.node)
-      val empty = IRNode(Empty)
-
-      def isRepeat(node: IRNode): Boolean = node.data.isInstanceOf[Repeat]
-
-      def loop(node: IRNode, prevIsRepeat: Boolean, nextIsRepeat: Boolean, inside: Set[Int]): IRNode = ctx.interrupt:
-        def copy(data: IRNodeData): IRNode = node.copy(data = data)
-
-        node.data match
-          case Disjunction(ns) => copy(Disjunction(ns.map(loop(_, prevIsRepeat, nextIsRepeat, inside))))
-          case Sequence(ns)    =>
-            val children = ns.toIndexedSeq.lift
-            copy:
-              Sequence:
-                ns.zipWithIndex.map:
-                  case (c, i) =>
-                    val prev = children(i - 1).map(isRepeat).getOrElse(prevIsRepeat)
-                    val next = children(i + 1).map(isRepeat).getOrElse(nextIsRepeat)
-                    loop(c, prev, next, inside)
-          case Capture(i, name, n) => copy(Capture(i, name, loop(n, prevIsRepeat, nextIsRepeat, inside + i)))
-          case Atomic(n)           => loop(n, prevIsRepeat, nextIsRepeat, inside)
-          case Repeat(n, q)        =>
-            val (min, k, strategy) = q match
-              case IRQuantifier.Exact(n)                    => (n, n, None)
-              case IRQuantifier.Unbounded(min, strategy)    => (min, min, Some(strategy))
-              case IRQuantifier.Bounded(min, max, strategy) => (min, max, Some(strategy))
-            if k > maxSimpleRepeatSize then
-              val s = strategy.getOrElse(BacktrackStrategy.Greedy)
-              copy(Repeat(loop(n, true, true, inside), IRQuantifier.Unbounded(if min == 0 then 0 else 1, s)))
-            else copy(Repeat(loop(n, true, true, inside), q))
-          case LookAhead(negative, n) =>
-            val c = loop(n, prevIsRepeat, nextIsRepeat, inside)
-            if !negative && nextIsRepeat then c else copy(Disjunction(Seq(c, empty)))
-          case LookBehind(negative, n, _) =>
-            val c = loop(n, prevIsRepeat, nextIsRepeat, inside)
-            if !negative && prevIsRepeat then c else copy(Disjunction(Seq(c, empty)))
-          case NonAtomicLookAhead(n) =>
-            val c = loop(n, prevIsRepeat, nextIsRepeat, inside)
-            if nextIsRepeat then c else copy(Disjunction(Seq(c, empty)))
-          case NonAtomicLookBehind(n, _) =>
-            val c = loop(n, prevIsRepeat, nextIsRepeat, inside)
-            if prevIsRepeat then c else copy(Disjunction(Seq(c, empty)))
-          case Conditional(_, yes, no) =>
-            copy(Disjunction(Seq(yes, no).map(loop(_, prevIsRepeat, nextIsRepeat, inside))))
-          case ResetMatchStart | BacktrackControl(_) => copy(Empty)
-          case BackReference(indices, _, _)          =>
-            val captures = indices.filterNot(inside.contains).flatMap(i => backRefs.get(i).map((i, _)))
-            if captures.isEmpty then copy(Empty)
-            else
-              val cs = captures.map((i, n) => loop(n, prevIsRepeat, nextIsRepeat, inside + i))
-              copy(Disjunction(cs :+ empty))
-          case Unsupported(_) => copy(Empty)
-          case _              => node
-
-      pattern.copy(node = loop(pattern.node, true, true, Set.empty))
-
-  /** Extracts back-references inside the given node. */
-  private[fuzz] def extractBackRefs(node: IRNode): Map[Int, IRNode] = node.data match
-    case Capture(i, _, n) => Map(i -> n) ++ extractBackRefs(n)
-    case _                => node.children.flatMap(extractBackRefs).toMap
+    try
+      // The inner expressions of the look-behinds read forward as look-aheads, on the paths where the ambiguities are.
+      val simplified = EpsNFABuilder.buildSimplified(
+        pattern.approximateRepeats(maxSimpleRepeatSize),
+        lookBehindsAsLookAheads = true,
+        maxNFASize
+      )
+      val orderedNFA = simplified.orderedNFA.mapAlphabet(_.representative)
+      val pairs = simplified.epsNFA.alphabet.pairs
+      val highs = pairs.collect { case (c, k) if k.high => c.representative }.toSet
+      val lows = pairs.collect { case (c, k) if k.low => c.representative }.toSet
+      val seeder = new StaticSeeder(
+        orderedNFA.alphabet,
+        orderedNFA.stateSet,
+        orderedNFA.inits.toSet,
+        orderedNFA.acceptSet,
+        orderedNFA.toGraph,
+        highs,
+        lows
+      )
+      seeder.seed(maxInitialGenerationSize, limit, maxSize)
+    catch
+      case ex: UnsupportedException =>
+        ctx.log(s"fuzz: static seeding gives up (${ex.getMessage})")
+        Set.empty
 
 private[fuzz] class StaticSeeder[A, Q](
     val alphabet: Set[A],
@@ -154,12 +104,12 @@ private[fuzz] class StaticSeeder[A, Q](
   def findTinyEDA(q0: Q): Iterator[(Seq[A], Seq[A], Seq[A])] =
     for
       w1 <- path(initSet, q0).iterator
-      w3 <- deadPath(q0).iterator
       (b, q2s) <- insMap(q0).filter(_._2.size >= 2).iterator
       q2 <- q2s
       (a, q1s) <- outsMap(q0).iterator
       q1 <- q1s
       w2 <- loopPath(q0, a, q1, q2, b).iterator
+      w3 <- deadPath(q0, pumpedStates(w1, w2)).iterator
     yield interrupt((w1, w2, w3))
 
   /** Returns all possible tiny IDAs from `q0`. */
@@ -171,7 +121,7 @@ private[fuzz] class StaticSeeder[A, Q](
       (q3, q2s) <- charToInsMap(b).iterator
       if graph.neighbors(q3).exists(_._1 == a)
       w2 <- middlePath(q0, a, q1s.toSet, q2s.toSet, b, q3).iterator
-      w3 <- deadPath(q3).iterator
+      w3 <- deadPath(q3, pumpedStates(w1, w2)).iterator
     yield interrupt((w1, w2, w3))
 
   /** Finds a path from `q0s` to `q1`. */
@@ -192,17 +142,45 @@ private[fuzz] class StaticSeeder[A, Q](
     if a == b && q1s.contains(q3) && q2s.contains(q0) then Some(Seq(a))
     else path(q1s, q2s).map(w => a +: w :+ b)
 
-  /** Finds a dead path from `q`.
+  /** A map from a state to a map from a character to the next states. */
+  private val nextMap: Map[Q, Map[A, Seq[Q]]] = interrupt:
+    graph.neighbors.view.mapValues(_.groupMap(_._1)(_._2)).toMap
+
+  /** A map from a state to the characters to accepting states. */
+  private val endingChars: Map[Q, Set[A]] = interrupt:
+    graph.neighbors.view.mapValues(_.collect { case (a, q1) if acceptSet.contains(q1) => a }.toSet).toMap
+
+  /** Returns the states after reading the word from the states. */
+  def read(qs: Set[Q], w: Seq[A]): Set[Q] =
+    w.foldLeft(qs)((qs, a) => qs.flatMap(q => nextMap.get(q).flatMap(_.get(a)).getOrElse(Seq.empty)))
+
+  /** Returns the states that the matching may be in after `w1` followed by some repetitions of `w2`. */
+  def pumpedStates(w1: Seq[A], w2: Seq[A]): Set[Q] =
+    @tailrec
+    def loop(qs: Set[Q], seen: Set[Set[Q]]): Set[Q] =
+      if seen.contains(qs) || seen.size > stateSet.size then seen.flatten
+      else loop(read(qs, w2), seen + qs)
+    interrupt(loop(read(read(initSet, w1), w2), Set.empty))
+
+  /** Finds a dead path from `q`, whose first character ends the match on no path from `states`.
     *
     * It does not start with a low surrogate after a high surrogate, which the engine reads together as one character.
     */
-  def deadPath(q: Q): Option[Seq[A]] =
+  def deadPath(q: Q, states: Set[Q]): Option[Seq[A]] =
     val afterHigh = reverseGraph.neighbors.getOrElse(q, Vector.empty).exists((a, _) => highs.contains(a))
     val chars = if afterHigh then alphabet.diff(lows) else alphabet
-    interrupt(chars.diff(graph.neighbors(q).map(_._1).toSet)).headOption match
+    // The matching is on the other paths too, where a character may end the match (e.g. a look-ahead `(?=,)`).
+    val ends = states.flatMap(endingChars.getOrElse(_, Set.empty))
+    interrupt(chars.diff(graph.neighbors(q).map(_._1).toSet).diff(ends)).headOption match
       case Some(c) => Some(Seq(c))
       case None    =>
-        interrupt(reverseGraph.path(stateSet.diff(acceptSet), q).map(_._1.map(_._2).reverse))
+        deadPathCache.getOrElseUpdate(
+          q,
+          interrupt(reverseGraph.path(stateSet.diff(acceptSet), q).map(_._1.map(_._2).reverse))
+        )
+
+  /** The paths from a state to a state that is not accepting, which [[deadPath]] finds without a dead character. */
+  private val deadPathCache: mutable.Map[Q, Option[Seq[A]]] = mutable.Map.empty
 
   /** Constructs an FString from an EDA/IDA triple. */
   def construct(t: (Seq[A], Seq[A], Seq[A]), f: (Int, Int) => Int)(using ev: A =:= UChar): FString =

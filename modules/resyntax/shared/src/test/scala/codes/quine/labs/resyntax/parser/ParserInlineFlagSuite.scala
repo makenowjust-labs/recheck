@@ -35,9 +35,9 @@ class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
   check("(?aT)", "", PCRE)(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(asciiPOSIXDigit = true), None))))
   check("(?aW)", "", PCRE)(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(asciiWord = true), None))))
   check("(?aDa)", "", PCRE):
-    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true, asciiDigit = true), None)))
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true, asciiDigit = true), None, Some("aDa"))))
   check("(?aU)", "", PCRE):
-    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true, ungreedy = true), None)))
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true, ungreedy = true), None, Some("aU"))))
   check("(?a-aD)", "", PCRE):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), Some(FlagSet(asciiDigit = true)))))
   check("(?-aW:a)", "", PCRE):
@@ -79,7 +79,11 @@ class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
   check("(?i-m+s-x)", "", DotNet):
     Command(
       CommandKind.InlineFlag(
-        FlagSetDiff(FlagSet(ignoreCase = true, dotAll = true), Some(FlagSet(multiline = true, verbose = true)))
+        FlagSetDiff(
+          FlagSet(ignoreCase = true, dotAll = true),
+          Some(FlagSet(multiline = true, verbose = true)),
+          Some("i-m+s-x")
+        )
       )
     )
   check("(?+)", "", DotNet)(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(), None))))
@@ -87,34 +91,38 @@ class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
   error("(?i-m-s)", "", Ruby())("Invalid flag at 6")
   check("(?i-m-x)", "", Ruby()):
     Command(
-      CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), Some(FlagSet(multiline = true, verbose = true))))
+      CommandKind.InlineFlag(
+        FlagSetDiff(FlagSet(ignoreCase = true), Some(FlagSet(multiline = true, verbose = true)), Some("i-m-x"))
+      )
     )
   check("(?--i:a)", "", Ruby()):
-    Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(ignoreCase = true)))), Literal('a'))
+    Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(ignoreCase = true)), Some("--i"))), Literal('a'))
   error("(?--i)", "", Java, PCRE, Perl())("Invalid group at 3")
   error("(?<\ud835\udc65>a)", "", DotNet)("Invalid identifier at 3")
   check("(?xx)", "", PCRE, Perl()):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true, verboseMore = true), None)))
   check("(?xx)", "", DotNet, Java, Python(), Ruby()):
-    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)))
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None, Some("xx"))))
 
   // Java skips whitespace and comments around the flags, and reads an `x` at once (checked with Java 27.0.1).
   check("(?i m)", "x", Java):
-    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, multiline = true), None)))
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, multiline = true), None, Some("i m"))))
   check("(?i - m)", "x", Java):
-    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), Some(FlagSet(multiline = true)))))
+    Command(
+      CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), Some(FlagSet(multiline = true)), Some("i - m")))
+    )
   check("(?i :a)", "x", Java):
-    Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None)), Literal('a'))
+    Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None, Some("i "))), Literal('a'))
   check("(?- i)", "x", Java):
-    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(ignoreCase = true)))))
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(ignoreCase = true)), Some("- i"))))
   check("(?x i)", "", Java):
-    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, verbose = true), None)))
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, verbose = true), None, Some("x i"))))
   error("(?i x)", "", Java)("Invalid flag at 3")
   error("(?i-x m)", "x", Java)("Invalid flag at 5")
   error("(?-x i)", "x", Java)("Invalid group at 4")
   error("(?i m)", "x", PCRE, Perl(), Python(), Ruby())("Invalid flag at 3")
   check("(?I)", "", DotNet):
-    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None)))
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None, Some("I"))))
   error("(?I)", "", Java, PCRE, Perl(), Python(), Ruby())("Invalid flag at 2")
   check("(?)", "", Java, PCRE, Perl())(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(), None))))
   error("(?)", "", DotNet, Python(), Ruby())("Invalid flag at 2")
@@ -124,24 +132,34 @@ class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
   check("(?i-:a)", "", DotNet, Java, JavaScript, PCRE, Perl(), Ruby()):
     Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), Some(FlagSet()))), Literal('a'))
   error("(?i-:a)", "", Python())("Invalid flag at 4")
+  // The flags keep their order as written.
+  check("(?mi)", "", DotNet, Java, PCRE, Perl(), Python()):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, multiline = true), None, Some("mi"))))
+  check("(?-xi:a)", "", DotNet, Java, PCRE, Perl(), Python(), Ruby()):
+    Group(
+      GroupKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(ignoreCase = true, verbose = true)), Some("-xi"))),
+      Literal('a')
+    )
   check("(?ii)", "", DotNet, Java, PCRE, Perl(), Python(), Ruby()):
-    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None)))
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None, Some("ii"))))
   error("(?ii:a)", "", JavaScript)("Duplicated flag at 3")
   check("(?i-i)", "", DotNet, Java, PCRE, Perl(), Ruby()):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), Some(FlagSet(ignoreCase = true)))))
   error("(?i-i:a)", "", JavaScript, Python())("Invalid flag at 4")
   check("(?aa)", "", PCRE, Python(), Ruby()):
-    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), None)))
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), None, Some("aa"))))
   check("(?aa)", "", Perl()):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true, asciiRestrict = true), None)))
   error("(?aaa)", "", Perl())("Duplicated flag at 4")
   error("(?uu)", "", Perl())("Duplicated flag at 3")
   // Onigmo's last character set flag wins: `/(?au)\w/` matches `é`, but `/(?ua)\w/` does not.
-  check("(?au)", "", Ruby())(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(unicode = true), None))))
-  check("(?ua)", "", Ruby())(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), None))))
-  check("(?ad)", "", Ruby())(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(hasIndices = true), None))))
+  check("(?au)", "", Ruby()):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(unicode = true), None, Some("au"))))
+  check("(?ua)", "", Ruby())(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), None, Some("ua")))))
+  check("(?ad)", "", Ruby()):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(hasIndices = true), None, Some("ad"))))
   check("(?ia)", "", Ruby()):
-    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, ascii = true), None)))
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, ascii = true), None, Some("ia"))))
   error("(?au)", "", Perl(), Python())("Invalid flag at 3")
   check("(?-a:a)", "", PCRE):
     Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(ascii = true)))), Literal('a'))
@@ -158,6 +176,13 @@ class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
       Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None))),
       Command(Comment("x")),
       Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(multiline = true), None))),
+      Literal('a')
+    )
+  check("(?x) (?i)a", "", Python()):
+    Sequence(
+      Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None))),
+      Blank(" "),
+      Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None))),
       Literal('a')
     )
   error("a(?i)", "", Python())("Inline flag not at the start at 1")
@@ -179,7 +204,10 @@ class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
   check(" (?x: a ) ", "", DotNet, Java, PCRE, Perl(), Python(), Ruby()):
     Sequence(
       Literal(' '),
-      Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)), Literal('a')),
+      Group(
+        GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)),
+        Sequence(Blank(" "), Literal('a'), Blank(" "))
+      ),
       Literal(' ')
     )
   check("(?x-i)", "", DotNet, Java, PCRE, Perl(), Ruby()):

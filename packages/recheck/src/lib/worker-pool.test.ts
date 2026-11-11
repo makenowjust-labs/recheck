@@ -64,6 +64,7 @@ test("check: with abort (3)", async () => {
     unitMode: null,
     status: "unknown",
     error: { kind: "cancel" },
+    upperBound: null,
     refutedAttacks: [],
   });
 });

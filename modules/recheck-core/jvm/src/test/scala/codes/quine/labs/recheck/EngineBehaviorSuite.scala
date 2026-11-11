@@ -40,7 +40,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
 
   def matches(source: String, flags: String, dialect: Dialect, input: UString): Boolean =
     val ir = ReDoS.parse(source, flags, dialect)
-    val program = ProgramBuilder.build(ir)
+    val program = ProgramBuilder.build(ir, false)
     Interpreter.run(program, input, Interpreter.Options()).status == Interpreter.Status.Ok
 
   def marks(chars: UString, set: CharSet): String =
@@ -243,7 +243,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     patterns.map: (source, subjects) =>
       try
         val ir = ReDoS.parse(wholePattern(source, end), flags, dialect)
-        val program = ProgramBuilder.build(ir)
+        val program = ProgramBuilder.build(ir, false)
         subjects
           .map: s =>
             val status = Interpreter.run(program, ir.mode.decode(s), Interpreter.Options()).status
@@ -408,7 +408,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
   def openCaptureModel(patterns: Seq[(String, Seq[String])], dialect: Dialect): Seq[String] =
     for (source, subjects) <- patterns; subject <- subjects yield
       val ir = ReDoS.parse(source, "", dialect)
-      val result = Interpreter.run(ProgramBuilder.build(ir), ir.mode.decode(subject), Interpreter.Options())
+      val result = Interpreter.run(ProgramBuilder.build(ir, false), ir.mode.decode(subject), Interpreter.Options())
       result.captures.fold("none"): captures =>
         captures.grouped(2).map(c => if c(0) < 0 || c(1) < 0 then "-" else s"${c(0)}-${c(1)}").mkString(" ")
 

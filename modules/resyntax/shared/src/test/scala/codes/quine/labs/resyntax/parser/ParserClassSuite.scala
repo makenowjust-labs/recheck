@@ -2,6 +2,12 @@ package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.AssertKind.*
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.CaseCommandKind
+import codes.quine.labs.resyntax.ast.CaseForm
+import codes.quine.labs.resyntax.ast.CasePart
+import codes.quine.labs.resyntax.ast.CaseRegionEnd
+import codes.quine.labs.resyntax.ast.CaseRegionEnd.*
+import codes.quine.labs.resyntax.ast.ClassItem
+import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.CommandKind.InlineFlag
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
@@ -11,9 +17,20 @@ import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.QuoteLiteral.*
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.dialect.Dialect.*
 
 class ParserClassSuite extends munit.FunSuite with ParserHelper:
+
+  val EmptyQuote: ClassItemData = ClassCaseRegion(CaseCommandKind.QuoteCommand, Seq(), Closed)
+
+  /** Returns the region of `\u` or `\l` that makes the item from the text. */
+  def firstRegion(kind: CaseCommandKind, data: ClassItemData, written: String): ClassItemData =
+    ClassCaseRegion(kind, Seq(classPart(data, written)), NextCharacter)
+
+  /** Returns the value at an end of a range that the command makes from the text. */
+  def formValue(kind: CaseCommandKind, data: ClassValue, written: String, end: CaseRegionEnd): ClassItem.Value =
+    ClassItem.Value(data, SourceLocation.Invalid, Some(CaseForm(kind, written, end)))
 
   def classPOSIXLiteral(name: String): NodeData =
     Sequence(Class(false, ClassUnion(s"[:$name:".map(c => ClassLiteral(c))*)), Literal(']'))
@@ -72,36 +89,100 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
     Class(false, ClassUnion(ClassBackslashValue(Unknown('g')), ClassBackslashValue(Unknown('k'))))
   )
   // Perl's lexer applies the case commands of a regex literal to its text, even inside a class.
-  check("[\\uA]", "", Perl())(Class(false, ClassLiteral('A')))
-  check("[\\Ua-z]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('Z'))))
-  check("[\\Ux\\Ey]", "", Perl())(Class(false, ClassUnion(ClassLiteral('X'), ClassLiteral('y'))))
-  check("[A-\\Lz]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
-  check("[A-\\LZ]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
-  check("[A\\L-z]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
+  check("[\\Ux\\Ey]", "", Perl()):
+    val upper = ClassCaseRegion(CaseCommandKind.UpperCommand, Seq(classPart(ClassLiteral('X'), "x")), Closed)
+    Class(false, ClassUnion(upper, ClassLiteral('y')))
+  check("[\\Qa-c\\E]", "", Perl()):
+    val parts = Seq(
+      classPart(ClassLiteral('a'), "a"),
+      classPart(ClassBackslashValue(Unknown('-')), "-"),
+      classPart(ClassLiteral('c'), "c")
+    )
+    Class(false, ClassCaseRegion(CaseCommandKind.QuoteCommand, parts, Closed))
+  check("[\\Ux\\Q.\\E\\E]", "", Perl()):
+    val dot = classPart(ClassBackslashValue(Escape(Single('.'), '.')), ".")
+    val quote = CasePart(ClassItem(ClassCaseRegion(CaseCommandKind.QuoteCommand, Seq(dot), Closed)), None)
+    Class(false, ClassCaseRegion(CaseCommandKind.UpperCommand, Seq(classPart(ClassLiteral('X'), "x"), quote), Closed))
+  // `\u` and `\l` change only the next character, which is their region.
+  check("[\\uA]", "", Perl())(Class(false, firstRegion(CaseCommandKind.UpperFirstCommand, ClassLiteral('A'), "A")))
+  check("[\\lAB]", "", Perl()):
+    Class(false, ClassUnion(firstRegion(CaseCommandKind.LowerFirstCommand, ClassLiteral('a'), "A"), ClassLiteral('B')))
+  // A command around exactly the value at an end of a range is the form of the value (e.g. `\uz`).
+  check("[A-\\uz]", "", Perl()):
+    val end = formValue(CaseCommandKind.UpperFirstCommand, ClassLiteral('Z'), "z", NextCharacter)
+    Class(false, ClassRange(ClassItem.Value(ClassLiteral('A')), end))
+  check("[\\u0100-\\uffff]", "", Perl()):
+    val zero = firstRegion(CaseCommandKind.UpperFirstCommand, ClassLiteral('0'), "0")
+    val end = formValue(CaseCommandKind.UpperFirstCommand, ClassLiteral('F'), "f", NextCharacter)
+    val range = ClassRange(ClassItem.Value(ClassLiteral('0')), end)
+    Class(false, ClassUnion((zero +: "10".map(ClassLiteral(_)) :+ range) ++ "fff".map(ClassLiteral(_))*))
+  check("[A-\\LZ\\E]", "", Perl()):
+    val end = formValue(CaseCommandKind.LowerCommand, ClassLiteral('z'), "Z", Closed)
+    Class(false, ClassRange(ClassItem.Value(ClassLiteral('A')), end))
+  check("[\\Ua\\E-z]", "", Perl()):
+    val begin = formValue(CaseCommandKind.UpperCommand, ClassLiteral('A'), "a", Closed)
+    Class(false, ClassRange(begin, ClassItem.Value(ClassLiteral('z'))))
+  // The commands without `\E` in a class, and the ones whose ranges are not those of items or values, are not kept.
+  checkPrinted("[\\Ua-z]", "[A-Z]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('Z'))))
+  checkPrinted("[A-\\Lz]", "[A-z]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
+  checkPrinted("[A-\\LZ]", "[A-z]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
+  checkPrinted("[A\\L-z]", "[A-z]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
+  checkPrinted("[\\Ua\\Lb\\E]", "[A\\Lb\\E]", "", Perl()):
+    val lower = ClassCaseRegion(CaseCommandKind.LowerCommand, Seq(classPart(ClassLiteral('b'), "b")), Closed)
+    Class(false, ClassUnion(ClassLiteral('A'), lower))
+  checkPrinted("[\\Ux\\Q\\Ey\\E]", "[XY]", "", Perl())(Class(false, ClassUnion(ClassLiteral('X'), ClassLiteral('Y'))))
   error("[a\\U-z]", "", Perl())("Out of order class range at 1")
   error("[a-\\Uz]", "", Perl())("Out of order class range at 1")
-  check("[\\E]a]", "", Perl())(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  checkPrinted("[\\E]a]", "[]a]", "", Perl())(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
   error("[\\E]", "", Perl())("Unclosed ']' at 4")
-  check("[\\Qa-c\\E]", "", Perl()):
-    Class(false, ClassUnion(ClassLiteral('a'), ClassBackslashValue(Unknown('-')), ClassLiteral('c')))
   error("[\\Q]", "", Perl())("Unclosed ']' at 4")
   // Java and PCRE read `\Q...\E` as the regex syntax.
-  check("[\\Qa]\\E]", "", Java, PCRE)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral(']'))))
-  check("[\\Q]\\E]", "", Java, PCRE)(Class(false, ClassUnion(ClassLiteral(']'))))
-  check("[a-\\Qz\\E]", "", Java, PCRE, Perl())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[\\Qa\\E-z]", "", Java, PCRE, Perl())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[\\Qxy\\E-\\Qza\\E]", "", Java, PCRE, Perl()):
+  check("[\\Qa]\\E]", "", Java, PCRE):
+    val parts = Seq(classPart(ClassLiteral('a'), "a"), classPart(ClassLiteral(']'), "]"))
+    Class(false, ClassCaseRegion(CaseCommandKind.QuoteCommand, parts, Closed))
+  check("[\\Q]\\E]", "", Java, PCRE):
+    Class(false, ClassCaseRegion(CaseCommandKind.QuoteCommand, Seq(classPart(ClassLiteral(']'), "]")), Closed))
+  // A quote of one character at an end of a range is the form of the value, and a quote of more is not kept.
+  check("[a-\\Qz\\E]", "", Java, PCRE, Perl()):
+    val end = formValue(CaseCommandKind.QuoteCommand, ClassLiteral('z'), "z", Closed)
+    Class(false, ClassRange(ClassItem.Value(ClassLiteral('a')), end))
+  check("[\\Qa\\E-z]", "", Java, PCRE, Perl()):
+    val begin = formValue(CaseCommandKind.QuoteCommand, ClassLiteral('a'), "a", Closed)
+    Class(false, ClassRange(begin, ClassItem.Value(ClassLiteral('z'))))
+  test("Parser.parse: a value in a command at an end of a range is at the command, and the range spans them"):
+    for dialect <- Seq(Java, Perl()) do
+      val flagSet = FlagSet.parse("", dialect)
+      val s = "[\\Qa\\E-\\Qz\\E]"
+      val node = Parser.parse(s, flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
+      val Class(false, ClassItem.NonValue(ClassRange(begin, end), loc)) = node.data: @unchecked
+      assertEquals((begin.loc, end.loc, loc), (SourceLocation(1, 6), SourceLocation(7, 12), SourceLocation(1, 12)))
+  checkPrinted("[\\Qxy\\E-\\Qza\\E]", "[xy-za]", "", Java, PCRE, Perl()):
     Class(false, ClassUnion(ClassLiteral('x'), ClassRange(ClassLiteral('y'), ClassLiteral('z')), ClassLiteral('a')))
   error("[\\Qxz\\E-y]", "", Java, PCRE)("Out of order class range at 4")
   error("[\\Qxz\\E-y]", "", Perl())("Out of order class range at 4")
-  check("[a-\\Q\\Ez]", "", Java, PCRE, Perl())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  checkPrinted("[a-\\Q\\Ez]", "[a-z]", "", Java, PCRE, Perl()):
+    Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z')))
   check("[a-\\Q\\E]", "", Java, PCRE):
-    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassUnion()))
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), EmptyQuote))
   check("[\\Q\\E-z]", "", Java, PCRE):
-    Class(false, ClassUnion(ClassUnion(), ClassLiteral('-'), ClassLiteral('z')))
-  check("[a\\Q\\E-z]", "", Java, PCRE, Perl())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+    Class(false, ClassUnion(EmptyQuote, ClassLiteral('-'), ClassLiteral('z')))
+  // A quote next to a hyphen that makes no range is kept.
+  val QuoteAB: ClassItemData = ClassCaseRegion(
+    CaseCommandKind.QuoteCommand,
+    Seq(classPart(ClassLiteral('a'), "a"), classPart(ClassLiteral('b'), "b")),
+    Closed
+  )
+  check("[\\Qab\\E-\\Q\\E]", "", Java, PCRE)(Class(false, ClassUnion(QuoteAB, ClassLiteral('-'), EmptyQuote)))
+  check("[\\w-\\Qab\\E]", "", Java)(Class(false, ClassUnion(ClassBackslashClass(Word), ClassLiteral('-'), QuoteAB)))
+  checkPrinted("[a\\Q\\E-z]", "[a-z]", "", Java, PCRE, Perl()):
+    Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z')))
   check("[\\Q\\E]a]", "", Java, PCRE):
-    Class(false, ClassUnion(ClassUnion(), ClassLiteral(']'), ClassLiteral('a')))
+    Class(false, ClassUnion(EmptyQuote, ClassLiteral(']'), ClassLiteral('a')))
+  check("[\\Q\\E \\Q\\E]]", "x", Java):
+    Class(false, ClassUnion(EmptyQuote, ClassBlank(" "), EmptyQuote, ClassLiteral(']')))
+  checkPrinted("[a\\Q\\E -z]", "[a-z]", "x", Java)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[a\\Q\\E b]", "x", Java):
+    Class(false, ClassUnion(ClassLiteral('a'), EmptyQuote, ClassBlank(" "), ClassLiteral('b')))
   error("[\\Q\\E]", "", Java, PCRE)("Unclosed ']' at 6")
   // A pattern from a runtime string reads the commands as letters, which the regex engine passes through.
   checkPerlString("[\\Ua-z]", "")(
@@ -224,34 +305,48 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
         ClassNest(false, ClassRange(ClassLiteral('a'), ClassLiteral('c')))
       )
     )
-  check("[a b]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('b'))))
+  check("[a b]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassBlank(" "), ClassLiteral('b'))))
   check("[a b]", "x", DotNet, PCRE, Perl(), Python(), Ruby()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral(' '), ClassLiteral('b')))
-  check("[a - z]", "x", Java)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[a#x\nb]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('b'))))
-  check("[ ]]", "x", Java)(Class(false, ClassLiteral(']')))
+  // The blanks in a range and in `&&` are not kept.
+  checkPrinted("[a - z]", "[a-z]", "x", Java)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[a#x\nb]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassBlank("#x\n"), ClassLiteral('b'))))
+  check("[ ]]", "x", Java)(Class(false, ClassUnion(ClassBlank(" "), ClassLiteral(']'))))
   error("[ ]", "x", Java)("Unclosed ']' at 3")
   error("[a- ]", "x", Java)("Out of order class range at 1")
   // Java reads `^` only right after `[`, and skips whitespace and comments in `&&` (checked with Java 27.0.1).
-  check("[ ^a]", "x", Java)(Class(false, ClassUnion(ClassLiteral('^'), ClassLiteral('a'))))
-  check("[a& #c\n&b]", "x", Java)(Class(false, ClassIntersection(ClassLiteral('a'), ClassLiteral('b'))))
+  check("[ ^a]", "x", Java)(Class(false, ClassUnion(ClassBlank(" "), ClassLiteral('^'), ClassLiteral('a'))))
+  checkPrinted("[a& #c\n&b]", "[a&&b]", "x", Java):
+    Class(false, ClassIntersection(ClassLiteral('a'), ClassLiteral('b')))
+  check("[a && b]", "x", Java):
+    Class(
+      false,
+      ClassIntersection(ClassUnion(ClassLiteral('a'), ClassBlank(" ")), ClassUnion(ClassBlank(" "), ClassLiteral('b')))
+    )
+  error("[ && ]", "x", Java)("Invalid class set operation at 1")
   // Java drops the `&` of `[a& b]` and rejects `[a- [b]]`, which recheck does not reproduce.
-  check("[a& b]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('&'), ClassLiteral('b'))))
+  check("[a& b]", "x", Java):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('&'), ClassBlank(" "), ClassLiteral('b')))
   check("[a- [b]]", "x", Java):
-    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassNest(false, ClassLiteral('b'))))
+    Class(
+      false,
+      ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassBlank(" "), ClassNest(false, ClassLiteral('b')))
+    )
   // PCRE's and Perl's `xx` skip only U+0009 and U+0020 in a class, also before `^`, and a single `x` turns `xx` off
   // (checked with PHP 8.5.12 with PCRE2 10.49 and Perl 5.44.0).
-  check("[a \tb]", "xx", Perl())(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('b'))))
+  check("[a \tb]", "xx", Perl())(Class(false, ClassUnion(ClassLiteral('a'), ClassBlank(" \t"), ClassLiteral('b'))))
   check("[a\n#b]", "xx", Perl()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('\n'), ClassLiteral('#'), ClassLiteral('b')))
-  check("[ ^ a - c ]", "xx", Perl())(Class(true, ClassRange(ClassLiteral('a'), ClassLiteral('c'))))
-  check("[a- ]", "xx", Perl())(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'))))
-  check("[ ]a]", "xx", Perl())(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  // The blanks before `^` and in a range are not kept.
+  checkPrinted("[ ^ a - c ]", "[^ a-c ]", "xx", Perl()):
+    Class(true, ClassUnion(ClassBlank(" "), ClassRange(ClassLiteral('a'), ClassLiteral('c')), ClassBlank(" ")))
+  check("[a- ]", "xx", Perl())(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassBlank(" "))))
+  check("[ ]a]", "xx", Perl())(Class(false, ClassUnion(ClassBlank(" "), ClassLiteral(']'), ClassLiteral('a'))))
   error("[ ]", "xx", Perl())("Unclosed ']' at 3")
   check("(?xx)[a b]", "", PCRE, Perl()):
     Sequence(
       Command(InlineFlag(FlagSetDiff(FlagSet(verbose = true, verboseMore = true), None))),
-      Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('b')))
+      Class(false, ClassUnion(ClassLiteral('a'), ClassBlank(" "), ClassLiteral('b')))
     )
   check("(?xx)(?x)[a b]", "", PCRE, Perl()):
     Sequence(

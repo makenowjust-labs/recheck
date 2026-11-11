@@ -1,11 +1,16 @@
 package codes.quine.labs.resyntax.ir
 
+import codes.quine.labs.resyntax.ast.BacktrackStrategy.Greedy
+import codes.quine.labs.resyntax.ast.BacktrackStrategy.Lazy
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.LineTerminatorSet
+import codes.quine.labs.resyntax.ir.IRQuantifier.Bounded
+import codes.quine.labs.resyntax.ir.IRQuantifier.Exact
+import codes.quine.labs.resyntax.ir.IRQuantifier.Unbounded
 import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.parser.Parser
 
@@ -254,6 +259,32 @@ class IRPatternSuite extends munit.FunSuite:
     "(?<x>.{5,})?" -> 5,
     "(?<=.{4,6})" -> 6,
     "\\{2}" -> 0
+  )
+
+  /** Returns the quantifiers in the pre-order after approximating the repetitions to the sum of counts below `5`. */
+  def approximated(pattern: IRPattern): Seq[IRQuantifier] =
+    pattern.approximateRepeats(5).node.collect { case IRNodeData.Repeat(_, q) => q }
+
+  check("IRPattern#approximateRepeats")(approximated)(
+    "a{2}b{2}" -> Seq(Exact(2), Exact(2)),
+    "a{3}b{4}" -> Seq(Exact(3), Unbounded(1, Greedy)),
+    "a{4}b{3}" -> Seq(Unbounded(1, Greedy), Exact(3)),
+    // On a tie, the later one is approximated first.
+    "a{3}b{3}" -> Seq(Exact(3), Unbounded(1, Greedy)),
+    "(?:a{2}){3}" -> Seq(Unbounded(1, Greedy), Exact(2)),
+    "a{0,6}?" -> Seq(Unbounded(0, Lazy)),
+    "a{2,6}" -> Seq(Unbounded(1, Greedy)),
+    "a{6,}" -> Seq(Unbounded(1, Greedy)),
+    "a*b+c?d{6}" -> Seq(Unbounded(0, Greedy), Unbounded(1, Greedy), Bounded(0, 1, Greedy), Unbounded(1, Greedy)),
+    "(?:a?){6}" -> Seq(Exact(6), Bounded(0, 1, Greedy)),
+    "(?<=a{4})b{3}" -> Seq(Exact(4), Unbounded(1, Greedy)),
+    "(?=a{6})(b{6})|c{6}" -> Seq(Unbounded(1, Greedy), Unbounded(1, Greedy), Unbounded(1, Greedy))
+  )
+
+  check("IRPattern#approximateRepeats", dialect = Dialect.PCRE)(approximated)(
+    "(?>a{6})(?*b{6})(?<*c{4})d{3}" -> Seq(Unbounded(1, Greedy), Unbounded(1, Greedy), Exact(4), Unbounded(1, Greedy)),
+    "(?(?=a{6})b{6}|c)(?(?<=d{4})e{3})(f)(?(1)g{6})" ->
+      Seq(Unbounded(1, Greedy), Unbounded(1, Greedy), Exact(4), Unbounded(1, Greedy), Unbounded(1, Greedy))
   )
 
   check("IRPattern#needsLineTerminatorDistinction", "m")(_.needsLineTerminatorDistinction)(

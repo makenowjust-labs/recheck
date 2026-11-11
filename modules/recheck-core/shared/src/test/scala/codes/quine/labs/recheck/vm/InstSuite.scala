@@ -46,6 +46,15 @@ class InstSuite extends munit.FunSuite:
     assertEquals(Inst.Assert(AssertKind.InputBegin).toString, "assert input_begin")
     assertEquals(Inst.Read(ReadKind.Char('a'), None).toString, "read char 0x61")
     assertEquals(Inst.Read(ReadKind.Char('a'), Some(SourceLocation(0, 1))).toString, "read char 0x61 ; 0-1")
+    assertEquals(Inst.ReadRepeat(ReadKind.Char('a'), 2, None).toString, "read_repeat char 0x61{2}")
+    assertEquals(
+      Inst.ReadRepeat(ReadKind.Char('a'), 2, Some(SourceLocation(0, 4))).toString,
+      "read_repeat char 0x61{2} ; 0-4"
+    )
+    assertEquals(
+      Inst.TryReadRepeat(ReadKind.Char('a'), 3, None, Label("x", 0), Label("y", 1)).toString,
+      "try-read-repeat (char 0x61){0,3} #x@0 #y@1"
+    )
     assertEquals(Inst.ReadBack(ReadKind.Char('a'), None).toString, "read_back char 0x61")
     assertEquals(Inst.ReadBack(ReadKind.Char('a'), Some(SourceLocation(0, 1))).toString, "read_back char 0x61 ; 0-1")
     assertEquals(Inst.CapOpen(0).toString, "cap_open 0")

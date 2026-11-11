@@ -8,7 +8,7 @@ import styles from './Demo.module.css';
 import { hotspotOf } from './permalink';
 
 import type { Build } from './builds';
-import type { DiagnosticsSnapshot } from './permalink';
+import type { DiagnosticsSnapshot, UpperBoundSnapshot } from './permalink';
 
 const REPORTS_URL = 'https://github.com/makenowjust-labs/recheck/discussions/categories/reports';
 const REPORTS_EMAIL = 'make.just.on@gmail.com';
@@ -54,6 +54,16 @@ const Loading: React.FC = () => (
       </div>
     </div>
   </div>
+);
+
+// The upper bound that the fuzz checker finds before fuzzing, with its hotspot unless it is linear.
+const UpperBoundRow: React.FC<{ source: string; upperBound: UpperBoundSnapshot }> = ({ source, upperBound }) => (
+  <Row title="Upper Bound">
+    <Badge kind={upperBound.complexity.type === 'linear' ? 'secondary' : 'warning'}>
+      {upperBound.complexity.summary}
+    </Badge>
+    {upperBound.hotspot.length > 0 ? <Hotspot source={source} hotspot={hotspotOf(upperBound)} /> : null}
+  </Row>
 );
 
 type Props = {
@@ -160,6 +170,9 @@ const DemoResult: React.FC<Props> = ({ recorded = false, result, time, log, buil
           </Row>,
         );
         break;
+    }
+    if (result.status !== 'invalid' && result.upperBound !== undefined) {
+      rows.push(<UpperBoundRow source={result.source} upperBound={result.upperBound} key="upper-bound" />);
     }
     if (permalink !== null) {
       rows.push(

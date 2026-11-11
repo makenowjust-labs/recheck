@@ -104,7 +104,7 @@ private[build] final class LookBehindAnalyzer(
       nodes.foldLeft(Option(Width(0, 0))): (acc, node) =>
         for w1 <- acc; w2 <- width(node, visiting, conditionals)
         yield Width(add(w1.min, w2.min), add(w1.max, w2.max))
-    case NodeData.Repeat(node, quantifier) =>
+    case NodeData.Repeat(node, quantifier, _) =>
       val (min, max) = bounds(quantifier)
       // PCRE takes an unbounded repeat as unbounded even with a zero-width node (e.g. `(?<=(?:)*)`), except a look-ahead.
       val zeroWidthIsBounded = featureSet.lookBehindRule != IRLookBehindRule.PCRE || (node.data match
@@ -159,6 +159,11 @@ private[build] final class LookBehindAnalyzer(
         case BackslashKind.EscapeCall(_, Reference.IndexedReference(0)) => Some(Width(0, Inf))
         case BackslashKind.EscapeCall(_, ref)                           => callWidth(node, ref, visiting)
         case _: BackslashKind.Assert | _: BackslashKind.CaseCommand     => Some(Width(0, 0))
+    // `IRBuilder.build` removes the blanks and expands Ruby's `\u{...}` and the case regions.
+    // $COVERAGE-OFF$
+    case NodeData.Blank(_) | NodeData.UnicodeList(_, _) | NodeData.CaseRegion(_, _, _) =>
+      throw new IllegalStateException(s"Unexpected source node: $node")
+    // $COVERAGE-ON$
 
   private def isAcceptOrFail(node: Node): Boolean = node.data match
     case NodeData.Command(CommandKind.BacktrackControl(Some(kind), _)) =>
@@ -173,10 +178,10 @@ private[build] final class LookBehindAnalyzer(
       nodes.zip(prefixes).flatMap((node, prefix) => perlAcceptMin(node).map(add(prefix, _))).minOption
     case NodeData.Disjunction(nodes) => nodes.flatMap(perlAcceptMin).minOption
     // `(*ACCEPT)` ends only an atomic group or a possessive repetition in Perl.
-    case NodeData.Repeat(_, quantifier) if quantifier.strategy == BacktrackStrategy.Possessive => None
-    case NodeData.Repeat(node, quantifier) if bounds(quantifier)._2 > 0                        => perlAcceptMin(node)
-    case NodeData.Group(_: GroupKind.LookAround | _: GroupKind.Atomic, _)                      => None
-    case NodeData.Group(_, node)                                                               => perlAcceptMin(node)
+    case NodeData.Repeat(_, quantifier, _) if quantifier.strategy == BacktrackStrategy.Possessive => None
+    case NodeData.Repeat(node, quantifier, _) if bounds(quantifier)._2 > 0                        => perlAcceptMin(node)
+    case NodeData.Group(_: GroupKind.LookAround | _: GroupKind.Atomic, _)                         => None
+    case NodeData.Group(_, node)                                                                  => perlAcceptMin(node)
     case NodeData.Command(CommandKind.BranchReset(nodes))      => nodes.flatMap(perlAcceptMin).minOption
     case NodeData.Command(CommandKind.Conditional(_, yes, no)) => (yes +: no.toSeq).flatMap(perlAcceptMin).minOption
     case _                                                     => None
@@ -255,8 +260,8 @@ private[build] final class LookBehindAnalyzer(
           BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline | EscapeClassKind.GraphemeCluster)
         ) =>
       true
-    case NodeData.Repeat(_, quantifier) => quantifier.strategy == BacktrackStrategy.Possessive
-    case _                              => false
+    case NodeData.Repeat(_, quantifier, _) => quantifier.strategy == BacktrackStrategy.Possessive
+    case _                                 => false
 
   private def rubyWidth(node: Node): RubyWidth = node.data match
     case NodeData.Disjunction(nodes) =>
@@ -270,7 +275,7 @@ private[build] final class LookBehindAnalyzer(
         case (RubyWidth.Fixed(l), RubyWidth.Fixed(r))          => RubyWidth.Fixed(l + r)
         case (RubyWidth.Variable, _) | (_, RubyWidth.Variable) => RubyWidth.Variable
         case _                                                 => RubyWidth.Unknown
-    case NodeData.Repeat(node, quantifier) =>
+    case NodeData.Repeat(node, quantifier, _) =>
       bounds(quantifier) match
         case (min, max) if min == max =>
           rubyWidth(node) match
@@ -297,7 +302,7 @@ private[build] final class LookBehindAnalyzer(
   /** Returns the widths of the nodes, where the escapes of the bytes of a character are together (e.g. `\xC3\xA9`). */
   private def rubyChars(nodes: IndexedSeq[Node]): Seq[RubyWidth] =
     def byte(node: Node): Option[Int] = node.data match
-      case NodeData.Backslash(BackslashKind.Escape(style, value)) if IRCharResolver.isRubyByte(style, value) =>
+      case NodeData.Backslash(BackslashKind.Escape(style, value, _)) if IRCharResolver.isRubyByte(style, value) =>
         Some(value)
       case _ => None
 
@@ -328,7 +333,7 @@ private[build] final class LookBehindAnalyzer(
         case NodeData.Group(kind, child) if isJavaGroup(kind)         => studyJava(child :: rest, info)
         case NodeData.Group(GroupKind.Atomic(_), child)               => studyJava(rest, studyJava(List(child), info))
         case NodeData.Group(_, _)                                     => studyJava(rest, info)
-        case NodeData.Repeat(child, quantifier)                       => studyJavaRepeat(child, quantifier, rest, info)
+        case NodeData.Repeat(child, quantifier, _)                    => studyJavaRepeat(child, quantifier, rest, info)
         case NodeData.Backslash(_: BackslashKind.EscapeBackReference) => studyJava(rest, info.copy(maxValid = false))
         case NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)) =>
           studyJava(rest, info.copy(maxLength = info.maxLength + 2))

@@ -118,12 +118,12 @@ object PatternAlphabet:
         (c, kind)
     PatternAlphabet(mode, pairs)
 
-  /** Computes the alphabet of the pattern.
+  /** Computes the alphabet of the pattern, where each of `moreSets` is a union of atoms too.
     *
     * Its kinds tell the word sets of [[wordSets]], the line terminators of [[kindLineTerminators]] and the marks of
     * [[wordMarks]] by their indices.
     */
-  def of(pattern: IRPattern): PatternAlphabet =
+  def of(pattern: IRPattern, moreSets: Seq[CharSet] = Seq.empty): PatternAlphabet =
     val universe = pattern.universe
     def loop(node: IRNode): Seq[CharSet] = node.data match
       case Chars(set) =>
@@ -144,7 +144,7 @@ object PatternAlphabet:
 
     build(
       pattern.mode,
-      loop(pattern.node) ++ extra,
+      loop(pattern.node) ++ extra ++ moreSets,
       lineTerminator,
       words.headOption,
       needsCRLFDistinction(pattern),

@@ -24,6 +24,9 @@ class DiagnosticsSuite extends munit.FunSuite:
     RuntimeAttack("ruby 4.0.7", Duration(1, SECONDS), RuntimeAttackResult.Finish(Duration(3, MILLISECONDS)))
   )
 
+  val upperBound: UpperBound =
+    UpperBound(AttackComplexity.Exponential(false), Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Hot))))
+
   test("Diagnostics#toString"):
     assertEquals(
       Diagnostics
@@ -190,6 +193,57 @@ class DiagnosticsSuite extends munit.FunSuite:
           |  Attack string : "a" * 2 + "!"
           |  Runtime attack: refuted (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)""".stripMargin
     )
+    // The upper bound comes before the refuted attacks, with its hotspot if it is not linear.
+    assertEquals(
+      Diagnostics
+        .Safe(
+          "(a|aa)+",
+          "",
+          Dialect.JavaScript,
+          UnitMode.UTF16,
+          AttackComplexity.Safe(true),
+          Seq(refutedAttack),
+          Checker.Fuzz,
+          Some(upperBound)
+        )
+        .toString,
+      s"""|Input     : /(a|aa)+/
+          |Dialect   : javascript
+          |Status    : safe
+          |Complexity: safe (fuzz)
+          |Checker   : fuzz
+          |
+          |Upper bound:
+          |- Complexity: exponential
+          |  Hotspot   : /${upperBound.hotspot.highlight("(a|aa)+")}/
+          |
+          |Refuted attacks:
+          |- Complexity    : 2nd degree polynomial
+          |  Attack string : 'a'.repeat(2) + '!'
+          |  Runtime attack: refuted (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)""".stripMargin
+    )
+    assertEquals(
+      Diagnostics
+        .Unknown(
+          "a+",
+          "",
+          Dialect.JavaScript,
+          Some(UnitMode.UTF16),
+          Diagnostics.ErrorKind.Timeout,
+          Seq.empty,
+          Some(Checker.Fuzz),
+          Some(UpperBound(AttackComplexity.Linear, Hotspot.empty))
+        )
+        .toString,
+      s"""|Input  : /a+/
+          |Dialect: javascript
+          |Status : unknown
+          |Error  : timeout
+          |Checker: fuzz
+          |
+          |Upper bound:
+          |- Complexity: linear""".stripMargin
+    )
 
   test("Diagnostics.Unknown: refuted attacks require the unit mode"):
     intercept[IllegalArgumentException]:
@@ -261,6 +315,36 @@ class DiagnosticsSuite extends munit.FunSuite:
         None
       )
     )
+
+  test("Diagnostics#withUpperBound"):
+    val bound = Some(upperBound)
+    val safe =
+      Diagnostics.Safe("", "", Dialect.JavaScript, UnitMode.UTF16, AttackComplexity.Safe(true), Seq.empty, Checker.Fuzz)
+    assertEquals(safe.withUpperBound(bound), safe.copy(upperBound = bound))
+    val vulnerable = Diagnostics.Vulnerable(
+      "",
+      "",
+      Dialect.JavaScript,
+      UnitMode.UTF16,
+      AttackComplexity.Exponential(true),
+      AttackPattern(Seq.empty, UnitMode.UTF16.decode("a"), 0),
+      Hotspot.empty,
+      None,
+      Seq.empty,
+      Checker.Fuzz
+    )
+    assertEquals(vulnerable.withUpperBound(bound), vulnerable.copy(upperBound = bound))
+    val unknown =
+      Diagnostics.Unknown(
+        "",
+        "",
+        Dialect.JavaScript,
+        None,
+        Diagnostics.ErrorKind.Timeout,
+        Seq.empty,
+        Some(Checker.Fuzz)
+      )
+    assertEquals(unknown.withUpperBound(bound), unknown.copy(upperBound = bound))
 
   test("Diagnostics.ErrorKind#toString"):
     assertEquals(Diagnostics.ErrorKind.Timeout.toString, "timeout")

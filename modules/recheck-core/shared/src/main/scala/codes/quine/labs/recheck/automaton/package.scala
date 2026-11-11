@@ -6,7 +6,7 @@ package codes.quine.labs.recheck
   *
   *   - [[DFA]]
   *   - ε-NFA ([[EpsNFA]]) and a compiler from the RegExp pattern to ε-NFA ([[EpsNFABuilder]])
-  *   - [[NFA]] and its variants ([[OrderedNFA]], [[NFAwLA]])
+  *   - NFA variants ([[OrderedNFA]], [[NFAwLA]])
   *
   * On top of them, [[AutomatonChecker]] is automaton theory ReDoS checker implementation, and
   *

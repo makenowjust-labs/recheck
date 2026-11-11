@@ -21,7 +21,7 @@ private[build] object NodeKey:
   def children(node: Node): Seq[Node] = node.data match
     case NodeData.Disjunction(nodes) => nodes
     case NodeData.Sequence(nodes)    => nodes
-    case NodeData.Repeat(node, _)    => Seq(node)
+    case NodeData.Repeat(node, _, _) => Seq(node)
     case NodeData.Group(_, node)     => Seq(node)
     case NodeData.Command(kind)      =>
       kind match

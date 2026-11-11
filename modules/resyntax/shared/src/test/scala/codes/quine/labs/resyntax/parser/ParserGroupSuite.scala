@@ -58,8 +58,10 @@ class ParserGroupSuite extends munit.FunSuite with ParserHelper:
   // Perl's byte string takes only ASCII names.
   error("(?<\u00e9>a)", "", Perl(utf8 = false))("Invalid identifier at 3")
   check("(?<\ud835\udc65>a)", "", Perl())(Group(NamedCapture(Angle, "\ud835\udc65"), Literal('a')))
-  check("(?<\\u{41}\\u0042>a)", "", JavaScript)(Group(NamedCapture(Angle, "AB"), Literal('a')))
-  check("(?<\\ud835\\udc65>a)", "", JavaScript)(Group(NamedCapture(Angle, "\ud835\udc65"), Literal('a')))
+  // The escapes in a group name are not kept.
+  checkPrinted("(?<\\u{41}\\u0042>a)", "(?<AB>a)", "", JavaScript)(Group(NamedCapture(Angle, "AB"), Literal('a')))
+  checkPrinted("(?<\\ud835\\udc65>a)", "(?<\ud835\udc65>a)", "", JavaScript):
+    Group(NamedCapture(Angle, "\ud835\udc65"), Literal('a'))
   error("(?<\\u0031>a)", "", JavaScript)("Invalid identifier at 3")
   check("(?<a-b>a)", "", Ruby())(Group(NamedCapture(Angle, "a-b"), Literal('a')))
   check("(?<\\w+[>a)", "", Ruby())(Group(NamedCapture(Angle, "\\w+["), Literal('a')))
@@ -106,13 +108,17 @@ class ParserGroupSuite extends munit.FunSuite with ParserHelper:
   check("(a)", "", All*)(Group(IndexedCapture, Literal('a')))
 
   // Java skips whitespace and comments in a group's opening except right after `(?` (checked with Java 27.0.1).
-  check("( ?:a)", "x", Java)(Group(NonCapture, Literal('a')))
+  // They are kept in the flags and in the body of a capture group, but not in the others.
+  check("( a)", "x", Java)(Group(IndexedCapture, Sequence(Blank(" "), Literal('a'))))
+  check("( |^)", "x", Java)(Group(IndexedCapture, Disjunction(Blank(" "), Caret)))
+  check("(#c\n)", "x", Java)(Group(IndexedCapture, Blank("#c\n")))
+  checkPrinted("( ?:a)", "(?:a)", "x", Java)(Group(NonCapture, Literal('a')))
   check("(? :a)", "x", Java)(Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), None)), Literal('a')))
-  check("(?#c\n:a)", "x", Java)(Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), None)), Literal('a')))
+  check("(?#c\n:a)", "x", Java)(Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), None, Some("#c\n"))), Literal('a')))
   error("(? =a)", "x", Java)("Invalid flag at 3")
   error("(?#x)", "", Java)("Invalid flag at 2")
-  check("(?< =a)", "x", Java)(Group(PositiveLookBehind(Symbolic), Literal('a')))
-  check("(?<n #c\na >a)", "x", Java)(Group(NamedCapture(Angle, "na"), Literal('a')))
+  checkPrinted("(?< =a)", "(?<=a)", "x", Java)(Group(PositiveLookBehind(Symbolic), Literal('a')))
+  checkPrinted("(?<n #c\na >a)", "(?<na>a)", "x", Java)(Group(NamedCapture(Angle, "na"), Literal('a')))
   error("(", "", All*)("Unclosed group at 1")
 
   error("(?Px)", "", PCRE, Python())("Invalid group at 3")

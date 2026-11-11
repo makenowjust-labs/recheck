@@ -121,11 +121,11 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
     )
 
   private def walk(node: Node): Unit = node.data match
-    case NodeData.Disjunction(nodes) => nodes.foreach(walk)
-    case NodeData.Sequence(nodes)    => nodes.foreach(walk)
-    case NodeData.Repeat(child, _)   => walk(child)
-    case NodeData.Group(kind, child) => walkGroup(node, kind, child)
-    case NodeData.Command(kind)      => walkCommand(node, kind)
+    case NodeData.Disjunction(nodes)  => nodes.foreach(walk)
+    case NodeData.Sequence(nodes)     => nodes.foreach(walk)
+    case NodeData.Repeat(child, _, _) => walk(child)
+    case NodeData.Group(kind, child)  => walkGroup(node, kind, child)
+    case NodeData.Command(kind)       => walkCommand(node, kind)
     case NodeData.Backslash(_: BackslashKind.EscapeBackReference | _: BackslashKind.EscapeCall) =>
       markSite(node)
     case NodeData.Literal(_) | NodeData.Class(_, _) |
@@ -161,16 +161,16 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
       scoped:
         context = context.update(diff)
         walk(child)
-    case GroupKind.ResetFlag(flagSet) =>
+    case GroupKind.ResetFlag(flagSet, _) =>
       scoped:
         context = context.reset(flagSet)
         walk(child)
     case _ => scoped(walk(child))
 
   private def walkCommand(node: Node, kind: CommandKind): Unit = kind match
-    case CommandKind.InlineFlag(diff)   => context = context.update(diff)
-    case CommandKind.ResetFlag(flagSet) => context = context.reset(flagSet)
-    case CommandKind.BranchReset(nodes) =>
+    case CommandKind.InlineFlag(diff)      => context = context.update(diff)
+    case CommandKind.ResetFlag(flagSet, _) => context = context.reset(flagSet)
+    case CommandKind.BranchReset(nodes)    =>
       val start = next
       var end = next
       branchResetDepth += 1

@@ -10,7 +10,12 @@ object BackslashKind:
 
   final case class Unknown(value: Int) extends BackslashValue
 
-  final case class Escape(style: EscapeStyle, value: Int) extends BackslashValue
+  /** Escape is an escape of a value in the style.
+    *
+    * `written` is the text after its letters as written (e.g. `7f` of `\x7f`, `{0041}` of `\x{0041}`, `j` of Ruby's
+    * `\C-j`, and the digits after `\` or Java's `\0` of `\012`), or `None` for the plain text of the style.
+    */
+  final case class Escape(style: EscapeStyle, value: Int, written: Option[String] = None) extends BackslashValue
 
   final case class EscapeClass(kind: EscapeClassKind) extends BackslashKind
 
@@ -21,5 +26,5 @@ object BackslashKind:
 
   final case class Assert(kind: AssertKind) extends BackslashKind
 
-  /** CaseCommand is Java's and PCRE's quoting command (`\Q` or `\E`). */
+  /** CaseCommand is a command out of a case region, which is PCRE's `\E` out of a quote that does nothing. */
   final case class CaseCommand(kind: CaseCommandKind) extends BackslashKind

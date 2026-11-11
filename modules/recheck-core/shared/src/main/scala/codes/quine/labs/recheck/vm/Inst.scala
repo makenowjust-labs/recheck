@@ -61,6 +61,19 @@ object Inst:
 
     override def toString: String = s"try-la (${read.kind}) $next $fallback"
 
+  /** `try-read-repeat`: Reads characters of the kind as many as possible up to `max`, and jumps to a `next` block.
+    *
+    * It is `x{0,max}` of a greedy repetition of a read, and it leaves the backtracking points of the fewer characters,
+    * which jump to a `fallback` block, as the repetition does without a counter.
+    */
+  final case class TryReadRepeat(kind: ReadKind, max: Int, loc: Option[SourceLocation], next: Label, fallback: Label)
+      extends Terminator
+      with HeatSource:
+
+    def successors: Set[Label] = Set(next, fallback)
+
+    override def toString: String = s"try-read-repeat ($kind){0,$max} $next $fallback"
+
   /** `try-lb`: Compound instruction of `try` and `read-back`. */
   final case class TryLB(read: ReadBack, next: Label, fallback: Label) extends Terminator:
 
@@ -227,6 +240,17 @@ object Inst:
         case Some(SourceLocation(start, end)) => s" ; $start-$end"
         case None                             => ""
       s"read $kind$loc"
+
+  /** `read_repeat`: Reads `n` characters of the kind, which is `x{n}` of a read without a counter. */
+  final case class ReadRepeat(kind: ReadKind, n: Int, loc: Option[SourceLocation])
+      extends NonTerminator
+      with HeatSource:
+
+    override def toString: String =
+      val loc = this.loc match
+        case Some(SourceLocation(start, end)) => s" ; $start-$end"
+        case None                             => ""
+      s"read_repeat $kind{$n}$loc"
 
   /** `read_back`: Tests current position with receding. */
   final case class ReadBack(kind: ReadKind, loc: Option[SourceLocation]) extends NonTerminator with HeatSource:

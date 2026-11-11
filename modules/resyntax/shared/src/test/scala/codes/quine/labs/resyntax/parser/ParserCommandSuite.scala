@@ -13,6 +13,7 @@ import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.GroupKind.*
 import codes.quine.labs.resyntax.ast.NameStyle.*
+import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
 import codes.quine.labs.resyntax.ast.Reference.*
@@ -99,7 +100,8 @@ class ParserCommandSuite extends munit.FunSuite with ParserHelper:
         Literal('c')
       )
     )
-  check("(?(?C) (?!a)b)", "x", PCRE):
+  // The blanks in a condition are not kept.
+  checkPrinted("(?(?C) (?!a)b)", "(?(?C)(?!a)b)", "x", PCRE):
     Command(
       Conditional(
         CalloutLookAround(CommandKind.Callout, LookAround(NegativeLookAhead(Symbolic), Literal('a'))),
@@ -109,17 +111,20 @@ class ParserCommandSuite extends munit.FunSuite with ParserHelper:
   error("(?(?C1) (?=a)b)", "", PCRE)("Invalid condition at 7")
   error("(?(?C1)(?:a)b)", "", PCRE)("Invalid condition at 8")
   error("(?(?C1)(?=a)b)", "", Perl())("Invalid condition at 3")
-  check("(?(?:.)b)", "", DotNet)(Command(Conditional(LookAround(Dot), Literal('b'))))
+  // The group of a .NET look-ahead condition, the zeros of an index and a version's zero minor are not kept.
+  checkPrinted("(?(?:.)b)", "(?(.)b)", "", DotNet)(Command(Conditional(LookAround(Dot), Literal('b'))))
   error("(?(.)b)", "", PCRE, Perl())("Invalid condition at 3")
   check("(?(0)a)", "", DotNet)(Command(Conditional(Indexed(0), Literal('a'))))
   error("(?(0)a)", "", PCRE, Perl(), Python(), Ruby())("Invalid condition at 3")
-  check("(?(01)a)", "", DotNet, PCRE, Python(), Ruby())(Command(Conditional(Indexed(1), Literal('a'))))
+  checkPrinted("(?(01)a)", "(?(1)a)", "", DotNet, PCRE, Python(), Ruby()):
+    Command(Conditional(Indexed(1), Literal('a')))
   error("(?(01)a)", "", Perl())("Invalid condition at 3")
   error("(?(DEFINE)a|b)", "", PCRE, Perl())("Invalid condition at 11")
   check("(?(DEFINEx)a)", "", PCRE)(Command(Conditional(Named(Bare, "DEFINEx"), Literal('a'))))
   check("(?(Rx)a)", "", PCRE)(Command(Conditional(Named(Bare, "Rx"), Literal('a'))))
   error("(?(Rx)a)", "", Perl())("Invalid condition at 3")
-  check("(?(VERSION>=10)a)", "", PCRE)(Command(Conditional(Version(lt = true, 10, 0), Literal('a'))))
+  checkPrinted("(?(VERSION>=10)a)", "(?(VERSION>=10.0)a)", "", PCRE):
+    Command(Conditional(Version(lt = true, 10, 0), Literal('a')))
   error("(?(VERSION>=10.)a)", "", PCRE)("Invalid condition at 15")
   check("(?'x'a)", "", DotNet, PCRE, Perl(), Ruby())(Group(NamedCapture(Quote, "x"), Literal('a')))
   check("(?'x-y'a)", "", DotNet)(Group(Balance(Quote, Some("x"), "y"), Literal('a')))
@@ -143,7 +148,7 @@ class ParserCommandSuite extends munit.FunSuite with ParserHelper:
   check("(?^x)", "", PCRE, Perl())(Command(CommandKind.ResetFlag(FlagSet(verbose = true))))
   check("(?^x:a)", "", PCRE, Perl())(Group(GroupKind.ResetFlag(FlagSet(verbose = true)), Literal('a')))
   check("(?^)", "", PCRE, Perl())(Command(CommandKind.ResetFlag(FlagSet())))
-  check("(?^aa)", "", PCRE)(Command(CommandKind.ResetFlag(FlagSet(ascii = true))))
+  check("(?^aa)", "", PCRE)(Command(CommandKind.ResetFlag(FlagSet(ascii = true), Some("aa"))))
   check("(?^aa)", "", Perl())(Command(CommandKind.ResetFlag(FlagSet(ascii = true, asciiRestrict = true))))
   error("(?^d)", "", Perl())("Invalid flag at 3")
   error("(?^-i)", "", PCRE, Perl())("Invalid group at 3")
@@ -155,14 +160,18 @@ class ParserCommandSuite extends munit.FunSuite with ParserHelper:
     Disjunction(Sequence(Literal('a'), Command(Comment("x"))), Command(Comment("y")))
   check("((?#x))", "", DotNet, PCRE, Perl(), Python(), Ruby())(Group(IndexedCapture, Command(Comment("x"))))
   error("(?#x", "", DotNet, PCRE, Perl(), Python(), Ruby())("Invalid group at 4")
-  check("(?(?#x)a)", "", Ruby())(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), None))))
+  // The comments that Ruby removes are kept in the flags and quantifiers, but not right after `(?` or in a name.
+  checkPrinted("(?(?#x)a)", "(?a)", "", Ruby()):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), None)))
   check("(?i(?#x)m)a", "", Ruby()):
     Sequence(
-      Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, multiline = true), None))),
+      Command(
+        CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, multiline = true), None, Some("i(?#x)m")))
+      ),
       Literal('a')
     )
-  check("a{1(?#x),2}", "", Ruby())(Repeat(Literal('a'), Bounded(1, 2, Greedy)))
-  check("(?<a(?#x)b>c)", "", Ruby())(Group(NamedCapture(Angle, "ab"), Literal('c')))
+  check("a{1(?#x),2}", "", Ruby())(Repeat(Node(Literal('a')), Bounded(1, 2, Greedy), Some("{1(?#x),2}")))
+  checkPrinted("(?<a(?#x)b>c)", "(?<ab>c)", "", Ruby())(Group(NamedCapture(Angle, "ab"), Literal('c')))
   // Ruby reads `\x` and `\u` before removing comments, so a comment in them is an error.
   error("\\x(?#x)41", "", Ruby())("Invalid backslash escape at 1")
   error("\\u{4(?#x)1}", "", Ruby())("Invalid backslash escape at 1")
@@ -194,7 +203,11 @@ class ParserCommandSuite extends munit.FunSuite with ParserHelper:
   error("\\(?#x)", "", Ruby())("Unmatched ')' at 5")
   error("(?x:#(?#\n))", "", Ruby())("Unmatched ')' at 10")
   check("(?x:#\n)(?#y)", "", Ruby()):
-    Sequence(Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)), Sequence()), Command(Comment("y")))
+    Sequence(
+      Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)), Blank("#\n")),
+      Command(Comment("y"))
+    )
+  check("a (?#x)b", "x", Ruby())(Sequence(Literal('a'), Blank(" "), Command(Comment("x")), Literal('b')))
   check("(?{x})", "", Perl())(Command(InlineCode("x")))
   check("(??{x})", "", Perl())(Command(EmbedCode("x")))
   check("(?C)", "", PCRE)(Command(Callout))
@@ -238,7 +251,8 @@ class ParserCommandSuite extends munit.FunSuite with ParserHelper:
   check("(*naplb:a)", "", PCRE)(Group(NonAtomicPositiveLookBehind(Abbrev), Literal('a')))
   check("(*:x)", "", PCRE, Perl())(Command(BacktrackControl(None, Some("x"))))
   check("(*scan_substring:(1)a)", "", PCRE)(Group(ScanSubstring(Alphabetic, Seq(IndexedReference(1))), Literal('a')))
-  check("(*scs:(-1,<x>,'y')a)", "", PCRE):
+  // The quotes of a name are not kept.
+  checkPrinted("(*scs:(-1,<x>,'y')a)", "(*scs:(-1,<x>,<y>)a)", "", PCRE):
     Group(
       ScanSubstring(Abbrev, Seq(RelativeReference(-1), NamedReference("x"), NamedReference("y"))),
       Literal('a')

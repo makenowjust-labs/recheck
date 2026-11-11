@@ -78,6 +78,25 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
           pos += size
     UString.from(str.result())
 
+  /** The string that the strings differing only in how many times their parts repeat share. */
+  def skeleton: UString =
+    val str = copy(n = 2).toUString
+    val maxSize = seq.collect { case Repeat(_, size) => size }.maxOption.getOrElse(0)
+    def repeats(i: Int, size: Int): Boolean =
+      i + 2 * size <= str.length && (0 until size).forall(k => str(i + k) == str(i + size + k))
+    val result = IndexedSeq.newBuilder[UChar]
+    var i = 0
+    while i < str.length do
+      (1 to maxSize).find(repeats(i, _)) match
+        case Some(size) =>
+          result.addAll(str.slice(i, i + size).iterator)
+          i += size
+          while repeats(i - size, size) do i += size
+        case None =>
+          result.addOne(str(i))
+          i += 1
+    UString.from(result.result())
+
   /** Checks whether the string is one of the mode for any repeat counts, as
     * [[diagnostics.AttackPattern.admitsAnyRepeatCount]] does.
     *

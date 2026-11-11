@@ -21,6 +21,7 @@ import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.RefutedAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
+import codes.quine.labs.recheck.diagnostics.UpperBound
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
@@ -47,8 +48,35 @@ class CodecSuite extends munit.FunSuite:
         "unitMode" := "utf16",
         "status" := "safe",
         "complexity" := AttackComplexity.Linear.asInstanceOf[AttackComplexity],
+        "upperBound" := Json.Null,
         "refutedAttacks" := Json.arr(),
         "checker" := Checker.Fuzz.asInstanceOf[Checker]
+      )
+    )
+    val upperBound = UpperBound(AttackComplexity.Polynomial(2, false), Hotspot(Seq(Hotspot.Spot(0, 1, Hotspot.Hot))))
+    assertEquals(
+      encodeDiagnostics(
+        Diagnostics.Safe(
+          "a*a*!",
+          "",
+          Dialect.JavaScript,
+          UnitMode.UTF16,
+          AttackComplexity.Safe(true),
+          Seq.empty,
+          Checker.Fuzz,
+          Some(upperBound)
+        )
+      ).hcursor.downField("upperBound").focus,
+      Some(
+        Json.obj(
+          "complexity" := Json.obj(
+            "type" := "polynomial",
+            "degree" := 2,
+            "summary" := "2nd degree polynomial",
+            "isFuzz" := false
+          ),
+          "hotspot" := Json.arr(Json.obj("start" := 0, "end" := 1, "temperature" := "hot"))
+        )
       )
     )
     assertEquals(
@@ -100,6 +128,7 @@ class CodecSuite extends munit.FunSuite:
         ),
         "hotspot" := Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Hot), Hotspot.Spot(3, 4, Hotspot.Hot))),
         "runtimeAttack" := Json.Null,
+        "upperBound" := Json.Null,
         "refutedAttacks" := Json.arr(),
         "checker" := Checker.Automaton.asInstanceOf[Checker]
       )
@@ -133,6 +162,7 @@ class CodecSuite extends munit.FunSuite:
         "unitMode" := Json.Null,
         "status" := "unknown",
         "error" := ErrorKind.InvalidRegExp("unknown flag").asInstanceOf[ErrorKind],
+        "upperBound" := Json.Null,
         "refutedAttacks" := Json.arr(),
         "checker" := None
       )
@@ -146,7 +176,8 @@ class CodecSuite extends munit.FunSuite:
           Some(UnitMode.UTF16),
           ErrorKind.RuntimeAttacksRefuted,
           Seq(refutedAttack),
-          Some(Checker.Fuzz)
+          Some(Checker.Fuzz),
+          Some(upperBound)
         )
       ),
       Json.obj(
@@ -156,6 +187,7 @@ class CodecSuite extends munit.FunSuite:
         "unitMode" := "utf16",
         "status" := "unknown",
         "error" := Json.obj("kind" := "runtime-attacks-refuted"),
+        "upperBound" := encodeUpperBound(upperBound),
         "refutedAttacks" := Json.arr(encodeRefutedAttack(Dialect.JavaScript, UnitMode.UTF16)(refutedAttack)),
         "checker" := "fuzz"
       )
@@ -431,6 +463,7 @@ class CodecSuite extends munit.FunSuite:
           "incubationTimeout" := 123,
           "maxGeneStringSize" := 123,
           "maxGenerationSize" := 123,
+          "maxAttackCandidates" := 123,
           "crossoverSize" := 123,
           "mutationSize" := 123,
           "attackTimeout" := 123,
@@ -439,6 +472,7 @@ class CodecSuite extends munit.FunSuite:
           "accelerationMode" := "off",
           "maxRepeatCount" := 123,
           "maxNFASize" := 123,
+          "maxDFASize" := 123,
           "maxPatternSize" := 123,
           "dialect" := Json.obj("name" := "perl", "utf8" := false, "source" := "string"),
           "maxRefutedAttacks" := 123
@@ -462,6 +496,7 @@ class CodecSuite extends munit.FunSuite:
           incubationTimeout = Duration(123, MILLISECONDS),
           maxGeneStringSize = 123,
           maxGenerationSize = 123,
+          maxAttackCandidates = 123,
           crossoverSize = 123,
           mutationSize = 123,
           attackTimeout = Duration(123, MILLISECONDS),
@@ -470,6 +505,7 @@ class CodecSuite extends munit.FunSuite:
           accelerationMode = AccelerationMode.Off,
           maxRepeatCount = 123,
           maxNFASize = 123,
+          maxDFASize = 123,
           maxPatternSize = 123,
           dialect = Dialect.Perl(utf8 = false, source = PerlSource.String),
           maxRefutedAttacks = 123

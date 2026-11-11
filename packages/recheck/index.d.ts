@@ -55,6 +55,7 @@ export type SafeDiagnostics = {
   unitMode: UnitMode;
   status: "safe";
   complexity: SafeComplexity;
+  upperBound: UpperBound | null;
   refutedAttacks: RefutedAttack[];
   checker: "automaton" | "fuzz";
 };
@@ -75,8 +76,28 @@ export type VulnerableDiagnostics = {
    * The run of the attack string on the real regex engine, or `null` if it is not run.
    */
   runtimeAttack: RuntimeAttack | null;
+  upperBound: UpperBound | null;
   refutedAttacks: RefutedAttack[];
   checker: "automaton" | "fuzz";
+};
+
+/**
+ * UpperBound is the upper bound of the matching time complexity that the fuzz checker finds before fuzzing.
+ *
+ * The diagnostics have it when the fuzz checker runs and finds the bound, and `null` otherwise.
+ * If the bound is linear, the regex is safe without fuzzing.
+ */
+export type UpperBound = {
+  /**
+   * The complexity of the bound, which is `linear` or vulnerable, and whose `isFuzz` is `false`.
+   */
+  complexity:
+    { type: "linear"; summary: string; isFuzz: false } | VulnerableComplexity;
+  /**
+   * The hotspot of the worst attack string of the bound, which is empty if the bound is linear.
+   * The bound may count matchings that the regex engine does not take, so it may not be an actual hotspot.
+   */
+  hotspot: Hotspot[];
 };
 
 /**
@@ -149,6 +170,7 @@ export type UnknownDiagnostics = {
   unitMode: UnitMode | null;
   status: "unknown";
   error: Error;
+  upperBound: UpperBound | null;
   refutedAttacks: RefutedAttack[];
   checker?: "automaton" | "fuzz";
 };
