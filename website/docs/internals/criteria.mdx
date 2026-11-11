@@ -49,6 +49,14 @@ In practice, as shown in the following flowchart, the algorithm is assumed to be
   />
 </p>
 
+The algorithm based on automata theory also gives up on the constructs that it cannot model exactly (e.g. back-references).
+Then the fuzzing first builds an automaton that explores every path the backtracking may take: a look-around may or may not succeed, and a back-reference matches one of the strings that the groups it refers to may match, or the empty string.
+The matching time of this automaton bounds the one of the regular expression from above.
+If the bound is linear, the regular expression is safe without fuzzing (e.g. `/^([a-z]+)=\1$/`).
+Otherwise, the fuzzing starts from the attack strings of the bound (see [Seeding](fuzzing.mdx#seeding)).
+The repetitions of the largest counts become `*` or `+` in the bound until the sum of the rest is below the threshold of the repeat counts (e.g. `/^[a-z]{1,64}@[a-z]{1,255}$/` is safe, as the bound of `/^[a-z]+@[a-z]+$/` is linear).
+As the bound is a part of the fuzzing, the `fuzz` checker bounds a regular expression too, while the `automaton` checker does not.
+
 ## Notes
 
 - The reason why we first determine whether or not to use the fuzzing on a sum of the numbers of quantifiers in the regular expression is to perform ReDoS detection from a practical point of view. For example, `/^(a|a){32}$/` is considered safe in theory because it has only a finite number of ambiguities, but in practice, it may try $2^{32}$ matching processes and is obviously vulnerable.
