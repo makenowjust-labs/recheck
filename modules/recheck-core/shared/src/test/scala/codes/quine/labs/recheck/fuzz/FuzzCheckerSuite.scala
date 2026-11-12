@@ -288,6 +288,11 @@ class FuzzCheckerSuite extends munit.FunSuite:
     assertEquals(confirm("[a-z0-9]{100,}", FString(1, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a')))), None)
     // The growth beyond the scale is the one of the attack.
     assertEquals(confirm("^(?:b{0,20}c|b*b*b*$)", repeatOf('b', 1)), Some(3))
+    // The steps grow quadratically until the twelfth copy, on which the match succeeds, though the copies are longer
+    // than twice the scale before it.
+    val copies = FString(1, FString.Repeat(0, 6) +: "00000;".map(c => FString.Wrap(c.toInt)))
+    assertEquals(confirm("(?:\\d+;){12}", copies), None)
+    assertEquals(confirm("^(?:\\d+;)*(?:\\d+;)*$", FString(1, copies.seq :+ FString.Wrap('!'))), Some(2))
     // A string without repetitions is confirmed if its run stops.
     val exponential = checkerOf(ReDoS.parse("^(?:c|c)*$", "", Dialect.JavaScript))
     val measurement = Measurement(Growth.Exponential, 1, 0, true)

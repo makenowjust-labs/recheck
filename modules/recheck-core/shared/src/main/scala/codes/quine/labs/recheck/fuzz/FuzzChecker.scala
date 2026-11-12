@@ -710,8 +710,12 @@ private[fuzz] final class FuzzChecker(
     * if the run stops on the limit or the timeout, or if its steps are the ones of the polynomial. Otherwise the growth
     * is measured again from the count, and confirmed on a count further once more.
     *
-    * The exponential growth that the steps tell beyond the scale is confirmed without a run, and a string without
+    * The exponential growth that the steps tell beyond the scale is confirmed without this run, and a string without
     * repetitions if its run stops.
+    *
+    * Another run tells the same on the count whose copies of the repeated parts are beyond the scale (see
+    * [[countBeyondCopies]]), or on the count of the attack string for the exponential growth, within
+    * `measurementLimit`.
     *
     * The runs take many steps, so they memoize even with back-references (see
     * [[FuzzProgram.usesAccelerationOnAttack]]).
@@ -720,32 +724,59 @@ private[fuzz] final class FuzzChecker(
     val memoizes = fuzz.usesAccelerationOnAttack(accelerationMode)
     if str.isConstant then
       return Option.when(stepsOn(str, str.n, attackLimit, attackTimeout, memoizes).isEmpty)(measurement)
-    val isBeyond = measurement.first >= countBeyond(str, scale)
-    if measurement.growth == Growth.Exponential && isBeyond && !measurement.stops then return Some(measurement)
-
     // The steps reach the limit on the count of the attack string, so the counts to confirm end on it.
     val end = attackCount(str, measurement.growth) match
       case Some(count) => count
       case None        => return None
+
+    // The least count of the measured ones that is `target` or more, up to `end`.
+    def countFrom(target: Int): Int = measurement.growth match
+      case p: Growth.Polynomial => (p.start + (target - p.start + p.stride - 1) / p.stride * p.stride).min(end)
+      case Growth.Exponential   => target.min(end)
+
+    // Runs the string on the count, and returns its steps unless the growth lasts on it: the run stops, or its steps
+    // are the ones of the polynomial.
+    def refutedOn(count: Int, limit: Int): Option[Option[Long]] =
+      val steps = stepsOn(str, count, limit, attackTimeout, memoizes)
+      val lasts = steps.forall: steps =>
+        measurement.growth match
+          case p: Growth.Polynomial => p.stepsOn(count) == steps
+          case Growth.Exponential   => false
+      Option.unless(lasts)(steps)
+
+    def measuredAgain(count: Int, steps: Option[Long]): Option[Measurement] =
+      if !measuresAgain then None
+      else
+        measure(str, count, Int.MaxValue, attackLimit, attackTimeout, Map(count -> steps), memoizes)
+          .filter(_.growth.isSuperLinear)
+          .flatMap(confirm(str, _, false))
+
     // The steps change the growth a little after the repeated parts get longer than the scale, as the fixed parts
     // and the other repeated parts are read with them.
-    val least = countBeyond(str, 2 * scale)
-    val count = measurement.growth match
-      case p: Growth.Polynomial =>
-        val k = (least.max(2 * measurement.last) - p.start + p.stride - 1) / p.stride
-        (p.start + k * p.stride).min(end)
-      case Growth.Exponential => least.max(measurement.last + 1).min(end)
-    val steps = stepsOn(str, count, attackLimit, attackTimeout, memoizes)
-    val lasts = steps.forall: steps =>
-      measurement.growth match
-        case p: Growth.Polynomial => p.stepsOn(count) == steps
-        case Growth.Exponential   => false
-    if lasts then Some(measurement)
-    else if !measuresAgain then None
+    val size = 2 * scale
+    val isBeyond = measurement.first >= countBeyond(str, scale)
+    val count =
+      if measurement.growth == Growth.Exponential && isBeyond && !measurement.stops then measurement.last
+      else
+        val least = countBeyond(str, size)
+        val count = measurement.growth match
+          case _: Growth.Polynomial => countFrom(least.max(2 * measurement.last))
+          case Growth.Exponential   => countFrom(least.max(measurement.last + 1))
+        refutedOn(count, attackLimit) match
+          case Some(steps) => return measuredAgain(count, steps)
+          case None        => count
+
+    // The parts of the pattern may read a character of each copy of a repeated part, with the loops between them
+    // reading the rest, so the growth may still change until the copies are more than the scale (e.g. the match of
+    // `(?:\d+;){12}` succeeds on the twelfth `00000;`). A run with the smaller limit tells such a change.
+    val copies = measurement.growth match
+      case _: Growth.Polynomial => countFrom(countBeyondCopies(str, size))
+      case Growth.Exponential   => end
+    if copies <= count then Some(measurement)
     else
-      measure(str, count, Int.MaxValue, attackLimit, attackTimeout, Map(count -> steps), memoizes)
-        .filter(_.growth.isSuperLinear)
-        .flatMap(confirm(str, _, false))
+      refutedOn(copies, measurementLimit) match
+        case Some(steps) => measuredAgain(copies, steps)
+        case None        => Some(measurement)
 
   /** Returns the offset of the count and the size of the part of each repetition of the string.
     *
@@ -757,6 +788,12 @@ private[fuzz] final class FuzzChecker(
   /** Returns the least repeat count on which every repetition of the string, which has some, is longer than `size`. */
   def countBeyond(str: FString, size: Int): Int =
     repeatsOf(str).map((m, repeatSize) => size / repeatSize + 1 - m).max.max(1)
+
+  /** Returns the least repeat count on which every repetition of the string, which has some, repeats more than `size`
+    * times.
+    */
+  def countBeyondCopies(str: FString, size: Int): Int =
+    repeatsOf(str).map((m, _) => size + 1 - m).max.max(1)
 
   /** Returns the least repeat count on which the steps of the growth reach `attackLimit`, or the largest one within
     * `maxAttackStringSize` if they do not there. It is `None` if no count of the growth is within it.
