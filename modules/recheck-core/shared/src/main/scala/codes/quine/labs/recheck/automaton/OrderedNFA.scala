@@ -89,9 +89,10 @@ final case class OrderedNFA[A, Q](
   /** Builds a look-ahead DFA from this NFA.
     *
     * The DFA reads the input backward. Its state is a set of states of this NFA which succeed on the rest of the input.
-    * It throws [[UnsupportedException]] when the DFA would have `maxDFASize` transitions or more.
+    * It throws [[UnsupportedException]] when the DFA would have `maxDFASize` transitions or more, or when the NFA with
+    * it would have `maxNFASize` transitions or more by their least number (see [[toNFAwLA]]).
     */
-  def toLookAheadDFA(maxDFASize: Int)(using ctx: Context): DFA[A, Set[Q]] =
+  def toLookAheadDFA(maxDFASize: Int, maxNFASize: Int = Int.MaxValue)(using ctx: Context): DFA[A, Set[Q]] =
     ctx.interrupt:
       val reverseLeaves = mutable.Map.empty[(Q, A), Set[Q]].withDefaultValue(Set.empty)
       for ((q1, a) -> b) <- delta; q2 <- b.allLeaves do
@@ -122,6 +123,10 @@ final case class OrderedNFA[A, Q](
           ctx.log("auto: exceed maxDFASize on look-ahead DFA construction")
           throw new UnsupportedException("look-ahead DFA size is too large")
 
+      // The least size of the NFA with the look-ahead DFA, which grows with each transition as in `toNFAwLA`.
+      val least = leastTransitions(false)
+      var leastNFASize = 0L
+
       add(acceptSet)
       while queue.nonEmpty do
         ctx.interrupt:
@@ -132,6 +137,11 @@ final case class OrderedNFA[A, Q](
               .filter(q1 => !tested.contains((q1, a)) || delta((q1, a)).succeeds(p2.contains))
             newDelta.addOne((p2, a) -> p1)
             if !newStateSet.contains(p1) then add(p1)
+
+            if inputStates.isEmpty || p1.exists(inputStates.contains) then leastNFASize += least(a)
+            if leastNFASize >= maxNFASize then
+              ctx.log("auto: exceed maxNFASize on look-ahead DFA construction")
+              throw new UnsupportedException("NFAwLA size is too large")
 
       val dfa = DFA(alphabet, newStateSet.toSet, acceptSet, newAcceptSet.result(), newDelta.result())
       ctx.log:

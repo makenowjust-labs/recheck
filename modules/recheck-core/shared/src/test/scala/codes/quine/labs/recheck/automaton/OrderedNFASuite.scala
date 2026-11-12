@@ -142,6 +142,11 @@ class OrderedNFASuite extends munit.FunSuite:
       )
     )
     assertEquals(nfa1.toLookAheadDFA(7).delta.size, 6)
+    // The NFA with it has a transition or more for each of its transitions on the characters of the NFA.
+    val least = nfa1.toNFAwLA(nfa1.toLookAheadDFA(7), identity, false, Int.MaxValue).delta.values.map(_.size).sum
+    assertEquals(nfa1.toLookAheadDFA(7, least + 1).delta.size, 6)
+    interceptMessage[UnsupportedException]("NFAwLA size is too large"):
+      nfa1.toLookAheadDFA(7, 1)
     interceptMessage[UnsupportedException]("look-ahead DFA size is too large"):
       nfa1.toLookAheadDFA(6)
 
