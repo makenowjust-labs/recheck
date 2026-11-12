@@ -15,7 +15,7 @@ ThisBuild / developers := List(
 )
 ThisBuild / versionScheme := Some("early-semver")
 
-ThisBuild / scalaVersion := "3.10.0"
+ThisBuild / scalaVersion := "3.10.1"
 ThisBuild / scalacOptions ++= Seq(
   "-encoding",
   "UTF-8",
