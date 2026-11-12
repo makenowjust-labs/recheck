@@ -6,6 +6,12 @@ New Features:
 - [#1947](https://github.com/makenowjust-labs/recheck/pull/1947) Add a blog article about v4.6, playground, and case studies ([@makenowjust](https://github.com/makenowjust))
 - [#378](https://github.com/makenowjust-labs/recheck/pull/378) Support other regex dialects: Ruby, Python, Java, .NET, Perl, PCRE ([@makenowjust](https://github.com/makenowjust))
 - [#1977](https://github.com/makenowjust-labs/recheck/pull/1977) Add a printer of the AST that keeps the written forms ([@makenowjust](https://github.com/makenowjust))
+- [#1978](https://github.com/makenowjust-labs/recheck/pull/1978) Support look-ahead assertions in the automaton checker ([@makenowjust](https://github.com/makenowjust))
+- [#1980](https://github.com/makenowjust-labs/recheck/pull/1980) Support bounded look-behind assertions in the automaton checker ([@makenowjust](https://github.com/makenowjust))
+- [#1981](https://github.com/makenowjust-labs/recheck/pull/1981) Support unbounded look-behind assertions in the automaton checker ([@makenowjust](https://github.com/makenowjust))
+- [#1983](https://github.com/makenowjust-labs/recheck/pull/1983) Support atomic groups in the automaton checker ([@makenowjust](https://github.com/makenowjust))
+- [#1987](https://github.com/makenowjust-labs/recheck/pull/1987) Add an upper-bound analysis to the fuzz checker ([@makenowjust](https://github.com/makenowjust))
+- [#1988](https://github.com/makenowjust-labs/recheck/pull/1988) Expand the back-references in the automaton checker ([@makenowjust](https://github.com/makenowjust))
 
 Fixes:
 
@@ -15,6 +21,9 @@ Fixes:
 - [#1973](https://github.com/makenowjust-labs/recheck/pull/1973) Keep the value of a capture until it closes, which a back-reference in it sees ([@makenowjust](https://github.com/makenowjust))
 - [#1976](https://github.com/makenowjust-labs/recheck/pull/1976) Speed up the VM interpreter ([@makenowjust](https://github.com/makenowjust))
 - [#1984](https://github.com/makenowjust-labs/recheck/pull/1984) Make the interruption test of the exec platform deterministic ([@makenowjust](https://github.com/makenowjust))
+- [#1989](https://github.com/makenowjust-labs/recheck/pull/1989) Speed up the automaton checker ([@makenowjust](https://github.com/makenowjust))
+- [#1990](https://github.com/makenowjust-labs/recheck/pull/1990) Estimate the growth of the fuzz candidates before the attacks ([@makenowjust](https://github.com/makenowjust))
+- [#1991](https://github.com/makenowjust-labs/recheck/pull/1991) Speed up the VM for the fuzz checker ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
@@ -28,6 +37,7 @@ Misc:
 - [#1964](https://github.com/makenowjust-labs/recheck/pull/1964) Cache the builds of PHP and PCRE2 apart from the other mise tools ([@makenowjust](https://github.com/makenowjust))
 - [#1965](https://github.com/makenowjust-labs/recheck/pull/1965) Show the dialects by their names in the Playground ([@makenowjust](https://github.com/makenowjust))
 - [#1962](https://github.com/makenowjust-labs/recheck/pull/1962) Update dependency @playwright/test to v1.65.0 ([@renovate[bot]](https://github.com/apps/renovate))
+- [#1966](https://github.com/makenowjust-labs/recheck/pull/1966) Offer the beta releases in the Playground ([@makenowjust](https://github.com/makenowjust))
 - [#1971](https://github.com/makenowjust-labs/recheck/pull/1971) Look up mise's Perl versions in relocatable-perl, and wait a day for a release ([@makenowjust](https://github.com/makenowjust))
 - [#1985](https://github.com/makenowjust-labs/recheck/pull/1985) Update dependency jdx/mise to v2026.11.6 ([@renovate[bot]](https://github.com/apps/renovate))
 - [#1986](https://github.com/makenowjust-labs/recheck/pull/1986) Update dependency scala to v3.10.1 ([@renovate[bot]](https://github.com/apps/renovate))
