@@ -4,6 +4,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.compiletime.uninitialized
 import scala.concurrent.duration.Duration
+import scala.util.hashing.MurmurHash3
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.TimeoutException
@@ -113,10 +114,15 @@ object Interpreter:
       override def toString: String = "timeout"
 
   /** CoverageLocation is a location in coverage. */
-  final case class CoverageLocation(instID: Int, counters: Vector[Int])
+  final case class CoverageLocation(instID: Int, counters: Vector[Int]):
+
+    // The sets of the coverage hash each location many times.
+    override val hashCode: Int = MurmurHash3.caseClassHash(this)
 
   /** CoverageItem is an item of matching coverage. */
-  final case class CoverageItem(loc: CoverageLocation, ok: Boolean)
+  final case class CoverageItem(loc: CoverageLocation, ok: Boolean):
+
+    override val hashCode: Int = MurmurHash3.caseClassHash(this)
 
   /** FailedPoint is a failed point on matching. */
   final case class FailedPoint(target: CoverageLocation, pos: Int, kind: ReadKind, capture: Option[UString])
@@ -361,8 +367,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       .toSeq
     val heatmap =
       heats.indices.iterator.collect { case k if heats(k) > 0 => program.heatLocations(k) -> heats(k) }.toMap
-    val covered = coveredInsts.iterator.map(k => CoverageItem(CoverageLocation(k / 2, Vector.empty), k % 2 == 1))
-    val coverage = this.coverage.toSet ++ covered
+    val coverage = this.coverage.toSet ++ coveredInsts.iterator.map(program.coverageItems(_))
     Result(status, captures, steps, loops, failedPoints.toSet, coverage, heatmap.withDefaultValue(0))
 
   /** Runs matching from the start of the input. */
