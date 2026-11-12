@@ -299,7 +299,8 @@ private[fuzz] final class FuzzChecker(
     val results = Iterator
       .single(pop)
       .flatMap: pop =>
-        val boundSeed = upperBoundSeed()
+        val witnessSeed = upperBoundSeed()
+        val boundSeed = witnessSeed ++ suffixedSeed(witnessSeed)
         boundSeed.foreach(pop.execute)
         val fingerprints = pop.candidates.keySet.toSet
         val (steepest, others) = attacker.ordered(pop.candidates.values.toVector).partition(attacker.isSteepest)
@@ -312,6 +313,28 @@ private[fuzz] final class FuzzChecker(
               case (fingerprint, candidate) if !fingerprints.contains(fingerprint) => candidate
             (others ++ attacker.ordered(seeded.toVector)).sortBy(-_.rank).iterator.flatMap(attacker.tryAttack)
     (results, pop)
+
+  /** Computes the seeds of the upper bound whose matches succeed again, with each literal of the pattern as the suffix
+    * after the last repetition, up to the size of the initial generation with `seeds`.
+    *
+    * An upper bound tells no failure of the rest of the pattern or of a look-around, so the suffix of its witness may
+    * let the match succeed, and then the matching stops before the other paths of the witness. A literal of the pattern
+    * may make it fail (e.g. `</a>` for `(?!.*</a>)`).
+    */
+  def suffixedSeed(seeds: Seq[FString]): Seq[FString] = interrupt:
+    val opts = Options(incubationLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode))
+    val suffixes = parts.map(_.iterator.map(FString.Wrap(_)).toIndexedSeq)
+    seeds
+      .distinctBy(_.seq)
+      .iterator
+      .filter(seed => Interpreter.runWithTimeout(program, seed.toUString, opts, incubationTimeout).status == Status.Ok)
+      .flatMap: seed =>
+        val last = seed.seq.lastIndexWhere(_.isInstanceOf[FString.Repeat])
+        val body = seed.seq.take(last + 1 + attacker.repeatsOf(seed).last._2)
+        suffixes.map(suffix => FString(seed.n, body ++ suffix))
+      .filterNot(seeds.contains)
+      .take(maxInitialGenerationSize - seeds.size)
+      .toSeq
 
   /** Computes the seeds of the witnesses of the upper bound. */
   def upperBoundSeed(): Seq[FString] =

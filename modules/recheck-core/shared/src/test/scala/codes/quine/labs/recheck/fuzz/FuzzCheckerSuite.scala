@@ -272,6 +272,23 @@ class FuzzCheckerSuite extends munit.FunSuite:
     assertEquals(waitingResults.next()._1, AttackComplexity.Polynomial(2, true))
     assert(waiting.seederSeed(waiting.upperBoundSeed()).exists(str => waitingPop.set.exists(_.str == str)))
 
+  test("FuzzChecker#suffixedSeed"):
+    import Parameters.*
+    def checkerWithBound(source: String): FuzzChecker =
+      val ir = ReDoS.parse(source, "", Dialect.JavaScript)
+      checkerOf(ir, upperBound = FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100))
+
+    // The match of the witness succeeds unless `xyz` follows, which makes the look-ahead fail.
+    val checker = checkerWithBound("^(?:a|a)*(?!.*xyz)")
+    val seeds = checker.upperBoundSeed()
+    val suffixed = checker.suffixedSeed(seeds)
+    assert(clue(suffixed).nonEmpty)
+    assert(suffixed.forall(_.toUString.iterator.toSeq.endsWith("xyz".map(_.toInt))))
+    assertEquals(checker.init()._1.next()._1, AttackComplexity.Exponential(true))
+    // A seed whose match fails has no other suffix.
+    val failing = checkerWithBound("^(?:a|a)*$")
+    assertEquals(failing.suffixedSeed(failing.upperBoundSeed()), Seq.empty)
+
   /** The degree of the polynomial growth, or `-1` for the exponential one. */
   def degreeOf(measurement: Measurement): Int = measurement.growth match
     case p: Growth.Polynomial => p.degree
