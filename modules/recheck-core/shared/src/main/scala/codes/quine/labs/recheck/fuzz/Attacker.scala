@@ -144,10 +144,18 @@ private[fuzz] final class Attacker(
 
   /** Runs the attacks from the candidates, the steepest growth first. */
   def attack(candidates: Iterator[Candidate]): Iterator[AttackResult] = interrupt:
+    ordered(candidates.toVector).iterator.flatMap(tryAttack)
+
+  /** Returns the candidates in the order of their attacks, the steepest growth first. */
+  def ordered(candidates: Seq[Candidate]): Seq[Candidate] = interrupt:
     // The candidates are sorted before any attack, with the growth that the larger limit tells.
-    val sorted = candidates.toVector.flatMap(remeasureOrFail).sortBy(-_.rank)
+    val sorted = candidates.flatMap(remeasureOrFail).sortBy(-_.rank)
     // The steepest one is boosted first (see [[boost]]), and it stays after the boosted one, whose attack may fail.
-    (sorted.headOption.flatMap(boost) ++ sorted).iterator.flatMap(tryAttack)
+    sorted.headOption.flatMap(boost).toSeq ++ sorted
+
+  /** Whether the growth of the candidate is the steepest one of the attacks to try. */
+  def isSteepest(candidate: Candidate): Boolean =
+    if triesExponential then candidate.measurement.growth == Growth.Exponential else candidate.rank >= maxTriedDegree
 
   /** Measures the candidate again (see [[remeasure]]), whose fingerprint is added to [[failedFingerprints]] if its
     * steps do not grow more than linearly.

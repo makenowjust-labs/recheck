@@ -234,11 +234,11 @@ class FuzzCheckerSuite extends munit.FunSuite:
   /** A witness of `^a*$` for the upper bounds in the tests. */
   val witness: Witness[UChar] = Witness(Seq((Seq.empty, Seq('a'))), Seq('!'))
 
-  test("FuzzChecker#seed"):
+  test("FuzzChecker#upperBoundSeed, FuzzChecker#seederSeed"):
     val ir = ReDoS.parse("^a*$", "", Dialect.JavaScript)
     val quadratic = Complexity.Polynomial(2, witness)
     val cubic = Complexity.Polynomial(3, witness)
-    val seed = checkerOf(ir, upperBound = Some(Seq(cubic, quadratic, quadratic))).seed()
+    val checker = checkerOf(ir, upperBound = Some(Seq(cubic, quadratic, quadratic)))
     def seeds(complexity: Complexity.Vulnerable[UChar]): Seq[FString] =
       FuzzChecker.buildSeeds(
         complexity,
@@ -249,8 +249,28 @@ class FuzzCheckerSuite extends munit.FunSuite:
     // The first seeds of the witnesses come before the others, without duplicates.
     val upperBoundSeed =
       Seq(seeds(cubic).head, seeds(quadratic).head) ++ seeds(cubic).tail.filterNot(seeds(quadratic).contains)
-    assertEquals(seed.take(upperBoundSeed.size), upperBoundSeed)
-    assertEquals(seed.drop(upperBoundSeed.size).toSet, checkerOf(ir).seed().toSet -- upperBoundSeed)
+    assertEquals(checker.upperBoundSeed(), upperBoundSeed)
+    // The seeds of the seeder are the ones without the upper bound, except the seeds of the upper bound.
+    val seederSeed = checkerOf(ir).seederSeed(Seq.empty)
+    assert(seederSeed.nonEmpty)
+    assertEquals(checker.seederSeed(upperBoundSeed).toSet, seederSeed.toSet -- upperBoundSeed)
+    assertEquals(checker.seederSeed(seederSeed).toSet, Set.empty)
+
+  test("FuzzChecker#init: the seeder runs after the steepest attacks from the upper bound"):
+    val ir = ReDoS.parse("^a*a*$", "", Dialect.JavaScript)
+    val checker = checkerOf(ir, upperBound = Some(Seq(Complexity.Polynomial(2, witness))))
+    val (results, pop) = checker.init()
+    assertEquals(results.next()._1, AttackComplexity.Polynomial(2, true))
+    val boundSeed = checker.upperBoundSeed()
+    assertEquals(pop.set.map(_.str).toSet, boundSeed.toSet)
+    // The seeds of the seeder run when the attacks run out.
+    results.toSeq
+    assert(checker.seederSeed(boundSeed).exists(str => pop.set.exists(_.str == str)))
+    // A candidate below the steepest growth of an exponential upper bound waits for the seeds of the seeder.
+    val waiting = checkerOf(ir, upperBound = Some(Seq(Complexity.Exponential(witness))))
+    val (waitingResults, waitingPop) = waiting.init()
+    assertEquals(waitingResults.next()._1, AttackComplexity.Polynomial(2, true))
+    assert(waiting.seederSeed(waiting.upperBoundSeed()).exists(str => waitingPop.set.exists(_.str == str)))
 
   /** The degree of the polynomial growth, or `-1` for the exponential one. */
   def degreeOf(measurement: Measurement): Int = measurement.growth match

@@ -160,7 +160,8 @@ object FuzzChecker:
     *
     * `bound` is the upper bound of the pattern (see [[upperBound]]). The steps on the strings that the counts count
     * grow as the bound at most, which is taken for the steps of the size of the pattern times the power of the degree
-    * of twice the scale of the pattern (see [[scaleOf]]). An exponential bound may reach the limit on a few characters.
+    * of twice the bounded width of the pattern (see [[Attacker.boundedWidthOf]]). An exponential bound may reach the
+    * limit on a few characters.
     */
   private[fuzz] def isLinearBeyondCounts(
       pattern: IRPattern,
@@ -174,7 +175,7 @@ object FuzzChecker:
       .map: vulnerable =>
         vulnerable.collect { case p: Complexity.Polynomial[?] => p.degree }.max
     degree.exists: degree =>
-      val reaches = pattern.size * Math.pow(2.0 * scaleOf(pattern.node), degree) >= attackLimit
+      val reaches = pattern.size * Math.pow(2.0 * Attacker.boundedWidthOf(pattern.node), degree) >= attackLimit
       val tail = pattern.dropUniversalTail
       // Without a repetition to flatten, the bound beyond the counts is `bound`.
       !reaches && tail.flattenRepeats(maxRepeatCount) != tail.approximateRepeats(maxRepeatCount) &&
@@ -290,23 +291,37 @@ private[fuzz] final class FuzzChecker(
       pop = iterPop
       iterResults
 
-  /** Creates the initial generation from the seed set. */
+  /** Creates the initial generation from the seed set, where the seeds of the seeder run after the steepest attacks
+    * from the seeds of the upper bound.
+    */
   def init(): (Iterator[AttackResult], Population) = interrupt:
     val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty)
     val results = Iterator
       .single(pop)
       .flatMap: pop =>
-        seed().foreach(pop.execute)
-        attacker.attack(pop.candidates.valuesIterator)
+        val boundSeed = upperBoundSeed()
+        boundSeed.foreach(pop.execute)
+        val fingerprints = pop.candidates.keySet.toSet
+        val (steepest, others) = attacker.ordered(pop.candidates.values.toVector).partition(attacker.isSteepest)
+        // No seed of the seeder grows steeper, and the seeder takes long.
+        steepest.iterator.flatMap(attacker.tryAttack) ++ Iterator
+          .single(pop)
+          .flatMap: pop =>
+            seederSeed(boundSeed).foreach(pop.execute)
+            val seeded = pop.candidates.iterator.collect:
+              case (fingerprint, candidate) if !fingerprints.contains(fingerprint) => candidate
+            (others ++ attacker.ordered(seeded.toVector)).sortBy(-_.rank).iterator.flatMap(attacker.tryAttack)
     (results, pop)
 
-  /** Computes the seed set, where the witnesses of the upper bound come first. */
-  def seed(): Seq[FString] = interrupt:
-    log(s"fuzz: seeding start (seeder: $seeder)")
+  /** Computes the seeds of the witnesses of the upper bound. */
+  def upperBoundSeed(): Seq[FString] =
     // The first seeds of the witnesses come before the others, so that every witness has a seed.
     val boundSeeds = upperBound.toSeq.flatten.map(buildSeeds(_, incubationLimit, maxGeneStringSize, maxDegree))
-    val upperBoundSeed = (boundSeeds.map(_.head) ++ boundSeeds.flatMap(_.tail)).distinct
-      .take(maxInitialGenerationSize)
+    (boundSeeds.map(_.head) ++ boundSeeds.flatMap(_.tail)).distinct.take(maxInitialGenerationSize)
+
+  /** Computes the seeds of the seeder, which fill the initial generation after the ones of the upper bound. */
+  def seederSeed(upperBoundSeed: Seq[FString]): Seq[FString] = interrupt:
+    log(s"fuzz: seeding start (seeder: $seeder)")
     val seederSeed: Set[FString] = seeder match
       case Seeder.Static =>
         val staticSeed =
@@ -330,10 +345,10 @@ private[fuzz] final class FuzzChecker(
         else staticSeed
       case Seeder.Dynamic =>
         DynamicSeeder.seed(fuzz, seedingLimit, seedingTimeout, maxInitialGenerationSize, accelerationMode)
-    val seed = upperBoundSeed ++ (seederSeed -- upperBoundSeed).take(maxInitialGenerationSize - upperBoundSeed.size)
+    val seed = (seederSeed -- upperBoundSeed).take(maxInitialGenerationSize - upperBoundSeed.size).toSeq
 
     log(s"""|fuzz: seeding finish
-            |  size: ${seed.size}""".stripMargin)
+            |  size: ${upperBoundSeed.size + seed.size}""".stripMargin)
     seed
 
   /** Iterates a generation. */
