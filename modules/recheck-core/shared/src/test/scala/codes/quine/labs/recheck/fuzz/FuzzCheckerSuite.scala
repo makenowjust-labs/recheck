@@ -321,6 +321,29 @@ class FuzzCheckerSuite extends munit.FunSuite:
     // A string whose steps grow linearly is not a candidate.
     assertEquals(candidatesOf(checker, FString(1000, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('x')))), Seq.empty)
 
+  test("FuzzChecker#additionsOf"):
+    val checker = checkerOf(ReDoS.parse("^a*b$", "", Dialect.JavaScript))
+    val seq = IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'))
+    val additions = checker.additionsOf(FString(5, seq))
+    // A character and its repetition are added at the start and at the end of the repetition.
+    assert(additions.contains(FString(1, FString.Wrap('b') +: seq)))
+    assert(additions.contains(FString(1, seq :+ FString.Wrap('b'))))
+    assert(additions.contains(FString(1, seq ++ IndexedSeq(FString.Repeat(0, 1), FString.Wrap('b')))))
+    assertEquals(additions.size, 2 * 2 * checker.alphabet.pairs.size)
+
+  test("FuzzChecker#raise"):
+    val checker = checkerOf(ReDoS.parse("\\s*<(\\w+)(?:[^>]+)?>", "", Dialect.JavaScript))
+    // The steps of `<{n}0{n}` grow quadratically, where only the last `<` goes on to `\w+`.
+    val seq = IndexedSeq(FString.Repeat(0, 1), FString.Wrap('<'), FString.Repeat(0, 1), FString.Wrap('0'))
+    val candidate = candidatesOf(checker, FString(1, seq)).head
+    assertEquals(degreeOf(candidate.measurement), 2)
+    // Without the repetition of `<`, a repetition of a space before it makes the steps cubic.
+    val raised = checker.raise(candidate).get
+    assertEquals(degreeOf(raised.measurement), 3)
+    assertEquals(raised.str.countRepeat, 2)
+    // A skeleton is raised once.
+    assertEquals(checker.raise(candidate), None)
+
   test("FuzzChecker#attack: the degree is exact"):
     // The steps of the lower degrees are many, which a slope of the steps takes for the cubic growth.
     val ir = ReDoS.parse("^(?:a|b)*[ab]*[ab]*[ab]*$", "", Dialect.JavaScript)

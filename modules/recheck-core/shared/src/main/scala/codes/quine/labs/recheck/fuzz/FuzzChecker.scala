@@ -499,17 +499,79 @@ private[fuzz] final class FuzzChecker(
 
   /** Runs the attacks from the candidates, the steepest growth first. */
   def attack(candidates: Iterator[Candidate]): Iterator[AttackResult] = interrupt:
-    def rank(candidate: Candidate): Int = candidate.measurement.growth match
-      case Growth.Exponential   => Int.MaxValue
-      case p: Growth.Polynomial => p.degree
     def refineOrFail(candidate: Candidate): Option[Candidate] =
       val refined = Option.unless(failedSkeletons.contains(candidate.str.skeleton))(candidate).flatMap(refine)
       if refined.isEmpty then failedSkeletons.add(candidate.str.skeleton)
       refined
     // The candidates are sorted before any attack, with the growth that the larger limit tells.
+    // The steepest one is raised first (see [[raise]]), and it stays after the raised one, whose attack may fail.
     Iterator
       .single(())
-      .flatMap(_ => candidates.toVector.flatMap(refineOrFail).sortBy(-rank(_)).iterator.flatMap(tryAttack))
+      .flatMap: _ =>
+        val sorted = candidates.toVector.flatMap(refineOrFail).sortBy(-rank(_))
+        (sorted.headOption.flatMap(raise) ++ sorted).iterator.flatMap(tryAttack)
+
+  /** The rank of the growth of a candidate, which is the degree, or the largest for the exponential one. */
+  private def rank(candidate: Candidate): Int = candidate.measurement.growth match
+    case Growth.Exponential   => Int.MaxValue
+    case p: Growth.Polynomial => p.degree
+
+  /** The skeletons of the candidates that [[raise]] tried. */
+  val raisedSkeletons: mutable.Set[UString] = mutable.Set.empty
+
+  /** Raises the growth of the candidate by adding a character or a repetition to its string again and again, while the
+    * growth gets steeper, and returns the steepest one, or `None` if none is steeper.
+    *
+    * A string from a seed or a mutation may grow less than the pattern allows, when a character ends the matching early
+    * or a loop of the pattern has no part to repeat. The growth of each string tells whether an addition helps, as it
+    * is exact. It stops on the largest degree to report.
+    */
+  def raise(candidate: Candidate): Option[Candidate] = interrupt:
+    val target = maxTriedDegree
+    if !raisedSkeletons.add(candidate.str.skeleton) then return None
+
+    def measured(str: FString): Option[Candidate] =
+      val admits = str.countRepeat < maxDegree && str.admitsAnyRepeatCount(pattern.mode)
+      Option
+        .when(admits)(str)
+        .flatMap(str => measurements.getOrElseUpdate(str.seq, measureFirst(str, incubationLimit)))
+        .filter(_.growth.isSuperLinear)
+        .map(Candidate(str, _))
+        // A run that stops tells nothing of the growth until it is measured with the larger limit.
+        .flatMap(candidate =>
+          if triesExponential then refine(candidate) else Option.unless(candidate.measurement.stops)(candidate)
+        )
+
+    // The string without the repetitions that the growth does not need, which may keep an addition from raising it
+    // (e.g. `<` repeated in `<{n}0{n}` for `\s*<\w+[^>]+>`, where only the last `<` goes on).
+    def reduced(candidate: Candidate): Candidate =
+      val positions = candidate.str.seq.indices.filter(candidate.str.seq(_).isInstanceOf[FString.Repeat]).reverse
+      positions.foldLeft(candidate): (current, pos) =>
+        measured(current.str.delete(pos, 1)).filter(rank(_) >= rank(current)).getOrElse(current)
+
+    var best = reduced(candidate)
+    var continues = true
+    while continues && rank(best) < target do
+      // The first of the steepest ones, for the same result on each run.
+      val next =
+        additionsOf(best.str).iterator.flatMap(measured).foldLeft(best)((x, y) => if rank(y) > rank(x) then y else x)
+      continues = next ne best
+      best = if continues then reduced(next) else best
+    Option.when(rank(best) > rank(candidate))(best)
+
+  /** Returns the strings adding a character, or a repetition of a character, to the string at its start, its end and
+    * the ends of its repetitions.
+    */
+  def additionsOf(str: FString): Seq[FString] =
+    val chars = alphabet.pairs.map(_._1.representative).distinct
+    val ends = str.seq.zipWithIndex.collect:
+      case (FString.Repeat(_, size), pos) => Seq(pos, (pos + 1 + size).min(str.size))
+    val positions = (0 +: ends.flatten :+ str.size).distinct.sorted
+    for
+      pos <- positions
+      c <- chars
+      part <- Seq(IndexedSeq(FString.Wrap(c)), IndexedSeq(FString.Repeat(0, 1), FString.Wrap(c)))
+    yield str.copy(n = 1).insert(pos, part)
 
   /** The skeletons of the candidates whose attacks fail. */
   val failedSkeletons: mutable.Set[UString] = mutable.Set.empty
