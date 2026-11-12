@@ -25,3 +25,12 @@ class FuzzProgramSuite extends munit.FunSuite:
     // The verbs and the non-atomic look-arounds do not allow memoization.
     for source <- Seq("a(*PRUNE)b", "(*napla:a)a"); mode <- AccelerationMode.values do
       assertEquals(from(source, "", Dialect.PCRE).usesAcceleration(mode), false, s"$source in $mode")
+
+  test("FuzzProgram#usesAccelerationOnAttack"):
+    val fuzz = from("(foo)\\1", "")
+    // A back-reference does not turn it off.
+    assertEquals(fuzz.usesAccelerationOnAttack(AccelerationMode.Auto), true)
+    assertEquals(fuzz.usesAccelerationOnAttack(AccelerationMode.On), true)
+    assertEquals(fuzz.usesAccelerationOnAttack(AccelerationMode.Off), false)
+    for source <- Seq("a(*PRUNE)b", "(*napla:a)a"); mode <- AccelerationMode.values do
+      assertEquals(from(source, "", Dialect.PCRE).usesAccelerationOnAttack(mode), false, s"$source in $mode")

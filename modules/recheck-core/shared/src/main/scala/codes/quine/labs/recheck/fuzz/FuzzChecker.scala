@@ -595,9 +595,18 @@ private[fuzz] final class FuzzChecker(
     val fixedSize = str.size - repeats.size - repeats.map(_._2).sum
     fixedSize + repeats.map((m, size) => (count.toLong + m).max(0) * size).sum
 
-  /** Returns the steps of the string on the repeat count, or `None` if the run stops on the limit or the timeout. */
-  def stepsOn(str: FString, count: Int, limit: Int, timeout: Duration): Option[Long] =
-    val opts = Options(limit, usesAcceleration = fuzz.usesAcceleration(accelerationMode))
+  /** Returns the steps of the string on the repeat count, or `None` if the run stops on the limit or the timeout.
+    *
+    * `memoizes` tells whether the VM memoizes the failed states, which does not change the steps.
+    */
+  def stepsOn(
+      str: FString,
+      count: Int,
+      limit: Int,
+      timeout: Duration,
+      memoizes: Boolean = fuzz.usesAcceleration(accelerationMode)
+  ): Option[Long] =
+    val opts = Options(limit, usesAcceleration = memoizes)
     val result = Interpreter.runWithTimeout(program, str.copy(n = count).toUString, opts, timeout)
     Option.unless(result.status == Status.Limit || result.status == Status.Timeout)(result.steps.toLong)
 
@@ -615,7 +624,8 @@ private[fuzz] final class FuzzChecker(
       to: Int,
       limit: Int,
       timeout: Duration,
-      known: Map[Int, Option[Long]] = Map.empty
+      known: Map[Int, Option[Long]] = Map.empty,
+      memoizes: Boolean = fuzz.usesAcceleration(accelerationMode)
   ): Option[Measurement] = interrupt:
     val steps = mutable.Map.from(known)
 
@@ -624,7 +634,7 @@ private[fuzz] final class FuzzChecker(
       var count = start
       var size = 0
       while size < measuredDegree + 3 && count <= to do
-        steps.getOrElseUpdate(count, stepsOn(str, count, limit, timeout)) match
+        steps.getOrElseUpdate(count, stepsOn(str, count, limit, timeout, memoizes)) match
           case None    => return Some(Measurement(Growth.Exponential, start, count - stride, true))
           case Some(s) =>
             window.addOne(s)
@@ -702,9 +712,14 @@ private[fuzz] final class FuzzChecker(
     *
     * The exponential growth that the steps tell beyond the scale is confirmed without a run, and a string without
     * repetitions if its run stops.
+    *
+    * The runs take many steps, so they memoize even with back-references (see
+    * [[FuzzProgram.usesAccelerationOnAttack]]).
     */
   def confirm(str: FString, measurement: Measurement, measuresAgain: Boolean = true): Option[Measurement] = interrupt:
-    if str.isConstant then return Option.when(stepsOn(str, str.n, attackLimit, attackTimeout).isEmpty)(measurement)
+    val memoizes = fuzz.usesAccelerationOnAttack(accelerationMode)
+    if str.isConstant then
+      return Option.when(stepsOn(str, str.n, attackLimit, attackTimeout, memoizes).isEmpty)(measurement)
     val isBeyond = measurement.first >= countBeyond(str, scale)
     if measurement.growth == Growth.Exponential && isBeyond && !measurement.stops then return Some(measurement)
 
@@ -720,7 +735,7 @@ private[fuzz] final class FuzzChecker(
         val k = (least.max(2 * measurement.last) - p.start + p.stride - 1) / p.stride
         (p.start + k * p.stride).min(end)
       case Growth.Exponential => least.max(measurement.last + 1).min(end)
-    val steps = stepsOn(str, count, attackLimit, attackTimeout)
+    val steps = stepsOn(str, count, attackLimit, attackTimeout, memoizes)
     val lasts = steps.forall: steps =>
       measurement.growth match
         case p: Growth.Polynomial => p.stepsOn(count) == steps
@@ -728,7 +743,7 @@ private[fuzz] final class FuzzChecker(
     if lasts then Some(measurement)
     else if !measuresAgain then None
     else
-      measure(str, count, Int.MaxValue, attackLimit, attackTimeout, Map(count -> steps))
+      measure(str, count, Int.MaxValue, attackLimit, attackTimeout, Map(count -> steps), memoizes)
         .filter(_.growth.isSuperLinear)
         .flatMap(confirm(str, _, false))
 
