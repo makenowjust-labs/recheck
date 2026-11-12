@@ -121,7 +121,7 @@ private[fuzz] final class Attacker(
   val boostedFingerprints: mutable.Set[FString.Fingerprint] = mutable.Set.empty
 
   /** Whether an attack from the string is avoided. */
-  def isAvoided(str: FString): Boolean = attacks.get(str).exists(_.exists(avoidsAttack.tupled))
+  def isAvoided(str: FString): Boolean = attacks.nonEmpty && attacks.get(str).exists(_.exists(avoidsAttack.tupled))
 
   /** Returns the candidate of the string if its steps grow more than linearly, where `stops` tells whether its run
     * stopped on the limit or the timeout.
