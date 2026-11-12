@@ -140,6 +140,19 @@ final case class OrderedNFA[A, Q](
             |  alphabet size: ${dfa.alphabet.size}""".stripMargin
       dfa
 
+  /** Returns the least number of the transitions that [[toNFAwLA]] makes from the transitions on each character, for
+    * each transition of the look-ahead DFA on it.
+    *
+    * A transition makes the leaves that a matcher explores whichever of them succeed (see [[Branch.minExplored]]), or
+    * every leaf with `isUpperBound`.
+    */
+  private def leastTransitions(isUpperBound: Boolean): Map[A, Long] =
+    delta.toSeq
+      .collect:
+        case ((q1, a), b) if !inputStates.contains(q1) => a -> (if isUpperBound then b.leaves.size else b.minExplored)
+      .groupMapReduce(_._1)(_._2.toLong)(_ + _)
+      .withDefaultValue(0L)
+
   /** Converts this into [[NFAwLA]] with the look-ahead DFA, whose state `p` succeeds on the states `statesOf(p)` (see
     * [[toLookAheadDFA]]).
     *
@@ -147,6 +160,9 @@ final case class OrderedNFA[A, Q](
     *
     * With `isUpperBound`, the result has every leaf of the transitions, as no look-ahead prunes them, so its paths
     * include every explored path.
+    *
+    * It throws [[UnsupportedException]] when the result would have `maxNFASize` transitions or more, before building
+    * them if their least number tells it (see [[leastTransitions]]).
     */
   def toNFAwLA[P](lookAheadDFA: DFA[A, P], statesOf: P => Set[Q], isUpperBound: Boolean, maxNFASize: Int)(using
       ctx: Context
@@ -160,6 +176,14 @@ final case class OrderedNFA[A, Q](
           .filter { case (_, p1) => inputs.contains(p1) }
           .groupMap(_._1._2) { case (p2, _) -> p1 => ctx.interrupt((p1, p2)) }
           .withDefaultValue(Vector.empty)
+
+      def exceed(): Nothing =
+        ctx.log("auto: exceed maxNFASize on NFAwLA construction")
+        throw new UnsupportedException("NFAwLA size is too large")
+
+      // The size is known to exceed before building, when the least transitions do.
+      val least = leastTransitions(isUpperBound)
+      if reverseDelta.iterator.map((a, ps) => least(a) * ps.size).sum >= maxNFASize then exceed()
 
       val newAlphabet = Set.newBuilder[(A, P)]
       val newStateSet = Set.newBuilder[(Q, P)]
@@ -186,9 +210,7 @@ final case class OrderedNFA[A, Q](
               newStateSet.addOne((q1, p1)).addAll(qp2s)
 
               deltaSize += qp2s.size
-              if deltaSize >= maxNFASize then
-                ctx.log("auto: exceed maxNFASize on NFAwLA construction")
-                throw new UnsupportedException("NFAwLA size is too large")
+              if deltaSize >= maxNFASize then exceed()
 
       val nfaWLA = NFAwLA[A, Q, P](
         newAlphabet.result(),

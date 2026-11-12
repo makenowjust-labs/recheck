@@ -49,6 +49,11 @@ class OrderedNFASuite extends munit.FunSuite:
     interceptMessage[UnsupportedException]("NFAwLA size is too large") {
       toNFAwLA(nfa, false, 1)
     }
+    // Each of the four transitions makes a transition or more, and every leaf with `isUpperBound`.
+    assertEquals(toNFAwLA(nfa, false, 5).delta.size, 4)
+    interceptMessage[UnsupportedException]("NFAwLA size is too large")(toNFAwLA(nfa, false, 4))
+    assertEquals(toNFAwLA(nfa, true, 7).delta.values.map(_.size).sum, 6)
+    interceptMessage[UnsupportedException]("NFAwLA size is too large")(toNFAwLA(nfa, true, 6))
     interceptMessage[UnsupportedException]("look-ahead DFA size is too large"):
       nfa.toLookAheadDFA(1)
 
