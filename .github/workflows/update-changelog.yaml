@@ -8,6 +8,7 @@ on:
 
 concurrency:
   group: update-changelog
+  queue: max
 
 jobs:
   update-changelog:
@@ -16,6 +17,8 @@ jobs:
     if: github.event.pull_request.merged == true
     steps:
       - uses: actions/checkout@v7
+      - name: Pull the latest `main`
+        run: git pull --rebase origin main
       - name: Update CHANGELOG.md
         id: changelog
         uses: actions/github-script@v9
