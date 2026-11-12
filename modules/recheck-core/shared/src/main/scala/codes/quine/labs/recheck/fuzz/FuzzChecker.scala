@@ -25,9 +25,13 @@ import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
 import codes.quine.labs.recheck.vm.Program
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.ir.IRNode
+import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRPattern
+import codes.quine.labs.resyntax.ir.IRQuantifier
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
 /** ReDoS vulnerable RegExp checker based on fuzzing. */
@@ -164,6 +168,27 @@ object FuzzChecker:
     val seeds = for seq <- seqs; n <- counts.map(_.max(1)).distinct yield FString(n, seq.toIndexedSeq)
     seeds.distinct
 
+  /** Returns the scale of the pattern of the node: the largest width of what it matches when each repetition without
+    * the largest count (e.g. `*` and `{2,}`) iterates the least times, or once for no times.
+    *
+    * It is the length of the characters that the pattern reads without looping, as far as the node tells. A
+    * back-reference adds none.
+    */
+  private[fuzz] def scaleOf(node: IRNode): Int =
+    def scale(node: IRNode): Long = node.data match
+      case IRNodeData.Chars(_)           => 1
+      case IRNodeData.Strings(set)       => set.strings.iterator.map(_.length.toLong).maxOption.getOrElse(0L).max(1)
+      case IRNodeData.Disjunction(nodes) => nodes.map(scale).maxOption.getOrElse(0)
+      case IRNodeData.Repeat(child, quantifier) =>
+        val count = quantifier match
+          case IRQuantifier.Exact(n)         => n
+          case IRQuantifier.Unbounded(n, _)  => n.max(1)
+          case IRQuantifier.Bounded(_, m, _) => m
+        (count * scale(child)).min(Int.MaxValue / 4)
+      case _ => node.children.map(scale).sum.min(Int.MaxValue / 4)
+
+    scale(node).toInt
+
   /** Trace is a summary of IR execution. */
   private[fuzz] final case class Trace(
       str: FString,
@@ -172,17 +197,23 @@ object FuzzChecker:
       coverage: Set[CoverageItem]
   )
 
-  /** Run is a run of a string that ends, with the size of its input, its steps, and whether it reaches a new coverage
-    * item.
-    */
-  private[fuzz] final case class Run(str: FString, size: Int, steps: Int, reachesNew: Boolean)
-
-  /** The least ratio of the steps per character that two doublings of the repeat count add, for a string to climb.
+  /** Measurement is the growth of the steps of a string, measured on its repeat counts from `first` to `last`.
     *
-    * It is the ratio of the steps of the log-log slope 1.5, below which [[FuzzChecker.estimate]] takes the steps as
-    * less than quadratic.
+    * `stops` tells that a run stopped on the limit or the timeout on the count after `last`, which the exponential
+    * growth is for.
     */
-  private[fuzz] val ClimbGrowth: Double = Math.sqrt(2)
+  private[fuzz] final case class Measurement(growth: Growth, first: Int, last: Int, stops: Boolean)
+
+  /** Candidate is a string whose steps grow more than linearly, with the measurement telling it. */
+  private[fuzz] final case class Candidate(str: FString, measurement: Measurement)
+
+  /** The degrees above `maxDegree` that a measurement tells from the exponential growth. */
+  private[fuzz] val ExtraDegrees: Int = 3
+
+  /** The largest scale of a pattern that the first measurement of a string tries the counts beyond (see
+    * [[FuzzChecker.measureFirst]]).
+    */
+  private[fuzz] val SmallScale: Int = 256
 
   /** Generation is an immutable generation. */
   private[fuzz] final case class Generation(
@@ -234,8 +265,8 @@ private[fuzz] final class FuzzChecker(
   /** A set that holds strings once executed. */
   val inputs: mutable.Set[UString] = mutable.Set.empty
 
-  /** The sequences of the strings that climbed (see [[Population.climb]]). */
-  val climbed: mutable.Set[IndexedSeq[FString.FChar]] = mutable.Set.empty
+  /** The measurements of the sequences of the strings on their first repeat counts (see [[measure]]). */
+  val measurements: mutable.Map[IndexedSeq[FString.FChar], Option[Measurement]] = mutable.Map.empty
 
   /** The complexities and the hotspots of the attacks from each string. */
   val attacks: mutable.Map[FString, List[(AttackComplexity.Vulnerable, Hotspot)]] = mutable.Map.empty
@@ -466,140 +497,242 @@ private[fuzz] final class FuzzChecker(
     val s = t.delete(pos, size)
     next.execute(s)
 
-  /** Runs the attacks from the candidates, the steepest estimate first. */
-  def attack(candidates: Iterator[FString]): Iterator[AttackResult] = interrupt:
-    val failed = mutable.ArrayBuffer.empty[FString]
-    attackInOrder(candidates, failed) ++ failed.iterator.flatMap(tryAttackPolynomialOnce(_, maxTriedDegree))
+  /** Runs the attacks from the candidates, the steepest growth first. */
+  def attack(candidates: Iterator[Candidate]): Iterator[AttackResult] = interrupt:
+    def rank(candidate: Candidate): Int = candidate.measurement.growth match
+      case Growth.Exponential   => Int.MaxValue
+      case p: Growth.Polynomial => p.degree
+    def refineOrFail(candidate: Candidate): Option[Candidate] =
+      val refined = Option.unless(failedSkeletons.contains(candidate.str.skeleton))(candidate).flatMap(refine)
+      if refined.isEmpty then failedSkeletons.add(candidate.str.skeleton)
+      refined
+    // The candidates are sorted before any attack, with the growth that the larger limit tells.
+    Iterator
+      .single(())
+      .flatMap(_ => candidates.toVector.flatMap(refineOrFail).sortBy(-rank(_)).iterator.flatMap(tryAttack))
 
-  /** The skeletons of the candidates whose attacks fail or whose steps grow less than quadratically. */
+  /** The skeletons of the candidates whose attacks fail. */
   val failedSkeletons: mutable.Set[UString] = mutable.Set.empty
 
-  /** Runs the attacks of [[attack]], adding the candidates whose exponential attacks fail to `failed`. */
-  def attackInOrder(candidates: Iterator[FString], failed: mutable.Buffer[FString]): Iterator[AttackResult] =
-    interrupt:
-      val estimates = mutable.ArrayBuffer.empty[(FString, Double)]
-      while candidates.hasNext && !estimates.exists((_, slope) => isSteepest(slope)) do
-        val str = candidates.next()
-        if !failedSkeletons.contains(str.skeleton) then
-          estimate(str) match
-            case Some(slope) => estimates.addOne((str, slope))
-            case None        => failedSkeletons.add(str.skeleton)
-      if estimates.isEmpty then Iterator.empty
-      else
-        val results = estimates
-          .sortBy(-_._2)
-          .iterator
-          .filterNot((str, _) => failedSkeletons.contains(str.skeleton))
-          .flatMap: (str, slope) =>
-            degreeOf(slope) match
-              case None         => tryAttackExponentialOnce(str, failed)
-              case Some(degree) => tryAttackPolynomialOnce(str, degree)
-        results ++ attackInOrder(candidates, failed)
+  /** The scale of the pattern (see [[FuzzChecker.scaleOf]]).
+    *
+    * The steps of a string follow one growth on the repeat counts whose repeated parts are longer than it, where no
+    * repetition of the pattern counts them any more.
+    */
+  val scale: Int = scaleOf(pattern.node)
 
-  /** Runs the exponential attack from the candidate, and adds it to `failed` if it fails. */
-  def tryAttackExponentialOnce(str: FString, failed: mutable.Buffer[FString]): Iterator[AttackResult] =
-    val result = tryAttackExponential(str)
-    if result.isEmpty then failed.addOne(str)
-    record(str, result)
+  /** The largest degree of the polynomial growth that a measurement tells from the exponential one. */
+  val measuredDegree: Int = maxDegree + ExtraDegrees
 
-  /** Runs the polynomial attack from the candidate, and adds its skeleton to [[failedSkeletons]] if it fails. */
-  def tryAttackPolynomialOnce(str: FString, degree: Int): Iterator[AttackResult] =
-    val result = tryAttackPolynomial(str, degree)
-    if result.isEmpty then failedSkeletons.add(str.skeleton)
-    record(str, result)
+  /** The step limit of the runs of the measurements on executing the strings. */
+  val measurementLimit: Int = Math.min(attackLimit.toDouble, incubationLimit * Math.pow(2, maxDegree + 1)).toInt
 
-  /** The step limit of the runs on estimation. */
-  val estimationLimit: Int = Math.min(attackLimit.toDouble, incubationLimit * Math.pow(2, maxDegree + 1)).toInt
+  /** Returns the size of the input of the string on the repeat count. */
+  def sizeOn(str: FString, count: Int): Long =
+    val repeats = repeatsOf(str)
+    val fixedSize = str.size - repeats.size - repeats.map(_._2).sum
+    fixedSize + repeats.map((m, size) => (count.toLong + m).max(0) * size).sum
 
-  /** Estimates the growth of the steps of the string as their log-log slope, or `None` if it is less than quadratic. */
-  def estimate(str: FString): Option[Double] = interrupt:
-    if str.isConstant then return Some(Double.PositiveInfinity)
+  /** Returns the steps of the string on the repeat count, or `None` if the run stops on the limit or the timeout. */
+  def stepsOn(str: FString, count: Int, limit: Int, timeout: Duration): Option[Long] =
+    val opts = Options(limit, usesAcceleration = fuzz.usesAcceleration(accelerationMode))
+    val result = Interpreter.runWithTimeout(program, str.copy(n = count).toUString, opts, timeout)
+    Option.unless(result.status == Status.Limit || result.status == Status.Timeout)(result.steps.toLong)
 
-    val opts = Options(estimationLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode))
-    // The steps on the repeat count, and whether the run stops before the match ends.
-    def run(n: Int): (Double, Boolean) =
-      val result = Interpreter.runWithTimeout(program, str.copy(n = n).toUString, opts, incubationTimeout)
-      (result.steps.toDouble, result.status == Status.Limit || result.status == Status.Timeout)
-    def repeatedSize(n: Int): Double = str.seq.collect { case FString.Repeat(m, size) => (n + m).max(0) * size }.sum
-    def slope(n1: Int, steps1: Double, n2: Int, steps2: Double): Double =
-      Math.log(steps2 / steps1) / Math.log(repeatedSize(n2) / repeatedSize(n1))
+  /** Measures the growth of the steps of the string on the repeat counts from `from` up to `to`.
+    *
+    * It runs the string on the counts from `from`, as few as tell the growth (see [[Growth.of]]). While they tell none,
+    * it tries the counts from the next one, on which the steps may follow the growth at last, and every second count,
+    * on which the steps may be a polynomial when a loop of the pattern reads the repeated part twice.
+    *
+    * The growth is exponential if a run stops on the limit or the timeout.
+    */
+  def measure(
+      str: FString,
+      from: Int,
+      to: Int,
+      limit: Int,
+      timeout: Duration,
+      known: Map[Int, Option[Long]] = Map.empty
+  ): Option[Measurement] = interrupt:
+    val steps = mutable.Map.from(known)
 
-    var n = str.n
-    var (s, stops) = run(n)
-    var above = Option.empty[(Int, Double)]
-    while stops && n > 1 do
-      above = Some((n, s))
-      n /= 2
-      val (s1, stops1) = run(n)
-      s = s1
-      stops = stops1
-    if stops then return Option.when(s >= estimationLimit)(Double.PositiveInfinity)
-    if repeatedSize(n) == 0 || s == 0 then return None
+    def measureOn(start: Int, stride: Int): Option[Measurement] =
+      val window = IndexedSeq.newBuilder[Long]
+      var count = start
+      var size = 0
+      while size < measuredDegree + 3 && count <= to do
+        steps.getOrElseUpdate(count, stepsOn(str, count, limit, timeout)) match
+          case None    => return Some(Measurement(Growth.Exponential, start, count - stride, true))
+          case Some(s) =>
+            window.addOne(s)
+            size += 1
+            Growth.of(start, stride, window.result(), measuredDegree) match
+              case Some(growth) => return Some(Measurement(growth, start, count, false))
+              case None         => count += stride
+      None
 
-    // The slope above the count, and whether it is exact, which it is not on a lower bound of the steps.
-    val upper = above match
-      case Some((n2, s2))                                                     => Some((slope(n, s, n2, s2), false))
-      case None if str.fixedSize + repeatedSize(2 * n) <= maxAttackStringSize =>
-        val (s2, stops2) = run(2 * n)
-        Some((slope(n, s, 2 * n, s2), !stops2))
-      case None => None
-    val lower =
-      if repeatedSize(n / 2) == 0 then None
-      else
-        val (s0, stops0) = run(n / 2)
-        Option.unless(stops0 || s0 == 0)(slope(n / 2, s0, n, s))
-    val estimate = upper match
-      case Some((slope, true)) if slope < 1.5 => Some(slope)
-      case _                                  => (upper.map(_._1) ++ lower).maxOption
-    log(s"""|fuzz: estimate (slope: ${estimate.getOrElse("none")})
+    Iterator((from, 1), (from + 1, 1), (from, 2)).flatMap(measureOn(_, _)).nextOption()
+
+  /** Measures the growth of the steps of the string on its first repeat counts, or on the first ones beyond the scale
+    * of the pattern up to `SmallScale` if they tell none.
+    */
+  def measureFirst(str: FString, limit: Int): Option[Measurement] =
+    measure(str, 1, Int.MaxValue, limit, incubationTimeout).orElse:
+      Option
+        .when(scale <= SmallScale)(countBeyond(str, scale))
+        .flatMap(measure(str, _, Int.MaxValue, limit, incubationTimeout))
+
+  /** Measures the growth of the steps of the string on the repeat counts up to the largest one whose run ends, from its
+    * own.
+    */
+  def measureBelow(str: FString): Option[Measurement] = interrupt:
+    var count = str.n
+    while count > 1 && stepsOn(str, count, measurementLimit, incubationTimeout).isEmpty do count /= 2
+    measure(str, (count - measuredDegree - 2).max(1), count, measurementLimit, incubationTimeout)
+
+  /** Runs the attack from the candidate, whose skeleton is added to [[failedSkeletons]] if it fails. */
+  def tryAttack(candidate: Candidate): Option[AttackResult] = interrupt:
+    val str = candidate.str
+    val skeleton = str.skeleton
+    if failedSkeletons.contains(skeleton) then return None
+
+    log(s"""|fuzz: attack (growth: ${show(candidate.measurement.growth)})
             |  string: $str""".stripMargin)
-    estimate.filter(_ >= 1.5)
+    val result =
+      for
+        measurement <- confirm(str, candidate.measurement)
+        count <- attackCount(str, measurement.growth)
+      yield
+        val complexity = measurement.growth match
+          case p: Growth.Polynomial                   => AttackComplexity.Polynomial(p.degree.min(maxTriedDegree), true)
+          case Growth.Exponential if triesExponential => AttackComplexity.Exponential(true)
+          case Growth.Exponential                     => AttackComplexity.Polynomial(maxTriedDegree, true)
+        val attack = str.copy(n = count)
+        log(s"""|fuzz: attack succeeded (growth: ${show(measurement.growth)})
+                |  string: $attack""".stripMargin)
+        (complexity, attack.toAttackPattern(pattern.mode), hotspotOf(str, measurement, count))
+    result match
+      case Some((complexity, _, hotspot)) => attacks(str) = (complexity, hotspot) :: attacks.getOrElse(str, Nil)
+      case None                           => failedSkeletons.add(skeleton)
+    result
 
-  /** The degree of the polynomial attack for the slope, or `None` for the exponential one. */
-  def degreeOf(slope: Double): Option[Int] =
-    if triesExponential && slope > maxDegree + 0.5 then None
-    else Some(Math.round(slope.min(maxTriedDegree.toDouble)).toInt.max(2))
+  private def show(growth: Growth): String = growth match
+    case Growth.Exponential   => "exponential"
+    case p: Growth.Polynomial => s"polynomial of degree ${p.degree}"
 
-  /** Whether no attack can be steeper than the one of the slope. */
-  def isSteepest(slope: Double): Boolean =
-    degreeOf(slope) == (if triesExponential then None else Some(maxTriedDegree))
+  /** Measures the growth of a candidate again with the larger limit if a run stopped on measuring it, and returns the
+    * candidate with it, or `None` if the steps do not grow more than linearly.
+    */
+  def refine(candidate: Candidate): Option[Candidate] =
+    if !candidate.measurement.stops || candidate.str.isConstant then Some(candidate)
+    else
+      measureFirst(candidate.str, measurementLimit)
+        .filter(_.growth.isSuperLinear)
+        .map(measurement => candidate.copy(measurement = measurement))
 
-  /** Records the attack from the string. */
-  def record(str: FString, result: Option[AttackResult]): Iterator[AttackResult] =
-    result.iterator.map: r =>
-      val (complexity, _, hotspot) = r
-      attacks(str) = (complexity, hotspot) :: attacks.getOrElse(str, Nil)
-      r
+  /** Confirms that the growth of the measurement lasts beyond the scale of the pattern, and returns the measurement
+    * there, or `None` if the steps do not grow more than linearly there.
+    *
+    * A run on a count beyond the scale, and twice the last count of the measurement or more, tells it. The growth lasts
+    * if the run stops on the limit or the timeout, or if its steps are the ones of the polynomial. Otherwise the growth
+    * is measured again from the count, and confirmed on a count further once more.
+    *
+    * The exponential growth that the steps tell beyond the scale is confirmed without a run, and a string without
+    * repetitions if its run stops.
+    */
+  def confirm(str: FString, measurement: Measurement, measuresAgain: Boolean = true): Option[Measurement] = interrupt:
+    if str.isConstant then return Option.when(stepsOn(str, str.n, attackLimit, attackTimeout).isEmpty)(measurement)
+    val isBeyond = measurement.first >= countBeyond(str, scale)
+    if measurement.growth == Growth.Exponential && isBeyond && !measurement.stops then return Some(measurement)
 
-  /** Constructs an attack string on assuming the pattern is exponential. */
-  def tryAttackExponential(str: FString): Option[AttackResult] = interrupt:
-    log("fuzz: attack (exponential)")
-    val n = RepeatUtil.exponential(attackLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
-    val attack = str.copy(n = n)
-    tryAttackExecute(attack).map:
-      case (pattern, hotspot) => (AttackComplexity.Exponential(true), pattern, hotspot)
+    // The steps reach the limit on the count of the attack string, so the counts to confirm end on it.
+    val end = attackCount(str, measurement.growth) match
+      case Some(count) => count
+      case None        => return None
+    // The steps change the growth a little after the repeated parts get longer than the scale, as the fixed parts
+    // and the other repeated parts are read with them.
+    val least = countBeyond(str, 2 * scale)
+    val count = measurement.growth match
+      case p: Growth.Polynomial =>
+        val k = (least.max(2 * measurement.last) - p.start + p.stride - 1) / p.stride
+        (p.start + k * p.stride).min(end)
+      case Growth.Exponential => least.max(measurement.last + 1).min(end)
+    val steps = stepsOn(str, count, attackLimit, attackTimeout)
+    val lasts = steps.forall: steps =>
+      measurement.growth match
+        case p: Growth.Polynomial => p.stepsOn(count) == steps
+        case Growth.Exponential   => false
+    if lasts then Some(measurement)
+    else if !measuresAgain then None
+    else
+      measure(str, count, Int.MaxValue, attackLimit, attackTimeout, Map(count -> steps))
+        .filter(_.growth.isSuperLinear)
+        .flatMap(confirm(str, _, false))
 
-  /** Constructs an attack string on assuming the pattern is polynomial. */
-  def tryAttackPolynomial(str: FString, degree: Int): Option[AttackResult] = interrupt:
-    log(s"fuzz: attack (polynomial: $degree)")
-    val n = RepeatUtil.polynomial(degree, attackLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
-    val attack = str.copy(n = n)
-    tryAttackExecute(attack).map:
-      case (pattern, hotspot) => (AttackComplexity.Polynomial(degree, true), pattern, hotspot)
+  /** Returns the offset of the count and the size of the part of each repetition of the string.
+    *
+    * The part of the last repetition may be shorter than the size of its specifier.
+    */
+  def repeatsOf(str: FString): Seq[(Int, Int)] =
+    str.seq.zipWithIndex.collect { case (FString.Repeat(m, size), pos) => (m, size.min(str.size - pos - 1)) }
 
-  /** Executes the string to construct attack string. */
-  def tryAttackExecute(str: FString): Option[(AttackPattern, Hotspot)] = interrupt:
-    val input = str.toUString
-    if input.length <= maxAttackStringSize then
-      val usesAcceleration = fuzz.usesAcceleration(accelerationMode)
-      val opts = Options(attackLimit, usesAcceleration = usesAcceleration, needsHeatmap = true)
-      val result = Interpreter.runWithTimeout(program, input, opts, attackTimeout)
-      if result.status == Status.Limit || result.status == Status.Timeout then
-        log:
-          s"""|fuzz: attack succeeded (status: ${result.status})
-              |  string: ${str}""".stripMargin
-        return Some((str.toAttackPattern(pattern.mode), Hotspot.build(result.heatmap, heatRatio)))
-    None
+  /** Returns the least repeat count on which every repetition of the string, which has some, is longer than `size`. */
+  def countBeyond(str: FString, size: Int): Int =
+    repeatsOf(str).map((m, repeatSize) => size / repeatSize + 1 - m).max.max(1)
+
+  /** Returns the least repeat count on which the steps of the growth reach `attackLimit`, or the largest one within
+    * `maxAttackStringSize` if they do not there. It is `None` if no count of the growth is within it.
+    */
+  def attackCount(str: FString, growth: Growth): Option[Int] =
+    growth match
+      case Growth.Exponential =>
+        val repeatSize = repeatsOf(str).map(_._2).sum
+        val fixedSize = (sizeOn(str, 0) min Int.MaxValue).toInt
+        Some(RepeatUtil.exponential(attackLimit, fixedSize, repeatSize, maxAttackStringSize).max(1))
+      case p: Growth.Polynomial =>
+        def reaches(k: Int): Boolean = p.stepsOn(p.start + k * p.stride) >= attackLimit
+        // The largest count whose string fits, where every part repeats.
+        val repeats = repeatsOf(str)
+        val growth = repeats.map(_._2).sum
+        val largest =
+          (maxAttackStringSize - sizeOn(str, 0) - repeats.map((m, size) => m.toLong.min(0) * size).sum) / growth
+        if largest < p.start || sizeOn(str, largest.toInt) > maxAttackStringSize then return None
+        // The steps of a polynomial growing more than linearly increase on the counts.
+        var low = 0
+        var high = ((largest - p.start) / p.stride).toInt
+        while low < high do
+          val middle = low + (high - low) / 2
+          if reaches(middle) then high = middle else low = middle + 1
+        Some(p.start + low * p.stride)
+
+  /** Builds the hotspots of the attack string of the repeat count, from the heat of the runs on the repeat counts of
+    * the measurement, which is scaled up to the attack string along its growth on each part.
+    */
+  def hotspotOf(str: FString, measurement: Measurement, count: Int): Hotspot = interrupt:
+    // The runs do not memoize, with which the heat takes long.
+    val opts = Options(attackLimit, needsHeatmap = true)
+    def heatOn(count: Int): Map[SourceLocation, Int] =
+      Interpreter.runWithTimeout(program, str.copy(n = count).toUString, opts, incubationTimeout).heatmap
+
+    val heat: Map[SourceLocation, Double] = measurement.growth match
+      case _ if str.isConstant || measurement.last < measurement.first =>
+        heatOn(measurement.first.max(1)).map((loc, heat) => loc -> heat.toDouble)
+      case p: Growth.Polynomial =>
+        val heats = (0 to p.degree).map(k => heatOn(p.start + k * p.stride))
+        heats
+          .flatMap(_.keys)
+          .distinct
+          .map: loc =>
+            val polynomial = Growth.Polynomial.through(p.start, p.stride, heats.map(heat => BigInt(heat(loc))))
+            loc -> polynomial.stepsOn(count).toDouble
+          .toMap
+      case Growth.Exponential =>
+        val last = heatOn(measurement.last)
+        val previous = if measurement.last > measurement.first then heatOn(measurement.last - 1) else last
+        last.map: (loc, heat) =>
+          loc -> heat * Math.pow(heat.toDouble / previous(loc).max(1), (count - measurement.last).max(0).toDouble)
+    Hotspot.build(heat, heatRatio)
 
   /** Population is a mutable generation on fuzzing. */
   final class Population(
@@ -608,81 +741,57 @@ private[fuzz] final class FuzzChecker(
       val visited: mutable.Set[CoverageItem]
   ):
 
-    /** The strings that reach `incubationLimit`, one for each skeleton whose attacks have not failed. */
-    val candidates: mutable.LinkedHashMap[UString, FString] = mutable.LinkedHashMap.empty
+    /** The strings whose steps grow more than linearly, one for each skeleton whose attacks have not failed. */
+    val candidates: mutable.LinkedHashMap[UString, Candidate] = mutable.LinkedHashMap.empty
 
-    /** Executes the string and adds its result, and a candidate of an attack if it reaches `incubationLimit`.
+    /** Executes the string and adds its result, and a candidate of an attack if its steps grow more than linearly.
       *
-      * A string with repetitions climbs once for its sequence (see [[climb]]).
+      * The growth of a string with repetitions is measured once for its sequence, on its first repeat counts (see
+      * [[measureFirst]]). A string of a few steps per character may grow to an attack on more repetitions, which its
+      * rate does not tell. When the run of the string stops on the limit or the timeout without the growth, the growth
+      * is measured on the counts below its own too (see [[measureBelow]]), where the steps may grow differently.
       *
-      * A string without repetitions that reaches a new coverage item is also executed as the one repeating it as a
-      * whole, which climbs. The matching goes as far as the item from each of the starts that the repetition makes.
+      * A string without repetitions is a candidate if its run stops. If it reaches a new coverage item, it is also
+      * executed as the one repeating it as a whole. The matching goes as far as the item from each of the starts that
+      * the repetition makes.
       */
     def execute(str: FString): Unit =
-      val climbs = !str.isConstant && !climbed.contains(str.seq)
-      for run <- run(str, climbs) do
-        if climbs then
-          climbed.add(str.seq)
-          climb(run)
-        if run.reachesNew && str.isConstant && !str.isEmpty then
-          execute(FString(1, FString.Repeat(0, str.size) +: str.seq))
-
-    /** Executes the strings of the repeat count doubled again and again, while the steps grow more than linearly.
-      *
-      * A string of a few steps per character may grow to an attack on more repetitions, which its rate does not tell.
-      * The growth is checked on the smaller counts first if any, whose runs are shorter.
-      */
-    private def climb(run: Run): Unit =
-      def next(run: Run): Option[Run] = this.run(run.str.mapN(_ * 2), true)
-
-      var runs =
-        if run.str.n < 4 then
-          next(run) match
-            case Some(twice) => (run, twice)
-            case None        => return
-        else
-          (this.run(run.str.mapN(_ / 4), true), this.run(run.str.mapN(_ / 2), true)) match
-            case (Some(quarter), Some(half)) if grows(quarter, half, run) => (half, run)
-            case _                                                        => return
-      while true do
-        next(runs._2) match
-          case Some(run) if grows(runs._1, runs._2, run) => runs = (runs._2, run)
-          case _                                         => return
-
-    /** Whether the steps of the runs grow more than linearly, by the steps per character added between them. */
-    private def grows(run0: Run, run1: Run, run2: Run): Boolean =
-      val growth0 = (run1.steps - run0.steps).toDouble / (run1.size - run0.size)
-      val growth1 = (run2.steps - run1.steps).toDouble / (run2.size - run1.size)
-      growth1 > 0 && growth1 >= ClimbGrowth * growth0
-
-    /** Runs the string, and returns the run unless it stops on the limit or the timeout.
-      *
-      * On the first run of its input, it adds the result, and a candidate of an attack if it reaches `incubationLimit`.
-      * It runs the input again only if `reruns`.
-      */
-    private def run(str: FString, reruns: Boolean): Option[Run] =
-      if candidates.size >= maxAttackCandidates then return None
-      if str.countRepeat >= maxDegree || !str.admitsAnyRepeatCount(pattern.mode) then return None
+      if candidates.size >= maxAttackCandidates then return
+      if str.countRepeat >= maxDegree || !str.admitsAnyRepeatCount(pattern.mode) then return
 
       val input = str.toUString
-      if input.length >= maxGeneStringSize then return None
-      val isFirst = !inputs.contains(input)
-      if !isFirst && !reruns then return None
+      if input.length >= maxGeneStringSize then return
 
-      val usesAcceleration = fuzz.usesAcceleration(accelerationMode)
-      val opts = Options(incubationLimit, usesAcceleration = usesAcceleration, needsCoverage = isFirst)
-      val result = Interpreter.runWithTimeout(program, input, opts, incubationTimeout)
-      val stops = result.status == Status.Limit || result.status == Status.Timeout
-      val reachesNew = isFirst && !result.coverage.subsetOf(visited)
-      if isFirst then
+      var stops = false
+      var reachesNew = false
+      if !inputs.contains(input) then
+        val usesAcceleration = fuzz.usesAcceleration(accelerationMode)
+        val opts = Options(incubationLimit, usesAcceleration = usesAcceleration, needsCoverage = true)
+        val result = Interpreter.runWithTimeout(program, input, opts, incubationTimeout)
+        stops = result.status == Status.Limit || result.status == Status.Timeout
+        reachesNew = !result.coverage.subsetOf(visited)
         add(str, input, result)
-        if stops then
-          log:
-            s"""|fuzz: candidate (status: ${result.status})
-                |  string: $str""".stripMargin
-          val skeleton = str.skeleton
-          if !failedSkeletons.contains(skeleton) && !candidates.contains(skeleton) then candidates(skeleton) = str
-      Option.unless(stops)(Run(str, input.length, result.steps, reachesNew))
+
+      if str.isConstant then
+        if stops then addCandidate(str, Measurement(Growth.Exponential, str.n, str.n - 1, true))
+        else if reachesNew && !str.isEmpty then execute(FString(1, FString.Repeat(0, str.size) +: str.seq))
+      else
+        measurements.getOrElseUpdate(str.seq, measureFirst(str, incubationLimit)) match
+          case Some(measurement) if measurement.growth.isSuperLinear => addCandidate(str, measurement)
+          case _ if stops && !failedSkeletons.contains(str.skeleton) =>
+            measureBelow(str) match
+              case Some(measurement) if measurement.growth.isSuperLinear => addCandidate(str, measurement)
+              case _                                                     => failedSkeletons.add(str.skeleton)
+          case _ => ()
+
+    /** Adds the string as a candidate, unless its skeleton has one or its attacks failed. */
+    private def addCandidate(str: FString, measurement: Measurement): Unit =
+      val skeleton = str.skeleton
+      if !failedSkeletons.contains(skeleton) && !candidates.contains(skeleton) then
+        log:
+          s"""|fuzz: candidate (growth: ${show(measurement.growth)})
+              |  string: $str""".stripMargin
+        candidates(skeleton) = Candidate(str, measurement)
 
     /** Records the execution result. */
     def add(str: FString, input: UString, result: Result): Unit =

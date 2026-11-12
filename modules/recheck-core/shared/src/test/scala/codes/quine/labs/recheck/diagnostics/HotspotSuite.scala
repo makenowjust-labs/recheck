@@ -37,4 +37,9 @@ class HotspotSuite extends munit.FunSuite:
         Seq(Hotspot.Spot(0, 1, Hotspot.Hot), Hotspot.Spot(2, 3, Hotspot.Hot), Hotspot.Spot(4, 5, Hotspot.Warm))
       )
     )
-    assertEquals(Hotspot.build(Map.empty, 0.5), Hotspot.empty)
+    assertEquals(Hotspot.build(Map.empty[SourceLocation, Int], 0.5), Hotspot.empty)
+    // The heat may be scaled.
+    assertEquals(
+      Hotspot.build(Map(SourceLocation(0, 1) -> 1e300, SourceLocation(1, 2) -> 1.0), 0.5),
+      Hotspot(Seq(Hotspot.Spot(0, 1, Hotspot.Hot), Hotspot.Spot(1, 2, Hotspot.Warm)))
+    )

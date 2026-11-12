@@ -41,8 +41,14 @@ class GrowthSuite extends munit.FunSuite:
     assertEquals(strided.stepsOn(2), BigInt(4))
     assertEquals(strided.stepsOn(302), BigInt(302 * 302))
 
+  test("Growth.Polynomial.through"):
+    assertEquals(Growth.Polynomial.through(1, 1, Vector(1, 4, 9)), Growth.Polynomial(1, 1, Vector(1, 3, 2)))
+    assertEquals(Growth.Polynomial.through(3, 2, Vector(7)), Growth.Polynomial(3, 2, Vector(7)))
+
   test("Growth#isSuperLinear"):
     assert(!Growth.Polynomial(1, 1, Vector(5)).isSuperLinear)
     assert(!Growth.Polynomial(1, 1, Vector(4, 3)).isSuperLinear)
     assert(Growth.Polynomial(1, 1, Vector(1, 3, 2)).isSuperLinear)
+    // The steps of a negative last order stop growing.
+    assert(!Growth.Polynomial(1, 1, Vector(30, 10, -2)).isSuperLinear)
     assert(Growth.Exponential.isSuperLinear)

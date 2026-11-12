@@ -14,6 +14,8 @@ import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.FString.Repeat
 import codes.quine.labs.recheck.fuzz.FString.Wrap
+import codes.quine.labs.recheck.fuzz.FuzzChecker.Candidate
+import codes.quine.labs.recheck.fuzz.FuzzChecker.Measurement
 import codes.quine.labs.recheck.fuzz.FuzzChecker.Trace
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
@@ -238,29 +240,93 @@ class FuzzCheckerSuite extends munit.FunSuite:
   def repeatOf(c: Char, n: Int): FString =
     FString(n, IndexedSeq(FString.Repeat(0, 1), FString.Wrap(c), FString.Wrap('!')))
 
-  test("FuzzChecker#estimate"):
-    val ir = ReDoS.parse("^(?:a*$|b*b*$|(?:c|c)*$)", "", Dialect.JavaScript)
+  /** The degree of the polynomial growth, or `-1` for the exponential one. */
+  def degreeOf(measurement: Measurement): Int = measurement.growth match
+    case p: Growth.Polynomial => p.degree
+    case Growth.Exponential   => -1
+
+  test("FuzzChecker.scaleOf"):
+    def scaleOf(source: String): Int = FuzzChecker.scaleOf(ReDoS.parse(source, "", Dialect.JavaScript).node)
+    assertEquals(scaleOf("abc"), 3)
+    assertEquals(scaleOf("ab|cde"), 3)
+    // A repetition without the largest count iterates the least times, or once.
+    assertEquals(scaleOf("a*b+c?"), 3)
+    assertEquals(scaleOf("a{3}b{2,5}c{4,}"), 12)
+    assertEquals(scaleOf("(?:ab{3}){2}"), 8)
+
+  test("FuzzChecker#measure"):
+    import Parameters.*
+    val ir = ReDoS.parse("^(?:a*$|b*b*$|(?:c|c)*$|(?:dd)*(?:dd)*$)", "", Dialect.JavaScript)
     val checker = checkerOf(ir)
-    assertEquals(checker.estimate(repeatOf('a', 1000)), None)
-    assertEqualsDouble(checker.estimate(repeatOf('b', 1000)).get, 2.0, 0.2)
-    assert(checker.estimate(repeatOf('c', 30)).get > Parameters.DefaultMaxDegree + 0.5)
-    assert(checker.estimate(FString(1, IndexedSeq(FString.Wrap('c'), FString.Wrap('!')))).get.isPosInfinity)
-    // The steps grow quadratically up to 100 characters after `=`, and the match succeeds past them (#1310).
-    val bounded = checkerOf(ReDoS.parse("^.*?=[^&]{100}", "", Dialect.JavaScript))
-    val str = FString(30, IndexedSeq(FString.Repeat(0, 2), FString.Wrap('='), FString.Wrap('x')))
-    assertEquals(bounded.estimate(str), None)
+    def measure(c: Char, limit: Int = DefaultIncubationLimit, to: Int = Int.MaxValue): Option[Measurement] =
+      checker.measure(repeatOf(c, 1), 1, to, limit, DefaultIncubationTimeout)
+
+    // The fewest counts tell the growth.
+    assertEquals(measure('a').map(m => (degreeOf(m), m.first, m.last, m.stops)), Some((1, 1, 4, false)))
+    assertEquals(measure('b').map(m => (degreeOf(m), m.first, m.last, m.stops)), Some((2, 1, 5, false)))
+    assertEquals(measure('c').map(m => (degreeOf(m), m.first, m.stops)), Some((-1, 1, false)))
+    // A run that stops tells the exponential growth.
+    assertEquals(measure('c', limit = 100).map(m => (degreeOf(m), m.stops)), Some((-1, true)))
+    // The steps are a polynomial on every second count when a loop reads the repeated part twice.
+    assertEquals(measure('d').map(_.growth).collect { case p: Growth.Polynomial => (p.degree, p.stride) }, Some((2, 2)))
+    // The counts above `to` do not run.
+    assertEquals(measure('b', to = 4), None)
+
+  test("FuzzChecker#measureBelow"):
+    val checker = checkerOf(ReDoS.parse("^b*b*$", "", Dialect.JavaScript))
+    assertEquals(checker.measureBelow(repeatOf('b', 100)).map(m => (degreeOf(m), m.first, m.last)), Some((2, 91, 95)))
+
+  test("FuzzChecker#confirm"):
+    def confirm(source: String, str: FString): Option[Int] =
+      val checker = checkerOf(ReDoS.parse(source, "", Dialect.JavaScript))
+      checker.measureFirst(str, Parameters.DefaultIncubationLimit).flatMap(checker.confirm(str, _)).map(degreeOf)
+
+    assertEquals(confirm("^b*b*$", repeatOf('b', 1)), Some(2))
+    assertEquals(confirm("^(?:c|c)*$", repeatOf('c', 1)), Some(-1))
+    // The steps grow quadratically up to 100 characters, and linearly on longer strings (#1310).
+    assertEquals(confirm("^.*?=[^&]{100}", FString(1, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('=')))), None)
+    assertEquals(confirm("[a-z0-9]{100,}", FString(1, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a')))), None)
+    // The growth beyond the scale is the one of the attack.
+    assertEquals(confirm("^(?:b{0,20}c|b*b*b*$)", repeatOf('b', 1)), Some(3))
+    // A string without repetitions is confirmed if its run stops.
+    val exponential = checkerOf(ReDoS.parse("^(?:c|c)*$", "", Dialect.JavaScript))
+    val measurement = Measurement(Growth.Exponential, 1, 0, true)
+    assertEquals(
+      exponential.confirm(FString(UString.from(Seq.fill(40)('c'.toInt) :+ '!'.toInt)), measurement),
+      Some(measurement)
+    )
+    assertEquals(exponential.confirm(FString(UString('c', '!')), measurement), None)
+
+  test("FuzzChecker#attackCount"):
+    val checker = checkerOf(ReDoS.parse("^b*b*$", "", Dialect.JavaScript))
+    val square = Growth.Polynomial(1, 1, Vector(1, 3, 2))
+    // The least count of `n * n` steps reaching the limit.
+    assertEquals(checker.attackCount(repeatOf('b', 1), square), Some(38730))
+    // The largest count within `maxAttackStringSize` when the steps do not reach the limit.
+    val long = FString(1, FString.Repeat(0, 100) +: IndexedSeq.fill(100)(FString.Wrap('b')))
+    assertEquals(checker.attackCount(long, square), Some(3000))
+
+  /** The candidates after executing the strings. */
+  def candidatesOf(checker: FuzzChecker, strs: FString*): Seq[Candidate] =
+    val pop = new checker.Population(0, mutable.Set.empty, mutable.Set.empty)
+    strs.foreach(pop.execute)
+    pop.candidates.values.toSeq
 
   test("FuzzChecker#attack: the steepest candidate first"):
     val ir = ReDoS.parse("^(?:b*b*$|(?:c|c)*$)", "", Dialect.JavaScript)
     val checker = checkerOf(ir)
-    val results = checker.attack(Iterator(repeatOf('b', 1000), repeatOf('c', 30)))
+    val results = checker.attack(candidatesOf(checker, repeatOf('b', 1), repeatOf('c', 1)).iterator)
     assertEquals(results.next()._1, AttackComplexity.Exponential(true))
     assertEquals(results.next()._1, AttackComplexity.Polynomial(2, true))
-    // A string whose steps grow linearly is not an attack.
-    assertEquals(
-      checker.attack(Iterator(FString(1000, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('x'))))).toSeq,
-      Seq.empty
-    )
+    // A string whose steps grow linearly is not a candidate.
+    assertEquals(candidatesOf(checker, FString(1000, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('x')))), Seq.empty)
+
+  test("FuzzChecker#attack: the degree is exact"):
+    // The steps of the lower degrees are many, which a slope of the steps takes for the cubic growth.
+    val ir = ReDoS.parse("^(?:a|b)*[ab]*[ab]*[ab]*$", "", Dialect.JavaScript)
+    val checker = checkerOf(ir)
+    val results = checker.attack(candidatesOf(checker, repeatOf('a', 1)).iterator)
+    assertEquals(results.next()._1, AttackComplexity.Polynomial(4, true))
 
   test("FuzzChecker#Population#execute: strings that some repeat count makes no string of the mode"):
     val ir = ReDoS.parse("^[\\uD800-\\uDBFF]*[\\uDC00-\\uDFFF]*$", "u", Dialect.JavaScript)
@@ -287,7 +353,9 @@ class FuzzCheckerSuite extends munit.FunSuite:
     val checker = checkerOf(ir)
     val str = FString(30, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a')))
     val same = FString(15, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'), FString.Repeat(0, 1), FString.Wrap('a')))
-    assertEquals(checker.attack(Iterator(str, same)).toSeq, Seq.empty)
+    val candidates = candidatesOf(checker, str, same)
+    assertEquals(candidates.map(_.str), Seq(str))
+    assertEquals(checker.attack(candidates.iterator).toSeq, Seq.empty)
     assertEquals(checker.failedSkeletons.toSet, Set(str.skeleton))
     // The quadratic steps of 30 characters stay below the attack limit of the quick check.
     assert(!check("[a-z0-9]{30,}", "", quick = true))
@@ -304,30 +372,33 @@ class FuzzCheckerSuite extends munit.FunSuite:
     pop.execute(strs(0).copy(n = 31))
     pop.execute(strs(0).copy(seq = FString.Repeat(2, 1) +: strs(0).seq.tail))
     strs.foreach(pop.execute)
-    assertEquals(pop.candidates.values.toSeq, strs.take(max))
+    assertEquals(pop.candidates.values.map(_.str).toSeq, strs.take(max))
     assertEquals(checker.inputs.size, max + 2)
 
-  test("FuzzChecker#Population#execute: climbing"):
+  test("FuzzChecker#Population#execute: the growth of the steps"):
     val seq = IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'), FString.Wrap('!'))
-    def inputsOf(source: String, strs: FString*): (Set[Int], Seq[FString]) =
-      val checker = checkerOf(ReDoS.parse(source, "", Dialect.JavaScript))
-      val pop = new checker.Population(0, mutable.Set.empty, mutable.Set.empty)
-      strs.foreach(pop.execute)
-      (checker.inputs.map(_.length - 1).toSet, pop.candidates.values.toSeq)
-
-    // The quadratic steps climb to a candidate.
-    assertEquals(inputsOf("^a*a*$", FString(1, seq)), (Set(1, 2, 4, 8, 16, 32, 64, 128, 256), Seq(FString(256, seq))))
-    // The linear steps do not climb.
-    assertEquals(inputsOf("^a*$", FString(1, seq)), (Set(1, 2, 4), Seq.empty))
-    // The growth is checked on the smaller counts first.
-    assertEquals(inputsOf("^a*$", FString(64, seq)), (Set(64, 16, 32), Seq.empty))
-    assertEquals(inputsOf("^a*a*$", FString(8, seq)), (Set(8, 2, 4, 16, 32, 64, 128, 256), Seq(FString(256, seq))))
-    // A sequence climbs once, even after the run of its input.
-    // The first string also runs as `(a!){n}` of 3 and 7 characters before `!`.
+    // A string of a few steps is a candidate when its steps grow more than linearly.
+    val quadratic = checkerOf(ReDoS.parse("^a*a*$", "", Dialect.JavaScript))
     assertEquals(
-      inputsOf("^a*a*$", FString(UString('a', '!')), FString(1, seq), FString(3, seq))._1,
-      Set(1, 2, 4, 8, 16, 32, 64, 128, 256, 3, 7)
+      candidatesOf(quadratic, FString(1, seq)).map(c => (c.str, degreeOf(c.measurement))),
+      Seq((FString(1, seq), 2))
     )
+    assertEquals(quadratic.inputs.toSet, Set(UString('a', '!')))
+    val linear = checkerOf(ReDoS.parse("^a*$", "", Dialect.JavaScript))
+    assertEquals(candidatesOf(linear, FString(1, seq), FString(1000, seq)), Seq.empty)
+    // The growth is measured once for a sequence, even after the run of the input.
+    val checker = checkerOf(ReDoS.parse("^a*a*$", "", Dialect.JavaScript))
+    val candidates = candidatesOf(checker, FString(UString('a', '!')), FString(1, seq), FString(3, seq))
+    assertEquals(candidates.map(_.str), Seq(FString(1, seq)))
+    assertEquals(checker.measurements.keySet.toSet, Set(seq, FString.Repeat(0, 2) +: seq.tail))
+
+  test("FuzzChecker#Population#execute: a string whose run stops without the growth on the first counts"):
+    // The steps grow on the counts beyond the scale of the pattern only, which the first counts are not.
+    val checker = checkerOf(ReDoS.parse("^(?:a{300}a*a*)?$", "", Dialect.JavaScript))
+    val seq = IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'), FString.Wrap('!'))
+    assertEquals(candidatesOf(checker, FString(1, seq)), Seq.empty)
+    val candidates = candidatesOf(checker, FString(1000, seq))
+    assertEquals(candidates.map(c => (c.str, degreeOf(c.measurement))), Seq((FString(1000, seq), 2)))
 
   test("FuzzChecker#Population#execute: a string reaching a new coverage item repeats as a whole"):
     val checker = checkerOf(ReDoS.parse("foo.+bar", "", Dialect.JavaScript))
@@ -335,10 +406,23 @@ class FuzzCheckerSuite extends munit.FunSuite:
     val str = FString(UString('f', 'o', 'o', 'x', 'x'))
     val whole = FString.Repeat(0, 5) +: str.seq
     pop.execute(str)
-    assertEquals(pop.candidates.values.toSeq, Seq(FString(128, whole)))
+    assertEquals(pop.candidates.values.map(_.str).toSeq, Seq(FString(1, whole)))
     // The string reaches no new coverage item.
     pop.execute(FString(UString('f', 'o', 'o', 'x', 'x', 'x')))
-    assertEquals(checker.climbed.toSet, Set(whole))
+    assertEquals(checker.measurements.keySet.toSet, Set(whole))
+
+  test("FuzzChecker#hotspotOf"):
+    val source = "^x*(?:a|a)*b*b*$"
+    val checker = checkerOf(ReDoS.parse(source, "", Dialect.JavaScript))
+    val str = FString(1, IndexedSeq(FString.Wrap('x'), FString.Repeat(0, 1), FString.Wrap('b'), FString.Wrap('!')))
+    val measurement = checker.measureFirst(str, Parameters.DefaultIncubationLimit).get
+    // The second `b*` reads the characters again on each backtracking of the first, so it is hot on the attack string.
+    val hot = checker
+      .hotspotOf(str, measurement, 50000)
+      .spots
+      .collect:
+        case Hotspot.Spot(start, end, Hotspot.Hot) => (start, end)
+    assertEquals(hot, Seq((13, 14)))
 
   test("FuzzChecker#Population#execute: no candidate of a skeleton whose attack failed"):
     val ir = ReDoS.parse("^(?:a|a)*$", "", Dialect.JavaScript)
