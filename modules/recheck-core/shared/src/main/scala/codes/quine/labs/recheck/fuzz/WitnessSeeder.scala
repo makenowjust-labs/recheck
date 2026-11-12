@@ -25,12 +25,21 @@ object WitnessSeeder:
       maxSize: Int,
       maxDegree: Int,
       maxInitialGenerationSize: Int,
-      accelerationMode: AccelerationMode
+      accelerationMode: AccelerationMode,
+      accelerationHitRatio: Double
   )(using ctx: Context): Seq[FString] = ctx.interrupt:
     // The first seeds of the witnesses come before the others, so that every witness has a seed.
     val seeds = complexities.map(buildSeeds(_, limit, maxSize, maxDegree))
     val witnessSeed = (seeds.map(_.head) ++ seeds.flatMap(_.tail)).distinct.take(maxInitialGenerationSize)
-    witnessSeed ++ suffixedSeed(fuzz, witnessSeed, limit, timeout, maxInitialGenerationSize, accelerationMode)
+    witnessSeed ++ suffixedSeed(
+      fuzz,
+      witnessSeed,
+      limit,
+      timeout,
+      maxInitialGenerationSize,
+      accelerationMode,
+      accelerationHitRatio
+    )
 
   /** Builds seeds from the witness of the complexity, for the complexity and for each lower degree. */
   private[fuzz] def buildSeeds(
@@ -62,9 +71,14 @@ object WitnessSeeder:
       limit: Int,
       timeout: Duration,
       maxInitialGenerationSize: Int,
-      accelerationMode: AccelerationMode
+      accelerationMode: AccelerationMode,
+      accelerationHitRatio: Double
   )(using ctx: Context): Seq[FString] = ctx.interrupt:
-    val opts = Options(limit, usesAcceleration = fuzz.usesAcceleration(accelerationMode))
+    val opts = Options(
+      limit,
+      usesAcceleration = fuzz.usesAcceleration(accelerationMode),
+      accelerationHitRatio = accelerationHitRatio
+    )
     val suffixes = fuzz.parts.toSeq.map(_.iterator.map(FString.Wrap(_)).toIndexedSeq)
     seeds
       .distinctBy(_.seq)

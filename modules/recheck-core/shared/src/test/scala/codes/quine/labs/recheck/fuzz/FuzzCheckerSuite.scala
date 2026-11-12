@@ -145,7 +145,12 @@ class FuzzCheckerSuite extends munit.FunSuite:
       DefaultAttackTimeout,
       DefaultMaxAttackStringSize,
       DefaultMaxDegree,
+      DefaultMaxExtraDegree,
+      DefaultMaxIncubationBoundedWidth,
+      DefaultMaxBoostIteration,
+      DefaultBoundedWidthRatio,
       DefaultAccelerationMode,
+      DefaultAccelerationHitRatio,
       avoidsAttack,
       upperBound
     )
@@ -169,6 +174,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
       DefaultMaxIteration,
       DefaultMaxDegree,
       DefaultAccelerationMode,
+      DefaultAccelerationHitRatio,
       upperBound,
       attacker
     )
@@ -197,15 +203,23 @@ class FuzzCheckerSuite extends munit.FunSuite:
 
   test("FuzzChecker.isLinearBeyondCounts"):
     import Parameters.*
-    def isLinearBeyondCounts(source: String): Boolean =
+    def isLinearBeyondCounts(source: String, boundedWidthRatio: Double = DefaultBoundedWidthRatio): Boolean =
       val ir = ReDoS.parse(source, "", Dialect.JavaScript)
       val bound = FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100)
-      FuzzChecker.isLinearBeyondCounts(ir, bound, DefaultMaxRepeatCount, DefaultMaxNFASize, DefaultAttackLimit)
+      FuzzChecker.isLinearBeyondCounts(
+        ir,
+        bound,
+        DefaultMaxRepeatCount,
+        DefaultMaxNFASize,
+        DefaultAttackLimit,
+        boundedWidthRatio
+      )
 
     // The steps grow quadratically only up to 100 characters after `=` (#1310).
     assert(isLinearBeyondCounts("^.*?=[^&]{100}!"))
     // The steps on so many characters reach the limit.
     assert(!isLinearBeyondCounts("^.*?=[^&]{30000}!"))
+    assert(!isLinearBeyondCounts("^.*?=[^&]{100}!", boundedWidthRatio = 1000))
     // The repetition is not the only loop reading the characters again.
     assert(!isLinearBeyondCounts("^.*?=[^&]{100}[^&]*!"))
     assert(!isLinearBeyondCounts("^.*?=[^&]*!"))

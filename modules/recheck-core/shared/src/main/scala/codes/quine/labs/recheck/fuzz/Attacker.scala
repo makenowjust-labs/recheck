@@ -41,14 +41,6 @@ object Attacker:
       case Growth.Exponential   => Int.MaxValue
       case p: Growth.Polynomial => p.degree
 
-  /** The degrees above `maxDegree` that a measurement tells from the exponential growth. */
-  private[fuzz] val ExtraDegrees: Int = 3
-
-  /** The largest bounded width of a pattern that the first measurement of a string tries the counts beyond (see
-    * [[Attacker.measureFirst]]).
-    */
-  private[fuzz] val SmallBoundedWidth: Int = 256
-
   /** Returns the bounded width of the node, the largest width of what it matches when each repetition without the
     * largest count iterates the least times.
     */
@@ -79,7 +71,12 @@ private[fuzz] final class Attacker(
     val attackTimeout: Duration,
     val maxAttackStringSize: Int,
     val maxDegree: Int,
+    val maxExtraDegree: Int,
+    val maxIncubationBoundedWidth: Int,
+    val maxBoostIteration: Int,
+    val boundedWidthRatio: Double,
     val accelerationMode: AccelerationMode,
+    val accelerationHitRatio: Double,
     val avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean,
     val upperBound: Option[Seq[Complexity.Vulnerable[UChar]]]
 )(using val ctx: Context):
@@ -99,7 +96,7 @@ private[fuzz] final class Attacker(
   val boundedWidth: Int = boundedWidthOf(pattern.node)
 
   /** The largest degree of the polynomial growth that a measurement tells from the exponential one. */
-  val measuredDegree: Int = maxDegree + ExtraDegrees
+  val measuredDegree: Int = maxDegree + maxExtraDegree
 
   /** The step limit of the runs of the measurements on executing the strings. */
   val measurementLimit: Int = Math.min(attackLimit.toDouble, incubationLimit * Math.pow(2, maxDegree + 1)).toInt
@@ -169,7 +166,7 @@ private[fuzz] final class Attacker(
     */
   def boost(candidate: Candidate): Option[Candidate] = interrupt:
     val target = maxTriedDegree
-    if !boostedFingerprints.add(candidate.str.fingerprint) then return None
+    if maxBoostIteration <= 0 || !boostedFingerprints.add(candidate.str.fingerprint) then return None
 
     def measured(str: FString): Option[Candidate] =
       val admits = str.countRepeat < maxDegree && str.admitsAnyRepeatCount(pattern.mode)
@@ -192,12 +189,14 @@ private[fuzz] final class Attacker(
 
     var best = reduced(candidate)
     var continues = true
-    while continues && best.rank < target do
+    var iteration = 0
+    while continues && iteration < maxBoostIteration && best.rank < target do
       // The first of the steepest ones, for the same result on each run.
       val next =
         additionsOf(best.str).iterator.flatMap(measured).foldLeft(best)((x, y) => if y.rank > x.rank then y else x)
       continues = next ne best
       best = if continues then reduced(next) else best
+      iteration += 1
     Option.when(best.rank > candidate.rank)(best)
 
   /** Returns the strings adding a character, or a repetition of a character, to the string at its start, its end and
@@ -256,7 +255,7 @@ private[fuzz] final class Attacker(
   ): Option[Long] =
     runs.getOrElseUpdate(
       (str.seq, count, limit, timeout, memoizes), {
-        val opts = Options(limit, usesAcceleration = memoizes)
+        val opts = Options(limit, usesAcceleration = memoizes, accelerationHitRatio = accelerationHitRatio)
         val result = Interpreter.runWithTimeout(fuzz.program, str.copy(n = count).toUString, opts, timeout)
         Option.unless(result.status == Status.Limit || result.status == Status.Timeout)(result.steps.toLong)
       }
@@ -289,12 +288,12 @@ private[fuzz] final class Attacker(
     Iterator((from, 1), (from + 1, 1), (from, 2)).flatMap(measureOn(_, _)).nextOption()
 
   /** Measures the growth of the steps of the string on its first repeat counts, or on the first ones beyond the bounded
-    * width of the pattern up to `SmallBoundedWidth` if they tell none.
+    * width of the pattern up to `maxIncubationBoundedWidth` if they tell none.
     */
   def measureFirst(str: FString, limit: Int): Option[Measurement] =
     measure(str, 1, Int.MaxValue, limit, incubationTimeout).orElse:
       Option
-        .when(boundedWidth <= SmallBoundedWidth)(countBeyond(str, boundedWidth))
+        .when(boundedWidth <= maxIncubationBoundedWidth)(countBeyond(str, boundedWidth))
         .flatMap(measure(str, _, Int.MaxValue, limit, incubationTimeout))
 
   /** Measures the growth of the steps of the string on the repeat counts up to the largest one whose run ends, from its
@@ -349,7 +348,7 @@ private[fuzz] final class Attacker(
 
     // The steps change the growth a little after the repeated parts get longer than the bounded width, as the fixed
     // parts and the other repeated parts are read with them.
-    val size = 2 * boundedWidth
+    val size = Math.ceil(boundedWidthRatio * boundedWidth).toInt
     val isBeyond = measurement.first >= countBeyond(str, boundedWidth)
     val count =
       if measurement.growth == Growth.Exponential && isBeyond && !measurement.stops then measurement.last

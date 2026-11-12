@@ -27,7 +27,8 @@ object DynamicSeeder:
       limit: Int = Parameters.DefaultSeedingLimit,
       timeout: Duration,
       maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
-      accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode
+      accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode,
+      accelerationHitRatio: Double = Parameters.DefaultAccelerationHitRatio
   )(using ctx: Context): Set[FString] = ctx.interrupt:
     import ctx.*
 
@@ -39,6 +40,7 @@ object DynamicSeeder:
     val opts = Options(
       limit,
       usesAcceleration = fuzz.usesAcceleration(accelerationMode),
+      accelerationHitRatio = accelerationHitRatio,
       needsLoopAnalysis = true,
       needsFailedPoints = true,
       needsCoverage = true

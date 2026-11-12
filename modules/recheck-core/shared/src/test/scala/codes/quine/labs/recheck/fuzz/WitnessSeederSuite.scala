@@ -26,7 +26,8 @@ class WitnessSeederSuite extends munit.FunSuite:
       DefaultMaxGeneStringSize,
       DefaultMaxDegree,
       DefaultMaxInitialGenerationSize,
-      DefaultAccelerationMode
+      DefaultAccelerationMode,
+      DefaultAccelerationHitRatio
     )
 
   /** Checks the upper bound of the pattern, which has some. */
@@ -83,7 +84,8 @@ class WitnessSeederSuite extends munit.FunSuite:
         DefaultIncubationLimit,
         DefaultIncubationTimeout,
         DefaultMaxInitialGenerationSize,
-        DefaultAccelerationMode
+        DefaultAccelerationMode,
+        DefaultAccelerationHitRatio
       )
 
     // The match of the witness succeeds unless `xyz` follows, which makes the look-ahead fail.

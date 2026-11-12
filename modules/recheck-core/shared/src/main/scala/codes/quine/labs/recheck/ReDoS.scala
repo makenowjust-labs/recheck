@@ -280,7 +280,12 @@ object ReDoS:
         maxAttackCandidates,
         maxIteration,
         maxDegree,
+        maxExtraDegree,
+        maxIncubationBoundedWidth,
+        maxBoostIteration,
+        boundedWidthRatio,
         accelerationMode,
+        accelerationHitRatio,
         avoidsAttack
       )
       upperBound = checkedUpperBound

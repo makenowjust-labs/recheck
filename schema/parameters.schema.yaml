@@ -30,6 +30,19 @@ description: "Parameters is the set of the parameters of the analysis."
 type: object
 additionalProperties: false
 properties:
+  accelerationHitRatio:
+    title: "Acceleration Hit Ratio"
+    description: |-
+      The ratio of the hits to the lookups of the memoization table under which a run of the VM stops the acceleration.
+
+      A run looks up the table again and again, and it stops memoizing when the hits are fewer than this ratio of the lookups so far.
+      With `0`, it never stops.
+    type: number
+    default: 0.01
+    x-scala-type: "Double"
+    x-cli: "acceleration-hit-ratio"
+    x-since: "5.0.0"
+
   accelerationMode:
     title: "Acceleration Mode"
     description: |-
@@ -69,6 +82,20 @@ properties:
     x-scala-type: "Duration"
     x-cli: "attack-timeout"
     x-since: "4.2.0"
+
+  boundedWidthRatio:
+    title: "Bounded Width Ratio"
+    description: |-
+      The ratio to the bounded width of the pattern of the length of the repeated parts beyond which the fuzz checker confirms an attack string.
+
+      The bounded width of a pattern is the largest width of what it matches when each repetition without the largest count iterates the least times.
+      The fuzz checker confirms the growth of the steps of an attack string on a repeat count whose repeated parts are longer than the bounded width times this ratio.
+      It also takes the steps of the shorter strings as bounded by this length, when it skips the fuzzing of a pattern whose steps grow linearly beyond the counts of its repetitions.
+    type: number
+    default: 2
+    x-scala-type: "Double"
+    x-cli: "bounded-width-ratio"
+    x-since: "5.0.0"
 
   checker:
     title: "Checker"
@@ -220,7 +247,7 @@ properties:
 
   maxAttackCandidates:
     title: "Max Attack Candidates"
-    description: "The maximum number of strings reaching `incubationLimit` that each generation collects on fuzzing before the attacks."
+    description: "The maximum number of attack candidates, the strings whose steps grow more than linearly as they repeat, that each generation collects on fuzzing before the attacks."
     type: integer
     default: 8
     x-scala-type: "Int"
@@ -248,6 +275,19 @@ properties:
     x-cli: "max-back-reference-strings"
     x-since: "5.0.0"
 
+  maxBoostIteration:
+    title: "Max Boost Iteration"
+    description: |-
+      The maximum number of times that the fuzz checker boosts an attack candidate.
+
+      Each time, it adds a character or a repetition of a character to the string of the steepest candidate, and it goes on from the one whose steps grow steeper.
+      With `0`, it attacks with the candidates as they are.
+    type: integer
+    default: 10
+    x-scala-type: "Int"
+    x-cli: "max-boost-iteration"
+    x-since: "5.0.0"
+
   maxDFASize:
     title: "Max DFA Size"
     description: "The maximum size of the DFA to determine which algorithm is used."
@@ -266,6 +306,18 @@ properties:
     x-cli: "max-degree"
     x-since: "1.1.0"
 
+  maxExtraDegree:
+    title: "Max Extra Degree"
+    description: |-
+      The maximum number of degrees above `maxDegree` that the fuzz checker tells from the exponential growth.
+
+      The fuzz checker runs a string on consecutive repeat counts, and it takes the growth of the steps for a polynomial up to the degree of `maxDegree` plus this value, or else for the exponential one.
+    type: integer
+    default: 3
+    x-scala-type: "Int"
+    x-cli: "max-extra-degree"
+    x-since: "5.0.0"
+
   maxGeneStringSize:
     title: "Max Gene String Size"
     description: "The maximum length of the gene string on fuzzing."
@@ -283,6 +335,19 @@ properties:
     x-scala-type: "Int"
     x-cli: "max-generation-size"
     x-since: "1.0.0"
+
+  maxIncubationBoundedWidth:
+    title: "Max Incubation Bounded Width"
+    description: |-
+      The maximum bounded width of the pattern up to which the fuzz checker measures the growth of a gene string beyond the bounded width on incubation.
+
+      The bounded width of a pattern is the largest width of what it matches when each repetition without the largest count iterates the least times.
+      The steps of a string grow as on an attack string only when its repeated parts are longer than the bounded width, which takes long to run for a large one.
+    type: integer
+    default: 256
+    x-scala-type: "Int"
+    x-cli: "max-incubation-bounded-width"
+    x-since: "5.0.0"
 
   maxInitialGenerationSize:
     title: "Max Initial Generation Size"
