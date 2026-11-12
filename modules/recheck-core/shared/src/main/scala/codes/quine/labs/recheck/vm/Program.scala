@@ -45,6 +45,15 @@ object Program:
       predecessors: Vector[Set[Label]]
   ):
 
+    /** Whether each block is a junction, which two or more blocks jump to. */
+    private[vm] val isJunction: IArray[Boolean] = IArray.from(predecessors.map(_.size >= 2))
+
+    /** Whether each block is the head of a loop, which blocks both before it and from it on jump to. */
+    private[vm] val isLoopHead: IArray[Boolean] =
+      IArray.tabulate(predecessors.size)(i =>
+        predecessors(i).exists(_.index >= i) && predecessors(i).exists(_.index < i)
+      )
+
     /** Whether memoizing the failed states keeps the matching result. */
     def allowsMemoization: Boolean =
       // The verbs skip backtracking points.
