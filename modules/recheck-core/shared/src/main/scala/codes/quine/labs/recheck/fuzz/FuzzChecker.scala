@@ -83,6 +83,9 @@ object FuzzChecker:
       if bound.exists(_.isEmpty) then
         ctx.log("fuzz: linear upper bound")
         (Iterator.empty, AttackComplexity.Safe(false), reported)
+      else if isLinearBeyondCounts(pattern, bound, maxRepeatCount, maxNFASize, attackLimit) then
+        ctx.log("fuzz: linear upper bound beyond the counts")
+        (Iterator.empty, AttackComplexity.Safe(true), reported)
       else
         lazy val attacker = new Attacker(
           pattern,
@@ -136,7 +139,53 @@ object FuzzChecker:
       maxNFASize: Int,
       maxInitialGenerationSize: Int
   )(using ctx: Context): Option[Seq[Complexity.Vulnerable[UChar]]] =
-    val approximated = pattern.approximateRepeats(maxRepeatCount)
+    val approximated = pattern.dropUniversalTail.approximateRepeats(maxRepeatCount)
+    upperBoundOf(approximated, maxRepeatCount, maxNFASize, maxInitialGenerationSize)
+
+  /** Checks the upper bound of the complexity of the pattern on the strings longer than what its counts count, as
+    * [[upperBound]] does, on the pattern whose repetitions of large counts iterate once (see
+    * [[IRPattern.flattenRepeats]]).
+    */
+  private[fuzz] def upperBoundBeyondCounts(
+      pattern: IRPattern,
+      maxRepeatCount: Int,
+      maxNFASize: Int,
+      maxInitialGenerationSize: Int
+  )(using ctx: Context): Option[Seq[Complexity.Vulnerable[UChar]]] =
+    val flattened = pattern.dropUniversalTail.flattenRepeats(maxRepeatCount)
+    upperBoundOf(flattened, maxRepeatCount, maxNFASize, maxInitialGenerationSize)
+
+  /** Checks whether the steps of the pattern grow linearly on the strings longer than what its counts count, and cannot
+    * reach `attackLimit` on the shorter ones, so that the pattern has no attack to find.
+    *
+    * `bound` is the upper bound of the pattern (see [[upperBound]]). The steps on the strings that the counts count
+    * grow as the bound at most, which is taken for the steps of the size of the pattern times the power of the degree
+    * of twice the scale of the pattern (see [[scaleOf]]). An exponential bound may reach the limit on a few characters.
+    */
+  private[fuzz] def isLinearBeyondCounts(
+      pattern: IRPattern,
+      bound: Option[Seq[Complexity.Vulnerable[UChar]]],
+      maxRepeatCount: Int,
+      maxNFASize: Int,
+      attackLimit: Int
+  )(using ctx: Context): Boolean =
+    val degree = bound
+      .filter(_.forall(_.isInstanceOf[Complexity.Polynomial[?]]))
+      .map: vulnerable =>
+        vulnerable.collect { case p: Complexity.Polynomial[?] => p.degree }.max
+    degree.exists: degree =>
+      val reaches = pattern.size * Math.pow(2.0 * scaleOf(pattern.node), degree) >= attackLimit
+      val tail = pattern.dropUniversalTail
+      // Without a repetition to flatten, the bound beyond the counts is `bound`.
+      !reaches && tail.flattenRepeats(maxRepeatCount) != tail.approximateRepeats(maxRepeatCount) &&
+      upperBoundBeyondCounts(pattern, maxRepeatCount, maxNFASize, 0).exists(_.isEmpty)
+
+  private def upperBoundOf(
+      approximated: IRPattern,
+      maxRepeatCount: Int,
+      maxNFASize: Int,
+      maxInitialGenerationSize: Int
+  )(using ctx: Context): Option[Seq[Complexity.Vulnerable[UChar]]] =
     // The repetitions left may hide a large constant in a linear bound (e.g. the `2^50` paths of `(a?){50}`).
     if approximated.repeatCount >= maxRepeatCount then
       ctx.log("fuzz: no upper bound for too many repeats")

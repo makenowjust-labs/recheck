@@ -194,6 +194,27 @@ class FuzzCheckerSuite extends munit.FunSuite:
     assertEquals(upperBound("^(?*a+)b+$", Dialect.PCRE), None)
     // Nor do the repetitions that stay with too many repeats, whose bound would hide the `2^50` paths of `(a?){50}`.
     assertEquals(upperBound("^(a?){50}a{50}$"), None)
+    // The repetition of any character at the end matches any rest, so it does not make the bound quadratic.
+    val tail = ReDoS.parse("^.*?(?:ab).*$", "s", Dialect.JavaScript)
+    assertEquals(FuzzChecker.upperBound(tail, DefaultMaxRepeatCount, DefaultMaxNFASize, 100), Some(Seq.empty))
+
+  test("FuzzChecker.isLinearBeyondCounts"):
+    import Parameters.*
+    def isLinearBeyondCounts(source: String): Boolean =
+      val ir = ReDoS.parse(source, "", Dialect.JavaScript)
+      val bound = FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100)
+      FuzzChecker.isLinearBeyondCounts(ir, bound, DefaultMaxRepeatCount, DefaultMaxNFASize, DefaultAttackLimit)
+
+    // The steps grow quadratically only up to 100 characters after `=` (#1310).
+    assert(isLinearBeyondCounts("^.*?=[^&]{100}!"))
+    // The steps on so many characters reach the limit.
+    assert(!isLinearBeyondCounts("^.*?=[^&]{30000}!"))
+    // The repetition is not the only loop reading the characters again.
+    assert(!isLinearBeyondCounts("^.*?=[^&]{100}[^&]*!"))
+    assert(!isLinearBeyondCounts("^.*?=[^&]*!"))
+    // The steps of an exponential bound may reach the limit on a few characters.
+    assert(!isLinearBeyondCounts("^(?:a|a){40}$"))
+    assert(!isLinearBeyondCounts("^(a?){50}a{50}$"))
 
   test("FuzzChecker.buildSeeds"):
     val witness = Witness[UChar](Seq((Seq('x'), Seq('a')), (Seq.empty, Seq('b', 'c', 'd'))), Seq('!'))

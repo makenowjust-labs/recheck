@@ -287,6 +287,43 @@ class IRPatternSuite extends munit.FunSuite:
       Seq(Unbounded(1, Greedy), Unbounded(1, Greedy), Exact(4), Unbounded(1, Greedy), Unbounded(1, Greedy))
   )
 
+  /** Returns the quantifiers in the pre-order after flattening the repetitions to the sum of counts below `5`. */
+  def flattened(pattern: IRPattern): Seq[IRQuantifier] =
+    pattern.flattenRepeats(5).node.collect { case IRNodeData.Repeat(_, q) => q }
+
+  check("IRPattern#flattenRepeats")(flattened)(
+    "a{2}b{2}" -> Seq(Exact(2), Exact(2)),
+    "a{3}b{4}" -> Seq(Exact(3), Exact(1)),
+    "(?:a{2}){3}" -> Seq(Exact(1), Exact(2)),
+    "a{0,6}?" -> Seq(Bounded(0, 1, Lazy)),
+    "a{2,6}" -> Seq(Exact(1)),
+    "a{6,}" -> Seq(Unbounded(1, Greedy)),
+    // A repetition whose body loops, or refers to a capture, is approximated.
+    "(?:a*b){6}" -> Seq(Unbounded(1, Greedy), Unbounded(0, Greedy)),
+    "(a)(?:b\\1){6}" -> Seq(Unbounded(1, Greedy))
+  )
+
+  /** Returns the quantifiers in the pre-order and whether an assertion is left, after dropping the universal tail. */
+  def tailDropped(pattern: IRPattern): (Seq[IRQuantifier], Boolean) =
+    val node = pattern.dropUniversalTail.node
+    (node.collect { case IRNodeData.Repeat(_, q) => q }, node.exists(_.isInstanceOf[IRNodeData.Assert]))
+
+  check("IRPattern#dropUniversalTail", "s")(tailDropped)(
+    "a*b.*" -> (Seq(Unbounded(0, Greedy)), false),
+    "a*b.*$" -> (Seq(Unbounded(0, Greedy)), false),
+    "a*b(.*?)$" -> (Seq(Unbounded(0, Greedy)), false),
+    "(?:a.*|b.*)$" -> (Seq.empty, false),
+    // `.+` fails at the end of the string, and so does `$` after `a`.
+    "a.+$" -> (Seq(Unbounded(1, Greedy)), true),
+    "(?:a|b.*)$" -> (Seq(Unbounded(0, Greedy)), true),
+    "a.*b" -> (Seq(Unbounded(0, Greedy)), false)
+  )
+
+  // Without `s`, `.` does not match a line terminator.
+  check("IRPattern#dropUniversalTail")(tailDropped)(
+    "a.*$" -> (Seq(Unbounded(0, Greedy)), true)
+  )
+
   check("IRPattern#needsLineTerminatorDistinction", "m")(_.needsLineTerminatorDistinction)(
     ".|^" -> true,
     "^|." -> true,

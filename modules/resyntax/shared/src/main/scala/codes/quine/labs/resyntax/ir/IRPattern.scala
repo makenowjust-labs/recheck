@@ -63,7 +63,52 @@ final case class IRPattern(
   /** Returns the pattern where repetitions become `*` or `+` from the largest count (the later first on a tie), until
     * the sum of the counts of the rest is below `maxCount`, which has every path of this pattern.
     */
-  def approximateRepeats(maxCount: Int): IRPattern =
+  def approximateRepeats(maxCount: Int): IRPattern = replaceRepeats(maxCount)((_, q) => IRPattern.approximate(q))
+
+  /** Returns the pattern where the repetitions that [[approximateRepeats]] changes iterate once instead (or at most
+    * once), when their bodies have no unbounded repetition nor back-reference.
+    *
+    * The iterations of such a repetition add no loop, so the pattern loops as this pattern does. Matching it grows as
+    * matching this pattern does on the strings longer than what the counts of this pattern count.
+    */
+  def flattenRepeats(maxCount: Int): IRPattern = replaceRepeats(maxCount): (n, q) =>
+    val loops = n.exists:
+      case Repeat(_, _: IRQuantifier.Unbounded) => true
+      case _: BackReference                     => true
+      case _: Unsupported                       => true
+      case _                                    => false
+    if loops then IRPattern.approximate(q) else IRPattern.once(q)
+
+  /** Returns the pattern without the repetition of any character at its end, and the end assertions after it (e.g.
+    * `.*$` with the `s` flag).
+    *
+    * They match any rest of the string once what is before them matches, so matching the pattern backtracks as matching
+    * this pattern does, apart from reading the rest.
+    */
+  def dropUniversalTail: IRPattern =
+    def isEnd(node: IRNode): Boolean = node.data match
+      case Assert(IRAssertKind.TextEnd | _: IRAssertKind.LineEnd | _: IRAssertKind.ChompTextEnd) => true
+      case _                                                                                     => false
+    // The node without the tail on every path to its end, or `None` if a path has none.
+    def drop(node: IRNode): Option[IRNode] = node.data match
+      case Repeat(IRNode(Chars(set), _), IRQuantifier.Unbounded(0, _)) if set == universe =>
+        Some(node.copy(data = Empty))
+      case Capture(i, name, n) =>
+        drop(n).map(n => node.copy(data = Capture(i, name, n)))
+      case Sequence(ns) =>
+        val rest = ns.reverse.dropWhile(isEnd).reverse
+        rest.lastOption.flatMap(drop).map(last => node.copy(data = Sequence(rest.init :+ last)))
+      case Disjunction(ns) =>
+        val dropped = ns.map(drop)
+        Option.when(dropped.nonEmpty && dropped.forall(_.isDefined))(node.copy(data = Disjunction(dropped.flatten)))
+      case _ => None
+
+    drop(node).fold(this)(node => copy(node = node))
+
+  /** Returns the pattern where the quantifiers of repetitions are replaced from the largest count (the later first on a
+    * tie), until the sum of the counts of the rest is below `maxCount`.
+    */
+  private def replaceRepeats(maxCount: Int)(replace: (IRNode, IRQuantifier) => IRQuantifier): IRPattern =
     // The counts of the repetitions in the pre-order, with whether each stays.
     // A repetition whose body can match the empty string stays, since an empty iteration of `+` ends it.
     // A repetition in a look-behind stays, since a look-behind matched forward starts where the counts tell.
@@ -90,7 +135,7 @@ final case class IRPattern(
       val data = node.data match
         case Repeat(n, q) =>
           index += 1
-          val q1 = if approximated.contains(index) then IRPattern.approximate(q) else q
+          val q1 = if approximated.contains(index) then replace(n, q) else q
           Repeat(loop(n), q1)
         case Disjunction(ns)                   => Disjunction(ns.map(loop))
         case Sequence(ns)                      => Sequence(ns.map(loop))
@@ -275,6 +320,15 @@ object IRPattern:
     case IRQuantifier.Exact(_)                  => IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy)
     case IRQuantifier.Unbounded(_, strategy)    => IRQuantifier.Unbounded(1, strategy)
     case IRQuantifier.Bounded(min, _, strategy) => IRQuantifier.Unbounded(min.min(1), strategy)
+
+  /** Returns the quantifier of one iteration, or of at most one for a repetition that may be skipped, where the
+    * iterations above a least count stay as `+`.
+    */
+  private def once(q: IRQuantifier): IRQuantifier = q match
+    case IRQuantifier.Exact(_)                => IRQuantifier.Exact(1)
+    case IRQuantifier.Unbounded(_, strategy)  => IRQuantifier.Unbounded(1, strategy)
+    case IRQuantifier.Bounded(0, _, strategy) => IRQuantifier.Bounded(0, 1, strategy)
+    case IRQuantifier.Bounded(_, _, _)        => IRQuantifier.Exact(1)
 
   /** Checks whether the set is one character or the case variants of one character, as a literal is. */
   private def isOneCharUpToCase(set: CharSet): Boolean =
