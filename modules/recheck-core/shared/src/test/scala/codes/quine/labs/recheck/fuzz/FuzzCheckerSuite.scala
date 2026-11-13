@@ -14,8 +14,6 @@ import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.Attacker.Candidate
 import codes.quine.labs.recheck.fuzz.Attacker.Measurement
-import codes.quine.labs.recheck.fuzz.FString.Repeat
-import codes.quine.labs.recheck.fuzz.FString.Wrap
 import codes.quine.labs.recheck.fuzz.FuzzChecker.Trace
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
@@ -216,44 +214,18 @@ class FuzzCheckerSuite extends munit.FunSuite:
     assert(!isLinearBeyondCounts("^(?:a|a){40}$"))
     assert(!isLinearBeyondCounts("^(a?){50}a{50}$"))
 
-  test("FuzzChecker.buildSeeds"):
-    val witness = Witness[UChar](Seq((Seq('x'), Seq('a')), (Seq.empty, Seq('b', 'c', 'd'))), Seq('!'))
-    val seq = Vector(Wrap('x'), Repeat(0, 1), Wrap('a'), Repeat(0, 3), Wrap('b'), Wrap('c'), Wrap('d'), Wrap('!'))
-    val first = Vector(Wrap('x'), Repeat(0, 1), Wrap('a'))
-    // The repeat count reaches the limit by the complexity, and then by each lower degree, for the whole witness and
-    // then for the first pump only.
-    assertEquals(
-      FuzzChecker.buildSeeds(Complexity.Polynomial(3, witness), 1000, 100, 4),
-      Seq(FString(12, seq), FString(23, seq), FString(12, first), FString(23, first))
-    )
-    assertEquals(
-      FuzzChecker.buildSeeds(Complexity.Exponential(witness), 1000, 100, 3).take(3),
-      Seq(FString(8, seq), FString(12, seq), FString(23, seq))
-    )
-
   /** A witness of `^a*$` for the upper bounds in the tests. */
   val witness: Witness[UChar] = Witness(Seq((Seq.empty, Seq('a'))), Seq('!'))
 
-  test("FuzzChecker#upperBoundSeed, FuzzChecker#seederSeed"):
+  test("FuzzChecker#seederSeed"):
     val ir = ReDoS.parse("^a*$", "", Dialect.JavaScript)
-    val quadratic = Complexity.Polynomial(2, witness)
-    val cubic = Complexity.Polynomial(3, witness)
-    val checker = checkerOf(ir, upperBound = Some(Seq(cubic, quadratic, quadratic)))
-    def seeds(complexity: Complexity.Vulnerable[UChar]): Seq[FString] =
-      FuzzChecker.buildSeeds(
-        complexity,
-        Parameters.DefaultIncubationLimit,
-        Parameters.DefaultMaxGeneStringSize,
-        Parameters.DefaultMaxDegree
-      )
-    // The first seeds of the witnesses come before the others, without duplicates.
-    val upperBoundSeed =
-      Seq(seeds(cubic).head, seeds(quadratic).head) ++ seeds(cubic).tail.filterNot(seeds(quadratic).contains)
-    assertEquals(checker.upperBoundSeed(), upperBoundSeed)
-    // The seeds of the seeder are the ones without the upper bound, except the seeds of the upper bound.
+    val checker = checkerOf(ir, upperBound = Some(Seq(Complexity.Polynomial(3, witness))))
+    val witnessSeed = checker.witnessSeed()
+    assert(witnessSeed.nonEmpty)
+    // The seeds of the seeder are the ones without the upper bound, except the seeds of the witnesses.
     val seederSeed = checkerOf(ir).seederSeed(Seq.empty)
     assert(seederSeed.nonEmpty)
-    assertEquals(checker.seederSeed(upperBoundSeed).toSet, seederSeed.toSet -- upperBoundSeed)
+    assertEquals(checker.seederSeed(witnessSeed).toSet, seederSeed.toSet -- witnessSeed)
     assertEquals(checker.seederSeed(seederSeed).toSet, Set.empty)
 
   test("FuzzChecker#init: the seeder runs after the steepest attacks from the upper bound"):
@@ -261,33 +233,23 @@ class FuzzCheckerSuite extends munit.FunSuite:
     val checker = checkerOf(ir, upperBound = Some(Seq(Complexity.Polynomial(2, witness))))
     val (results, pop) = checker.init()
     assertEquals(results.next()._1, AttackComplexity.Polynomial(2, true))
-    val boundSeed = checker.upperBoundSeed()
-    assertEquals(pop.set.map(_.str).toSet, boundSeed.toSet)
+    val witnessSeed = checker.witnessSeed()
+    assertEquals(pop.set.map(_.str).toSet, witnessSeed.toSet)
     // The seeds of the seeder run when the attacks run out.
     results.toSeq
-    assert(checker.seederSeed(boundSeed).exists(str => pop.set.exists(_.str == str)))
+    assert(checker.seederSeed(witnessSeed).exists(str => pop.set.exists(_.str == str)))
     // A candidate below the steepest growth of an exponential upper bound waits for the seeds of the seeder.
     val waiting = checkerOf(ir, upperBound = Some(Seq(Complexity.Exponential(witness))))
     val (waitingResults, waitingPop) = waiting.init()
     assertEquals(waitingResults.next()._1, AttackComplexity.Polynomial(2, true))
-    assert(waiting.seederSeed(waiting.upperBoundSeed()).exists(str => waitingPop.set.exists(_.str == str)))
+    assert(waiting.seederSeed(waiting.witnessSeed()).exists(str => waitingPop.set.exists(_.str == str)))
 
-  test("FuzzChecker#suffixedSeed"):
+  test("FuzzChecker#init: the seeds of other suffixes"):
     import Parameters.*
-    def checkerWithBound(source: String): FuzzChecker =
-      val ir = ReDoS.parse(source, "", Dialect.JavaScript)
-      checkerOf(ir, upperBound = FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100))
-
+    val ir = ReDoS.parse("^(?:a|a)*(?!.*xyz)", "", Dialect.JavaScript)
+    val bound = FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100)
     // The match of the witness succeeds unless `xyz` follows, which makes the look-ahead fail.
-    val checker = checkerWithBound("^(?:a|a)*(?!.*xyz)")
-    val seeds = checker.upperBoundSeed()
-    val suffixed = checker.suffixedSeed(seeds)
-    assert(clue(suffixed).nonEmpty)
-    assert(suffixed.forall(_.toUString.iterator.toSeq.endsWith("xyz".map(_.toInt))))
-    assertEquals(checker.init()._1.next()._1, AttackComplexity.Exponential(true))
-    // A seed whose match fails has no other suffix.
-    val failing = checkerWithBound("^(?:a|a)*$")
-    assertEquals(failing.suffixedSeed(failing.upperBoundSeed()), Seq.empty)
+    assertEquals(checkerOf(ir, upperBound = bound).init()._1.next()._1, AttackComplexity.Exponential(true))
 
   /** The degree of the polynomial growth, or `-1` for the exponential one. */
   def degreeOf(measurement: Measurement): Int = measurement.growth match

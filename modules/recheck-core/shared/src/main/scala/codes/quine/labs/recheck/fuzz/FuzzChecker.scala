@@ -199,27 +199,6 @@ object FuzzChecker:
             .toVector
       catch case _: UnsupportedException => None
 
-  /** Builds seeds from a witness of the upper bound, for its complexity and for each lower degree. */
-  private[fuzz] def buildSeeds(
-      complexity: Complexity.Vulnerable[UChar],
-      limit: Int,
-      maxSize: Int,
-      maxDegree: Int
-  ): Seq[FString] =
-    val witness = complexity.witness
-    val pumps = witness.pumps.map: (prefix, pump) =>
-      prefix.map(FString.Wrap(_)) ++ (FString.Repeat(0, pump.size) +: pump.map(FString.Wrap(_)))
-    val seqs =
-      (pumps.flatten ++ witness.suffix.map(FString.Wrap(_))) +: (pumps.size - 1 to 1 by -1).map(pumps.take(_).flatten)
-    val lowerDegrees = complexity match
-      case _: Complexity.Exponential[UChar]    => maxDegree to 2 by -1
-      case Complexity.Polynomial(degree, _, _) => degree - 1 to 2 by -1
-    val counts =
-      complexity.bestRepeatCount(limit, maxSize) +:
-        lowerDegrees.map(Complexity.Polynomial(_, witness).bestRepeatCount(limit, maxSize))
-    val seeds = for seq <- seqs; n <- counts.map(_.max(1)).distinct yield FString(n, seq.toIndexedSeq)
-    seeds.distinct
-
   /** Trace is a summary of IR execution. */
   private[fuzz] final case class Trace(
       str: FString,
@@ -287,54 +266,42 @@ private[fuzz] final class FuzzChecker(
       iterResults
 
   /** Creates the initial generation from the seed set, where the seeds of the seeder run after the steepest attacks
-    * from the seeds of the upper bound.
+    * from the seeds of the witnesses of the upper bound.
     */
   def init(): (Iterator[AttackResult], Population) = interrupt:
     val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty)
     val results = Iterator
       .single(pop)
       .flatMap: pop =>
-        val witnessSeed = upperBoundSeed()
-        val boundSeed = witnessSeed ++ suffixedSeed(witnessSeed)
-        boundSeed.foreach(pop.execute)
+        val seed = witnessSeed()
+        seed.foreach(pop.execute)
         val fingerprints = pop.candidates.keySet.toSet
         val (steepest, others) = attacker.ordered(pop.candidates.values.toVector).partition(attacker.isSteepest)
         // No seed of the seeder grows steeper, and the seeder takes long.
         steepest.iterator.flatMap(attacker.tryAttack) ++ Iterator
           .single(pop)
           .flatMap: pop =>
-            seederSeed(boundSeed).foreach(pop.execute)
+            seederSeed(seed).foreach(pop.execute)
             val seeded = pop.candidates.iterator.collect:
               case (fingerprint, candidate) if !fingerprints.contains(fingerprint) => candidate
             (others ++ attacker.ordered(seeded.toVector)).sortBy(-_.rank).iterator.flatMap(attacker.tryAttack)
     (results, pop)
 
-  /** Computes the seeds of the upper bound whose matches succeed again, with each literal of the pattern as the suffix
-    * after the last repetition, up to the size of the initial generation with `seeds`.
-    */
-  def suffixedSeed(seeds: Seq[FString]): Seq[FString] = interrupt:
-    val opts = Options(incubationLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode))
-    val suffixes = parts.map(_.iterator.map(FString.Wrap(_)).toIndexedSeq)
-    seeds
-      .distinctBy(_.seq)
-      .iterator
-      .filter(seed => Interpreter.runWithTimeout(program, seed.toUString, opts, incubationTimeout).status == Status.Ok)
-      .flatMap: seed =>
-        val last = seed.seq.lastIndexWhere(_.isInstanceOf[FString.Repeat])
-        val body = seed.seq.take(last + 1 + attacker.repeatsOf(seed).last._2)
-        suffixes.map(suffix => FString(seed.n, body ++ suffix))
-      .filterNot(seeds.contains)
-      .take(maxInitialGenerationSize - seeds.size)
-      .toSeq
+  /** Computes the seeds of the witnesses of the upper bound (see [[WitnessSeeder]]). */
+  def witnessSeed(): Seq[FString] =
+    WitnessSeeder.seed(
+      fuzz,
+      upperBound.toSeq.flatten,
+      incubationLimit,
+      incubationTimeout,
+      maxGeneStringSize,
+      maxDegree,
+      maxInitialGenerationSize,
+      accelerationMode
+    )
 
-  /** Computes the seeds of the witnesses of the upper bound. */
-  def upperBoundSeed(): Seq[FString] =
-    // The first seeds of the witnesses come before the others, so that every witness has a seed.
-    val boundSeeds = upperBound.toSeq.flatten.map(buildSeeds(_, incubationLimit, maxGeneStringSize, maxDegree))
-    (boundSeeds.map(_.head) ++ boundSeeds.flatMap(_.tail)).distinct.take(maxInitialGenerationSize)
-
-  /** Computes the seeds of the seeder, which fill the initial generation after the ones of the upper bound. */
-  def seederSeed(upperBoundSeed: Seq[FString]): Seq[FString] = interrupt:
+  /** Computes the seeds of the seeder, which fill the initial generation after the ones of the witnesses. */
+  def seederSeed(witnessSeed: Seq[FString]): Seq[FString] = interrupt:
     log(s"fuzz: seeding start (seeder: $seeder)")
     val seederSeed: Set[FString] = seeder match
       case Seeder.Static =>
@@ -359,10 +326,10 @@ private[fuzz] final class FuzzChecker(
         else staticSeed
       case Seeder.Dynamic =>
         DynamicSeeder.seed(fuzz, seedingLimit, seedingTimeout, maxInitialGenerationSize, accelerationMode)
-    val seed = (seederSeed -- upperBoundSeed).take(maxInitialGenerationSize - upperBoundSeed.size).toSeq
+    val seed = (seederSeed -- witnessSeed).take(maxInitialGenerationSize - witnessSeed.size).toSeq
 
     log(s"""|fuzz: seeding finish
-            |  size: ${upperBoundSeed.size + seed.size}""".stripMargin)
+            |  size: ${witnessSeed.size + seed.size}""".stripMargin)
     seed
 
   /** Iterates a generation. */
