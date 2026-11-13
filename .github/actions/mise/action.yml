@@ -31,7 +31,7 @@ runs:
         key: ${{ runner.os }}-${{ runner.arch }}-${{ steps.image.outputs.os }}-php-${{ hashFiles('.config/mise/conf.d/php.toml') }}
     - uses: jdx/mise-action@v5
       with:
-        version: 2026.11.6
+        version: 2026.11.7
         install_args: ${{ inputs.tools }}
         cache_key: ${{ inputs.cache-key }}
     - if: inputs.pnpm-install == 'true'
