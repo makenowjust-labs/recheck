@@ -140,20 +140,19 @@ object FuzzChecker:
       maxInitialGenerationSize: Int
   )(using ctx: Context): Option[Seq[Complexity.Vulnerable[UChar]]] =
     val approximated = pattern.dropUniversalTail.approximateRepeats(maxRepeatCount)
-    upperBoundOf(approximated, maxRepeatCount, maxNFASize, maxInitialGenerationSize)
+    upperBoundOf(approximated, maxInitialGenerationSize.max(1), maxRepeatCount, maxNFASize)
 
   /** Checks the upper bound of the complexity of the pattern on the strings longer than what its counts count, as
     * [[upperBound]] does, on the pattern whose repetitions of large counts iterate once (see
-    * [[IRPattern.flattenRepeats]]).
+    * [[IRPattern.flattenRepeats]]), and returns the worst vulnerable complexity only.
     */
   private[fuzz] def upperBoundBeyondCounts(
       pattern: IRPattern,
       maxRepeatCount: Int,
-      maxNFASize: Int,
-      maxInitialGenerationSize: Int
+      maxNFASize: Int
   )(using ctx: Context): Option[Seq[Complexity.Vulnerable[UChar]]] =
     val flattened = pattern.dropUniversalTail.flattenRepeats(maxRepeatCount)
-    upperBoundOf(flattened, maxRepeatCount, maxNFASize, maxInitialGenerationSize)
+    upperBoundOf(flattened, 1, maxRepeatCount, maxNFASize)
 
   /** Checks whether the steps of the pattern grow linearly on the strings longer than what its counts count, and cannot
     * reach `attackLimit` on the shorter ones, so that the pattern has no attack to find.
@@ -167,20 +166,22 @@ object FuzzChecker:
   )(using ctx: Context): Boolean =
     val degree = bound
       .filter(_.forall(_.isInstanceOf[Complexity.Polynomial[?]]))
-      .map: vulnerable =>
-        vulnerable.collect { case p: Complexity.Polynomial[?] => p.degree }.max
+      .map(_.collect { case p: Complexity.Polynomial[?] => p.degree }.max)
     degree.exists: degree =>
       val reaches = pattern.size * Math.pow(2.0 * Attacker.boundedWidthOf(pattern.node), degree) >= attackLimit
       val tail = pattern.dropUniversalTail
       // Without a repetition to flatten, the bound beyond the counts is `bound`.
       !reaches && tail.flattenRepeats(maxRepeatCount) != tail.approximateRepeats(maxRepeatCount) &&
-      upperBoundBeyondCounts(pattern, maxRepeatCount, maxNFASize, 0).exists(_.isEmpty)
+      upperBoundBeyondCounts(pattern, maxRepeatCount, maxNFASize).exists(_.isEmpty)
 
+  /** Checks the upper bound of the approximated pattern, and returns its vulnerable complexities from the worst, up to
+    * `complexityCount`.
+    */
   private def upperBoundOf(
       approximated: IRPattern,
+      complexityCount: Int,
       maxRepeatCount: Int,
-      maxNFASize: Int,
-      maxInitialGenerationSize: Int
+      maxNFASize: Int
   )(using ctx: Context): Option[Seq[Complexity.Vulnerable[UChar]]] =
     // The repetitions left may hide a large constant in a linear bound (e.g. the `2^50` paths of `(a?){50}`).
     if approximated.repeatCount >= maxRepeatCount then
@@ -192,10 +193,11 @@ object FuzzChecker:
         Option.when(simplified.isUpperBound):
           val orderedNFA = simplified.epsNFA.restrictInputs(simplified.orderedNFA)
           // The look-ahead DFA of the upper bound has the single state.
+          // The complexities are taken here, since the search for them may throw `UnsupportedException` too.
           AutomatonChecker
             .check(orderedNFA.mapAlphabet(_.representative), true, maxNFASize, Int.MaxValue)
             .collect { case v: Complexity.Vulnerable[UChar] => v }
-            .take(maxInitialGenerationSize.max(1))
+            .take(complexityCount)
             .toVector
       catch case _: UnsupportedException => None
 
@@ -270,22 +272,19 @@ private[fuzz] final class FuzzChecker(
     */
   def init(): (Iterator[AttackResult], Population) = interrupt:
     val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty)
-    val results = Iterator
-      .single(pop)
-      .flatMap: pop =>
-        val seed = witnessSeed()
-        seed.foreach(pop.execute)
-        val fingerprints = pop.candidates.keySet.toSet
-        val (steepest, others) = attacker.ordered(pop.candidates.values.toVector).partition(attacker.isSteepest)
-        // No seed of the seeder grows steeper, and the seeder takes long.
-        steepest.iterator.flatMap(attacker.tryAttack) ++ Iterator
-          .single(pop)
-          .flatMap: pop =>
-            seederSeed(seed).foreach(pop.execute)
-            val seeded = pop.candidates.iterator.collect:
-              case (fingerprint, candidate) if !fingerprints.contains(fingerprint) => candidate
-            (others ++ attacker.ordered(seeded.toVector)).sortBy(-_.rank).iterator.flatMap(attacker.tryAttack)
-    (results, pop)
+    val seed = witnessSeed()
+    seed.foreach(pop.execute)
+    val fingerprints = pop.candidates.keys.toSet
+    val (steepest, others) = attacker.ordered(pop.candidates.values.toVector).partition(attacker.isSteepest)
+
+    def seeded: Iterator[AttackResult] =
+      seederSeed(seed).foreach(pop.execute)
+      val candidates = pop.candidates.iterator.collect:
+        case (fingerprint, candidate) if !fingerprints.contains(fingerprint) => candidate
+      (others ++ attacker.ordered(candidates.toVector)).sortBy(-_.rank).iterator.flatMap(attacker.tryAttack)
+
+    // No seed of the seeder grows steeper, and the seeder takes long, so it runs when the steepest attacks run out.
+    (steepest.iterator.flatMap(attacker.tryAttack) ++ seeded, pop)
 
   /** Computes the seeds of the witnesses of the upper bound (see [[WitnessSeeder]]). */
   def witnessSeed(): Seq[FString] =
