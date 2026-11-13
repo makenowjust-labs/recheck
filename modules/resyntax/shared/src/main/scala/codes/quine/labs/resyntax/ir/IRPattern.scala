@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.ir
 import scala.annotation.tailrec
 
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
@@ -301,6 +302,45 @@ final case class IRPattern(
       case _            => node.children.flatMap(loop).toSet
 
     loop(node)
+
+  /** Returns the locations where the engine starts to read the pattern: the ones of the nodes that read characters,
+    * with a run of literal characters in a sequence (see [[parts]]) as the ones of its `partSize` characters read
+    * first.
+    *
+    * The engine reads such a run from its first character, or from its last one in a look-behind matched backward.
+    */
+  def readStartLocations(partSize: Int): Set[SourceLocation] =
+    def isLiteral(node: IRNode): Boolean = node.data match
+      case Chars(set) => IRPattern.isOneCharUpToCase(set)
+      case _          => false
+
+    def isBackward(matching: IRLookBehindMatch): Boolean = matching == IRLookBehindMatch.Backward
+
+    @tailrec
+    def extract(ns: Seq[IRNode], back: Boolean, starts: Set[SourceLocation] = Set.empty): Set[SourceLocation] =
+      if ns.isEmpty then starts
+      else
+        val (literals, rest) = ns.span(isLiteral)
+        val firsts = if back then literals.takeRight(partSize) else literals.take(partSize)
+        val (others, next) = rest.span(!isLiteral(_))
+        extract(next, back, starts ++ firsts.flatMap(_.loc.toOption) ++ others.flatMap(loop(_, back)))
+
+    def loop(node: IRNode, back: Boolean): Set[SourceLocation] = node.data match
+      case Sequence(ns)                                   => extract(ns, back)
+      case Chars(_) | Strings(_) | BackReference(_, _, _) => node.loc.toOption.toSet
+      case LookAhead(_, n)                                => loop(n, false)
+      case NonAtomicLookAhead(n)                          => loop(n, false)
+      case LookBehind(_, n, matching)                     => loop(n, isBackward(matching))
+      case NonAtomicLookBehind(n, matching)               => loop(n, isBackward(matching))
+      case Conditional(condition, yes, no)                =>
+        val inCondition = condition match
+          case IRCondition.LookAhead(_, n)            => loop(n, false)
+          case IRCondition.LookBehind(_, n, matching) => loop(n, isBackward(matching))
+          case IRCondition.Captured(_)                => Set.empty[SourceLocation]
+        inCondition ++ loop(yes, back) ++ loop(no, back)
+      case _ => node.children.flatMap(loop(_, back)).toSet
+
+    loop(node, false)
 
   /** Returns the sets of the literal characters, each of which is one character or the case variants of one. */
   def literalSets: Set[CharSet] =

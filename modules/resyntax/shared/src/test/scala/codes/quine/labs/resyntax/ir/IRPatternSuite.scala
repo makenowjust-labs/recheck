@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.ir
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.Greedy
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.Lazy
 import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UTF16Encoding
@@ -435,6 +436,42 @@ class IRPatternSuite extends munit.FunSuite:
   )
 
   check("IRPattern#parts", "i", Dialect.Python())(_.parts)("xyz" -> Set(UnitMode.UTF16.decode("XYZ")))
+
+  check("IRPattern#readStartLocations")(_.readStartLocations(1))(
+    "xyz.0" -> Set(SourceLocation(0, 1), SourceLocation(3, 4), SourceLocation(4, 5)),
+    "x.yz" -> Set(SourceLocation(0, 1), SourceLocation(1, 2), SourceLocation(2, 3)),
+    "(?:xy)*" -> Set(SourceLocation(3, 4)),
+    "x" -> Set(SourceLocation(0, 1)),
+    "x|yz" -> Set(SourceLocation(0, 1), SourceLocation(2, 3)),
+    "(a)\\1[bc]" -> Set(SourceLocation(1, 2), SourceLocation(3, 5), SourceLocation(5, 9)),
+    // A look-behind reads backward, and a look-ahead in it reads forward.
+    "(?<=xyz)" -> Set(SourceLocation(6, 7)),
+    "(?<!xy(?=ab))" -> Set(SourceLocation(5, 6), SourceLocation(9, 10))
+  )
+
+  // A look-behind of Java is matched forward.
+  check("IRPattern#readStartLocations", "", Dialect.Java)(_.readStartLocations(1))(
+    "(?<=xyz)" -> Set(SourceLocation(4, 5))
+  )
+
+  // A part has the characters read first up to the size.
+  check("IRPattern#readStartLocations: two characters of a part")(_.readStartLocations(2))(
+    "wxyz.0" -> Set(SourceLocation(0, 1), SourceLocation(1, 2), SourceLocation(4, 5), SourceLocation(5, 6)),
+    "(?<=xyz)" -> Set(SourceLocation(5, 6), SourceLocation(6, 7)),
+    "x" -> Set(SourceLocation(0, 1))
+  )
+
+  // A look-around of a condition reads as one outside a condition does, and the branches read as the outside does.
+  check("IRPattern#readStartLocations", "", Dialect.DotNet)(_.readStartLocations(1))(
+    "(?(?=ab)cd|ef)" -> Set(SourceLocation(5, 6), SourceLocation(8, 9), SourceLocation(11, 12)),
+    "(?<=(?(?<=ab)cd|ef))" -> Set(SourceLocation(11, 12), SourceLocation(14, 15), SourceLocation(17, 18))
+  )
+
+  // A non-atomic look-around reads as an atomic one does.
+  check("IRPattern#readStartLocations", "", Dialect.PCRE)(_.readStartLocations(1))(
+    "(?*xy)" -> Set(SourceLocation(3, 4)),
+    "(?<*xy)" -> Set(SourceLocation(4, 5))
+  )
 
   check("IRPattern#literalSets")(_.literalSets)(
     "ab[cd]." -> Set(CharSet.single('a'), CharSet.single('b')),

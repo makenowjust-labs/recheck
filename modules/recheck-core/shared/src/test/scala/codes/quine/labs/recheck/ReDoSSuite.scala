@@ -20,6 +20,7 @@ import codes.quine.labs.recheck.diagnostics.RefutedAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.recheck.diagnostics.UpperBound
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
@@ -482,7 +483,8 @@ class ReDoSSuite extends munit.FunSuite:
       val verify = (d: Diagnostics.Vulnerable) =>
         verified += 1
         d.copy(runtimeAttack = results(verified - 1))
-      ReDoS.verifyCandidates(candidates, () => safe, verify, mutable.ArrayBuffer.empty, maxRefutedAttacks, Seq.empty)
+      val refutedAttacks = mutable.ArrayBuffer.empty[RefutedAttack]
+      ReDoS.verifyCandidates(candidates, () => safe, verify, refutedAttacks, maxRefutedAttacks, Set.empty, Seq.empty)
 
     // The refuted ones are recorded, and the safe one is the final one when the candidates run out.
     assertEquals(
@@ -529,12 +531,13 @@ class ReDoSSuite extends munit.FunSuite:
     val params =
       Parameters(checker = Checker.Fuzz, maxGeneStringSize = 1000, maxAttackStringSize = 1000, maxIteration = 2)
     val ir = ReDoS.parse("^(?:a|a)*$", "", params.dialect)
+    val readStarts = ir.readStartLocations(params.maxRefutedAttackPartSize)
     val sets = ReDoS.characteristicSets(ir, params.attackStringCharacteristics)
     val refutedAttacks = mutable.ArrayBuffer.empty[RefutedAttack]
-    val avoidsAttack = ReDoS.isRefuted(refutedAttacks, sets, _, _, _)
+    val avoidsAttack = ReDoS.isRefuted(refutedAttacks, readStarts, sets, _, _, _)
     val (candidates, fuzzSafe, fuzzUpperBound) = ReDoS.checkFuzz("^(?:a|a)*$", "", ir, params, avoidsAttack)
     val verify = (d: Diagnostics.Vulnerable) => d.copy(runtimeAttack = finish)
-    val result = ReDoS.verifyCandidates(candidates, fuzzSafe, verify, refutedAttacks, 100, sets)
+    val result = ReDoS.verifyCandidates(candidates, fuzzSafe, verify, refutedAttacks, 100, readStarts, sets)
     result.withUpperBound(fuzzUpperBound()) match
       case d: Diagnostics.Safe =>
         assertEquals(
@@ -551,7 +554,7 @@ class ReDoSSuite extends munit.FunSuite:
           )
         )
         assert(d.refutedAttacks.nonEmpty)
-        val keys = d.refutedAttacks.map(r => ReDoS.AttackKey(r.complexity, r.attack, r.hotspot, sets))
+        val keys = d.refutedAttacks.map(r => ReDoS.AttackKey(r.complexity, r.attack, r.hotspot, readStarts, sets))
         assertEquals(keys.distinct, keys)
       case d => fail(s"not safe: $d")
 
@@ -560,8 +563,9 @@ class ReDoSSuite extends munit.FunSuite:
       val mode = UnitMode.UTF16
       AttackPattern(Seq((mode.decode(prefix), mode.decode(pump), 0)), mode.decode(suffix), 10)
     val attack = attackOf("", "a", "")
+    val readStarts = Set(SourceLocation(0, 1), SourceLocation(2, 3), SourceLocation(4, 5), SourceLocation(6, 7))
     def key(complexity: AttackComplexity.Vulnerable, hotspot: Hotspot): ReDoS.AttackKey =
-      ReDoS.AttackKey(complexity, attack, hotspot, Seq.empty)
+      ReDoS.AttackKey(complexity, attack, hotspot, readStarts, Seq.empty)
 
     val hotspot = Hotspot(Seq(Spot(0, 1, Warm), Spot(2, 3, Cold), Spot(4, 5, Hot), Spot(6, 7, Hot)))
     assertEquals(
@@ -578,10 +582,34 @@ class ReDoSSuite extends munit.FunSuite:
       key(AttackComplexity.Polynomial(3, false), hotspot)
     )
 
+    // A part is in the spots as its character read first.
+    val ir = ReDoS.parse("form.*edit_profile", "", Dialect.JavaScript)
+    val quadratic = AttackComplexity.Polynomial(2, true)
+    def partKey(partSize: Int)(spots: Spot*): ReDoS.AttackKey =
+      ReDoS.AttackKey(quadratic, attack, Hotspot(spots), ir.readStartLocations(partSize), Seq.empty)
+    val form = Seq(Spot(0, 4, Warm), Spot(4, 5, Hot))
+    assertEquals(
+      partKey(1)(form :+ Spot(6, 7, Warm)*),
+      ReDoS.AttackKey(Some(2), Seq(Spot(0, 1, Warm), Spot(4, 5, Hot), Spot(6, 7, Warm)), Set.empty)
+    )
+    assertEquals(partKey(1)(form :+ Spot(6, 12, Warm)*), partKey(1)(form :+ Spot(6, 7, Warm)*))
+    assertEquals(partKey(1)(form :+ Spot(6, 18, Warm)*), partKey(1)(form :+ Spot(6, 7, Warm)*))
+    assertNotEquals(partKey(1)(form*), partKey(1)(form :+ Spot(6, 7, Warm)*))
+    // With three characters of a part, the spots tell the first three characters read of `edit_profile` apart.
+    assertNotEquals(partKey(3)(form :+ Spot(6, 8, Warm)*), partKey(3)(form :+ Spot(6, 7, Warm)*))
+    assertNotEquals(partKey(3)(form :+ Spot(6, 9, Warm)*), partKey(3)(form :+ Spot(6, 8, Warm)*))
+    assertEquals(partKey(3)(form :+ Spot(6, 12, Warm)*), partKey(3)(form :+ Spot(6, 9, Warm)*))
+    // A spot over a part and the characters around it has each of them.
+    val around = ReDoS.parse("\\dab\\d", "", Dialect.JavaScript).readStartLocations(1)
+    assertEquals(
+      ReDoS.AttackKey(quadratic, attack, Hotspot(Seq(Spot(0, 6, Warm))), around, Seq.empty),
+      ReDoS.AttackKey(Some(2), Seq(Spot(0, 2, Warm), Spot(2, 3, Warm), Spot(4, 6, Warm)), Set.empty)
+    )
+
     // The characteristics are the sets that have a character of the prefixes, the pumps and the suffix.
     val sets = Seq(CharSet.single('a'), CharSet.single('b'), CharSet.single('c'), CharSet.single('d'))
     def characteristicsOf(attack: AttackPattern): Set[Int] =
-      ReDoS.AttackKey(AttackComplexity.Polynomial(2, true), attack, Hotspot.empty, sets).characteristics
+      ReDoS.AttackKey(quadratic, attack, Hotspot.empty, Set.empty, sets).characteristics
     assertEquals(characteristicsOf(attackOf("", "a", "")), Set(0))
     assertEquals(characteristicsOf(attackOf("b", "aa", "d")), Set(0, 1, 3))
     assertEquals(characteristicsOf(attackOf("", "x", "")), Set.empty)

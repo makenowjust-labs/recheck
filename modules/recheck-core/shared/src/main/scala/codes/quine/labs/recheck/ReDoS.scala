@@ -29,6 +29,7 @@ import codes.quine.labs.recheck.verification.RuntimeAttackVerifier
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException
 import codes.quine.labs.resyntax.ast.Node
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -65,9 +66,10 @@ object ReDoS:
 
     def diagnose(ir: IRPattern): Diagnostics =
       val refutedAttacks = mutable.ArrayBuffer.empty[RefutedAttack]
+      val readStarts = ir.readStartLocations(params.maxRefutedAttackPartSize)
       val sets = characteristicSets(ir, params.attackStringCharacteristics)
       val avoidsAttack = (c: AttackComplexity.Vulnerable, a: AttackPattern, h: Hotspot) =>
-        isRefuted(refutedAttacks, sets, c, a, h)
+        isRefuted(refutedAttacks, readStarts, sets, c, a, h)
       // The checkers run lazily on iterating the candidates, so that the errors of the checking are caught below.
       val (candidates, safe, upperBound) = params.checker match
         case Checker.Automaton => checkAutomaton(source, flags, ir, params)
@@ -76,7 +78,7 @@ object ReDoS:
       val diagnostics =
         try
           val verify = runRuntimeAttack(source, flags, params.dialect, ir.mode, params.runtimeAttackTimeout)
-          verifyCandidates(candidates, safe, verify, refutedAttacks, params.maxRefutedAttacks, sets)
+          verifyCandidates(candidates, safe, verify, refutedAttacks, params.maxRefutedAttacks, readStarts, sets)
         catch
           case ex: ReDoSException =>
             Diagnostics.Unknown.from(source, flags, params.dialect, Some(ir.mode), refutedAttacks.toSeq, ex)
@@ -88,7 +90,8 @@ object ReDoS:
   /** Runs `verify` on the candidates in order, and returns the final diagnostics of [[check]].
     *
     * `safe` gives the final diagnostics after the candidates run out. `refutedAttacks` collects the attacks that
-    * runtime attacks refute. `sets` are the ones of [[AttackKey]], by which a candidate is the same as a refuted one.
+    * runtime attacks refute. `readStarts` and `sets` are the ones of [[AttackKey]], by which a candidate is the same as
+    * a refuted one.
     */
   private[recheck] def verifyCandidates(
       candidates: Iterator[Diagnostics.Vulnerable],
@@ -96,10 +99,11 @@ object ReDoS:
       verify: Diagnostics.Vulnerable => Diagnostics.Vulnerable,
       refutedAttacks: mutable.Buffer[RefutedAttack],
       maxRefutedAttacks: Int,
+      readStarts: Set[SourceLocation],
       sets: Seq[CharSet]
   )(using ctx: Context): Diagnostics =
     val untried = candidates.filter: d =>
-      val skipped = isRefuted(refutedAttacks, sets, d.complexity, d.attack, d.hotspot)
+      val skipped = isRefuted(refutedAttacks, readStarts, sets, d.complexity, d.attack, d.hotspot)
       if skipped then ctx.log("runtime attack: skip the same attack as a refuted one")
       !skipped
 
@@ -130,13 +134,14 @@ object ReDoS:
     */
   private[recheck] def isRefuted(
       refutedAttacks: collection.Seq[RefutedAttack],
+      readStarts: Set[SourceLocation],
       sets: Seq[CharSet],
       complexity: AttackComplexity.Vulnerable,
       attack: AttackPattern,
       hotspot: Hotspot
   ): Boolean =
-    val key = AttackKey(complexity, attack, hotspot, sets)
-    refutedAttacks.exists(r => AttackKey(r.complexity, r.attack, r.hotspot, sets) == key)
+    val key = AttackKey(complexity, attack, hotspot, readStarts, sets)
+    refutedAttacks.exists(r => AttackKey(r.complexity, r.attack, r.hotspot, readStarts, sets) == key)
 
   /** Returns the sets of characters that tell an attack string from another in [[AttackKey]]. */
   private[recheck] def characteristicSets(ir: IRPattern, characteristics: AttackStringCharacteristics): Seq[CharSet] =
@@ -187,6 +192,11 @@ object ReDoS:
     * of which an engine may refute while it confirms another (e.g. `x[^∆]*∆y` on `'x'.repeat(n)`, which V8 refutes as a
     * Latin-1 string, and on a string with `∆`).
     *
+    * The spots are the ones at `readStarts`, the locations where the engine starts to read the pattern (see
+    * [[IRPattern.readStartLocations]]), which have a part of the pattern as its characters read first up to
+    * `maxRefutedAttackPartSize`. The attacks that differ only in how many characters of a part they read after them are
+    * the same one (e.g. `form.*edit_profile` on the repetitions of `formedit` and of `formedit_p`).
+    *
     * The characteristics are the indices of `sets` (see [[characteristicSets]]) that have a character of the attack
     * string.
     */
@@ -202,6 +212,7 @@ object ReDoS:
         complexity: AttackComplexity.Vulnerable,
         attack: AttackPattern,
         hotspot: Hotspot,
+        readStarts: Set[SourceLocation],
         sets: Seq[CharSet]
     ): AttackKey =
       val chars = (attack.pumps.iterator.flatMap((s, t, _) => s.iterator ++ t.iterator) ++ attack.suffix.iterator).toSet
@@ -209,7 +220,12 @@ object ReDoS:
       val degree = complexity match
         case AttackComplexity.Polynomial(degree, _) => Some(degree)
         case AttackComplexity.Exponential(_)        => None
-      AttackKey(degree, hotspot.spots, characteristics)
+      val spots =
+        for
+          loc <- readStarts.toSeq.sortBy(loc => (loc.start, loc.end))
+          spot <- hotspot.spots.find(spot => spot.start <= loc.start && loc.end <= spot.end)
+        yield Hotspot.Spot(loc.start, loc.end, spot.temperature)
+      AttackKey(degree, spots, characteristics)
 
   /** Runs the automaton checker, and returns the vulnerable diagnostics it finds, a function giving the safe
     * diagnostics once they run out, and a function giving the upper bound, which is always `None`.

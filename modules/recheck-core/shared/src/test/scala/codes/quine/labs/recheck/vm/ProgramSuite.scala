@@ -17,6 +17,14 @@ class ProgramSuite extends munit.FunSuite:
     assertEquals(meta.isJunction.toSeq, Seq(false, true, false, true))
     assertEquals(meta.isLoopHead.toSeq, Seq(false, true, false, false))
 
+  test("Program#heatLocations"):
+    given Context = Context()
+    val ir = ReDoS.parse("(x)yz\\1[\\q{ab|c}](?<=de)", "v", Dialect.JavaScript)
+    val locations = ProgramBuilder.build(ir, false).heatLocations.toSet
+    // The locations are the ones where the pattern starts to read, and the ones of `z` and `d` of the parts after them.
+    assert(ir.readStartLocations(1).subsetOf(locations))
+    assertEquals(locations -- ir.readStartLocations(1), Set(SourceLocation(4, 5), SourceLocation(21, 22)))
+
   test("Program#locationsTo"):
     given Context = Context()
     val program = ProgramBuilder.build(ReDoS.parse("^(?:xy|x\\s*\\s*z)$", "", Dialect.JavaScript), false)

@@ -436,6 +436,21 @@ properties:
     x-cli: "max-pattern-size"
     x-since: "1.1.1"
 
+  maxRefutedAttackPartSize:
+    title: "Max Refuted Attack Part Size"
+    description: |-
+      The maximum number of the characters of a run of literal characters in the pattern that tell an attack from a refuted one.
+
+      An attack with the same complexity and hotspots as a refuted one is not run on the runtime.
+      There, a run of literal characters (e.g. `edit_profile`) counts by its characters read first up to this number, so the attacks that differ only in the rest of the run are the same.
+      A larger number tells more attacks apart, and more of them are run on the runtime.
+      An engine may refute an attack that reads the first character of a run only, and confirm another that reads more (e.g. V8).
+    type: integer
+    default: 3
+    x-scala-type: "Int"
+    x-cli: "max-refuted-attack-part-size"
+    x-since: "5.0.0"
+
   maxRefutedAttacks:
     title: "Max Refuted Attacks"
     description: |-
