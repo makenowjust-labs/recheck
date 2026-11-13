@@ -17,10 +17,7 @@ final case class FuzzProgram(program: Program, alphabet: PatternAlphabet, parts:
     case AccelerationMode.On   => program.meta.allowsMemoization
     case AccelerationMode.Off  => false
 
-  /** Whether the VM memoizes the failed states in the mode on a run that confirms an attack string.
-    *
-    * Such a run takes many steps, which memoization saves even with back-references, whose captures a state has.
-    */
+  /** Whether the VM memoizes the failed states in the mode on a run that confirms an attack string. */
   def usesAccelerationOnAttack(mode: AccelerationMode): Boolean = mode match
     case AccelerationMode.Auto | AccelerationMode.On => program.meta.allowsMemoization
     case AccelerationMode.Off                        => false

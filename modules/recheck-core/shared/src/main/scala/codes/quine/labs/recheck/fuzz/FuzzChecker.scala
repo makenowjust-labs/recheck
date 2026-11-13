@@ -168,26 +168,23 @@ object FuzzChecker:
     val seeds = for seq <- seqs; n <- counts.map(_.max(1)).distinct yield FString(n, seq.toIndexedSeq)
     seeds.distinct
 
-  /** Returns the scale of the pattern of the node: the largest width of what it matches when each repetition without
-    * the largest count (e.g. `*` and `{2,}`) iterates the least times, or once for no times.
-    *
-    * It is the length of the characters that the pattern reads without looping, as far as the node tells. A
-    * back-reference adds none.
+  /** Returns the bounded width of the node, the largest width of what it matches when each repetition without the
+    * largest count iterates the least times.
     */
-  private[fuzz] def scaleOf(node: IRNode): Int =
-    def scale(node: IRNode): Long = node.data match
+  private[fuzz] def boundedWidthOf(node: IRNode): Int =
+    def width(node: IRNode): Long = node.data match
       case IRNodeData.Chars(_)           => 1
       case IRNodeData.Strings(set)       => set.strings.iterator.map(_.length.toLong).maxOption.getOrElse(0L).max(1)
-      case IRNodeData.Disjunction(nodes) => nodes.map(scale).maxOption.getOrElse(0)
+      case IRNodeData.Disjunction(nodes) => nodes.map(width).maxOption.getOrElse(0)
       case IRNodeData.Repeat(child, quantifier) =>
         val count = quantifier match
           case IRQuantifier.Exact(n)         => n
           case IRQuantifier.Unbounded(n, _)  => n.max(1)
           case IRQuantifier.Bounded(_, m, _) => m
-        (count * scale(child)).min(Int.MaxValue / 4)
-      case _ => node.children.map(scale).sum.min(Int.MaxValue / 4)
+        (count * width(child)).min(Int.MaxValue / 4)
+      case _ => node.children.map(width).sum.min(Int.MaxValue / 4)
 
-    scale(node).toInt
+    width(node).toInt
 
   /** Trace is a summary of IR execution. */
   private[fuzz] final case class Trace(
@@ -197,23 +194,26 @@ object FuzzChecker:
       coverage: Set[CoverageItem]
   )
 
-  /** Measurement is the growth of the steps of a string, measured on its repeat counts from `first` to `last`.
-    *
-    * `stops` tells that a run stopped on the limit or the timeout on the count after `last`, which the exponential
-    * growth is for.
+  /** Measurement is the growth of the steps of a string on its repeat counts from `first` to `last`, with whether a run
+    * stopped on the next one.
     */
   private[fuzz] final case class Measurement(growth: Growth, first: Int, last: Int, stops: Boolean)
 
   /** Candidate is a string whose steps grow more than linearly, with the measurement telling it. */
-  private[fuzz] final case class Candidate(str: FString, measurement: Measurement)
+  private[fuzz] final case class Candidate(str: FString, measurement: Measurement):
+
+    /** The rank of the growth, which is the degree, or the largest for the exponential one. */
+    def rank: Int = measurement.growth match
+      case Growth.Exponential   => Int.MaxValue
+      case p: Growth.Polynomial => p.degree
 
   /** The degrees above `maxDegree` that a measurement tells from the exponential growth. */
   private[fuzz] val ExtraDegrees: Int = 3
 
-  /** The largest scale of a pattern that the first measurement of a string tries the counts beyond (see
+  /** The largest bounded width of a pattern that the first measurement of a string tries the counts beyond (see
     * [[FuzzChecker.measureFirst]]).
     */
-  private[fuzz] val SmallScale: Int = 256
+  private[fuzz] val SmallBoundedWidth: Int = 256
 
   /** Generation is an immutable generation. */
   private[fuzz] final case class Generation(
@@ -499,36 +499,28 @@ private[fuzz] final class FuzzChecker(
 
   /** Runs the attacks from the candidates, the steepest growth first. */
   def attack(candidates: Iterator[Candidate]): Iterator[AttackResult] = interrupt:
-    def refineOrFail(candidate: Candidate): Option[Candidate] =
-      val refined = Option.unless(failedFingerprints.contains(candidate.str.fingerprint))(candidate).flatMap(refine)
-      if refined.isEmpty then failedFingerprints.add(candidate.str.fingerprint)
-      refined
     // The candidates are sorted before any attack, with the growth that the larger limit tells.
-    // The steepest one is raised first (see [[raise]]), and it stays after the raised one, whose attack may fail.
-    Iterator
-      .single(())
-      .flatMap: _ =>
-        val sorted = candidates.toVector.flatMap(refineOrFail).sortBy(-rank(_))
-        (sorted.headOption.flatMap(raise) ++ sorted).iterator.flatMap(tryAttack)
+    val sorted = candidates.toVector.flatMap(remeasureOrFail).sortBy(-_.rank)
+    // The steepest one is boosted first (see [[boost]]), and it stays after the boosted one, whose attack may fail.
+    (sorted.headOption.flatMap(boost) ++ sorted).iterator.flatMap(tryAttack)
 
-  /** The rank of the growth of a candidate, which is the degree, or the largest for the exponential one. */
-  private def rank(candidate: Candidate): Int = candidate.measurement.growth match
-    case Growth.Exponential   => Int.MaxValue
-    case p: Growth.Polynomial => p.degree
-
-  /** The fingerprints of the candidates that [[raise]] tried. */
-  val raisedFingerprints: mutable.Set[FString.Fingerprint] = mutable.Set.empty
-
-  /** Raises the growth of the candidate by adding a character or a repetition to its string again and again, while the
-    * growth gets steeper, and returns the steepest one, or `None` if none is steeper.
-    *
-    * A string from a seed or a mutation may grow less than the pattern allows, when a character ends the matching early
-    * or a loop of the pattern has no part to repeat. The growth of each string tells whether an addition helps, as it
-    * is exact. It stops on the largest degree to report.
+  /** Measures the candidate again (see [[remeasure]]), whose fingerprint is added to [[failedFingerprints]] if its
+    * steps do not grow more than linearly.
     */
-  def raise(candidate: Candidate): Option[Candidate] = interrupt:
+  def remeasureOrFail(candidate: Candidate): Option[Candidate] =
+    val remeasured = Option.unless(failedFingerprints.contains(candidate.str.fingerprint))(candidate).flatMap(remeasure)
+    if remeasured.isEmpty then failedFingerprints.add(candidate.str.fingerprint)
+    remeasured
+
+  /** The fingerprints of the candidates that [[boost]] tried. */
+  val boostedFingerprints: mutable.Set[FString.Fingerprint] = mutable.Set.empty
+
+  /** Boosts the candidate by adding a character or a repetition to its string again and again, while the growth gets
+    * steeper, and returns the steepest one, or `None` if none is steeper.
+    */
+  def boost(candidate: Candidate): Option[Candidate] = interrupt:
     val target = maxTriedDegree
-    if !raisedFingerprints.add(candidate.str.fingerprint) then return None
+    if !boostedFingerprints.add(candidate.str.fingerprint) then return None
 
     def measured(str: FString): Option[Candidate] =
       val admits = str.countRepeat < maxDegree && str.admitsAnyRepeatCount(pattern.mode)
@@ -539,25 +531,25 @@ private[fuzz] final class FuzzChecker(
         .map(Candidate(str, _))
         // A run that stops tells nothing of the growth until it is measured with the larger limit.
         .flatMap(candidate =>
-          if triesExponential then refine(candidate) else Option.unless(candidate.measurement.stops)(candidate)
+          if triesExponential then remeasure(candidate) else Option.unless(candidate.measurement.stops)(candidate)
         )
 
-    // The string without the repetitions that the growth does not need, which may keep an addition from raising it
+    // The string without the repetitions that the growth does not need, which may keep an addition from boosting it
     // (e.g. `<` repeated in `<{n}0{n}` for `\s*<\w+[^>]+>`, where only the last `<` goes on).
     def reduced(candidate: Candidate): Candidate =
       val positions = candidate.str.seq.indices.filter(candidate.str.seq(_).isInstanceOf[FString.Repeat]).reverse
       positions.foldLeft(candidate): (current, pos) =>
-        measured(current.str.delete(pos, 1)).filter(rank(_) >= rank(current)).getOrElse(current)
+        measured(current.str.delete(pos, 1)).filter(_.rank >= current.rank).getOrElse(current)
 
     var best = reduced(candidate)
     var continues = true
-    while continues && rank(best) < target do
+    while continues && best.rank < target do
       // The first of the steepest ones, for the same result on each run.
       val next =
-        additionsOf(best.str).iterator.flatMap(measured).foldLeft(best)((x, y) => if rank(y) > rank(x) then y else x)
+        additionsOf(best.str).iterator.flatMap(measured).foldLeft(best)((x, y) => if y.rank > x.rank then y else x)
       continues = next ne best
       best = if continues then reduced(next) else best
-    Option.when(rank(best) > rank(candidate))(best)
+    Option.when(best.rank > candidate.rank)(best)
 
   /** Returns the strings adding a character, or a repetition of a character, to the string at its start, its end and
     * the ends of its repetitions.
@@ -576,12 +568,8 @@ private[fuzz] final class FuzzChecker(
   /** The fingerprints of the candidates whose attacks fail. */
   val failedFingerprints: mutable.Set[FString.Fingerprint] = mutable.Set.empty
 
-  /** The scale of the pattern (see [[FuzzChecker.scaleOf]]).
-    *
-    * The steps of a string follow one growth on the repeat counts whose repeated parts are longer than it, where no
-    * repetition of the pattern counts them any more.
-    */
-  val scale: Int = scaleOf(pattern.node)
+  /** The bounded width of the pattern (see [[FuzzChecker.boundedWidthOf]]). */
+  val boundedWidth: Int = boundedWidthOf(pattern.node)
 
   /** The largest degree of the polynomial growth that a measurement tells from the exponential one. */
   val measuredDegree: Int = maxDegree + ExtraDegrees
@@ -595,10 +583,7 @@ private[fuzz] final class FuzzChecker(
     val fixedSize = str.size - repeats.size - repeats.map(_._2).sum
     fixedSize + repeats.map((m, size) => (count.toLong + m).max(0) * size).sum
 
-  /** Returns the steps of the string on the repeat count, or `None` if the run stops on the limit or the timeout.
-    *
-    * `memoizes` tells whether the VM memoizes the failed states, which does not change the steps.
-    */
+  /** Returns the steps of the string on the repeat count, or `None` if the run stops on the limit or the timeout. */
   def stepsOn(
       str: FString,
       count: Int,
@@ -610,14 +595,7 @@ private[fuzz] final class FuzzChecker(
     val result = Interpreter.runWithTimeout(program, str.copy(n = count).toUString, opts, timeout)
     Option.unless(result.status == Status.Limit || result.status == Status.Timeout)(result.steps.toLong)
 
-  /** Measures the growth of the steps of the string on the repeat counts from `from` up to `to`.
-    *
-    * It runs the string on the counts from `from`, as few as tell the growth (see [[Growth.of]]). While they tell none,
-    * it tries the counts from the next one, on which the steps may follow the growth at last, and every second count,
-    * on which the steps may be a polynomial when a loop of the pattern reads the repeated part twice.
-    *
-    * The growth is exponential if a run stops on the limit or the timeout.
-    */
+  /** Measures the growth of the steps of the string on the repeat counts from `from` up to `to`. */
   def measure(
       str: FString,
       from: Int,
@@ -646,13 +624,13 @@ private[fuzz] final class FuzzChecker(
 
     Iterator((from, 1), (from + 1, 1), (from, 2)).flatMap(measureOn(_, _)).nextOption()
 
-  /** Measures the growth of the steps of the string on its first repeat counts, or on the first ones beyond the scale
-    * of the pattern up to `SmallScale` if they tell none.
+  /** Measures the growth of the steps of the string on its first repeat counts, or on the first ones beyond the bounded
+    * width of the pattern up to `SmallBoundedWidth` if they tell none.
     */
   def measureFirst(str: FString, limit: Int): Option[Measurement] =
     measure(str, 1, Int.MaxValue, limit, incubationTimeout).orElse:
       Option
-        .when(scale <= SmallScale)(countBeyond(str, scale))
+        .when(boundedWidth <= SmallBoundedWidth)(countBeyond(str, boundedWidth))
         .flatMap(measure(str, _, Int.MaxValue, limit, incubationTimeout))
 
   /** Measures the growth of the steps of the string on the repeat counts up to the largest one whose run ends, from its
@@ -669,7 +647,7 @@ private[fuzz] final class FuzzChecker(
     val fingerprint = str.fingerprint
     if failedFingerprints.contains(fingerprint) then return None
 
-    log(s"""|fuzz: attack (growth: ${show(candidate.measurement.growth)})
+    log(s"""|fuzz: attack (growth: ${candidate.measurement.growth.show})
             |  string: $str""".stripMargin)
     val result =
       for
@@ -681,7 +659,7 @@ private[fuzz] final class FuzzChecker(
           case Growth.Exponential if triesExponential => AttackComplexity.Exponential(true)
           case Growth.Exponential                     => AttackComplexity.Polynomial(maxTriedDegree, true)
         val attack = str.copy(n = count)
-        log(s"""|fuzz: attack succeeded (growth: ${show(measurement.growth)})
+        log(s"""|fuzz: attack succeeded (growth: ${measurement.growth.show})
                 |  string: $attack""".stripMargin)
         (complexity, attack.toAttackPattern(pattern.mode), hotspotOf(str, measurement, count))
     result match
@@ -689,36 +667,18 @@ private[fuzz] final class FuzzChecker(
       case None                           => failedFingerprints.add(fingerprint)
     result
 
-  private def show(growth: Growth): String = growth match
-    case Growth.Exponential   => "exponential"
-    case p: Growth.Polynomial => s"polynomial of degree ${p.degree}"
-
   /** Measures the growth of a candidate again with the larger limit if a run stopped on measuring it, and returns the
     * candidate with it, or `None` if the steps do not grow more than linearly.
     */
-  def refine(candidate: Candidate): Option[Candidate] =
+  def remeasure(candidate: Candidate): Option[Candidate] =
     if !candidate.measurement.stops || candidate.str.isConstant then Some(candidate)
     else
       measureFirst(candidate.str, measurementLimit)
         .filter(_.growth.isSuperLinear)
         .map(measurement => candidate.copy(measurement = measurement))
 
-  /** Confirms that the growth of the measurement lasts beyond the scale of the pattern, and returns the measurement
-    * there, or `None` if the steps do not grow more than linearly there.
-    *
-    * A run on a count beyond the scale, and twice the last count of the measurement or more, tells it. The growth lasts
-    * if the run stops on the limit or the timeout, or if its steps are the ones of the polynomial. Otherwise the growth
-    * is measured again from the count, and confirmed on a count further once more.
-    *
-    * The exponential growth that the steps tell beyond the scale is confirmed without this run, and a string without
-    * repetitions if its run stops.
-    *
-    * Another run tells the same on the count whose copies of the repeated parts are beyond the scale (see
-    * [[countBeyondCopies]]), or on the count of the attack string for the exponential growth, within
-    * `measurementLimit`.
-    *
-    * The runs take many steps, so they memoize even with back-references (see
-    * [[FuzzProgram.usesAccelerationOnAttack]]).
+  /** Confirms that the growth of the measurement lasts beyond the bounded width of the pattern, and returns the
+    * measurement there, or `None` if the steps do not grow more than linearly there.
     */
   def confirm(str: FString, measurement: Measurement, measuresAgain: Boolean = true): Option[Measurement] = interrupt:
     val memoizes = fuzz.usesAccelerationOnAttack(accelerationMode)
@@ -751,10 +711,10 @@ private[fuzz] final class FuzzChecker(
           .filter(_.growth.isSuperLinear)
           .flatMap(confirm(str, _, false))
 
-    // The steps change the growth a little after the repeated parts get longer than the scale, as the fixed parts
-    // and the other repeated parts are read with them.
-    val size = 2 * scale
-    val isBeyond = measurement.first >= countBeyond(str, scale)
+    // The steps change the growth a little after the repeated parts get longer than the bounded width, as the fixed
+    // parts and the other repeated parts are read with them.
+    val size = 2 * boundedWidth
+    val isBeyond = measurement.first >= countBeyond(str, boundedWidth)
     val count =
       if measurement.growth == Growth.Exponential && isBeyond && !measurement.stops then measurement.last
       else
@@ -767,8 +727,8 @@ private[fuzz] final class FuzzChecker(
           case None        => count
 
     // The parts of the pattern may read a character of each copy of a repeated part, with the loops between them
-    // reading the rest, so the growth may still change until the copies are more than the scale (e.g. the match of
-    // `(?:\d+;){12}` succeeds on the twelfth `00000;`). A run with the smaller limit tells such a change.
+    // reading the rest, so the growth may still change until the copies are more than the bounded width (e.g. the
+    // match of `(?:\d+;){12}` succeeds on the twelfth `00000;`). A run with the smaller limit tells such a change.
     val copies = measurement.growth match
       case _: Growth.Polynomial => countFrom(countBeyondCopies(str, size))
       case Growth.Exponential   => end
@@ -778,10 +738,7 @@ private[fuzz] final class FuzzChecker(
         case Some(steps) => measuredAgain(copies, steps)
         case None        => Some(measurement)
 
-  /** Returns the offset of the count and the size of the part of each repetition of the string.
-    *
-    * The part of the last repetition may be shorter than the size of its specifier.
-    */
+  /** Returns the offset of the count and the size of the part of each repetition of the string. */
   def repeatsOf(str: FString): Seq[(Int, Int)] =
     str.seq.zipWithIndex.collect { case (FString.Repeat(m, size), pos) => (m, size.min(str.size - pos - 1)) }
 
@@ -858,19 +815,7 @@ private[fuzz] final class FuzzChecker(
     /** The strings whose steps grow more than linearly, one for each fingerprint whose attacks have not failed. */
     val candidates: mutable.LinkedHashMap[FString.Fingerprint, Candidate] = mutable.LinkedHashMap.empty
 
-    /** Executes the string and adds its result, and a candidate of an attack if its steps grow more than linearly.
-      *
-      * The string is normalized first (see [[FString.normalize]]), so the strings of the same characters are one.
-      *
-      * The growth of a string with repetitions is measured once for its sequence, on its first repeat counts (see
-      * [[measureFirst]]). A string of a few steps per character may grow to an attack on more repetitions, which its
-      * rate does not tell. When the run of the string stops on the limit or the timeout without the growth, the growth
-      * is measured on the counts below its own too (see [[measureBelow]]), where the steps may grow differently.
-      *
-      * A string without repetitions is a candidate if its run stops. If it reaches a new coverage item, it is also
-      * executed as the one repeating it as a whole. The matching goes as far as the item from each of the starts that
-      * the repetition makes.
-      */
+    /** Executes the string and adds its result, and a candidate of an attack if its steps grow more than linearly. */
     def execute(raw: FString): Unit =
       if candidates.size >= maxAttackCandidates then return
       val str = raw.normalize
@@ -906,7 +851,7 @@ private[fuzz] final class FuzzChecker(
       val fingerprint = str.fingerprint
       if !failedFingerprints.contains(fingerprint) && !candidates.contains(fingerprint) then
         log:
-          s"""|fuzz: candidate (growth: ${show(measurement.growth)})
+          s"""|fuzz: candidate (growth: ${measurement.growth.show})
               |  string: $str""".stripMargin
         candidates(fingerprint) = Candidate(str, measurement)
 

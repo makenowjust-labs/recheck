@@ -52,3 +52,7 @@ class GrowthSuite extends munit.FunSuite:
     // The steps of a negative last order stop growing.
     assert(!Growth.Polynomial(1, 1, Vector(30, 10, -2)).isSuperLinear)
     assert(Growth.Exponential.isSuperLinear)
+
+  test("Growth#show"):
+    assertEquals(Growth.Polynomial(1, 1, Vector(1, 3, 2)).show, "polynomial of degree 2")
+    assertEquals(Growth.Exponential.show, "exponential")

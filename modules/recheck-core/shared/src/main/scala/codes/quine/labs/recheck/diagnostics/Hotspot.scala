@@ -32,14 +32,13 @@ object Hotspot:
     new Hotspot(sortedSpots)
 
   /** Builds hotspots from a heatmap and rate. */
-  def build[N](heatmap: Map[SourceLocation, N], heatRate: Double)(using num: Numeric[N]): Hotspot =
+  def build(heatmap: Map[SourceLocation, Double], heatRate: Double): Hotspot =
     heatmap.maxByOption(_._2) match
       case Some((SourceLocation(_, _), max)) =>
         Hotspot:
           heatmap.toSeq.map:
             case (SourceLocation(start, end), count) =>
-              val isHot = num.toDouble(count) >= num.toDouble(max) * heatRate
-              Hotspot.Spot(start, end, if isHot then Hotspot.Hot else Hotspot.Warm)
+              Hotspot.Spot(start, end, if count >= max * heatRate then Hotspot.Hot else Hotspot.Warm)
       case None => empty
 
   /** An empty hotspot. */

@@ -1,22 +1,18 @@
 package codes.quine.labs.recheck.fuzz
 
-/** Growth is how the steps of the matching on a string grow on its repeat count.
-  *
-  * The steps that grow polynomially are a polynomial of the repeat count on equally spaced counts, so their difference
-  * table tells the degree exactly, whatever the steps of the lower degrees are.
-  */
+/** Growth is how the steps of the matching on a string grow on its repeat count. */
 sealed abstract class Growth extends Product with Serializable:
 
   /** Whether the steps grow more than linearly. */
   def isSuperLinear: Boolean
 
+  /** The name of the growth for the logs. */
+  def show: String
+
 object Growth:
 
   /** Polynomial is the growth of the steps that are a polynomial of the repeat count on the counts from `start` by
-    * `stride`.
-    *
-    * `differences` are the first entries of the orders of the difference table, from the steps on `start`. The last
-    * order is the degree.
+    * `stride`, with the first entries of the orders of their difference table.
     */
   final case class Polynomial(start: Int, stride: Int, differences: IndexedSeq[BigInt]) extends Growth:
 
@@ -24,6 +20,8 @@ object Growth:
 
     // The steps of a negative last order do not keep growing.
     def isSuperLinear: Boolean = degree >= 2 && differences.last > 0
+
+    def show: String = s"polynomial of degree $degree"
 
     /** Returns the steps on the count, which is one of the counts from `start` by `stride`. */
     def stepsOn(count: Int): BigInt =
@@ -51,12 +49,9 @@ object Growth:
 
     def isSuperLinear: Boolean = true
 
-  /** Returns the growth of the steps on the counts from `start` by `stride`, or `None` if they tell none.
-    *
-    * It is the polynomial of the least degree up to `maxDegree` whose next order of the differences has two or more
-    * entries, all zero, which takes the steps on `degree + 3` counts. It is exponential if every difference up to the
-    * order `maxDegree + 1` is positive on `maxDegree + 3` counts or more.
-    */
+    def show: String = "exponential"
+
+  /** Returns the growth of the steps on the counts from `start` by `stride`, or `None` if they tell none. */
   def of(start: Int, stride: Int, steps: IndexedSeq[Long], maxDegree: Int): Option[Growth] =
     var differences = steps.map(BigInt(_))
     var firsts = Vector.empty[BigInt]

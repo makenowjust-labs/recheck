@@ -30,14 +30,14 @@ class HotspotSuite extends munit.FunSuite:
 
   test("Hotspot.build"):
     val hotspot =
-      Hotspot.build(Map(SourceLocation(0, 1) -> 4, SourceLocation(2, 3) -> 2, SourceLocation(4, 5) -> 1), 0.5)
+      Hotspot.build(Map(SourceLocation(0, 1) -> 4.0, SourceLocation(2, 3) -> 2.0, SourceLocation(4, 5) -> 1.0), 0.5)
     assertEquals(
       hotspot,
       Hotspot(
         Seq(Hotspot.Spot(0, 1, Hotspot.Hot), Hotspot.Spot(2, 3, Hotspot.Hot), Hotspot.Spot(4, 5, Hotspot.Warm))
       )
     )
-    assertEquals(Hotspot.build(Map.empty[SourceLocation, Int], 0.5), Hotspot.empty)
+    assertEquals(Hotspot.build(Map.empty, 0.5), Hotspot.empty)
     // The heat may be scaled.
     assertEquals(
       Hotspot.build(Map(SourceLocation(0, 1) -> 1e300, SourceLocation(1, 2) -> 1.0), 0.5),
