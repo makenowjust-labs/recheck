@@ -2,6 +2,7 @@ package codes.quine.labs.recheck
 package automaton
 
 import scala.collection.mutable
+import scala.util.hashing.MurmurHash3
 
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
@@ -531,6 +532,8 @@ object EpsNFA:
 
     /** End is the end of the pattern. */
     case End
+
+    override lazy val hashCode: Int = MurmurHash3.caseClassHash(this)
 
   /** AssertKind is assertion kind of this ε-NFA transition. */
   sealed abstract class AssertKind extends Serializable with Product:

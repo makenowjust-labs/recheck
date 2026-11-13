@@ -1,6 +1,8 @@
 package codes.quine.labs.recheck
 package automaton
 
+import scala.util.hashing.MurmurHash3
+
 /** Branch is an ordered tree of choices with look-ahead assertions and choices in atomic groups.
   *
   * A backtracking matcher explores the leaves in order, and it stops at the first success.
@@ -28,6 +30,8 @@ enum Branch[+Q]:
     * needs no test: it fails within the group anyway if it does not reach the end.
     */
   case AtomicChoice(alternatives: Seq[(Branch[Q], Branch[Q])], last: Branch[Q])
+
+  override lazy val hashCode: Int = MurmurHash3.caseClassHash(this)
 
   /** Lists the leaves that a matcher may explore in order. */
   def leaves: Seq[Q] = this match
