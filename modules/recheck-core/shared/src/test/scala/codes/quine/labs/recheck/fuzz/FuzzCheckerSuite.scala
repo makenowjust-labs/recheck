@@ -52,7 +52,8 @@ class FuzzCheckerSuite extends munit.FunSuite:
         attackLimit = if quick then 10_000 else Parameters.DefaultAttackLimit,
         attackTimeout = attackTimeout,
         maxIteration = maxIteration,
-        avoidsAttack = (_, _, _) => false
+        avoidsAttack = (_, _, _) => false,
+        automatonAttacks = Seq.empty
       )
       ._1
       .nextOption()
@@ -102,7 +103,8 @@ class FuzzCheckerSuite extends munit.FunSuite:
           seedingLimit = 10000,
           incubationLimit = 10000,
           attackLimit = 10000,
-          avoidsAttack = (_, _, _) => false
+          avoidsAttack = (_, _, _) => false,
+          automatonAttacks = Seq.empty
         )
         ._1
         .nextOption()
@@ -122,7 +124,8 @@ class FuzzCheckerSuite extends munit.FunSuite:
           attackLimit = 100,
           maxGeneStringSize = 5,
           maxAttackStringSize = 5,
-          avoidsAttack = (_, _, _) => false
+          avoidsAttack = (_, _, _) => false,
+          automatonAttacks = Seq.empty
         )
         ._1
         .nextOption()

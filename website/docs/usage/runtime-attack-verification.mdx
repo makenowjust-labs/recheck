@@ -147,6 +147,10 @@ A refuted attack shows that the pattern is vulnerable on a naive backtracking en
 When no attack is confirmed, the result is `safe`, with the refuted attacks in `refutedAttacks`.
 However, when [`maxRefutedAttacks`](parameters.mdx#maxrefutedattacks) attacks are refuted, the checking stops there, and the result is `unknown` with the `runtime-attacks-refuted` error.
 
+With the `auto` checker, when every attack of the automaton checker is refuted, the fuzz checker looks for another attack, starting from the refuted ones.
+If it finds none, the result is `safe` by the fuzz checker, with the complexity of the refuted attacks as the [upper bound](diagnostics.mdx#upper-bound).
+If it does not finish within the [`timeout`](parameters.mdx#timeout), or the refuted attacks reach `maxRefutedAttacks` while it runs, the result is `safe` by the automaton checker instead of `unknown`.
+
 ## Engine Limits and Errors
 
 Some engines stop a long matching before the timeout, and the runtime attack tells the two kinds of stops apart.

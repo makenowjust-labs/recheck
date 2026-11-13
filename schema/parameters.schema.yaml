@@ -457,6 +457,7 @@ properties:
       The maximum number of attacks that the runtime attacks refute.
 
       When the runtime attacks refute this many attacks, the checking stops, and the result is `unknown` with the `runtime-attacks-refuted` error.
+      With the `auto` checker, when it happens while the fuzz checker looks for another attack after the refuted attacks of the automaton checker, the result is `safe` by the automaton checker.
     type: integer
     default: 10
     x-scala-type: "Int"

@@ -41,6 +41,9 @@ object FuzzChecker:
     * It checks the upper bound first (see [[upperBound]]), and it fuzzes only if the bound is not linear, from the
     * witnesses of the bound and with no attack above it.
     *
+    * `automatonAttacks` are the attacks that the automaton checker found, from the worst. If there is any, they are the
+    * upper bound, and the bound is not checked.
+    *
     * `avoidsAttack` tells whether to avoid an attack of the complexity, the string and the hotspot, which
     * runtime-attack verification refuted, and may change while iterating the results. Strings with an avoided attack
     * rank below the others in the next generation.
@@ -75,12 +78,15 @@ object FuzzChecker:
       accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode,
       accelerationHitRatio: Double = Parameters.DefaultAccelerationHitRatio,
       alphabetRepresentative: AlphabetRepresentative = Parameters.DefaultAlphabetRepresentative,
-      avoidsAttack: (AttackComplexity.Vulnerable, AttackPattern, Hotspot) => Boolean
+      avoidsAttack: (AttackComplexity.Vulnerable, AttackPattern, Hotspot) => Boolean,
+      automatonAttacks: Seq[Complexity.Vulnerable[UChar]]
   )(using
       ctx: Context
   ): (Iterator[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)], AttackComplexity.Safe, Option[UpperBound]) =
     ctx.interrupt:
-      val bound = upperBound(pattern, maxRepeatCount, maxNFASize, maxInitialGenerationSize, alphabetRepresentative)
+      val bound =
+        if automatonAttacks.nonEmpty then Some(automatonAttacks)
+        else upperBound(pattern, maxRepeatCount, maxNFASize, maxInitialGenerationSize, alphabetRepresentative)
       // The first complexity is the worst.
       val reported = bound.map:
         _.headOption.fold(UpperBound(AttackComplexity.Linear, Hotspot.empty))(v =>
