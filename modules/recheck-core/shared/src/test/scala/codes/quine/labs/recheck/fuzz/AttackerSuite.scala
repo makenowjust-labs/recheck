@@ -78,6 +78,16 @@ class AttackerSuite extends munit.FunSuite:
     assertEquals(boundedWidthOf("a{3}b{2,5}c{4,}"), 12)
     assertEquals(boundedWidthOf("(?:ab{3}){2}"), 8)
 
+  test("Attacker#stepsOn"):
+    import Parameters.*
+    val attacker = attackerOf(ReDoS.parse("^b*b*$", "", Dialect.JavaScript))
+    assertEquals(attacker.stepsOn(repeatOf('b', 1), 3, DefaultIncubationLimit, DefaultIncubationTimeout), Some(9L))
+    // A run that stops on the limit has no steps.
+    assertEquals(attacker.stepsOn(repeatOf('b', 1), 3, 5, DefaultIncubationTimeout), None)
+    // A run is remembered by its arguments, whatever the repeat count of the string is.
+    assertEquals(attacker.stepsOn(repeatOf('b', 100), 3, DefaultIncubationLimit, DefaultIncubationTimeout), Some(9L))
+    assertEquals(attacker.runs.size, 2)
+
   test("Attacker#measure"):
     import Parameters.*
     val ir = ReDoS.parse("^(?:a*$|b*b*$|(?:c|c)*$|(?:dd)*(?:dd)*$)", "", Dialect.JavaScript)

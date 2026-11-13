@@ -108,6 +108,9 @@ private[fuzz] final class Attacker(
   /** The measurements of the sequences of the strings on their first repeat counts (see [[measure]]). */
   val measurements: mutable.Map[IndexedSeq[FString.FChar], Option[Measurement]] = mutable.Map.empty
 
+  /** The results of the runs of [[stepsOn]], by its arguments. */
+  val runs: mutable.Map[(IndexedSeq[FString.FChar], Int, Int, Duration, Boolean), Option[Long]] = mutable.Map.empty
+
   /** The complexities and the hotspots of the attacks from each string. */
   val attacks: mutable.Map[FString, List[(AttackComplexity.Vulnerable, Hotspot)]] = mutable.Map.empty
 
@@ -244,9 +247,13 @@ private[fuzz] final class Attacker(
       timeout: Duration,
       memoizes: Boolean = fuzz.usesAcceleration(accelerationMode)
   ): Option[Long] =
-    val opts = Options(limit, usesAcceleration = memoizes)
-    val result = Interpreter.runWithTimeout(fuzz.program, str.copy(n = count).toUString, opts, timeout)
-    Option.unless(result.status == Status.Limit || result.status == Status.Timeout)(result.steps.toLong)
+    runs.getOrElseUpdate(
+      (str.seq, count, limit, timeout, memoizes), {
+        val opts = Options(limit, usesAcceleration = memoizes)
+        val result = Interpreter.runWithTimeout(fuzz.program, str.copy(n = count).toUString, opts, timeout)
+        Option.unless(result.status == Status.Limit || result.status == Status.Timeout)(result.steps.toLong)
+      }
+    )
 
   /** Measures the growth of the steps of the string on the repeat counts from `from` up to `to`. */
   def measure(
@@ -255,17 +262,14 @@ private[fuzz] final class Attacker(
       to: Int,
       limit: Int,
       timeout: Duration,
-      known: Map[Int, Option[Long]] = Map.empty,
       memoizes: Boolean = fuzz.usesAcceleration(accelerationMode)
   ): Option[Measurement] = interrupt:
-    val steps = mutable.Map.from(known)
-
     def measureOn(start: Int, stride: Int): Option[Measurement] =
       val window = IndexedSeq.newBuilder[Long]
       var count = start
       var size = 0
       while size < measuredDegree + 3 && count <= to do
-        steps.getOrElseUpdate(count, stepsOn(str, count, limit, timeout, memoizes)) match
+        stepsOn(str, count, limit, timeout, memoizes) match
           case None    => return Some(Measurement(Growth.Exponential, start, count - stride, true))
           case Some(s) =>
             window.addOne(s)
@@ -321,20 +325,18 @@ private[fuzz] final class Attacker(
       case p: Growth.Polynomial => (p.start + (target - p.start + p.stride - 1) / p.stride * p.stride).min(end)
       case Growth.Exponential   => target.min(end)
 
-    // Runs the string on the count, and returns its steps unless the growth lasts on it: the run stops, or its steps
-    // are the ones of the polynomial.
-    def refutedOn(count: Int, limit: Int): Option[Option[Long]] =
-      val steps = stepsOn(str, count, limit, attackTimeout, memoizes)
-      val lasts = steps.forall: steps =>
+    // Runs the string on the count, and tells whether the growth lasts on it: the run stops, or its steps are the ones
+    // of the polynomial.
+    def lastsOn(count: Int, limit: Int): Boolean =
+      stepsOn(str, count, limit, attackTimeout, memoizes).forall: steps =>
         measurement.growth match
           case p: Growth.Polynomial => p.stepsOn(count) == steps
           case Growth.Exponential   => false
-      Option.unless(lasts)(steps)
 
-    def measuredAgain(count: Int, steps: Option[Long]): Option[Measurement] =
+    def measuredAgain(count: Int): Option[Measurement] =
       if !measuresAgain then None
       else
-        measure(str, count, Int.MaxValue, attackLimit, attackTimeout, Map(count -> steps), memoizes)
+        measure(str, count, Int.MaxValue, attackLimit, attackTimeout, memoizes)
           .filter(_.growth.isSuperLinear)
           .flatMap(confirm(str, _, false))
 
@@ -349,9 +351,8 @@ private[fuzz] final class Attacker(
         val count = measurement.growth match
           case _: Growth.Polynomial => countFrom(least.max(2 * measurement.last))
           case Growth.Exponential   => countFrom(least.max(measurement.last + 1))
-        refutedOn(count, attackLimit) match
-          case Some(steps) => return measuredAgain(count, steps)
-          case None        => count
+        if !lastsOn(count, attackLimit) then return measuredAgain(count)
+        count
 
     // The parts of the pattern may read a character of each copy of a repeated part, with the loops between them
     // reading the rest, so the growth may still change until the copies are more than the bounded width (e.g. the
@@ -359,11 +360,8 @@ private[fuzz] final class Attacker(
     val copies = measurement.growth match
       case _: Growth.Polynomial => countFrom(countBeyondCopies(str, size))
       case Growth.Exponential   => end
-    if copies <= count then Some(measurement)
-    else
-      refutedOn(copies, measurementLimit) match
-        case Some(steps) => measuredAgain(copies, steps)
-        case None        => Some(measurement)
+    if copies <= count || lastsOn(copies, measurementLimit) then Some(measurement)
+    else measuredAgain(copies)
 
   /** Returns the offset of the count and the size of the part of each repetition of the string. */
   def repeatsOf(str: FString): Seq[(Int, Int)] =
