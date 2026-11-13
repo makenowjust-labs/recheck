@@ -63,13 +63,14 @@ final case class IRPattern(
   /** Returns the pattern where repetitions become `*` or `+` from the largest count (the later first on a tie), until
     * the sum of the counts of the rest is below `maxCount`, which has every path of this pattern.
     */
-  def approximateRepeats(maxCount: Int): IRPattern = replaceRepeats(maxCount)((_, q) => IRPattern.approximate(q))
+  def approximateRepeats(maxCount: Int): IRPattern = replaceRepeats(maxCount)((_, q, _) => IRPattern.approximate(q))
 
   /** Returns the pattern where the repetitions that [[approximateRepeats]] changes iterate once instead (or at most
-    * once), when their bodies have no unbounded repetition nor back-reference.
+    * once), when they are in no unbounded repetition and their bodies have none nor a back-reference.
     */
-  def flattenRepeats(maxCount: Int): IRPattern = replaceRepeats(maxCount): (n, q) =>
-    val loops = n.exists:
+  def flattenRepeats(maxCount: Int): IRPattern = replaceRepeats(maxCount): (n, q, inLoop) =>
+    // An unbounded repetition enters a repetition in it again and again, so its counts count on a string of any length.
+    val loops = inLoop || n.exists:
       case Repeat(_, _: IRQuantifier.Unbounded) => true
       case _: BackReference                     => true
       case _: Unsupported                       => true
@@ -102,7 +103,7 @@ final case class IRPattern(
   /** Returns the pattern where the quantifiers of repetitions are replaced from the largest count (the later first on a
     * tie), until the sum of the counts of the rest is below `maxCount`.
     */
-  private def replaceRepeats(maxCount: Int)(replace: (IRNode, IRQuantifier) => IRQuantifier): IRPattern =
+  private def replaceRepeats(maxCount: Int)(replace: (IRNode, IRQuantifier, Boolean) => IRQuantifier): IRPattern =
     // The counts of the repetitions in the pre-order, with whether each stays.
     // A repetition whose body can match the empty string stays, since an empty iteration of `+` ends it.
     // A repetition in a look-behind stays, since a look-behind matched forward starts where the counts tell.
@@ -125,30 +126,32 @@ final case class IRPattern(
     val approximated = order.zip(sums).dropWhile(_._2 < maxCount).map(_._1).toSet
 
     var index = -1
-    def loop(node: IRNode): IRNode =
+    // `inLoop` tells whether the node is in an unbounded repetition, which `replace` takes with a repetition.
+    def loop(node: IRNode, inLoop: Boolean): IRNode =
       val data = node.data match
         case Repeat(n, q) =>
           index += 1
-          val q1 = if approximated.contains(index) then replace(n, q) else q
-          Repeat(loop(n), q1)
-        case Disjunction(ns)                   => Disjunction(ns.map(loop))
-        case Sequence(ns)                      => Sequence(ns.map(loop))
-        case Atomic(n)                         => Atomic(loop(n))
-        case LookAhead(negative, n)            => LookAhead(negative, loop(n))
-        case LookBehind(negative, n, matching) => LookBehind(negative, loop(n), matching)
-        case Capture(i, name, n)               => Capture(i, name, loop(n))
-        case NonAtomicLookAhead(n)             => NonAtomicLookAhead(loop(n))
-        case NonAtomicLookBehind(n, matching)  => NonAtomicLookBehind(loop(n), matching)
+          val q1 = if approximated.contains(index) then replace(n, q, inLoop) else q
+          Repeat(loop(n, inLoop || q.isInstanceOf[IRQuantifier.Unbounded]), q1)
+        case Disjunction(ns)                   => Disjunction(ns.map(loop(_, inLoop)))
+        case Sequence(ns)                      => Sequence(ns.map(loop(_, inLoop)))
+        case Atomic(n)                         => Atomic(loop(n, inLoop))
+        case LookAhead(negative, n)            => LookAhead(negative, loop(n, inLoop))
+        case LookBehind(negative, n, matching) => LookBehind(negative, loop(n, inLoop), matching)
+        case Capture(i, name, n)               => Capture(i, name, loop(n, inLoop))
+        case NonAtomicLookAhead(n)             => NonAtomicLookAhead(loop(n, inLoop))
+        case NonAtomicLookBehind(n, matching)  => NonAtomicLookBehind(loop(n, inLoop), matching)
         case Conditional(condition, yes, no)   =>
           val c = condition match
-            case IRCondition.LookAhead(negative, n)            => IRCondition.LookAhead(negative, loop(n))
-            case IRCondition.LookBehind(negative, n, matching) => IRCondition.LookBehind(negative, loop(n), matching)
-            case captured: IRCondition.Captured                => captured
-          Conditional(c, loop(yes), loop(no))
+            case IRCondition.LookAhead(negative, n)            => IRCondition.LookAhead(negative, loop(n, inLoop))
+            case IRCondition.LookBehind(negative, n, matching) =>
+              IRCondition.LookBehind(negative, loop(n, inLoop), matching)
+            case captured: IRCondition.Captured => captured
+          Conditional(c, loop(yes, inLoop), loop(no, inLoop))
         case data => data
       node.copy(data = data)
 
-    copy(node = loop(node))
+    copy(node = loop(node, false))
 
   /** Checks whether the pattern has no unbounded repetition, nor an unsupported node, which may be a recursion. */
   def isBounded: Boolean =

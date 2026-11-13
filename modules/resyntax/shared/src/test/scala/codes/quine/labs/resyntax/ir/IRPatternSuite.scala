@@ -300,7 +300,10 @@ class IRPatternSuite extends munit.FunSuite:
     "a{6,}" -> Seq(Unbounded(1, Greedy)),
     // A repetition whose body loops, or refers to a capture, is approximated.
     "(?:a*b){6}" -> Seq(Unbounded(1, Greedy), Unbounded(0, Greedy)),
-    "(a)(?:b\\1){6}" -> Seq(Unbounded(1, Greedy))
+    "(a)(?:b\\1){6}" -> Seq(Unbounded(1, Greedy)),
+    // So is a repetition in an unbounded repetition, which enters it again and again.
+    "(?:a{2,6}b)*" -> Seq(Unbounded(0, Greedy), Unbounded(1, Greedy)),
+    "(?:(?=a{6})b)+" -> Seq(Unbounded(1, Greedy), Unbounded(1, Greedy))
   )
 
   /** Returns the quantifiers in the pre-order and whether an assertion is left, after dropping the universal tail. */

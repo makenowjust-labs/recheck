@@ -210,6 +210,8 @@ class FuzzCheckerSuite extends munit.FunSuite:
     // The repetition is not the only loop reading the characters again.
     assert(!isLinearBeyondCounts("^.*?=[^&]{100}[^&]*!"))
     assert(!isLinearBeyondCounts("^.*?=[^&]*!"))
+    // The first repetition enters `a{2,100}` again and again, so both read `aab` repeated to any length.
+    assert(!isLinearBeyondCounts("^(?:a{2,100}b)*(?:aab)*$"))
     // The steps of an exponential bound may reach the limit on a few characters.
     assert(!isLinearBeyondCounts("^(?:a|a){40}$"))
     assert(!isLinearBeyondCounts("^(a?){50}a{50}$"))
