@@ -84,7 +84,7 @@
     "@types/node": "26.6.6",
     "esbuild": "0.28.2",
     "jest": "30.5.2",
-    "prettier": "3.9.10",
+    "prettier": "3.10.1",
     "recheck-parameters": "workspace:*",
     "rimraf": "6.1.4",
     "typescript": "7.0.2"
