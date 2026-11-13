@@ -34,7 +34,7 @@ class WitnessSeederSuite extends munit.FunSuite:
   def upperBound(source: String): Seq[Complexity.Vulnerable[UChar]] =
     import Parameters.*
     val ir = ReDoS.parse(source, "", Dialect.JavaScript)
-    FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100).get
+    FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100, DefaultAlphabetRepresentative).get
 
   test("WitnessSeeder.seed"):
     val witness = Witness[UChar](Seq((Seq.empty, Seq('a'))), Seq('!'))

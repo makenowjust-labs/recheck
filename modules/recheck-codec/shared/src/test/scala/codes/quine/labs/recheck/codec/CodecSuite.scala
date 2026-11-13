@@ -9,6 +9,7 @@ import io.circe.Json
 import io.circe.syntax.*
 
 import codes.quine.labs.recheck.common.AccelerationMode
+import codes.quine.labs.recheck.common.AlphabetRepresentative
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
@@ -474,6 +475,7 @@ class CodecSuite extends munit.FunSuite:
           "boundedWidthRatio" := 1.5,
           "accelerationMode" := "off",
           "accelerationHitRatio" := 0.125,
+          "alphabetRepresentative" := "smallest",
           "maxRepeatCount" := 123,
           "maxNFASize" := 123,
           "maxDFASize" := 123,
@@ -511,6 +513,7 @@ class CodecSuite extends munit.FunSuite:
           boundedWidthRatio = 1.5,
           accelerationMode = AccelerationMode.Off,
           accelerationHitRatio = 0.125,
+          alphabetRepresentative = AlphabetRepresentative.Smallest,
           maxRepeatCount = 123,
           maxNFASize = 123,
           maxDFASize = 123,
@@ -547,6 +550,15 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(
       decodeAccelerationMode.decodeJson("xxx".asJson),
       Left(DecodingFailure("Unknown acceleration mode: xxx", List.empty))
+    )
+
+  test("codec.decodeAlphabetRepresentative"):
+    assertEquals(decodeAlphabetRepresentative.decodeJson("pretty".asJson), Right(AlphabetRepresentative.Pretty))
+    assertEquals(decodeAlphabetRepresentative.decodeJson("non-latin1".asJson), Right(AlphabetRepresentative.NonLatin1))
+    assertEquals(decodeAlphabetRepresentative.decodeJson("smallest".asJson), Right(AlphabetRepresentative.Smallest))
+    assertEquals(
+      decodeAlphabetRepresentative.decodeJson("xxx".asJson),
+      Left(DecodingFailure("Unknown alphabet representative: xxx", List.empty))
     )
 
   test("codec.decodeSeeder"):

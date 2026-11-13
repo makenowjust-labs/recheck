@@ -151,6 +151,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
       DefaultBoundedWidthRatio,
       DefaultAccelerationMode,
       DefaultAccelerationHitRatio,
+      DefaultAlphabetRepresentative,
       avoidsAttack,
       upperBound
     )
@@ -175,6 +176,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
       DefaultMaxDegree,
       DefaultAccelerationMode,
       DefaultAccelerationHitRatio,
+      DefaultAlphabetRepresentative,
       upperBound,
       attacker
     )
@@ -183,7 +185,13 @@ class FuzzCheckerSuite extends munit.FunSuite:
     import Parameters.*
     def upperBound(source: String, dialect: Dialect = Dialect.JavaScript, maxInitialGenerationSize: Int = 100) =
       val ir = ReDoS.parse(source, "", dialect)
-      FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, maxInitialGenerationSize)
+      FuzzChecker.upperBound(
+        ir,
+        DefaultMaxRepeatCount,
+        DefaultMaxNFASize,
+        maxInitialGenerationSize,
+        DefaultAlphabetRepresentative
+      )
     // The bound replaces the back-reference with a copy of `a*`, so the worst is cubic.
     val cubic = upperBound("^(a*)a*\\1b").get
     assertEquals(cubic.head.toAttackComplexity, AttackComplexity.Polynomial(3, false))
@@ -199,13 +207,17 @@ class FuzzCheckerSuite extends munit.FunSuite:
     assertEquals(upperBound("^(a?){50}a{50}$"), None)
     // The repetition of any character at the end matches any rest, so it does not make the bound quadratic.
     val tail = ReDoS.parse("^.*?(?:ab).*$", "s", Dialect.JavaScript)
-    assertEquals(FuzzChecker.upperBound(tail, DefaultMaxRepeatCount, DefaultMaxNFASize, 100), Some(Seq.empty))
+    assertEquals(
+      FuzzChecker.upperBound(tail, DefaultMaxRepeatCount, DefaultMaxNFASize, 100, DefaultAlphabetRepresentative),
+      Some(Seq.empty)
+    )
 
   test("FuzzChecker.isLinearBeyondCounts"):
     import Parameters.*
     def isLinearBeyondCounts(source: String, boundedWidthRatio: Double = DefaultBoundedWidthRatio): Boolean =
       val ir = ReDoS.parse(source, "", Dialect.JavaScript)
-      val bound = FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100)
+      val bound =
+        FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100, DefaultAlphabetRepresentative)
       FuzzChecker.isLinearBeyondCounts(
         ir,
         bound,
@@ -262,7 +274,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
   test("FuzzChecker#init: the seeds of other suffixes"):
     import Parameters.*
     val ir = ReDoS.parse("^(?:a|a)*(?!.*xyz)", "", Dialect.JavaScript)
-    val bound = FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100)
+    val bound = FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100, DefaultAlphabetRepresentative)
     // The match of the witness succeeds unless `xyz` follows, which makes the look-ahead fail.
     assertEquals(checkerOf(ir, upperBound = bound).init()._1.next()._1, AttackComplexity.Exponential(true))
 

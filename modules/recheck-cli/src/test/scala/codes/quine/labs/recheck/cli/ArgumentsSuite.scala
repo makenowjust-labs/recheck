@@ -7,6 +7,7 @@ import cats.data.Validated
 
 import codes.quine.labs.recheck.cli.arguments.given
 import codes.quine.labs.recheck.common.AccelerationMode
+import codes.quine.labs.recheck.common.AlphabetRepresentative
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Seeder
 import codes.quine.labs.resyntax.dialect.Dialect
@@ -30,6 +31,19 @@ class ArgumentsSuite extends munit.FunSuite:
     assertEquals(accelerationModeArgument.read("off"), Validated.validNel(AccelerationMode.Off))
     assertEquals(accelerationModeArgument.read("xxx"), Validated.invalidNel("unknown acceleration mode: xxx"))
     assertEquals(accelerationModeArgument.defaultMetavar, "mode")
+
+  test("arguments.alphabetRepresentativeArgument"):
+    assertEquals(alphabetRepresentativeArgument.read("pretty"), Validated.validNel(AlphabetRepresentative.Pretty))
+    assertEquals(
+      alphabetRepresentativeArgument.read("non-latin1"),
+      Validated.validNel(AlphabetRepresentative.NonLatin1)
+    )
+    assertEquals(alphabetRepresentativeArgument.read("smallest"), Validated.validNel(AlphabetRepresentative.Smallest))
+    assertEquals(
+      alphabetRepresentativeArgument.read("xxx"),
+      Validated.invalidNel("unknown alphabet representative: xxx")
+    )
+    assertEquals(alphabetRepresentativeArgument.defaultMetavar, "representative")
 
   test("arguments.seederArgument"):
     assertEquals(seederArgument.read("static"), Validated.validNel(Seeder.Static))

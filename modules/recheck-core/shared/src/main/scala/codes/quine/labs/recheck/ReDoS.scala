@@ -200,7 +200,7 @@ object ReDoS:
         val epsNFA = EpsNFABuilder.build(ir, maxNFASize, maxBackReferenceStrings)
         val orderedNFA = epsNFA.toOrderedNFA(false, maxNFASize, maxDFASize).rename
         AutomatonChecker.check(
-          epsNFA.restrictInputs(orderedNFA).mapAlphabet(_.representative),
+          epsNFA.restrictInputs(orderedNFA).mapAlphabet(alphabetRepresentative.of),
           false,
           maxNFASize,
           maxDFASize
@@ -286,6 +286,7 @@ object ReDoS:
         boundedWidthRatio,
         accelerationMode,
         accelerationHitRatio,
+        alphabetRepresentative,
         avoidsAttack
       )
       upperBound = checkedUpperBound

@@ -196,7 +196,7 @@ test("check: java with refuted attacks", async () => {
     refutedAttacks: [
       {
         complexity: { type: "exponential" },
-        attack: { pattern: "'a'.repeat(31) + '\\x00'" },
+        attack: { pattern: "'a'.repeat(31) + 'あ'" },
         runtimeAttack: {
           runtime: "fake",
           timeout: 1000,

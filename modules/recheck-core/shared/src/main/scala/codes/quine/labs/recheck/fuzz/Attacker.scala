@@ -6,6 +6,7 @@ import scala.concurrent.duration.Duration
 
 import codes.quine.labs.recheck.automaton.Complexity
 import codes.quine.labs.recheck.common.AccelerationMode
+import codes.quine.labs.recheck.common.AlphabetRepresentative
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
@@ -77,6 +78,7 @@ private[fuzz] final class Attacker(
     val boundedWidthRatio: Double,
     val accelerationMode: AccelerationMode,
     val accelerationHitRatio: Double,
+    val alphabetRepresentative: AlphabetRepresentative,
     val avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean,
     val upperBound: Option[Seq[Complexity.Vulnerable[UChar]]]
 )(using val ctx: Context):
@@ -203,7 +205,7 @@ private[fuzz] final class Attacker(
     * the ends of its repetitions.
     */
   def additionsOf(str: FString): Seq[FString] =
-    val chars = fuzz.alphabet.pairs.map(_._1.representative).distinct
+    val chars = fuzz.alphabet.pairs.map((set, _) => alphabetRepresentative.of(set)).distinct
     val ends = str.seq.zipWithIndex.collect:
       case (FString.Repeat(_, size), pos) => Seq(pos, (pos + 1 + size).min(str.size))
     val positions = (0 +: ends.flatten :+ str.size).distinct.sorted

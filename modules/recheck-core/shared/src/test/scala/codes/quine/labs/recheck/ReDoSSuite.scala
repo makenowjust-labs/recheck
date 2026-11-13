@@ -574,14 +574,14 @@ class ReDoSSuite extends munit.FunSuite:
       val d = ds.next().asInstanceOf[Diagnostics.Vulnerable]
       d.attack.toString(AttackPatternStyle.of(d.dialect, d.unitMode))
 
-    assertEquals(attack(Dialect.JavaScript, ""), "'a'.repeat(31) + '\\x00'")
-    assertEquals(attack(Dialect.Python(), ""), "'a' * 31 + '\\x00'")
-    assertEquals(attack(Dialect.Python(Dialect.Python.Type.Bytes), ""), "b'a' * 31 + b'\\x00'")
-    assertEquals(attack(Dialect.Ruby(), "n"), "\"a\".b + \"a\".b * 31 + \"\\x00\\n\\n\".b")
-    assertEquals(attack(Dialect.Java, ""), "\"a\".repeat(31) + \"\\u0000\"")
-    assertEquals(attack(Dialect.DotNet, ""), "string.Concat(Enumerable.Repeat(\"a\", 31)) + \"\\u0000\"")
-    assertEquals(attack(Dialect.Perl(), ""), "\"a\" x 31 . \"\\x00\"")
-    assertEquals(attack(Dialect.PCRE, ""), "str_repeat('a', 31) . \"\\x00\"")
+    assertEquals(attack(Dialect.JavaScript, ""), "'a'.repeat(31) + 'あ'")
+    assertEquals(attack(Dialect.Python(), ""), "'a' * 31 + 'あ'")
+    assertEquals(attack(Dialect.Python(Dialect.Python.Type.Bytes), ""), "b'a' * 31 + b'!'")
+    assertEquals(attack(Dialect.Ruby(), "n"), "\"a\".b + \"a\".b * 31 + \"!\\n\\n\".b")
+    assertEquals(attack(Dialect.Java, ""), "\"a\".repeat(31) + \"あ\"")
+    assertEquals(attack(Dialect.DotNet, ""), "string.Concat(Enumerable.Repeat(\"a\", 31)) + \"あ\"")
+    assertEquals(attack(Dialect.Perl(), ""), "\"a\" x 31 . \"\\x{3042}\"")
+    assertEquals(attack(Dialect.PCRE, ""), "str_repeat('a', 31) . '!'")
     assert(clue(attack(Dialect.Python(), "", Checker.Fuzz)).contains(" * "))
 
   test("ReDoS.checkAutomaton"):
@@ -596,7 +596,7 @@ class ReDoSSuite extends munit.FunSuite:
           AttackComplexity.Exponential(false),
           AttackPattern(
             Seq((UnitMode.UTF16.decode(""), UnitMode.UTF16.decode("a"), 0)),
-            UnitMode.UTF16.decode("\u0000"),
+            UnitMode.UTF16.decode("あ"),
             31
           ),
           Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot))),
@@ -694,7 +694,7 @@ class ReDoSSuite extends munit.FunSuite:
           AttackComplexity.Exponential(false),
           AttackPattern(
             Seq((UnitMode.UTF16.decode(""), UnitMode.UTF16.decode("a"), 0)),
-            UnitMode.UTF16.decode("\u0000"),
+            UnitMode.UTF16.decode("あ"),
             31
           ),
           Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot))),

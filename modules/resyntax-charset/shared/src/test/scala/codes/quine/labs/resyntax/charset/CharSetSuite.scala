@@ -32,6 +32,14 @@ class CharSetSuite extends munit.FunSuite with CharSetHelper:
     assertEquals(set((0xdc00, 0xe000)).representative, 0xdc00)
     intercept[NoSuchElementException](CharSet.empty.representative)
 
+  test("CharSet#representativeOutsideLatin1"):
+    assertEquals(set((0x61, 0x7b), (0x400, 0x500)).representativeOutsideLatin1, 0x400)
+    assertEquals(set((0, 0x110000)).representativeOutsideLatin1, 0x100)
+    assertEquals(set((0x61, 0x7b), (0xd800, 0x10000)).representativeOutsideLatin1, 0xe000)
+    assertEquals(set((0x61, 0x7b), (0xdc00, 0xe000)).representativeOutsideLatin1, 0x61)
+    assertEquals(set((0x61, 0x7b), (0xf0, 0x100)).representativeOutsideLatin1, 0x61)
+    intercept[NoSuchElementException](CharSet.empty.representativeOutsideLatin1)
+
   test("CharSet#contains"):
     val s = set((1, 3), (5, 7))
     assertEquals((0 to 8).filter(s.contains), IndexedSeq(1, 2, 5, 6))

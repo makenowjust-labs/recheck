@@ -60,6 +60,29 @@ properties:
     x-cli-metavar: "mode"
     x-since: "4.2.0"
 
+  alphabetRepresentative:
+    title: "Alphabet Representative"
+    description: |-
+      The character that stands for a set of characters in an attack string.
+
+      - `pretty` is a character that looks good in an attack string, outside Latin-1 (U+0000 to U+00FF) if the set has one.
+        It is the first one that the set has of `あ`, `α`, `Ω`, `字`, `０`, `、`, `∆` and the ideographic space, or else the smallest letter, number, punctuation or symbol outside Latin-1, the smallest character outside Latin-1, the smallest printable ASCII character, or the smallest character.
+      - `non-latin1` is the smallest character outside Latin-1, or the smallest one if the set has none.
+      - `smallest` is the smallest character.
+
+      An engine may optimize the matching against a string of only Latin-1 characters (e.g. V8), so an attack string with another character is more likely to work there.
+    type: string
+    enum: ["pretty", "non-latin1", "smallest"]
+    default: "pretty"
+    x-scala-type: "AlphabetRepresentative"
+    x-scala-values:
+      "pretty": "AlphabetRepresentative.Pretty"
+      "non-latin1": "AlphabetRepresentative.NonLatin1"
+      "smallest": "AlphabetRepresentative.Smallest"
+    x-cli: "alphabet-representative"
+    x-cli-metavar: "representative"
+    x-since: "5.0.0"
+
   attackLimit:
     title: "Attack Limit"
     description: |-
