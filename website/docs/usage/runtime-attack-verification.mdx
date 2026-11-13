@@ -67,8 +67,12 @@ $ recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
 Input     : /^(a|a)*$/
 Dialect   : ruby (encoding: UTF-8)
 Status    : safe
-Complexity: linear
-Checker   : automaton
+Complexity: safe (fuzz)
+Checker   : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /^(a|a)*$/
 
 Refuted attacks:
 - Complexity    : exponential

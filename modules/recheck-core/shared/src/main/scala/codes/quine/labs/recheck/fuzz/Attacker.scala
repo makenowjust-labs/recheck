@@ -421,7 +421,14 @@ private[fuzz] final class Attacker(
       case _ if str.isConstant || measurement.last <= measurement.first => Seq(measurement.first.max(1))
       case p: Growth.Polynomial => (0 to p.degree).map(k => p.start + k * p.stride)
       case Growth.Exponential   => Seq(measurement.last - 1, measurement.last)
-    val opts = Options(attackLimit, needsHeatmap = true)
+    // The runs memoize as the ones that confirm an attack do, which gives the same heat.
+    // The run on a count of many steps does not end in the timeout otherwise, and its heat lacks the parts read later.
+    val opts = Options(
+      attackLimit,
+      usesAcceleration = fuzz.usesAccelerationOnAttack(accelerationMode),
+      accelerationHitRatio = accelerationHitRatio,
+      needsHeatmap = true
+    )
     val heats = counts.map: count =>
       Interpreter.runWithTimeout(fuzz.program, str.copy(n = count).toUString, opts, incubationTimeout).heatmap
     val read = heats.flatMap(_.keys).toSet

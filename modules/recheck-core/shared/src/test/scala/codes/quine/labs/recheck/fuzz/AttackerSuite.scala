@@ -309,3 +309,19 @@ class AttackerSuite extends munit.FunSuite:
       attacker.hotspotOf(str, Measurement(Growth.Exponential, 1, 0, true)),
       Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Cold), Hotspot.Spot(5, 6, Hotspot.Hot), Hotspot.Spot(7, 8, Hotspot.Hot)))
     )
+
+  test("Attacker#hotspotOf: the parts read after many steps"):
+    val attacker = attackerOf(ReDoS.parse("^(?:(?:a|a)*!|a*a*!)", "", Dialect.JavaScript))
+    val str = FString(1, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a')))
+    // The second alternative is read after the `2^n` ways of the first one, which the runs memoize.
+    assertEquals(
+      attacker.hotspotOf(str, Measurement(Growth.Exponential, 16, 25, false)),
+      Hotspot(
+        Seq(
+          Hotspot.Spot(7, 8, Hotspot.Hot),
+          Hotspot.Spot(9, 10, Hotspot.Hot),
+          Hotspot.Spot(14, 15, Hotspot.Hot),
+          Hotspot.Spot(16, 17, Hotspot.Hot)
+        )
+      )
+    )
