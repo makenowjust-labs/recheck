@@ -69,14 +69,16 @@ class AttackerSuite extends munit.FunSuite:
     case Growth.Exponential   => -1
 
   test("Attacker.boundedWidthOf"):
-    def boundedWidthOf(source: String): Int =
-      Attacker.boundedWidthOf(ReDoS.parse(source, "", Dialect.JavaScript).node)
+    def boundedWidthOf(source: String, flags: String = ""): Int =
+      Attacker.boundedWidthOf(ReDoS.parse(source, flags, Dialect.JavaScript).node)
     assertEquals(boundedWidthOf("abc"), 3)
     assertEquals(boundedWidthOf("ab|cde"), 3)
     // A repetition without the largest count iterates the least times, or once.
     assertEquals(boundedWidthOf("a*b+c?"), 3)
     assertEquals(boundedWidthOf("a{3}b{2,5}c{4,}"), 12)
     assertEquals(boundedWidthOf("(?:ab{3}){2}"), 8)
+    // A class of strings is as wide as its longest string.
+    assertEquals(boundedWidthOf("[\\q{abc|d}]e", "v"), 4)
 
   test("Attacker#stepsOn"):
     import Parameters.*
@@ -144,6 +146,10 @@ class AttackerSuite extends munit.FunSuite:
     // The largest count within `maxAttackStringSize` when the steps do not reach the limit.
     val long = FString(1, FString.Repeat(0, 100) +: IndexedSeq.fill(100)(FString.Wrap('b')))
     assertEquals(attacker.attackCount(long, square), Some(3000))
+    // No count when one copy of the repeated part is longer than `maxAttackStringSize`.
+    val size = Parameters.DefaultMaxAttackStringSize + 1
+    val tooLong = FString(1, FString.Repeat(0, size) +: IndexedSeq.fill(size)(FString.Wrap('b')))
+    assertEquals(attacker.attackCount(tooLong, square), None)
 
   /** The candidates of the strings, whose runs do not stop. */
   def candidatesOf(attacker: Attacker, strs: FString*): Seq[Candidate] =
