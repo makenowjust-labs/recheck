@@ -306,6 +306,11 @@ class IRPatternSuite extends munit.FunSuite:
     "(?:(?=a{6})b)+" -> Seq(Unbounded(1, Greedy), Unbounded(1, Greedy))
   )
 
+  // A repetition whose body has an unsupported node, which may be a recursion, is approximated too.
+  check("IRPattern#flattenRepeats", dialect = Dialect.Ruby())(flattened)(
+    "(?:(?~a)b){6}" -> Seq(Unbounded(1, Greedy))
+  )
+
   /** Returns the quantifiers in the pre-order and whether an assertion is left, after dropping the universal tail. */
   def tailDropped(pattern: IRPattern): (Seq[IRQuantifier], Boolean) =
     val node = pattern.dropUniversalTail.node
