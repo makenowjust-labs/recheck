@@ -500,8 +500,8 @@ private[fuzz] final class FuzzChecker(
   /** Runs the attacks from the candidates, the steepest growth first. */
   def attack(candidates: Iterator[Candidate]): Iterator[AttackResult] = interrupt:
     def refineOrFail(candidate: Candidate): Option[Candidate] =
-      val refined = Option.unless(failedSkeletons.contains(candidate.str.skeleton))(candidate).flatMap(refine)
-      if refined.isEmpty then failedSkeletons.add(candidate.str.skeleton)
+      val refined = Option.unless(failedFingerprints.contains(candidate.str.fingerprint))(candidate).flatMap(refine)
+      if refined.isEmpty then failedFingerprints.add(candidate.str.fingerprint)
       refined
     // The candidates are sorted before any attack, with the growth that the larger limit tells.
     // The steepest one is raised first (see [[raise]]), and it stays after the raised one, whose attack may fail.
@@ -516,8 +516,8 @@ private[fuzz] final class FuzzChecker(
     case Growth.Exponential   => Int.MaxValue
     case p: Growth.Polynomial => p.degree
 
-  /** The skeletons of the candidates that [[raise]] tried. */
-  val raisedSkeletons: mutable.Set[UString] = mutable.Set.empty
+  /** The fingerprints of the candidates that [[raise]] tried. */
+  val raisedFingerprints: mutable.Set[FString.Fingerprint] = mutable.Set.empty
 
   /** Raises the growth of the candidate by adding a character or a repetition to its string again and again, while the
     * growth gets steeper, and returns the steepest one, or `None` if none is steeper.
@@ -528,7 +528,7 @@ private[fuzz] final class FuzzChecker(
     */
   def raise(candidate: Candidate): Option[Candidate] = interrupt:
     val target = maxTriedDegree
-    if !raisedSkeletons.add(candidate.str.skeleton) then return None
+    if !raisedFingerprints.add(candidate.str.fingerprint) then return None
 
     def measured(str: FString): Option[Candidate] =
       val admits = str.countRepeat < maxDegree && str.admitsAnyRepeatCount(pattern.mode)
@@ -573,8 +573,8 @@ private[fuzz] final class FuzzChecker(
       part <- Seq(IndexedSeq(FString.Wrap(c)), IndexedSeq(FString.Repeat(0, 1), FString.Wrap(c)))
     yield str.copy(n = 1).insert(pos, part)
 
-  /** The skeletons of the candidates whose attacks fail. */
-  val failedSkeletons: mutable.Set[UString] = mutable.Set.empty
+  /** The fingerprints of the candidates whose attacks fail. */
+  val failedFingerprints: mutable.Set[FString.Fingerprint] = mutable.Set.empty
 
   /** The scale of the pattern (see [[FuzzChecker.scaleOf]]).
     *
@@ -663,11 +663,11 @@ private[fuzz] final class FuzzChecker(
     while count > 1 && stepsOn(str, count, measurementLimit, incubationTimeout).isEmpty do count /= 2
     measure(str, (count - measuredDegree - 2).max(1), count, measurementLimit, incubationTimeout)
 
-  /** Runs the attack from the candidate, whose skeleton is added to [[failedSkeletons]] if it fails. */
+  /** Runs the attack from the candidate, whose fingerprint is added to [[failedFingerprints]] if it fails. */
   def tryAttack(candidate: Candidate): Option[AttackResult] = interrupt:
     val str = candidate.str
-    val skeleton = str.skeleton
-    if failedSkeletons.contains(skeleton) then return None
+    val fingerprint = str.fingerprint
+    if failedFingerprints.contains(fingerprint) then return None
 
     log(s"""|fuzz: attack (growth: ${show(candidate.measurement.growth)})
             |  string: $str""".stripMargin)
@@ -686,7 +686,7 @@ private[fuzz] final class FuzzChecker(
         (complexity, attack.toAttackPattern(pattern.mode), hotspotOf(str, measurement, count))
     result match
       case Some((complexity, _, hotspot)) => attacks(str) = (complexity, hotspot) :: attacks.getOrElse(str, Nil)
-      case None                           => failedSkeletons.add(skeleton)
+      case None                           => failedFingerprints.add(fingerprint)
     result
 
   private def show(growth: Growth): String = growth match
@@ -855,10 +855,12 @@ private[fuzz] final class FuzzChecker(
       val visited: mutable.Set[CoverageItem]
   ):
 
-    /** The strings whose steps grow more than linearly, one for each skeleton whose attacks have not failed. */
-    val candidates: mutable.LinkedHashMap[UString, Candidate] = mutable.LinkedHashMap.empty
+    /** The strings whose steps grow more than linearly, one for each fingerprint whose attacks have not failed. */
+    val candidates: mutable.LinkedHashMap[FString.Fingerprint, Candidate] = mutable.LinkedHashMap.empty
 
     /** Executes the string and adds its result, and a candidate of an attack if its steps grow more than linearly.
+      *
+      * The string is normalized first (see [[FString.normalize]]), so the strings of the same characters are one.
       *
       * The growth of a string with repetitions is measured once for its sequence, on its first repeat counts (see
       * [[measureFirst]]). A string of a few steps per character may grow to an attack on more repetitions, which its
@@ -869,8 +871,9 @@ private[fuzz] final class FuzzChecker(
       * executed as the one repeating it as a whole. The matching goes as far as the item from each of the starts that
       * the repetition makes.
       */
-    def execute(str: FString): Unit =
+    def execute(raw: FString): Unit =
       if candidates.size >= maxAttackCandidates then return
+      val str = raw.normalize
       if str.countRepeat >= maxDegree || !str.admitsAnyRepeatCount(pattern.mode) then return
 
       val input = str.toUString
@@ -891,21 +894,21 @@ private[fuzz] final class FuzzChecker(
         else if reachesNew && !str.isEmpty then execute(FString(1, FString.Repeat(0, str.size) +: str.seq))
       else
         measurements.getOrElseUpdate(str.seq, measureFirst(str, incubationLimit)) match
-          case Some(measurement) if measurement.growth.isSuperLinear => addCandidate(str, measurement)
-          case _ if stops && !failedSkeletons.contains(str.skeleton) =>
+          case Some(measurement) if measurement.growth.isSuperLinear       => addCandidate(str, measurement)
+          case _ if stops && !failedFingerprints.contains(str.fingerprint) =>
             measureBelow(str) match
               case Some(measurement) if measurement.growth.isSuperLinear => addCandidate(str, measurement)
-              case _                                                     => failedSkeletons.add(str.skeleton)
+              case _                                                     => failedFingerprints.add(str.fingerprint)
           case _ => ()
 
-    /** Adds the string as a candidate, unless its skeleton has one or its attacks failed. */
+    /** Adds the string as a candidate, unless its fingerprint has one or its attacks failed. */
     private def addCandidate(str: FString, measurement: Measurement): Unit =
-      val skeleton = str.skeleton
-      if !failedSkeletons.contains(skeleton) && !candidates.contains(skeleton) then
+      val fingerprint = str.fingerprint
+      if !failedFingerprints.contains(fingerprint) && !candidates.contains(fingerprint) then
         log:
           s"""|fuzz: candidate (growth: ${show(measurement.growth)})
               |  string: $str""".stripMargin
-        candidates(skeleton) = Candidate(str, measurement)
+        candidates(fingerprint) = Candidate(str, measurement)
 
     /** Records the execution result. */
     def add(str: FString, input: UString, result: Result): Unit =

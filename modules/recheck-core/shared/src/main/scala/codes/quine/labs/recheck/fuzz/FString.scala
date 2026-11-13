@@ -78,24 +78,61 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
           pos += size
     UString.from(str.result())
 
-  /** The string that the strings differing only in how many times their parts repeat share. */
-  def skeleton: UString =
-    val str = copy(n = 2).toUString
-    val maxSize = seq.collect { case Repeat(_, size) => size }.maxOption.getOrElse(0)
-    def repeats(i: Int, size: Int): Boolean =
-      i + 2 * size <= str.length && (0 until size).forall(k => str(i + k) == str(i + size + k))
-    val result = IndexedSeq.newBuilder[UChar]
+  /** Returns the normal form of the string, which has the same characters on every repeat count. */
+  def normalize: FString =
+    var segments = segmentsOf(seq)
     var i = 0
-    while i < str.length do
-      (1 to maxSize).find(repeats(i, _)) match
-        case Some(size) =>
-          result.addAll(str.slice(i, i + size).iterator)
-          i += size
-          while repeats(i - size, size) do i += size
-        case None =>
-          result.addOne(str(i))
-          i += 1
-    UString.from(result.result())
+    while i < segments.size do
+      segments(i) match
+        case Segment.Repeated(m0, part0) =>
+          var (m, part) = (m0, part0)
+          while i > 0 && segments(i - 1) == Segment.Fixed(part.last) do
+            part = part.last +: part.init
+            segments = segments.patch(i - 1, Seq(Segment.Repeated(m, part), Segment.Fixed(part.head)), 2)
+            i -= 1
+          val copy = part.map(Segment.Fixed(_))
+          while m >= -1 && segments.slice(i + 1, i + 1 + part.size) == copy do
+            m += 1
+            segments = segments.patch(i, Seq(Segment.Repeated(m, part)), 1 + part.size)
+        case Segment.Fixed(_) => ()
+      i += 1
+    val normalized = segments.flatMap:
+      case Segment.Fixed(u)          => Seq(Wrap(u))
+      case Segment.Repeated(m, part) => Repeat(m, part.size) +: part.map(Wrap(_))
+    FString(n, normalized)
+
+  /** Returns the fingerprint of the string (see [[Fingerprint]]). */
+  def fingerprint: Fingerprint =
+    import Fingerprint.Item
+
+    // The shortest part whose copies make the part.
+    def root(part: IndexedSeq[UChar]): IndexedSeq[UChar] =
+      val size = (1 to part.size).find(d => part.size % d == 0 && part.indices.forall(k => part(k) == part(k % d))).get
+      part.take(size)
+
+    var items: IndexedSeq[Item] = segmentsOf(seq).map:
+      case Segment.Fixed(u)          => Item.Fixed(u)
+      case Segment.Repeated(_, part) => Item.Repeated(root(part))
+
+    // Applies the first change of the items, if any.
+    def step: Option[IndexedSeq[Item]] =
+      items.indices.iterator
+        .map: i =>
+          (items(i), items.lift(i + 1)) match
+            case (Item.Fixed(u), Some(Item.Repeated(part))) if part.last == u =>
+              Some(items.patch(i, Seq(Item.Repeated(u +: part.init), Item.Fixed(u)), 2))
+            case (Item.Repeated(part), _) if items.slice(i + 1, i + 1 + part.size) == part.map(Item.Fixed(_)) =>
+              Some(items.patch(i + 1, Seq.empty, part.size))
+            case (Item.Repeated(part), Some(Item.Repeated(next))) if part == next =>
+              Some(items.patch(i + 1, Seq.empty, 1))
+            case _ => None
+        .collectFirst { case Some(changed) => changed }
+
+    var changed = step
+    while changed.isDefined do
+      items = changed.get
+      changed = step
+    Fingerprint(items)
 
   /** Checks whether the string is one of the mode for any repeat counts, as
     * [[diagnostics.AttackPattern.admitsAnyRepeatCount]] does.
@@ -193,6 +230,38 @@ object FString:
 
   /** Repeat is a repetition specifier in FString. */
   final case class Repeat(m: Int, size: Int) extends FChar
+
+  /** Fingerprint is the fixed characters and the repeated parts of a string in order, which the strings differing only
+    * in how many times their parts repeat share.
+    */
+  final case class Fingerprint(items: IndexedSeq[Fingerprint.Item])
+
+  object Fingerprint:
+
+    /** Item is a fixed character or a repeated part of a fingerprint. */
+    enum Item:
+      case Fixed(u: UChar)
+      case Repeated(part: IndexedSeq[UChar])
+
+  /** Segment is a fixed character or a repetition of a part of an FString, with the offset of its repeat count. */
+  private enum Segment:
+    case Fixed(u: UChar)
+    case Repeated(m: Int, part: IndexedSeq[UChar])
+
+  /** Splits the sequence into the segments, without the repetitions of no characters. */
+  private def segmentsOf(seq: IndexedSeq[FChar]): IndexedSeq[Segment] =
+    val segments = IndexedSeq.newBuilder[Segment]
+    var pos = 0
+    while pos < seq.size do
+      seq(pos) match
+        case Wrap(u) =>
+          segments.addOne(Segment.Fixed(u))
+          pos += 1
+        case Repeat(m, size) =>
+          val part = seq.slice(pos + 1, pos + 1 + size).collect { case Wrap(u) => u }
+          if part.nonEmpty then segments.addOne(Segment.Repeated(m, part))
+          pos += 1 + part.size
+    segments.result()
 
   /** Builds an FString from a string. */
   def apply(input: UString): FString = FString(1, input.iterator.map(Wrap(_)).toIndexedSeq)

@@ -346,7 +346,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
     val raised = checker.raise(candidate).get
     assertEquals(degreeOf(raised.measurement), 3)
     assertEquals(raised.str.countRepeat, 2)
-    // A skeleton is raised once.
+    // A fingerprint is raised once.
     assertEquals(checker.raise(candidate), None)
 
   test("FuzzChecker#attack: the degree is exact"):
@@ -375,7 +375,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
     pop.execute(FString(1, IndexedSeq(low, high)))
     assertEquals(checker.inputs.toSet, Set(UString(0xdc00, 0xd800)))
 
-  test("FuzzChecker#attack: the skeletons of failed attacks"):
+  test("FuzzChecker#attack: the fingerprints of failed attacks"):
     // The steps grow quadratically up to 100 characters, and the match succeeds on longer strings (#1310).
     val ir = ReDoS.parse("[a-z0-9]{100,}", "", Dialect.JavaScript)
     val checker = checkerOf(ir)
@@ -384,7 +384,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
     val candidates = candidatesOf(checker, str, same)
     assertEquals(candidates.map(_.str), Seq(str))
     assertEquals(checker.attack(candidates.iterator).toSeq, Seq.empty)
-    assertEquals(checker.failedSkeletons.toSet, Set(str.skeleton))
+    assertEquals(checker.failedFingerprints.toSet, Set(str.fingerprint))
     // The quadratic steps of 30 characters stay below the attack limit of the quick check.
     assert(!check("[a-z0-9]{30,}", "", quick = true))
 
@@ -395,7 +395,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
     val max = Parameters.DefaultMaxAttackCandidates
     val strs = (1 to max + 1).map: k =>
       FString(30, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'), FString.Wrap('a' + k)))
-    // The same skeleton is one candidate, and no string runs after `maxAttackCandidates` candidates.
+    // The same fingerprint is one candidate, and no string runs after `maxAttackCandidates` candidates.
     pop.execute(strs(0))
     pop.execute(strs(0).copy(n = 31))
     pop.execute(strs(0).copy(seq = FString.Repeat(2, 1) +: strs(0).seq.tail))
@@ -452,12 +452,12 @@ class FuzzCheckerSuite extends munit.FunSuite:
         case Hotspot.Spot(start, end, Hotspot.Hot) => (start, end)
     assertEquals(hot, Seq((13, 14)))
 
-  test("FuzzChecker#Population#execute: no candidate of a skeleton whose attack failed"):
+  test("FuzzChecker#Population#execute: no candidate of a fingerprint whose attack failed"):
     val ir = ReDoS.parse("^(?:a|a)*$", "", Dialect.JavaScript)
     val checker = checkerOf(ir)
     val pop = new checker.Population(0, mutable.Set.empty, mutable.Set.empty)
     val str = FString(30, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'), FString.Wrap('!')))
-    checker.failedSkeletons.add(str.skeleton)
+    checker.failedFingerprints.add(str.fingerprint)
     pop.execute(str)
     assert(pop.candidates.isEmpty)
 
