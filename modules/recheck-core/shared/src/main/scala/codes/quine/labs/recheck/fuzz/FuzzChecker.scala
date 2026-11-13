@@ -157,11 +157,6 @@ object FuzzChecker:
 
   /** Checks whether the steps of the pattern grow linearly on the strings longer than what its counts count, and cannot
     * reach `attackLimit` on the shorter ones, so that the pattern has no attack to find.
-    *
-    * `bound` is the upper bound of the pattern (see [[upperBound]]). The steps on the strings that the counts count
-    * grow as the bound at most, which is taken for the steps of the size of the pattern times the power of the degree
-    * of twice the bounded width of the pattern (see [[Attacker.boundedWidthOf]]). An exponential bound may reach the
-    * limit on a few characters.
     */
   private[fuzz] def isLinearBeyondCounts(
       pattern: IRPattern,
@@ -316,10 +311,6 @@ private[fuzz] final class FuzzChecker(
 
   /** Computes the seeds of the upper bound whose matches succeed again, with each literal of the pattern as the suffix
     * after the last repetition, up to the size of the initial generation with `seeds`.
-    *
-    * An upper bound tells no failure of the rest of the pattern or of a look-around, so the suffix of its witness may
-    * let the match succeed, and then the matching stops before the other paths of the witness. A literal of the pattern
-    * may make it fail (e.g. `</a>` for `(?!.*</a>)`).
     */
   def suffixedSeed(seeds: Seq[FString]): Seq[FString] = interrupt:
     val opts = Options(incubationLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode))

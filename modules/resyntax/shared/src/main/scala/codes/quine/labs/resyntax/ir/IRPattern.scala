@@ -67,9 +67,6 @@ final case class IRPattern(
 
   /** Returns the pattern where the repetitions that [[approximateRepeats]] changes iterate once instead (or at most
     * once), when their bodies have no unbounded repetition nor back-reference.
-    *
-    * The iterations of such a repetition add no loop, so the pattern loops as this pattern does. Matching it grows as
-    * matching this pattern does on the strings longer than what the counts of this pattern count.
     */
   def flattenRepeats(maxCount: Int): IRPattern = replaceRepeats(maxCount): (n, q) =>
     val loops = n.exists:
@@ -81,9 +78,6 @@ final case class IRPattern(
 
   /** Returns the pattern without the repetition of any character at its end, and the end assertions after it (e.g.
     * `.*$` with the `s` flag).
-    *
-    * They match any rest of the string once what is before them matches, so matching the pattern backtracks as matching
-    * this pattern does, apart from reading the rest.
     */
   def dropUniversalTail: IRPattern =
     def isEnd(node: IRNode): Boolean = node.data match
