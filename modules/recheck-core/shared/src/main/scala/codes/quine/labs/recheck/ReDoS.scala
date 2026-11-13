@@ -51,9 +51,9 @@ object ReDoS:
     * attack is not run or confirms the attack, or else the safe or unknown diagnostics, with the attacks refuted before
     * them.
     *
-    * An attack with the same complexity, hotspot and characteristics of its string as a refuted one is skipped (see
-    * [[AttackKey]]). When runtime-attack verification refutes `maxRefutedAttacks` attacks, the result is unknown with
-    * [[Diagnostics.ErrorKind.RuntimeAttacksRefuted]].
+    * An attack with the same complexity, spots of its hotspot, and characteristics of its string as a refuted one is
+    * skipped (see [[AttackKey]]). When runtime-attack verification refutes `maxRefutedAttacks` attacks, the result is
+    * unknown with [[Diagnostics.ErrorKind.RuntimeAttacksRefuted]].
     */
   def check(
       source: String,
@@ -181,12 +181,20 @@ object ReDoS:
       case ex: MultiFoldingLimitException => throw new UnsupportedException(ex.getMessage)
 
   /** AttackKey identifies an attack by the degree of the polynomial complexity (or `None` for the exponential one), the
-    * hotspot and the characteristics of the attack string.
+    * spots of the hotspot and the characteristics of the attack string.
+    *
+    * The warm and cold spots tell apart the attacks that grow at the same hot spots through different parts of the pattern, one
+    * of which an engine may refute while it confirms another (e.g. `x[^∆]*∆y` on `'x'.repeat(n)`, which V8 refutes as a
+    * Latin-1 string, and on a string with `∆`).
     *
     * The characteristics are the indices of `sets` (see [[characteristicSets]]) that have a character of the attack
     * string.
     */
-  private[recheck] final case class AttackKey(degree: Option[Int], spots: Seq[(Int, Int)], characteristics: Set[Int])
+  private[recheck] final case class AttackKey(
+      degree: Option[Int],
+      spots: Seq[Hotspot.Spot],
+      characteristics: Set[Int]
+  )
 
   private[recheck] object AttackKey:
 
@@ -201,8 +209,7 @@ object ReDoS:
       val degree = complexity match
         case AttackComplexity.Polynomial(degree, _) => Some(degree)
         case AttackComplexity.Exponential(_)        => None
-      val spots = hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Hot) => (s, e) }
-      AttackKey(degree, spots, characteristics)
+      AttackKey(degree, hotspot.spots, characteristics)
 
   /** Runs the automaton checker, and returns the vulnerable diagnostics it finds, a function giving the safe
     * diagnostics once they run out, and a function giving the upper bound, which is always `None`.

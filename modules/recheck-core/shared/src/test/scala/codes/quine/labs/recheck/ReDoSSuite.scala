@@ -563,14 +563,15 @@ class ReDoSSuite extends munit.FunSuite:
     def key(complexity: AttackComplexity.Vulnerable, hotspot: Hotspot): ReDoS.AttackKey =
       ReDoS.AttackKey(complexity, attack, hotspot, Seq.empty)
 
-    val hotspot = Hotspot(Seq(Spot(0, 1, Warm), Spot(4, 5, Hot), Spot(6, 7, Hot)))
+    val hotspot = Hotspot(Seq(Spot(0, 1, Warm), Spot(2, 3, Cold), Spot(4, 5, Hot), Spot(6, 7, Hot)))
     assertEquals(
       key(AttackComplexity.Exponential(true), hotspot),
-      ReDoS.AttackKey(None, Seq((4, 5), (6, 7)), Set.empty)
+      ReDoS.AttackKey(None, Seq(Spot(0, 1, Warm), Spot(2, 3, Cold), Spot(4, 5, Hot), Spot(6, 7, Hot)), Set.empty)
     )
-    assertEquals(
+    assertEquals(key(AttackComplexity.Polynomial(2, false), hotspot), key(AttackComplexity.Polynomial(2, true), hotspot))
+    assertNotEquals(
       key(AttackComplexity.Polynomial(2, false), hotspot),
-      key(AttackComplexity.Polynomial(2, true), Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot))))
+      key(AttackComplexity.Polynomial(2, false), Hotspot(Seq(Spot(0, 1, Warm), Spot(4, 5, Hot), Spot(6, 7, Hot))))
     )
     assertNotEquals(
       key(AttackComplexity.Polynomial(2, false), hotspot),
