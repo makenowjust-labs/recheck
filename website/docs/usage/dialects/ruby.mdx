@@ -103,7 +103,7 @@ Enable the [runtime-attack verification](../runtime-attack-verification.mdx) to 
 
 ## Runtime-Attack Verification
 
-- Command: `ruby -`.
+- Command: `ruby --disable-gems -`.
 - Matching: `Regexp#match?` (no `Regexp.timeout`).
 - Engine limits: none.
 - Engine errors: `RegexpError`, `NoMemoryError`, `SystemStackError`.

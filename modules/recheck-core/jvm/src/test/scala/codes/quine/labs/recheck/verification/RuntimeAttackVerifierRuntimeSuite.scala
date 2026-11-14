@@ -186,9 +186,9 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
   runtimeTest("RECHECK_RUBY", "ruby"):
     // The wrapper's runtime line comes first, and it shows the arguments.
     val ruby = script("my ruby", s"echo recheck:runtime wrapped \"$$@\"; exec '${which("ruby").get}' \"$$@\"")
-    val env = Map("RECHECK_RUBY" -> s"'$ruby' --disable-gems")
+    val env = Map("RECHECK_RUBY" -> s"'$ruby' --yjit")
     val r = verify("^(a|a)*$", "", Dialect.Ruby(), attack("a", 3, "\u0000"), env = env)
-    assertEquals(r.runtime, "wrapped --disable-gems -")
+    assertEquals(r.runtime, "wrapped --yjit --disable-gems -")
     assertFinish(r)
 
   test("RECHECK_JAVA: a fake runtime"):

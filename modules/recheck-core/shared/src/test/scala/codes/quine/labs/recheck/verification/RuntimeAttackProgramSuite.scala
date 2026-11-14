@@ -305,7 +305,7 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     assertEquals(js.content, "// Run: node runtime-attack.cjs\n" + generate("foo", "", Dialect.JavaScript).script)
     assertEquals(script("foo", Dialect.Python()).command, "python3 -I runtime-attack.py")
     assert(script("foo", Dialect.Python()).content.startsWith("# Run: python3 -I runtime-attack.py\nimport "))
-    assertEquals(script("foo", Dialect.Ruby()).command, "ruby runtime-attack.rb")
+    assertEquals(script("foo", Dialect.Ruby()).command, "ruby --disable-gems runtime-attack.rb")
     assertEquals(script("foo", Dialect.Perl()).command, "perl runtime-attack.pl")
     assert(script("foo", Dialect.Perl()).content.startsWith("# Run: perl runtime-attack.pl\nuse utf8;\n"))
     // PHP reads the comment after `<?php`.

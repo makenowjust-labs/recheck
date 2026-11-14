@@ -28,7 +28,7 @@ class ExecutorSuite extends munit.FunSuite:
       Seq(
         "node -",
         "python3 -I -",
-        "ruby -",
+        "ruby --disable-gems -",
         "java --source 17 RecheckTest.java",
         "dotnet run RecheckTest.cs",
         "perl -",
@@ -48,7 +48,7 @@ class ExecutorSuite extends munit.FunSuite:
       Seq(
         "node script",
         "python3 -I script",
-        "ruby script",
+        "ruby --disable-gems script",
         "java --source 17 script",
         "dotnet run script",
         "perl script",
@@ -85,7 +85,7 @@ class ExecutorSuite extends munit.FunSuite:
 
       assertEquals(args(NodeExecutor), "-\ninput")
       assertEquals(args(PythonExecutor), "-I\n-\ninput")
-      assertEquals(args(RubyExecutor), "-\n# encoding: UTF-8\ninput")
+      assertEquals(args(RubyExecutor), "--disable-gems\n-\n# encoding: UTF-8\ninput")
       assertEquals(args(java), "--source\n17\nclass RecheckTest {}\ninput")
       assertEquals(exec(dotnet), "11\nrun\n// test\ninput\n")
       assertEquals(args(PerlExecutor), "-\ninput")
