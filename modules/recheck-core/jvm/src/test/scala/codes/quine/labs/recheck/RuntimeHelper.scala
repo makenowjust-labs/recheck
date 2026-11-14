@@ -3,6 +3,7 @@ package codes.quine.labs.recheck
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import scala.concurrent.duration.Duration
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.exec.ExecResult
@@ -43,7 +44,7 @@ trait RuntimeHelper:
   /** Runs the input on the runtime of the executor in the environment variables, and returns the standard output. */
   def run(executor: Executor, input: String = "", env: Map[String, String] = Map.empty)(using munit.Location): String =
     given Context = Context()
-    executor.exec(input, None, "", env) match
+    executor.exec(input, None, Duration.Inf, "", env) match
       case ExecResult.Exit(0, out, _) => out
       case result                     => fail(s"`${executor.commandLine(env)}` failed: $result\n$input")
 

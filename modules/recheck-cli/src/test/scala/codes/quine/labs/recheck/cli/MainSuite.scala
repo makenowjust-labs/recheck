@@ -46,7 +46,7 @@ class MainSuite extends munit.FunSuite:
     val main = new Main:
       override def exit(exitCode: Int): Unit = throw new ExitException(exitCode)
 
-      override def runRuntimeAttack(logger: Option[Context.Logger])(
+      override def runRuntimeAttack(logger: Option[Context.Logger], compileTimeout: Duration)(
           source: String,
           dialect: Dialect,
           mode: UnitMode,

@@ -1,5 +1,6 @@
 package codes.quine.labs.recheck.exec
 
+import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 
 import codes.quine.labs.recheck.common.Context
@@ -15,7 +16,6 @@ private[exec] object Platform:
       args: Seq[String],
       replacement: Option[String],
       env: Map[String, String],
-      file: Option[SourceFile],
       input: String,
       timeout: Option[FiniteDuration],
       marker: String
@@ -28,8 +28,11 @@ private[exec] object Platform:
       command: String,
       replacement: Option[String],
       program: SourceFile,
-      versionArgs: Seq[String],
-      libraries: Seq[String]
+      versionArgs: Seq[Seq[String]],
+      compileArgs: (String, String) => Seq[String],
+      entry: String => String,
+      env: Map[String, String],
+      timeout: Duration
   )(using Context): String =
     // $COVERAGE-OFF$
     throw new UnexpectedException("Running a command is not supported on Scala.js.")

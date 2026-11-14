@@ -433,6 +433,7 @@ class CodecSuite extends munit.FunSuite:
         Json.obj(
           "attackTimeout" := Json.Null,
           "incubationTimeout" := Json.Null,
+          "runtimeAttackCompileTimeout" := Json.Null,
           "runtimeAttackTimeout" := Json.Null,
           "seedingTimeout" := Json.Null
         )
@@ -441,6 +442,7 @@ class CodecSuite extends munit.FunSuite:
         Parameters(
           attackTimeout = Duration.Inf,
           incubationTimeout = Duration.Inf,
+          runtimeAttackCompileTimeout = Duration.Inf,
           runtimeAttackTimeout = Duration.Inf,
           seedingTimeout = Duration.Inf
         )

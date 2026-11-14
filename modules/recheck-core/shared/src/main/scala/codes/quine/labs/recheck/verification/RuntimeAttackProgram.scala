@@ -250,7 +250,7 @@ object RuntimeAttackProgram:
           |""".stripMargin
     RuntimeAttackProgram(RubyExecutor, script)
 
-  /** Returns the data for the Java program for `java` as a single-file source program, using `Matcher#find`. */
+  /** Returns the data for the Java program for `java`, using `Matcher#find`. */
   private def java(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
     val options = flags.distinct.filter(c => "cdimsuxU".contains(c))
     RuntimeAttackProgram(JavaExecutor(JavaSource), encodeData(options, pattern, mode, attack))
@@ -312,7 +312,7 @@ object RuntimeAttackProgram:
         |}
         |""".stripMargin
 
-  /** Returns the data for the C# program for `dotnet run` (.NET 10 or later), using `Regex.Match` in the invariant
+  /** Returns the data for the C# program for `dotnet` (.NET 10 SDK or later), using `Regex.Match` in the invariant
     * culture.
     */
   private def dotnet(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =

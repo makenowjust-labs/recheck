@@ -134,9 +134,9 @@ object CalibrateRuntimeAttackCommand:
       (header ++ references ++ summary).mkString("\n")
 
   /** Runs the string against the pattern on the runtime of the dialect within the timeout, as the runtime-attack
-    * verification does.
+    * verification does, with the compilation of the program limited by `compileTimeout`.
     */
-  def run(logger: Option[Context.Logger])(
+  def run(logger: Option[Context.Logger], compileTimeout: Duration)(
       source: String,
       dialect: Dialect,
       mode: UnitMode,
@@ -144,7 +144,7 @@ object CalibrateRuntimeAttackCommand:
       timeout: FiniteDuration
   ): Option[RuntimeAttack] =
     given Context = Context(logger = logger)
-    RuntimeAttackVerifier.verify(source, "", dialect, mode, string, timeout, sys.env)
+    RuntimeAttackVerifier.verify(source, "", dialect, mode, string, timeout, compileTimeout, sys.env)
 
   /** Runs the matchings of the references by `run` in turn, again and again for the time on the clock `now` in
     * nanoseconds, or returns why they cannot be measured.

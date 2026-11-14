@@ -128,13 +128,14 @@ class Main:
   def exit(exitCode: Int): Unit = sys.exit(exitCode)
 
   /** Runs a matching on the runtime for `recheck calibrate-runtime-attack`. */
-  def runRuntimeAttack(logger: Option[Context.Logger])(
+  def runRuntimeAttack(logger: Option[Context.Logger], compileTimeout: Duration)(
       source: String,
       dialect: Dialect,
       mode: UnitMode,
       string: AttackPattern,
       timeout: FiniteDuration
-  ): Option[RuntimeAttack] = CalibrateRuntimeAttackCommand.run(logger)(source, dialect, mode, string, timeout)
+  ): Option[RuntimeAttack] =
+    CalibrateRuntimeAttackCommand.run(logger, compileTimeout)(source, dialect, mode, string, timeout)
   // $COVERAGE-ON$
 
   def run(args: Array[String]): Unit = command.parse(args.toSeq, sys.env) match
@@ -150,7 +151,7 @@ class Main:
         case _: Diagnostics.Vulnerable | _: Diagnostics.Unknown => exit(1)
 
     case Right(action: CalibrateRuntimeAttackAction) =>
-      val run = runRuntimeAttack(action.params.logger)
+      val run = runRuntimeAttack(action.params.logger, action.params.runtimeAttackCompileTimeout)
       CalibrateRuntimeAttackCommand.calibrate(action.params, action.ratio, action.time)(run) match
         case Right(calibration) =>
           Console.out.println(calibration.toString)

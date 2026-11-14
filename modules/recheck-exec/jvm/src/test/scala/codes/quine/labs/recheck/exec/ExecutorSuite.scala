@@ -1,6 +1,10 @@
 package codes.quine.labs.recheck.exec
 
 import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.util.Comparator
+import scala.concurrent.duration.*
 
 import codes.quine.labs.recheck.common.Context
 
@@ -16,7 +20,7 @@ class ExecutorSuite extends munit.FunSuite:
   val icu: ICUExecutor = ICUExecutor(SourceFile("RecheckTest.cpp", "// test"))
 
   /** A fake compiler, which prints its version for `--version`, and otherwise copies the program, a shell script, to
-    * the binary.
+    * the output.
     */
   val fakeCompiler: String =
     "#!/bin/sh\nif [ \"$1\" = --version ]; then echo fake 1.0; exit 0; fi\nfor a in \"$@\"; do\n  if [ \"$prev\" = -o ]; then out=\"$a\"; fi\n  case \"$a\" in *.sh) src=\"$a\" ;; esac\n  prev=\"$a\"\ndone\ncp \"$src\" \"$out\"\nchmod +x \"$out\"\n"
@@ -38,11 +42,11 @@ class ExecutorSuite extends munit.FunSuite:
         "python3 -I -",
         "python3 -I -",
         "ruby --disable-gems -",
-        "java --source 17 RecheckTest.java",
-        "dotnet run RecheckTest.cs",
+        "java -m jdk.compiler/com.sun.tools.javac.Main --release 17 -d RecheckTest RecheckTest.java && java -cp RecheckTest RecheckTest",
+        "dotnet build RecheckTest.cs -o RecheckTest --disable-build-servers && dotnet RecheckTest/RecheckTest.dll",
         "perl -",
         "php",
-        "c++ RecheckTest.cpp -o RecheckTest -licui18n -licuuc -licudata"
+        "c++ RecheckTest.cpp -o RecheckTest -licui18n -licuuc -licudata && ./RecheckTest"
       )
     )
     // The variable replaces the command, and an empty value is ignored.
@@ -54,10 +58,13 @@ class ExecutorSuite extends munit.FunSuite:
       PythonRegexExecutor.commandLine(Map("RECHECK_PYTHON_REGEX" -> "venv/bin/python")),
       "venv/bin/python -I -"
     )
-    assertEquals(java.commandLine(Map("RECHECK_JAVA" -> "my-java")), "my-java --source 17 RecheckTest.java")
+    assertEquals(
+      java.commandLine(Map("RECHECK_JAVA" -> "my-java")),
+      "my-java -m jdk.compiler/com.sun.tools.javac.Main --release 17 -d RecheckTest RecheckTest.java && my-java -cp RecheckTest RecheckTest"
+    )
     assertEquals(
       icu.commandLine(Map("RECHECK_ICU" -> "c++ -I/icu/include")),
-      "c++ -I/icu/include RecheckTest.cpp -o RecheckTest -licui18n -licuuc -licudata"
+      "c++ -I/icu/include RecheckTest.cpp -o RecheckTest -licui18n -licuuc -licudata && ./RecheckTest"
     )
 
   test("Executor#scriptCommandLine"):
@@ -83,59 +90,98 @@ class ExecutorSuite extends munit.FunSuite:
   test("Executor#exec"):
     // The command runs from `PATH` without the variable.
     object ShellExecutor extends Executor.Stdin("sh", "RECHECK_SH", stdin = Seq.empty)
-    assertEquals(ShellExecutor.exec("echo foo", None, "start", Map.empty), ExecResult.Exit(0, "foo\n", ""))
+    assertEquals(
+      ShellExecutor.exec("echo foo", None, Duration.Inf, "start", Map.empty),
+      ExecResult.Exit(0, "foo\n", "")
+    )
+
+  /** Creates an executable script in a new directory with a space in its name, and runs the body with its path. */
+  def withScript[A](name: String, content: String)(body: Path => A): A =
+    val dir = Files.createTempDirectory("recheck executor ")
+    val script = dir.resolve(name)
+    Files.writeString(script, content)
+    script.toFile.setExecutable(true)
+    try body(script)
+    finally
+      Files.deleteIfExists(script)
+      Files.deleteIfExists(dir)
+
+  /** Deletes the file or the directory with its contents. */
+  def delete(path: Path): Unit =
+    if Files.exists(path) then Files.walk(path).sorted(Comparator.reverseOrder()).forEach(Files.delete)
 
   test("Executor#exec: the variable"):
-    // A fake runtime prints the variables of .NET, the arguments with the content of a file, and the input.
-    val dir = Files.createTempDirectory("recheck executor ")
-    val runtime = dir.resolve("my runtime")
-    Files.writeString(
-      runtime,
+    // A fake runtime prints the arguments and the input.
+    val content = "#!/bin/sh\nfor a in \"$@\"; do echo \"$a\"; done\ncat\n"
+    withScript("my runtime", content): runtime =>
+      def exec(executor: Executor): ExecResult =
+        executor.exec("input", None, Duration.Inf, "start", Map(executor.variable -> s"'$runtime'"))
+
+      assertEquals(exec(NodeExecutor), ExecResult.Exit(0, "-\ninput\n", ""))
+      assertEquals(exec(PythonExecutor), ExecResult.Exit(0, "-I\n-\ninput\n", ""))
+      assertEquals(exec(RubyExecutor), ExecResult.Exit(0, "--disable-gems\n-\n# encoding: UTF-8\ninput\n", ""))
+      assertEquals(exec(PerlExecutor), ExecResult.Exit(0, "-\ninput\n", ""))
+      assertEquals(exec(PHPExecutor), ExecResult.Exit(0, "input\n", ""))
+
+  test("Executor#exec: a program that the runtime compiles"):
+    // A fake runtime creates the output of a compilation with the entry files of Java and .NET, and otherwise prints the
+    // variables of .NET, the arguments and the input.
+    val content =
       """|#!/bin/sh
+         |for a in "$@"; do
+         |  if [ "$prev" = -d ] || [ "$prev" = -o ]; then mkdir "$a"; touch "$a/RecheckTest.class" "$a/RecheckTest.dll"; exit 0; fi
+         |  prev="$a"
+         |done
          |echo "$DOTNET_NOLOGO$DOTNET_CLI_TELEMETRY_OPTOUT"
-         |for a in "$@"; do if [ -f "$a" ]; then cat "$a"; echo; else echo "$a"; fi; done
+         |echo "$*"
          |cat
          |""".stripMargin
-    )
-    runtime.toFile.setExecutable(true)
-    def exec(executor: Executor): String =
-      executor.exec("input", None, "start", Map(executor.variable -> s"'$runtime'")) match
-        case ExecResult.Exit(0, out, "") => out
-        case result                      => fail(s"unexpected: $result")
+    // The content is unique to this test, so that the runtime compiles it.
+    val nonce = s"// ${System.nanoTime()}"
+    val compiledJava = JavaExecutor(SourceFile("RecheckTest.java", nonce))
+    val compiledDotNet = DotNetExecutor(SourceFile("RecheckTest.cs", nonce))
+    withScript("my runtime", content): runtime =>
+      def exec(executor: Executor): Seq[String] =
+        executor.exec("input", None, Duration.Inf, "start", Map(executor.variable -> s"'$runtime'")) match
+          case ExecResult.Exit(0, out, "") => out.linesIterator.toSeq
+          case result                      => fail(s"unexpected: $result")
 
-    try
-      // The first line has the variables, which the environment may have.
-      def args(executor: Executor): String = exec(executor).linesIterator.drop(1).mkString("\n")
-
-      assertEquals(args(NodeExecutor), "-\ninput")
-      assertEquals(args(PythonExecutor), "-I\n-\ninput")
-      assertEquals(args(RubyExecutor), "--disable-gems\n-\n# encoding: UTF-8\ninput")
-      assertEquals(args(java), "--source\n17\nclass RecheckTest {}\ninput")
-      assertEquals(exec(dotnet), "11\nrun\n// test\ninput\n")
-      assertEquals(args(PerlExecutor), "-\ninput")
-      assertEquals(args(PHPExecutor), "input")
-    finally
-      Files.deleteIfExists(SourceDirectory.path(java.program))
-      Files.deleteIfExists(SourceDirectory.path(dotnet.program))
-      Files.deleteIfExists(runtime)
-      Files.deleteIfExists(dir)
+      // The first line of Java has the variables of .NET, which the environment may have.
+      val Seq(_, javaArgs, "input") = exec(compiledJava): @unchecked
+      val Seq("11", dotnetArgs, "input") = exec(compiledDotNet): @unchecked
+      try
+        assert(clue(javaArgs).matches("-cp .*/RecheckTest-[0-9a-f]{16} RecheckTest"))
+        // The key of the output of .NET has the lists of the SDKs and the runtimes.
+        val dotnetLine = Seq(s"'$runtime'", "build", "RecheckTest.cs", "-o", "RecheckTest", "--disable-build-servers")
+        val versions = "11\n--list-sdks\n11\n--list-runtimes\n"
+        val dotnetOutput = SourceDirectory.outputPath(compiledDotNet.program, dotnetLine, versions)
+        assertEquals(dotnetArgs, s"$dotnetOutput/RecheckTest.dll")
+      finally
+        delete(Paths.get(javaArgs.stripPrefix("-cp ").stripSuffix(" RecheckTest")))
+        delete(Paths.get(dotnetArgs).getParent)
 
   test("Executor#exec: a compiled program"):
-    val dir = Files.createTempDirectory("recheck executor ")
-    val compiler = dir.resolve("my compiler")
-    Files.writeString(compiler, fakeCompiler)
-    compiler.toFile.setExecutable(true)
     val program = SourceFile("RecheckTest.sh", s"#!/bin/sh\necho \"$$(cat)\" # ${System.nanoTime()}\n")
-    val executor = ICUExecutor(program)
-    try
-      assertEquals(
-        executor.exec("input", None, "start", Map("RECHECK_ICU" -> s"'$compiler'")),
-        ExecResult.Exit(0, "input\n", "")
-      )
-    finally
-      Files.deleteIfExists(SourceDirectory.path(program))
-      Files.deleteIfExists(
-        SourceDirectory.binaryPath(program, Seq(s"'$compiler'", "-licui18n", "-licuuc", "-licudata"), "fake 1.0\n")
-      )
-      Files.deleteIfExists(compiler)
-      Files.deleteIfExists(dir)
+    withScript("my compiler", fakeCompiler): compiler =>
+      val line = s"'$compiler'"
+      try
+        assertEquals(
+          ICUExecutor(program).exec("input", None, Duration.Inf, "start", Map("RECHECK_ICU" -> line)),
+          ExecResult.Exit(0, "input\n", "")
+        )
+      finally
+        val args = Seq(line, "RecheckTest.sh", "-o", "RecheckTest", "-licui18n", "-licuuc", "-licudata")
+        delete(SourceDirectory.outputPath(program, args, "fake 1.0\n"))
+
+  test("Executor#exec: the compilation does not count toward the timeout"):
+    val program = SourceFile("RecheckTest.sh", s"#!/bin/sh\necho \"$$(cat)\" # ${System.nanoTime()}\n")
+    withScript("my compiler", "#!/bin/sh\nsleep 1\n" + fakeCompiler.stripPrefix("#!/bin/sh\n")): compiler =>
+      val line = s"'$compiler'"
+      try
+        val result = ICUExecutor(program).exec("input", None, Duration.Inf, "start", Map("RECHECK_ICU" -> line))(using
+          Context(timeout = 500.millis)
+        )
+        assertEquals(result, ExecResult.Exit(0, "input\n", ""))
+      finally
+        val args = Seq(line, "RecheckTest.sh", "-o", "RecheckTest", "-licui18n", "-licuuc", "-licudata")
+        delete(SourceDirectory.outputPath(program, args, "fake 1.0\n"))

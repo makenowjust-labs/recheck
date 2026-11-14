@@ -22,7 +22,7 @@ object RuntimeAttackVerifier:
     *
     * It returns `None` without running when the timeout is not positive, this platform cannot run programs, or the
     * dialect or the pattern is not supported. It throws [[UnexpectedException]] when the runtime fails to run the
-    * program.
+    * program. `compileTimeout` limits the compilation of the program, which some runtimes need.
     *
     * The environment variables `env` may replace the command of the runtime (e.g. `RECHECK_NODE`).
     */
@@ -33,6 +33,7 @@ object RuntimeAttackVerifier:
       mode: UnitMode,
       attack: AttackPattern,
       timeout: Duration,
+      compileTimeout: Duration,
       env: Map[String, String]
   )(using ctx: Context): Option[RuntimeAttack] = ctx.interrupt:
     if timeout <= Duration.Zero || !Executor.isAvailable then None
@@ -45,7 +46,8 @@ object RuntimeAttackVerifier:
           val executor = program.executor
           val commandLine = executor.commandLine(env)
           ctx.log(s"runtime attack: command: $commandLine\n${program.script}")
-          val output = executor.exec(program.script, boundTimeout(timeout), RuntimeAttackProgram.StartLine, env)
+          val output =
+            executor.exec(program.script, boundTimeout(timeout), compileTimeout, RuntimeAttackProgram.StartLine, env)
           Some(parseOutput(executor.runtime(env), commandLine, timeout, output))
 
   /** Returns the time limit of a matching for the timeout, which is bounded by the deadline of the context. */

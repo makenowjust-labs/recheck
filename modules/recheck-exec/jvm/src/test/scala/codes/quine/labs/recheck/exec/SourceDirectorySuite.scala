@@ -5,8 +5,6 @@ import java.nio.file.attribute.FileTime
 import java.nio.file.attribute.PosixFilePermissions
 import java.util.concurrent.TimeUnit
 
-import codes.quine.labs.recheck.common.UnexpectedException
-
 class SourceDirectorySuite extends munit.FunSuite:
 
   test("SourceDirectory.directory"):
@@ -34,53 +32,19 @@ class SourceDirectorySuite extends munit.FunSuite:
       assert(Files.isDirectory(young))
     finally SourceDirectory.delete(young)
 
-  test("SourceDirectory.path"):
-    // The content is unique to this test, so that no other run writes the same file.
-    val source = SourceFile("Foo.java", s"class Foo {} // ${System.nanoTime()}")
-    val file = SourceDirectory.path(source)
-    val changed = SourceDirectory.path(source.copy(content = source.content + " "))
-    try
-      assertEquals(file.getParent, SourceDirectory.directory)
-      assert(clue(file.getFileName.toString).matches("Foo-[0-9a-f]{16}\\.java"))
-      assertEquals(Files.readString(file), source.content)
-      val modified = Files.getLastModifiedTime(file)
-      assertEquals(SourceDirectory.path(source), file)
-      assertEquals(Files.getLastModifiedTime(file), modified)
-      // A changed file is written again.
-      Files.writeString(file, "broken")
-      assertEquals(SourceDirectory.path(source), file)
-      assertEquals(Files.readString(file), source.content)
-      assertNotEquals(changed, file)
-    finally
-      Files.deleteIfExists(file)
-      Files.deleteIfExists(changed)
-
-  test("SourceDirectory.binaryPath"):
+  test("SourceDirectory.outputPath"):
     val source = SourceFile("Foo.cpp", "int main() {}")
-    val binary = SourceDirectory.binaryPath(source, Seq("c++", "-lfoo"), "c++ 1")
-    assertEquals(binary.getParent, SourceDirectory.directory)
-    assert(clue(binary.getFileName.toString).matches("Foo-[0-9a-f]{16}"))
-    assertEquals(SourceDirectory.binaryPath(source, Seq("c++", "-lfoo"), "c++ 1"), binary)
-    // Another command line, version or source has another binary.
-    assertNotEquals(SourceDirectory.binaryPath(source, Seq("c++ -O", "-lfoo"), "c++ 1"), binary)
-    assertNotEquals(SourceDirectory.binaryPath(source, Seq("c++", "-lfoo"), "c++ 2"), binary)
+    val output = SourceDirectory.outputPath(source, Seq("c++", "-lfoo"), "c++ 1")
+    assertEquals(output.getParent, SourceDirectory.directory)
+    assert(clue(output.getFileName.toString).matches("Foo-[0-9a-f]{16}"))
+    assertEquals(SourceDirectory.outputPath(source, Seq("c++", "-lfoo"), "c++ 1"), output)
+    // Another command line, version or source has another output.
+    assertNotEquals(SourceDirectory.outputPath(source, Seq("c++ -O", "-lfoo"), "c++ 1"), output)
+    assertNotEquals(SourceDirectory.outputPath(source, Seq("c++", "-lfoo"), "c++ 2"), output)
     assertNotEquals(
-      SourceDirectory.binaryPath(source.copy(content = "int main() { }"), Seq("c++", "-lfoo"), "c++ 1"),
-      binary
+      SourceDirectory.outputPath(source.copy(content = "int main() { }"), Seq("c++", "-lfoo"), "c++ 1"),
+      output
     )
-
-  test("SourceDirectory.path: a file that cannot be written"):
-    val source = SourceFile("Foo.java", s"class Foo {} // ${System.nanoTime()}")
-    val file = SourceDirectory.path(source)
-    Files.delete(file)
-    // A non-empty directory at the path of the file cannot be replaced.
-    val inner = Files.createFile(Files.createDirectory(file).resolve("inner"))
-    try
-      val ex = intercept[UnexpectedException](SourceDirectory.path(source))
-      assert(clue(ex.getMessage).startsWith(s"cannot write `$file`: "))
-    finally
-      Files.deleteIfExists(inner)
-      Files.deleteIfExists(file)
 
   test("SourceDirectory.sharedDirectory"):
     val parent = Files.createTempDirectory("recheck-exec-")

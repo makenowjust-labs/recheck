@@ -5,7 +5,9 @@ package codes.quine.labs.recheck.exec
   *
   * The libraries of ICU (`-licui18n -licuuc -licudata`) follow the program on the command line.
   */
-final case class ICUExecutor(program: SourceFile)
-    extends Executor.Compiled("c++", "RECHECK_ICU", program, Seq("-licui18n", "-licuuc", "-licudata")):
+final case class ICUExecutor(program: SourceFile) extends Executor.Compiled("c++", "RECHECK_ICU", program):
 
-  protected val versionArgs: Seq[String] = Seq("--version")
+  protected val versionArgs: Seq[Seq[String]] = Seq(Seq("--version"))
+
+  protected def compileArgs(source: String, output: String): Seq[String] =
+    Seq(source, "-o", output, "-licui18n", "-licuuc", "-licudata")

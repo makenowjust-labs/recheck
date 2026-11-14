@@ -43,7 +43,7 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
       env: Map[String, String] = Map.empty
   ): RuntimeAttack =
     val mode = ReDoS.parse(source, flags, dialect).mode
-    RuntimeAttackVerifier.verify(source, flags, dialect, mode, attack, timeout, env).get
+    RuntimeAttackVerifier.verify(source, flags, dialect, mode, attack, timeout, Duration.Inf, env).get
 
   /** Creates a shell script in a new directory with a space in its name. */
   def script(name: String, body: String): Path =
@@ -131,7 +131,7 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
     assertFinish(verify("^(?:😀)*!$", "", Dialect.Java, astral))
 
   runtimeTest(".NET", "dotnet"):
-    // The first run of `dotnet run -` builds the program, which takes some seconds.
+    // The first run builds the program, which takes some seconds.
     val r = verify("^(a|a)*$", "", Dialect.DotNet, attack("a", 31, "\u0000"))
     assertFinish(r)
     assert(clue(r.runtime).startsWith(".NET "))
@@ -177,7 +177,8 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
 
   /** Runs the standalone program on the runtime of the program of the dialect, and returns the output. */
   def runScript(script: RuntimeAttackProgram.Script, program: RuntimeAttackProgram): String = program.executor match
-    case _: JavaExecutor   => run(JavaExecutor(SourceFile(script.name, script.content)))
+    // The class of the Java program is `RecheckRuntimeAttack`, which names the program file.
+    case _: JavaExecutor   => run(JavaExecutor(SourceFile("RecheckRuntimeAttack.java", script.content)))
     case _: DotNetExecutor => run(DotNetExecutor(SourceFile(script.name, script.content)))
     case executor          => run(executor, script.content)
 
@@ -211,20 +212,32 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
     assertFinish(r)
 
   test("RECHECK_JAVA: a fake runtime"):
-    // A fake runtime reads the data of the program, and gets the path of the program as the last argument.
+    // A fake runtime prints its version, creates the class file of a compilation, and reads the data of the program on
+    // a run.
     val java = script(
       "fake java",
-      """|cat > /dev/null
-         |eval "file=\${$#}"
-         |test -f "$file" || exit 2
-         |echo "recheck:runtime fake $1 $2"
+      """|if [ "$1" = -version ]; then echo fake 1.0; exit 0; fi
+         |if [ "$1" = -m ]; then mkdir "$6"; touch "$6/RecheckRuntimeAttack.class"; exit 0; fi
+         |cat > /dev/null
+         |test -d "$2" || exit 2
+         |echo "recheck:runtime fake $1 $3"
          |echo recheck:start
          |echo recheck:engine-error StackOverflowError""".stripMargin
     )
     val r = verify("a", "", Dialect.Java, attack("a", 3, ""), env = Map("RECHECK_JAVA" -> s"\"$java\""))
-    assertEquals(r, RuntimeAttack("fake --source 17", 1.second, RuntimeAttackResult.EngineError("StackOverflowError")))
-    interceptMessage[UnexpectedException]("`sh -c 'exit 3' --source 17 RecheckRuntimeAttack.java` exited with 3"):
-      verify("a", "", Dialect.Java, attack("a", 3, ""), env = Map("RECHECK_JAVA" -> "sh -c 'exit 3'"))
+    assertEquals(
+      r,
+      RuntimeAttack("fake -cp RecheckRuntimeAttack", 1.second, RuntimeAttackResult.EngineError("StackOverflowError"))
+    )
+    // A run exiting without a message tells the command line.
+    val exit =
+      "sh -c 'case \"$1\" in -version) echo 1.0 ;; -m) mkdir \"$6\"; touch \"$6/RecheckRuntimeAttack.class\" ;; " +
+        "*) exit 3 ;; esac' sh"
+    interceptMessage[UnexpectedException](
+      s"`$exit -m jdk.compiler/com.sun.tools.javac.Main --release 17 -d RecheckRuntimeAttack RecheckRuntimeAttack.java && " +
+        s"$exit -cp RecheckRuntimeAttack RecheckRuntimeAttack` exited with 3"
+    ):
+      verify("a", "", Dialect.Java, attack("a", 3, ""), env = Map("RECHECK_JAVA" -> exit))
 
   runtimeTest("RuntimeAttackVerifier.verify: the deadline of the context", "node"):
     given Context = Context(timeout = 50.millis)
@@ -237,5 +250,6 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
         UnitMode.UTF16,
         exponential,
         10.seconds,
+        Duration.Inf,
         Map.empty
       )

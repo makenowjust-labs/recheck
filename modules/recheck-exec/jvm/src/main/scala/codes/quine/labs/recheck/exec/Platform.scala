@@ -6,11 +6,16 @@ import java.io.InputStreamReader
 import java.io.UncheckedIOException
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import scala.collection.mutable
+import scala.concurrent.duration.Deadline
+import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.*
 
@@ -36,96 +41,124 @@ private[exec] object Platform:
 
   /** Runs the command with the arguments, writing the input to its standard input.
     *
-    * The replacement is a command line of the shell running instead of the command. The path of the file follows the
-    * arguments, and until a run of the file exits normally or times out in this process, its runs do not run
-    * concurrently.
+    * The replacement is a command line of the shell running instead of the command.
     */
   def run(
       command: String,
       args: Seq[String],
       replacement: Option[String],
       env: Map[String, String],
-      file: Option[SourceFile],
       input: String,
       timeout: Option[FiniteDuration],
       marker: String
-  )(using ctx: Context): ExecResult =
-    val argv = replacement.fold(command +: args)(line => Seq(shell, "-c", s"$line \"$$@\"", "sh") ++ args)
-    val shown = (argv ++ file.map(_.name)).mkString(" ")
-    val path = file.map(SourceDirectory.path)
-    def start(): ExecResult = exec(argv ++ path.map(_.toString), shown, env, input, timeout, marker)
-
-    path.flatMap(SourceDirectory.firstRunLock) match
-      case Some(l) =>
-        while !l.tryLock(PollMillis, TimeUnit.MILLISECONDS) do ctx.interrupt(())
-        try
-          val result = start()
-          result match
-            case ExecResult.Exit(0, _, _) | ExecResult.Timeout(_) => path.foreach(SourceDirectory.markWarm)
-            case _                                                => ()
-          result
-        finally l.unlock()
-      case None => start()
+  )(using Context): ExecResult =
+    val argv = commandArgs(command, args, replacement)
+    exec(argv, argv.mkString(" "), env, input, timeout, marker, None)
 
   /** Compiles the program with the command, or the replacement command line of the shell, and returns the path of the
-    * binary.
+    * output.
     *
-    * The binary of the same source, the same command line and the same output of the command with `versionArgs` is
-    * compiled once, and the compilations of a binary do not run concurrently in this process. A failed compilation
-    * throws [[UnexpectedException]] with the compiler's output, as a failure of a file of the compilation does.
+    * The arguments `compileArgs(source, output)` follow the command. The output of the same source, the same command
+    * line and the same outputs of the command with the arguments in `versionArgs` is compiled once, and the
+    * compilations of an output do not run concurrently in this process. An output without the file `entry(output)` is
+    * compiled again.
+    *
+    * The timeout limits the commands printing the version, the wait for another compilation of the output in this
+    * process, and the compilation. A failed or timed-out compilation throws [[UnexpectedException]] with the compiler's
+    * output, as a failure of a file of the compilation does.
     */
   def compile(
       command: String,
       replacement: Option[String],
       program: SourceFile,
-      versionArgs: Seq[String],
-      libraries: Seq[String]
+      versionArgs: Seq[Seq[String]],
+      compileArgs: (String, String) => Seq[String],
+      entry: String => String,
+      env: Map[String, String],
+      timeout: Duration
   )(using ctx: Context): String =
-    val line = replacement.getOrElse(command)
-    val shown = (Seq(line, program.name, "-o", Executor.binaryName(program.name)) ++ libraries).mkString(" ")
-    val binary = SourceDirectory.binaryPath(program, line +: libraries, version(command, replacement, versionArgs))
-    val lock = SourceDirectory.lock(binary)
-    while !lock.tryLock(PollMillis, TimeUnit.MILLISECONDS) do ctx.interrupt(())
+    val deadline = timeout match
+      case d: FiniteDuration => Some(d.fromNow)
+      case _                 => None
+    val line = replacement.getOrElse(command) +: compileArgs(program.name, Executor.outputName(program.name))
+    val shown = line.mkString(" ")
+    val versionOutputs = versionArgs.map(version(command, replacement, _, env, deadline))
+    val path = SourceDirectory.outputPath(program, line, versionOutputs.mkString)
+    def isCompiled(output: Path): Boolean = Files.exists(Paths.get(entry(output.toString)), LinkOption.NOFOLLOW_LINKS)
+
+    val lock = SourceDirectory.lock(path)
+    acquire(lock, deadline, s"cannot compile `$shown`: timed out")
     try
-      if !Files.isExecutable(binary) then
-        val source = SourceDirectory.path(program)
+      if !isCompiled(path) then
         try
           SourceDirectory.deleteLeftovers()
-          // The binary moves from a new directory at once, so that another process never runs a partial binary.
+          // The output moves from a new directory at once, so that another process never runs a partial output.
+          // The source has its own name there, which may name the output (e.g. a public class of Java).
           val dir = Files.createTempDirectory(SourceDirectory.directory, "compile-")
           try
-            val output = dir.resolve(binary.getFileName)
-            val args = Seq(source.toString, "-o", output.toString) ++ libraries
-            val argv = replacement.fold(command +: args)(line => Seq(shell, "-c", s"$line \"$$@\"", "sh") ++ args)
-            val ExecResult.Exit(code, out, err) = exec(argv, shown, Map.empty, "", None, ""): @unchecked
-            if code != 0 then throw new UnexpectedException(s"cannot compile `$shown`:\n${(out + err).trim}")
-            Files.move(output, binary, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            val source = Files.writeString(dir.resolve(program.name), program.content)
+            val output = dir.resolve(path.getFileName)
+            val argv = commandArgs(command, compileArgs(source.toString, output.toString), replacement)
+            exec(argv, shown, env, "", None, "", deadline) match
+              case ExecResult.Exit(0, _, _)     => ()
+              case ExecResult.Exit(_, out, err) =>
+                throw new UnexpectedException(s"cannot compile `$shown`:\n${(out + err).trim}")
+              case ExecResult.Timeout(_) => throw new UnexpectedException(s"cannot compile `$shown`: timed out")
+            if !isCompiled(output) then throw new UnexpectedException(s"cannot compile `$shown`: no output")
+            // An output without its entry file is left, e.g. by a cleaner of the temporary directory.
+            if Files.exists(path, LinkOption.NOFOLLOW_LINKS) then SourceDirectory.delete(path)
+            try Files.move(output, path, StandardCopyOption.ATOMIC_MOVE)
+            catch
+              // Only a race with another process compiling the same output leads here, which the tests cannot set up.
+              // $COVERAGE-OFF$
+              case _: IOException if isCompiled(path) => ()
+              // $COVERAGE-ON$
           finally SourceDirectory.delete(dir)
         catch case ex: IOException => throw new UnexpectedException(s"cannot compile `$shown`: ${ex.getMessage}")
-      binary.toString
+      path.toString
     finally lock.unlock()
 
   /** Returns the output of the command, or the replacement command line of the shell, with the arguments printing its
     * version.
     *
-    * The command line runs once in this process. A failed command, or one printing nothing, throws
+    * The command line runs once in this process. A failed or timed-out command, or one printing nothing, throws
     * [[UnexpectedException]] with its output.
     */
-  private def version(command: String, replacement: Option[String], args: Seq[String])(using ctx: Context): String =
+  private def version(
+      command: String,
+      replacement: Option[String],
+      args: Seq[String],
+      env: Map[String, String],
+      deadline: Option[Deadline]
+  )(using ctx: Context): String =
     val line = replacement.getOrElse(command) +: args
-    while !versionLock.tryLock(PollMillis, TimeUnit.MILLISECONDS) do ctx.interrupt(())
+    val shown = line.mkString(" ")
+    acquire(versionLock, deadline, s"cannot run `$shown`: timed out")
     try
       versions.get(line) match
         case Some(output) => output
         case None         =>
-          val argv = replacement.fold(command +: args)(line => Seq(shell, "-c", s"$line \"$$@\"", "sh") ++ args)
-          val shown = line.mkString(" ")
-          val ExecResult.Exit(code, out, err) = exec(argv, shown, Map.empty, "", None, ""): @unchecked
-          if code != 0 then throw new UnexpectedException(s"cannot run `$shown`:\n${(out + err).trim}")
-          if (out + err).trim.isEmpty then throw new UnexpectedException(s"cannot run `$shown`: no output")
-          versions(line) = out + err
-          out + err
+          val output = exec(commandArgs(command, args, replacement), shown, env, "", None, "", deadline) match
+            case ExecResult.Exit(0, out, err) if (out + err).trim.nonEmpty => out + err
+            case ExecResult.Exit(0, _, _)     => throw new UnexpectedException(s"cannot run `$shown`: no output")
+            case ExecResult.Exit(_, out, err) =>
+              throw new UnexpectedException(s"cannot run `$shown`:\n${(out + err).trim}")
+            case ExecResult.Timeout(_) => throw new UnexpectedException(s"cannot run `$shown`: timed out")
+          versions(line) = output
+          output
     finally versionLock.unlock()
+
+  /** Locks the lock, checking the interruption of the context, or throws [[UnexpectedException]] with the message at
+    * the deadline.
+    */
+  private def acquire(lock: ReentrantLock, deadline: Option[Deadline], message: => String)(using ctx: Context): Unit =
+    while !lock.tryLock(PollMillis, TimeUnit.MILLISECONDS) do
+      ctx.interrupt(())
+      if deadline.exists(_.isOverdue()) then throw new UnexpectedException(message)
+
+  /** Returns the arguments of the process running the command, or the replacement command line of the shell. */
+  private def commandArgs(command: String, args: Seq[String], replacement: Option[String]): Seq[String] =
+    replacement.fold(command +: args)(line => Seq(shell, "-c", s"$line \"$$@\"", "sh") ++ args)
 
   private def exec(
       argv: Seq[String],
@@ -133,7 +166,8 @@ private[exec] object Platform:
       env: Map[String, String],
       input: String,
       timeout: Option[FiniteDuration],
-      marker: String
+      marker: String,
+      limit: Option[Deadline]
   )(using ctx: Context): ExecResult =
     val builder = new ProcessBuilder(argv.asJava)
     builder.environment().putAll(env.asJava)
@@ -163,9 +197,10 @@ private[exec] object Platform:
         process.getOutputStream.close()
       catch case _: IOException => () // The process exited before reading all the input.
 
-      while !started.await(PollMillis, TimeUnit.MILLISECONDS) && process.isAlive do ctx.interrupt(())
+      while !started.await(PollMillis, TimeUnit.MILLISECONDS) && process.isAlive && limit.forall(_.hasTimeLeft()) do
+        ctx.interrupt(())
 
-      val deadline = timeout.map(_.fromNow)
+      val deadline = (timeout.map(_.fromNow) ++ limit).minOption
       ctx.log(s"exec: wait for ${timeout.map(_.toString).getOrElse("exit")}")
       var finished = process.waitFor(PollMillis, TimeUnit.MILLISECONDS)
       while !finished && deadline.forall(_.hasTimeLeft()) do
@@ -173,10 +208,8 @@ private[exec] object Platform:
         val wait = deadline.map(d => math.min(d.timeLeft.toMillis, PollMillis)).getOrElse(PollMillis)
         finished = process.waitFor(math.max(wait, 1L), TimeUnit.MILLISECONDS)
 
-      if finished then
-        // A descendant may still hold the pipes after the process exits.
-        await(outReader)
-        await(errReader)
+      // A descendant may still hold the pipes after the process exits (e.g. a build server).
+      if finished && await(outReader, limit) && await(errReader, limit) then
         val code = process.exitValue()
         ctx.log(s"exec: finish\n  exit code: ${code}\n  out: ${out.toString.trim}\n  err: ${err.toString.trim}")
         ExecResult.Exit(code, out.toString, err.toString)
@@ -187,18 +220,21 @@ private[exec] object Platform:
         ExecResult.Timeout(out.toString)
     finally kill(process)
 
-  /** Kills the process with its descendants, e.g. the program that `dotnet run` starts. */
+  /** Kills the process with its descendants, e.g. the runtime that the shell of a replacement command line starts. */
   private def kill(process: Process): Unit =
     process.descendants().forEach(p => { p.destroyForcibly(); () })
     process.destroyForcibly()
     ()
 
-  /** Waits for the thread to end, checking the interruption of the context. */
-  private def await(thread: Thread)(using ctx: Context): Unit =
+  /** Waits for the thread to end until the limit, checking the interruption of the context, and returns whether it
+    * ended.
+    */
+  private def await(thread: Thread, limit: Option[Deadline])(using ctx: Context): Boolean =
     thread.join(PollMillis)
-    while thread.isAlive do
+    while thread.isAlive && limit.forall(_.hasTimeLeft()) do
       ctx.interrupt(())
       thread.join(PollMillis)
+    !thread.isAlive
 
   /** Starts a daemon thread running the body, which ends quietly when the stream is closed. */
   private def daemon(body: => Unit): Thread =

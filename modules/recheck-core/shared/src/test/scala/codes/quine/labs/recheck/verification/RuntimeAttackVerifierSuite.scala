@@ -24,20 +24,13 @@ class RuntimeAttackVerifierSuite extends munit.FunSuite:
     )
 
   test("RuntimeAttackVerifier.verify"):
-    assertEquals(
-      RuntimeAttackVerifier
-        .verify("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, Duration.MinusInf, Map.empty),
-      None
-    )
-    assertEquals(
-      RuntimeAttackVerifier.verify("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, Duration.Zero, Map.empty),
-      None
-    )
+    def verify(source: String, dialect: Dialect, timeout: Duration): Option[RuntimeAttack] =
+      RuntimeAttackVerifier.verify(source, "", dialect, UnitMode.CodePoint, attack, timeout, Duration.Inf, Map.empty)
+
+    assertEquals(verify("foo", Dialect.Python(), Duration.MinusInf), None)
+    assertEquals(verify("foo", Dialect.Python(), Duration.Zero), None)
     // A Perl pattern interpolating a variable is not run.
-    assertEquals(
-      RuntimeAttackVerifier.verify("a$x", "", Dialect.Perl(), UnitMode.CodePoint, attack, 1.second, Map.empty),
-      None
-    )
+    assertEquals(verify("a$x", Dialect.Perl(), 1.second), None)
 
   test("RuntimeAttackVerifier.boundTimeout"):
     assertEquals(RuntimeAttackVerifier.boundTimeout(Duration.Inf), None)

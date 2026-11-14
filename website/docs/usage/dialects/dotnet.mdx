@@ -80,10 +80,13 @@ The `RegexOptions` `RightToLeft`, `ECMAScript` and `NonBacktracking` have no fla
 
 ## Runtime-Attack Verification
 
-- Command: `dotnet run <file>.cs`.
+- Command: `dotnet build <file>.cs -o <dir> --disable-build-servers` once, and then `dotnet <dir>/<file>.dll`.
 - Matching: `Regex.Match`.
 - Engine limits: none.
 - Engine errors: `OutOfMemoryException`, `InsufficientExecutionStackException`.
 - Environment variable: `RECHECK_DOTNET`.
 
-`dotnet` runs the program as a file-based app, which needs a .NET 10 SDK or later.
+`dotnet` builds the program as a file-based app, which needs a .NET 10 SDK or later.
+`RECHECK_DOTNET` replaces `dotnet` in both commands.
+`dotnet` builds it with the latest SDK installed, since `global.json` in the current directory does not apply.
+`recheck` builds the program once for each command line and set of the SDKs and the runtimes that `dotnet` lists, and the next runs reuse the build.
