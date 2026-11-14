@@ -12,7 +12,7 @@ const Hotspot: React.FC<{ source: string; hotspot: readonly HotspotSpot[] }> = (
     if (index < start) {
       parts.push(<span key={index}>{source.substring(index, start)}</span>);
     }
-    const className = temperature === 'hot' ? styles.hotspotHot : styles.hotspotWarm;
+    const className = { hot: styles.hotspotHot, warm: styles.hotspotWarm, cold: styles.hotspotCold }[temperature];
     parts.push(
       <span key={start} className={className}>
         {source.substring(start, end)}

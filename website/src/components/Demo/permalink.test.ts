@@ -279,8 +279,16 @@ describe("hotspotOf", () => {
       { start: 4, end: 5, temperature: "warm" },
     ]);
     expect(
-      hotspotOf({ hotspot: [{ start: 0, end: 1, temperature: "normal" }] }),
-    ).toEqual([{ start: 0, end: 1, temperature: "warm" }]);
+      hotspotOf({
+        hotspot: [
+          { start: 0, end: 1, temperature: "normal" },
+          { start: 1, end: 2, temperature: "cold" },
+        ],
+      }),
+    ).toEqual([
+      { start: 0, end: 1, temperature: "warm" },
+      { start: 1, end: 2, temperature: "cold" },
+    ]);
   });
 });
 
