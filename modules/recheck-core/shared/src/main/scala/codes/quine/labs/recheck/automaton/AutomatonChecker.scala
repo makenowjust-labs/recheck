@@ -75,13 +75,16 @@ object AutomatonChecker:
 
   private def third3(t: StateTriple): StateNumber = (t & StateMask).toInt
 
-  /** A number of a letter, which the keys of the transitions in the IDA search pack. */
-  private type LetterNumber = Int
+  /** A number of a character, which the keys of the transitions in the IDA search pack. */
+  private type CharNumber = Int
 
-  /** A pair of the numbers of a letter and a state, a key of the transitions in the IDA search. */
-  private type LetterState = Long
+  /** The number of no character, which the edges back in the IDA search have. */
+  private val NoChar: CharNumber = -1
 
-  private def letterState(l: LetterNumber, q: StateNumber): LetterState = (l.toLong << 32) | q
+  /** A pair of the numbers of a character and a state, a key of the transitions in the IDA search. */
+  private type CharState = Long
+
+  private def charState(c: CharNumber, q: StateNumber): CharState = (c.toLong << 32) | q
 
   /** Merges the complexities, each ordered from the worst as [[AutomatonChecker#check]] gives them, into one ordered
     * from the worst, where `xs` comes first on a tie.
@@ -200,21 +203,21 @@ private final class AutomatonChecker[A, Q, P](
     AutomatonChecker.checkStateCount(numberedStates.size)
     numberedStates.zipWithIndex.toMap
 
-  /** The letters by their numbers. */
-  private lazy val letters: IndexedSeq[B] = interrupt(graph.edges.map(_._2).distinct)
+  /** The characters by their numbers. */
+  private lazy val chars: IndexedSeq[B] = interrupt(graph.edges.map(_._2).distinct)
 
-  /** The numbers of the letters. */
-  private lazy val letterNumbers: Map[B, LetterNumber] = letters.zipWithIndex.toMap
+  /** The numbers of the characters. */
+  private lazy val charNumbers: Map[B, CharNumber] = chars.zipWithIndex.toMap
 
   /** The transitions from the states of each SCC by the numbers, with the indices of the SCCs that they go to. */
-  private lazy val sccNumberedOutEdges: IndexedSeq[IndexedSeq[(Int, LetterNumber, StateNumber, StateNumber)]] =
+  private lazy val sccNumberedOutEdges: IndexedSeq[IndexedSeq[(Int, CharNumber, StateNumber, StateNumber)]] =
     interrupt:
-      sccOutEdges.map(_.map((j, a, q1, q2) => (j, letterNumbers(a), stateNumbers(q1), stateNumbers(q2))))
+      sccOutEdges.map(_.map((j, a, q1, q2) => (j, charNumbers(a), stateNumbers(q1), stateNumbers(q2))))
 
-  /** The transitions in each SCC, from the numbers of the letters to the pairs of the numbers of the states. */
-  private lazy val sccLoops: IndexedSeq[Map[LetterNumber, IndexedSeq[(StateNumber, StateNumber)]]] = interrupt:
+  /** The transitions in each SCC, from the numbers of the characters to the pairs of the numbers of the states. */
+  private lazy val sccLoops: IndexedSeq[Map[CharNumber, IndexedSeq[(StateNumber, StateNumber)]]] = interrupt:
     sccNumberedOutEdges.indices.map: i =>
-      sccNumberedOutEdges(i).collect { case (j, l, q1, q2) if j == i => (l, (q1, q2)) }.groupMap(_._1)(_._2)
+      sccNumberedOutEdges(i).collect { case (j, c, q1, q2) if j == i => (c, (q1, q2)) }.groupMap(_._1)(_._2)
 
   /** The numbers of the states that each numbered state has transitions to. */
   private lazy val stateSuccessors = interrupt:
@@ -242,7 +245,7 @@ private final class AutomatonChecker[A, Q, P](
         order.toIndexedSeq
     )
 
-  /** A map from a pair of the indices of SCCs to the transitions between them by the letters. */
+  /** A map from a pair of the indices of SCCs to the transitions between them by the characters. */
   private val sccPairEdges = interrupt:
     scc.indices
       .flatMap(i => sccOutEdges(i).map((j, a, q1, q2) => ((i, j), a, (q1, q2))))
@@ -304,10 +307,10 @@ private final class AutomatonChecker[A, Q, P](
         case None =>
           // A state pair graph with co-transition, whose vertices pack the numbers of the states.
           val g2 = interrupt(Graph.from(for
-            (l, es) <- sccLoops(sc).toIndexedSeq
+            (c, es) <- sccLoops(sc).toIndexedSeq
             (q11, q12) <- es
             (q21, q22) <- es
-          yield (statePair(q11, q21), l, statePair(q12, q22))))
+          yield (statePair(q11, q21), c, statePair(q12, q22))))
           val result = interrupt:
             g2.scc.view
               .flatMap: sc =>
@@ -320,8 +323,8 @@ private final class AutomatonChecker[A, Q, P](
                   (path2, _) <- g2.path(Set(p2), p1)
                 yield
                   val q1 = numberedStates(first(p1))
-                  val path = (path1 ++ path2).map: (p, l) =>
-                    ((numberedStates(first(p)), numberedStates(second(p))), letters(l))
+                  val path = (path1 ++ path2).map: (p, c) =>
+                    ((numberedStates(first(p)), numberedStates(second(p))), chars(c))
                   Pump(q1, path.map(_._2), q1, spotsG2(path, (q1, q1)), Vector.empty))
                 eda
               .headOption
@@ -380,55 +383,56 @@ private final class AutomatonChecker[A, Q, P](
   /** Finds an IDA structure between the source and the target SCCs of the indices. */
   private def findIDABetween(source: Int, target: Int): Option[Pump] =
     val between = interrupt(reachable(source) & coreachable(target))
-    // The transitions from the states in the SCCs between them, and in `target`, by the letters and the states.
+    // The transitions from the states in the SCCs between them, and in `target`, by the characters and the states.
     def nextOf(
-        edges: Iterator[(LetterNumber, StateNumber, StateNumber)]
+        edges: Iterator[(CharNumber, StateNumber, StateNumber)]
     ): mutable.LongMap[mutable.ArrayBuffer[StateNumber]] =
       val next = mutable.LongMap.empty[mutable.ArrayBuffer[StateNumber]]
-      for (l, q1, q2) <- edges do next.getOrElseUpdate(letterState(l, q1), mutable.ArrayBuffer.empty).addOne(q2)
+      for (c, q1, q2) <- edges do next.getOrElseUpdate(charState(c, q1), mutable.ArrayBuffer.empty).addOne(q2)
       next
     val betweenNext = interrupt:
       nextOf(
         between.iterator.flatMap(i =>
-          sccNumberedOutEdges(i).collect { case (j, l, q1, q2) if between(j) => (l, q1, q2) }
+          sccNumberedOutEdges(i).collect { case (j, c, q1, q2) if between(j) => (c, q1, q2) }
         )
       )
-    val targetNext = interrupt(nextOf(sccLoops(target).iterator.flatMap((l, es) => es.map((q1, q2) => (l, q1, q2)))))
+    val targetNext = interrupt(nextOf(sccLoops(target).iterator.flatMap((c, es) => es.map((q1, q2) => (c, q1, q2)))))
     val sourceOut = interrupt:
-      sccLoops(source).toSeq.flatMap((l, es) => es.map((q1, q2) => (q1, (l, q2)))).groupMap(_._1)(_._2)
+      sccLoops(source).toSeq.flatMap((c, es) => es.map((q1, q2) => (q1, (c, q2)))).groupMap(_._1)(_._2)
     val none = mutable.ArrayBuffer.empty[StateNumber]
 
     // The product of the transitions in `source`, between them, and in `target`, which is built only from the
     // triples `(q1, q1, q2)` for `q1` in `source` and `q2` in `target`, since only them matter. Its vertices pack the
     // numbers of the states.
+    // A transition goes to a state of the look-ahead DFA state of its character, so the loops of `q1` and `q2` on the
+    // same characters end at the same look-ahead DFA state.
     val sourceStates = sccStateStarts(source) until sccStateStarts(source + 1)
-    val targetStates = sccStateStarts(target) until sccStateStarts(target + 1)
-    val starts = interrupt(sourceStates.flatMap(q1 => targetStates.map(q2 => stateTriple(q1, q1, q2))))
+    val targetStates = (sccStateStarts(target) until sccStateStarts(target + 1)).groupBy(numberedStates(_)._2)
+    val pairs = interrupt:
+      sourceStates.flatMap(q1 => targetStates.getOrElse(numberedStates(q1)._2, Vector.empty).map((q1, _)))
+    val starts = pairs.map((q1, q2) => stateTriple(q1, q1, q2))
     val g3 = interrupt:
       val seen = mutable.LongMap.empty[Unit]
       for v <- starts do seen(v) = ()
       val queue = mutable.Queue.from(starts)
-      val edges = Vector.newBuilder[(StateTriple, LetterNumber, StateTriple)]
+      val edges = Vector.newBuilder[(StateTriple, CharNumber, StateTriple)]
       while queue.nonEmpty do
         interrupt:
           val v = queue.dequeue()
           for
-            (l, p1) <- sourceOut.getOrElse(third1(v), Vector.empty)
-            p2 <- betweenNext.getOrElse(letterState(l, third2(v)), none)
-            p3 <- targetNext.getOrElse(letterState(l, third3(v)), none)
+            (c, p1) <- sourceOut.getOrElse(third1(v), Vector.empty)
+            p2 <- betweenNext.getOrElse(charState(c, third2(v)), none)
+            p3 <- targetNext.getOrElse(charState(c, third3(v)), none)
           do
             val w = stateTriple(p1, p2, p3)
-            edges.addOne((v, l, w))
+            edges.addOne((v, c, w))
             if !seen.contains(w) then
               seen(w) = ()
               queue.enqueue(w)
       Graph.from(edges.result())
-    // The edges back from `(q1, q2, q2)` to `(q1, q1, q2)` have no letter.
+    // The edges back from `(q1, q2, q2)` to `(q1, q1, q2)` have no character.
     val g3back = interrupt:
-      Graph.from(
-        sourceStates.flatMap(q1 => targetStates.map(q2 => (stateTriple(q1, q2, q2), -1, stateTriple(q1, q1, q2)))) ++
-          g3.edges
-      )
+      Graph.from(pairs.map((q1, q2) => (stateTriple(q1, q2, q2), NoChar, stateTriple(q1, q1, q2))) ++ g3.edges)
 
     val result = interrupt:
       g3back.scc.iterator
@@ -447,8 +451,8 @@ private final class AutomatonChecker[A, Q, P](
                 g3.path(Set(stateTriple(q1, q1, q2)), stateTriple(q1, q2, q2))
                   .map: (path, _) =>
                     val (r1, r2) = (numberedStates(q1), numberedStates(q2))
-                    val decoded = path.map: (v, l) =>
-                      ((numberedStates(third1(v)), numberedStates(third2(v)), numberedStates(third3(v))), letters(l))
+                    val decoded = path.map: (v, c) =>
+                      ((numberedStates(third1(v)), numberedStates(third2(v)), numberedStates(third3(v))), chars(c))
                     val between = spots(decoded.map { case ((_, q2, _), a) => (q2, a) }, r2)
                     Pump(r1, decoded.map(_._2), r2, spotsG3(decoded, (r1, r2, r2)), between)
           ida

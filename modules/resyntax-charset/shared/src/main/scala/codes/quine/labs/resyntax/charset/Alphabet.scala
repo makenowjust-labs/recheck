@@ -6,7 +6,7 @@ import scala.collection.mutable
 /** Alphabet is a partition of the code values of a mode into disjoint non-empty atoms.
   *
   * An alphabet built by [[Alphabet.refine]] is the coarsest partition such that every given set is a union of atoms, so
-  * an automaton can use the atoms as its letters.
+  * an automaton can use the atoms as its characters.
   */
 final class Alphabet private (
     val mode: UnitMode,
