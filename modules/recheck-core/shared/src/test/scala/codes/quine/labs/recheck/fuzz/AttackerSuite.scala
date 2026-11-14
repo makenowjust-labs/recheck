@@ -20,7 +20,12 @@ class AttackerSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
   /** Builds an attacker of the pattern with the default parameters, except the given ones. */
-  def attackerOf(ir: IRPattern, upperBound: Option[Seq[Complexity.Vulnerable[UChar]]] = None): Attacker =
+  def attackerOf(
+      ir: IRPattern,
+      upperBound: Option[Seq[Complexity.Vulnerable[UChar]]] = None,
+      maxExtraDegree: Int = Parameters.DefaultMaxExtraDegree,
+      maxBoostIteration: Int = Parameters.DefaultMaxBoostIteration
+  ): Attacker =
     import Parameters.*
     new Attacker(
       ir,
@@ -31,8 +36,14 @@ class AttackerSuite extends munit.FunSuite:
       DefaultAttackTimeout,
       DefaultMaxAttackStringSize,
       DefaultMaxDegree,
+      maxExtraDegree,
+      DefaultMaxIncubationBoundedWidth,
+      maxBoostIteration,
+      DefaultBoundedWidthRatio,
       DefaultAccelerationMode,
-      (_, _) => false,
+      DefaultAccelerationHitRatio,
+      DefaultAlphabetRepresentative,
+      (_, _, _) => false,
       upperBound
     )
 
@@ -104,6 +115,14 @@ class AttackerSuite extends munit.FunSuite:
     assertEquals(measure('c', limit = 100).map(m => (degreeOf(m), m.stops)), Some((-1, true)))
     // The steps are a polynomial on every second count when a loop reads the repeated part twice.
     assertEquals(measure('d').map(_.growth).collect { case p: Growth.Polynomial => (p.degree, p.stride) }, Some((2, 2)))
+    // A polynomial of a degree above `maxDegree` plus `maxExtraDegree` is taken for the exponential growth.
+    val quintic = ReDoS.parse("^a*a*a*a*a*$", "", Dialect.JavaScript)
+    def degreeWith(maxExtraDegree: Int): Option[Int] =
+      attackerOf(quintic, maxExtraDegree = maxExtraDegree)
+        .measure(repeatOf('a', 1), 1, Int.MaxValue, DefaultIncubationLimit, DefaultIncubationTimeout)
+        .map(degreeOf)
+    assertEquals(degreeWith(DefaultMaxExtraDegree), Some(5))
+    assertEquals(degreeWith(0), Some(-1))
     // The counts above `to` do not run.
     assertEquals(measure('b', to = 4), None)
 
@@ -193,6 +212,9 @@ class AttackerSuite extends munit.FunSuite:
     assertEquals(boosted.str.countRepeat, 2)
     // A fingerprint is boosted once.
     assertEquals(attacker.boost(candidate), None)
+    // No candidate is boosted with `maxBoostIteration` of 0.
+    val unboosted = attackerOf(attacker.pattern, maxBoostIteration = 0)
+    assertEquals(unboosted.boost(candidatesOf(unboosted, FString(1, seq)).head), None)
 
   test("Attacker#attack: the degree is exact"):
     // The steps of the lower degrees are many, which a slope of the steps takes for the cubic growth.
@@ -286,4 +308,20 @@ class AttackerSuite extends munit.FunSuite:
     assertEquals(
       attacker.hotspotOf(str, Measurement(Growth.Exponential, 1, 0, true)),
       Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Cold), Hotspot.Spot(5, 6, Hotspot.Hot), Hotspot.Spot(7, 8, Hotspot.Hot)))
+    )
+
+  test("Attacker#hotspotOf: the parts read after many steps"):
+    val attacker = attackerOf(ReDoS.parse("^(?:(?:a|a)*!|a*a*!)", "", Dialect.JavaScript))
+    val str = FString(1, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a')))
+    // The second alternative is read after the `2^n` ways of the first one, which the runs memoize.
+    assertEquals(
+      attacker.hotspotOf(str, Measurement(Growth.Exponential, 16, 25, false)),
+      Hotspot(
+        Seq(
+          Hotspot.Spot(7, 8, Hotspot.Hot),
+          Hotspot.Spot(9, 10, Hotspot.Hot),
+          Hotspot.Spot(14, 15, Hotspot.Hot),
+          Hotspot.Spot(16, 17, Hotspot.Hot)
+        )
+      )
     )

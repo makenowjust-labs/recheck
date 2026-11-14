@@ -283,13 +283,13 @@ export type AttackPattern = {
   /**
    * An expression evaluating to the attack string in the host language of the dialect.
    *
-   * - `javascript`: `'a'.repeat(31) + '\x00'`
-   * - `python`: `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for `bytes`
-   * - `ruby`: `"a" * 31 + "\x00"`, or `"a".b * 31 + "\x00".b` for `ASCII-8BIT`
-   * - `java`: `"a".repeat(31) + "\u0000"`
-   * - `dotnet`: `string.Concat(Enumerable.Repeat("a", 31)) + "\u0000"` (C#, `System.Linq`)
-   * - `perl`: `"a" x 31 . "\x00"`
-   * - `pcre`: `str_repeat('a', 31) . "\x00"` (PHP)
+   * - `javascript`: `'a'.repeat(31) + 'あ'`
+   * - `python`: `'a' * 31 + 'あ'`, or `b'a' * 31 + b'!'` for `bytes`
+   * - `ruby`: `"a" + "a" * 31 + "あ\n\n"`, or `"a".b + "a".b * 31 + "!\n\n".b` for `ASCII-8BIT`
+   * - `java`: `"a".repeat(31) + "あ"`
+   * - `dotnet`: `string.Concat(Enumerable.Repeat("a", 31)) + "あ"` (C#, `System.Linq`)
+   * - `perl`: `"a" x 31 . "\x{3042}"`
+   * - `pcre`: `str_repeat('a', 31) . '!'` (PHP)
    */
   pattern: string;
 };

@@ -67,12 +67,16 @@ $ recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
 Input     : /^(a|a)*$/
 Dialect   : ruby (encoding: UTF-8)
 Status    : safe
-Complexity: linear
-Checker   : automaton
+Complexity: safe (fuzz)
+Checker   : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /^(a|a)*$/
 
 Refuted attacks:
 - Complexity    : exponential
-  Attack string : "a" + "a" * 31 + "\x00"
+  Attack string : "a" + "a" * 31 + "あ\n\n"
   Runtime attack: refuted (finished in 0 ms on ruby 4.0.9, timeout: 1000 ms)
 ```
 
@@ -146,6 +150,10 @@ Run the subcommand again when the runtime, the machine or `runtimeAttackLimit` c
 A refuted attack shows that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by the attack.
 When no attack is confirmed, the result is `safe`, with the refuted attacks in `refutedAttacks`.
 However, when [`maxRefutedAttacks`](parameters.mdx#maxrefutedattacks) attacks are refuted, the checking stops there, and the result is `unknown` with the `runtime-attacks-refuted` error.
+
+With the `auto` checker, when every attack of the automaton checker is refuted, the fuzz checker looks for another attack, starting from the refuted ones.
+If it finds none, the result is `safe` by the fuzz checker, with the complexity of the refuted attacks as the [upper bound](diagnostics.mdx#upper-bound).
+If it does not finish within the [`timeout`](parameters.mdx#timeout), or the refuted attacks reach `maxRefutedAttacks` while it runs, the result is `safe` by the automaton checker instead of `unknown`.
 
 ## Engine Limits and Errors
 

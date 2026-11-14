@@ -26,14 +26,15 @@ class WitnessSeederSuite extends munit.FunSuite:
       DefaultMaxGeneStringSize,
       DefaultMaxDegree,
       DefaultMaxInitialGenerationSize,
-      DefaultAccelerationMode
+      DefaultAccelerationMode,
+      DefaultAccelerationHitRatio
     )
 
   /** Checks the upper bound of the pattern, which has some. */
   def upperBound(source: String): Seq[Complexity.Vulnerable[UChar]] =
     import Parameters.*
     val ir = ReDoS.parse(source, "", Dialect.JavaScript)
-    FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100).get
+    FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100, DefaultAlphabetRepresentative).get
 
   test("WitnessSeeder.seed"):
     val witness = Witness[UChar](Seq((Seq.empty, Seq('a'))), Seq('!'))
@@ -83,7 +84,8 @@ class WitnessSeederSuite extends munit.FunSuite:
         DefaultIncubationLimit,
         DefaultIncubationTimeout,
         DefaultMaxInitialGenerationSize,
-        DefaultAccelerationMode
+        DefaultAccelerationMode,
+        DefaultAccelerationHitRatio
       )
 
     // The match of the witness succeeds unless `xyz` follows, which makes the look-ahead fail.

@@ -56,6 +56,18 @@ final class CharSet private (private val bounds: Array[UChar]):
       i += 2
     bounds(0)
 
+  /** Returns the smallest member outside Latin-1 that is not a surrogate, or [[representative]] if there is none. */
+  def representativeOutsideLatin1: UChar =
+    var i = 0
+    while i < bounds.length do
+      val start = math.max(bounds(i), 0x100)
+      val end = bounds(i + 1)
+      if start < end then
+        if !UTF16Encoding.isSurrogate(start) then return start
+        if end > 0xe000 then return 0xe000
+      i += 2
+    representative
+
   def contains(value: UChar): Boolean = (countLessOrEqual(bounds, value) & 1) == 1
 
   /** Checks whether this set contains a code value in `[first, last]`. */

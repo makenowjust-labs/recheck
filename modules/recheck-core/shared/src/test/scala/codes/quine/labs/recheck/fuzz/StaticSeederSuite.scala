@@ -18,15 +18,15 @@ class StaticSeederSuite extends munit.FunSuite:
         yield StaticSeeder.seed(ir, limit = 25000, maxSimpleRepeatSize = 10, maxNFASize = Int.MaxValue)
       result.get.map(_.toString)
 
-    assertEquals(seed("^a+a+$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
-    assertEquals(seed("^(a+)\\1$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
+    assertEquals(seed("^a+a+$", ""), Set("'a' + 'a'.repeat(224) + 'あ'", "'a' + 'a'.repeat(15) + 'あ'"))
+    assertEquals(seed("^(a+)\\1$", ""), Set("'a' + 'a'.repeat(224) + 'あ'", "'a' + 'a'.repeat(15) + 'あ'"))
     assertEquals(
       seed("^(?<foo>a+)\\k<foo>$", ""),
-      Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'")
+      Set("'a' + 'a'.repeat(224) + 'あ'", "'a' + 'a'.repeat(15) + 'あ'")
     )
-    assertEquals(seed("^a+(?=a+)$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
+    assertEquals(seed("^a+(?=a+)$", ""), Set("'a' + 'a'.repeat(224) + 'あ'", "'a' + 'a'.repeat(15) + 'あ'"))
     // A look-behind is a look-ahead of its inner expression, which reads the input forward.
-    assertEquals(seed("^a+(?<=a+)$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
+    assertEquals(seed("^a+(?<=a+)$", ""), Set("'a' + 'a'.repeat(224) + 'あ'", "'a' + 'a'.repeat(15) + 'あ'"))
     // The look-arounds may nest.
     assertEquals(seed("^a+(?<=a(?=a+))$", ""), seed("^a+(?=a(?=a+))$", ""))
     assert(seed("^a+(?=a(?<=a+))$", "").nonEmpty)
@@ -35,14 +35,14 @@ class StaticSeederSuite extends munit.FunSuite:
     assertEquals(seed("^(a+\\1)$", ""), seed("^(a+(?:a+|))$", ""))
     assertEquals(seed("^(?<x>a+\\k<x>)$", ""), seed("^(?<x>a+(?:a+|))$", ""))
     assertEquals(seed("^(a+\\2)(b+\\1)$", ""), seed("^(a+(?:b+(?:a+|)|))(b+(?:a+(?:b+|)|))$", ""))
-    assertEquals(seed("^a{11,}a{11,}$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
+    assertEquals(seed("^a{11,}a{11,}$", ""), Set("'a' + 'a'.repeat(224) + 'あ'", "'a' + 'a'.repeat(15) + 'あ'"))
 
     assertEquals(seed("^(fizz)*(fizz)*$", ""), Set("'fizz'.repeat(112) + 'i'"))
     // An atomic group is a choice of its alternatives.
     assertEquals(seed("^(?>a+)a+$", "", Dialect.PCRE), seed("^a+a+$", "", Dialect.PCRE))
 
     // A dead suffix is not `,`, which lets the look-ahead succeed and the match end.
-    assertEquals(seed("^a+a+(?=,)", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
+    assertEquals(seed("^a+a+(?=,)", ""), Set("'a' + 'a'.repeat(224) + 'あ'", "'a' + 'a'.repeat(15) + 'あ'"))
 
     assertEquals(seed("^a(?=a)$", ""), Set.empty[String])
     assertEquals(seed("^a(?<=a)$", ""), Set.empty[String])
@@ -51,9 +51,9 @@ class StaticSeederSuite extends munit.FunSuite:
     assertEquals(
       seed("^(?:\\uD800|\\uDC00)*(?:\\uD800|\\uDC00)*$", "u"),
       Set(
-        "'\\uD800' + '\\uD800'.repeat(224) + '\\x00'",
-        "'\\uD800' + '\\uD800'.repeat(15) + '\\x00'",
-        "'\\uDC00' + '\\uDC00'.repeat(224) + '\\x00'",
-        "'\\uDC00' + '\\uDC00'.repeat(15) + '\\x00'"
+        "'\\uD800' + '\\uD800'.repeat(224) + 'あ'",
+        "'\\uD800' + '\\uD800'.repeat(15) + 'あ'",
+        "'\\uDC00' + '\\uDC00'.repeat(224) + 'あ'",
+        "'\\uDC00' + '\\uDC00'.repeat(15) + 'あ'"
       )
     )

@@ -120,7 +120,7 @@ The following are not supported in any dialect.
 ## Approximations
 
 `recheck` models the matching of a naive backtracking engine.
-Most engines have optimizations that make some vulnerable patterns fast, and `recheck` does not model them (see each dialect's page).
+Most engines have optimizations that make some vulnerable patterns fast, and `recheck` does not implement them (see "Optimizations" of each dialect's page).
 
 The following is what we measured with `^(a|a)*$` against `'a'.repeat(n) + '!'`.
 

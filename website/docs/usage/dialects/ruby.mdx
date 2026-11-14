@@ -81,7 +81,6 @@ The encodings EUC-JP (`/e`) and Windows-31J (`/s`) are not supported, and their 
 
 ## Approximations
 
-- Ruby has memoization (since Ruby 3.2) that `recheck` does not model, so an attack that `recheck` reports may not work on Ruby, and the runtime-attack verification checks whether it does.
 - `\G` matches only at the start of the input, since `recheck` models a search from there, not one from a later position (e.g. the second match of `String#scan`).
 - Under `i`, `recheck` does not reproduce Onigmo's bugs in matching a character folded to several characters (e.g. `ß` and `ss`).
   For example, `(?<=ß)` and `(ß)\1` do not match `"ß"` and `"ßss"` in Ruby, but they do in `recheck`.
@@ -93,6 +92,14 @@ The encodings EUC-JP (`/e`) and Windows-31J (`/s`) are not supported, and their 
 - An iteration matching the empty string is not handled as Ruby does: Onigmo repeats copies of the node for a bounded repetition depending on the size of its compiled code, and it checks the captures in an empty iteration.
 - Onigmo does not restore the end of a group on backtracking inside the group, so a back-reference in the group can see the end of a failed attempt, and `recheck` does not reproduce it.
   For example, `^(a|ab\1)*$` matches `"aba"` in Ruby 4.0, but not in `recheck`.
+
+### Optimizations
+
+`recheck` does not implement the following optimization specific to Ruby, so most attacks that `recheck` reports do not work on Ruby.
+
+- The memoization of the matching (since Ruby 3.2).
+
+Enable the [runtime-attack verification](../runtime-attack-verification.mdx) to report only the patterns that are slow on Ruby.
 
 ## Runtime-Attack Verification
 

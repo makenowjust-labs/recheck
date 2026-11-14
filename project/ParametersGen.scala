@@ -74,6 +74,8 @@ object ParametersGen:
 
   private val typeImports: Map[String, String] = Map(
     "AccelerationMode" -> "codes.quine.labs.recheck.common.AccelerationMode",
+    "AlphabetRepresentative" -> "codes.quine.labs.recheck.common.AlphabetRepresentative",
+    "AttackStringCharacteristics" -> "codes.quine.labs.recheck.common.AttackStringCharacteristics",
     "Checker" -> "codes.quine.labs.recheck.common.Checker",
     "Seeder" -> "codes.quine.labs.recheck.common.Seeder",
     "Dialect" -> "codes.quine.labs.resyntax.dialect.Dialect",

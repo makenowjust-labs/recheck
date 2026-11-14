@@ -6,6 +6,7 @@ import scala.concurrent.duration.Duration
 
 import codes.quine.labs.recheck.automaton.Complexity
 import codes.quine.labs.recheck.common.AccelerationMode
+import codes.quine.labs.recheck.common.AlphabetRepresentative
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
@@ -41,14 +42,6 @@ object Attacker:
       case Growth.Exponential   => Int.MaxValue
       case p: Growth.Polynomial => p.degree
 
-  /** The degrees above `maxDegree` that a measurement tells from the exponential growth. */
-  private[fuzz] val ExtraDegrees: Int = 3
-
-  /** The largest bounded width of a pattern that the first measurement of a string tries the counts beyond (see
-    * [[Attacker.measureFirst]]).
-    */
-  private[fuzz] val SmallBoundedWidth: Int = 256
-
   /** Returns the bounded width of the node, the largest width of what it matches when each repetition without the
     * largest count iterates the least times.
     */
@@ -79,8 +72,14 @@ private[fuzz] final class Attacker(
     val attackTimeout: Duration,
     val maxAttackStringSize: Int,
     val maxDegree: Int,
+    val maxExtraDegree: Int,
+    val maxIncubationBoundedWidth: Int,
+    val maxBoostIteration: Int,
+    val boundedWidthRatio: Double,
     val accelerationMode: AccelerationMode,
-    val avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean,
+    val accelerationHitRatio: Double,
+    val alphabetRepresentative: AlphabetRepresentative,
+    val avoidsAttack: (AttackComplexity.Vulnerable, AttackPattern, Hotspot) => Boolean,
     val upperBound: Option[Seq[Complexity.Vulnerable[UChar]]]
 )(using val ctx: Context):
 
@@ -99,7 +98,7 @@ private[fuzz] final class Attacker(
   val boundedWidth: Int = boundedWidthOf(pattern.node)
 
   /** The largest degree of the polynomial growth that a measurement tells from the exponential one. */
-  val measuredDegree: Int = maxDegree + ExtraDegrees
+  val measuredDegree: Int = maxDegree + maxExtraDegree
 
   /** The step limit of the runs of the measurements on executing the strings. */
   val measurementLimit: Int = Math.min(attackLimit.toDouble, incubationLimit * Math.pow(2, maxDegree + 1)).toInt
@@ -110,8 +109,8 @@ private[fuzz] final class Attacker(
   /** The results of the runs of [[stepsOn]], by its arguments. */
   val runs: mutable.Map[(IndexedSeq[FString.FChar], Int, Int, Duration, Boolean), Option[Long]] = mutable.Map.empty
 
-  /** The complexities and the hotspots of the attacks from each string. */
-  val attacks: mutable.Map[FString, List[(AttackComplexity.Vulnerable, Hotspot)]] = mutable.Map.empty
+  /** The attacks from each string. */
+  val attacks: mutable.Map[FString, List[AttackResult]] = mutable.Map.empty
 
   /** The fingerprints of the candidates whose attacks fail. */
   val failedFingerprints: mutable.Set[FString.Fingerprint] = mutable.Set.empty
@@ -169,7 +168,7 @@ private[fuzz] final class Attacker(
     */
   def boost(candidate: Candidate): Option[Candidate] = interrupt:
     val target = maxTriedDegree
-    if !boostedFingerprints.add(candidate.str.fingerprint) then return None
+    if maxBoostIteration <= 0 || !boostedFingerprints.add(candidate.str.fingerprint) then return None
 
     def measured(str: FString): Option[Candidate] =
       val admits = str.countRepeat < maxDegree && str.admitsAnyRepeatCount(pattern.mode)
@@ -192,19 +191,21 @@ private[fuzz] final class Attacker(
 
     var best = reduced(candidate)
     var continues = true
-    while continues && best.rank < target do
+    var iteration = 0
+    while continues && iteration < maxBoostIteration && best.rank < target do
       // The first of the steepest ones, for the same result on each run.
       val next =
         additionsOf(best.str).iterator.flatMap(measured).foldLeft(best)((x, y) => if y.rank > x.rank then y else x)
       continues = next ne best
       best = if continues then reduced(next) else best
+      iteration += 1
     Option.when(best.rank > candidate.rank)(best)
 
   /** Returns the strings adding a character, or a repetition of a character, to the string at its start, its end and
     * the ends of its repetitions.
     */
   def additionsOf(str: FString): Seq[FString] =
-    val chars = fuzz.alphabet.pairs.map(_._1.representative).distinct
+    val chars = fuzz.alphabet.pairs.map((set, _) => alphabetRepresentative.of(set)).distinct
     val ends = str.seq.zipWithIndex.collect:
       case (FString.Repeat(_, size), pos) => Seq(pos, (pos + 1 + size).min(str.size))
     val positions = (0 +: ends.flatten :+ str.size).distinct.sorted
@@ -236,8 +237,8 @@ private[fuzz] final class Attacker(
                 |  string: $attack""".stripMargin)
         (complexity, attack.toAttackPattern(pattern.mode), hotspotOf(str, measurement))
     result match
-      case Some((complexity, _, hotspot)) => attacks(str) = (complexity, hotspot) :: attacks.getOrElse(str, Nil)
-      case None                           => failedFingerprints.add(fingerprint)
+      case Some(attacked) => attacks(str) = attacked :: attacks.getOrElse(str, Nil)
+      case None           => failedFingerprints.add(fingerprint)
     result
 
   /** Returns the size of the input of the string on the repeat count. */
@@ -256,7 +257,7 @@ private[fuzz] final class Attacker(
   ): Option[Long] =
     runs.getOrElseUpdate(
       (str.seq, count, limit, timeout, memoizes), {
-        val opts = Options(limit, usesAcceleration = memoizes)
+        val opts = Options(limit, usesAcceleration = memoizes, accelerationHitRatio = accelerationHitRatio)
         val result = Interpreter.runWithTimeout(fuzz.program, str.copy(n = count).toUString, opts, timeout)
         Option.unless(result.status == Status.Limit || result.status == Status.Timeout)(result.steps.toLong)
       }
@@ -289,12 +290,12 @@ private[fuzz] final class Attacker(
     Iterator((from, 1), (from + 1, 1), (from, 2)).flatMap(measureOn(_, _)).nextOption()
 
   /** Measures the growth of the steps of the string on its first repeat counts, or on the first ones beyond the bounded
-    * width of the pattern up to `SmallBoundedWidth` if they tell none.
+    * width of the pattern up to `maxIncubationBoundedWidth` if they tell none.
     */
   def measureFirst(str: FString, limit: Int): Option[Measurement] =
     measure(str, 1, Int.MaxValue, limit, incubationTimeout).orElse:
       Option
-        .when(boundedWidth <= SmallBoundedWidth)(countBeyond(str, boundedWidth))
+        .when(boundedWidth <= maxIncubationBoundedWidth)(countBeyond(str, boundedWidth))
         .flatMap(measure(str, _, Int.MaxValue, limit, incubationTimeout))
 
   /** Measures the growth of the steps of the string on the repeat counts up to the largest one whose run ends, from its
@@ -349,7 +350,7 @@ private[fuzz] final class Attacker(
 
     // The steps change the growth a little after the repeated parts get longer than the bounded width, as the fixed
     // parts and the other repeated parts are read with them.
-    val size = 2 * boundedWidth
+    val size = Math.ceil(boundedWidthRatio * boundedWidth).toInt
     val isBeyond = measurement.first >= countBeyond(str, boundedWidth)
     val count =
       if measurement.growth == Growth.Exponential && isBeyond && !measurement.stops then measurement.last
@@ -420,7 +421,14 @@ private[fuzz] final class Attacker(
       case _ if str.isConstant || measurement.last <= measurement.first => Seq(measurement.first.max(1))
       case p: Growth.Polynomial => (0 to p.degree).map(k => p.start + k * p.stride)
       case Growth.Exponential   => Seq(measurement.last - 1, measurement.last)
-    val opts = Options(attackLimit, needsHeatmap = true)
+    // The runs memoize as the ones that confirm an attack do, which gives the same heat.
+    // The run on a count of many steps does not end in the timeout otherwise, and its heat lacks the parts read later.
+    val opts = Options(
+      attackLimit,
+      usesAcceleration = fuzz.usesAccelerationOnAttack(accelerationMode),
+      accelerationHitRatio = accelerationHitRatio,
+      needsHeatmap = true
+    )
     val heats = counts.map: count =>
       Interpreter.runWithTimeout(fuzz.program, str.copy(n = count).toUString, opts, incubationTimeout).heatmap
     val read = heats.flatMap(_.keys).toSet

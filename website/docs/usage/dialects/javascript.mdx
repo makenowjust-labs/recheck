@@ -68,6 +68,49 @@ The matching unit is `utf16`, or `utf16-code-point` with the `u` or `v` flag (se
 - With the `y` flag, the match starts only at the start of the input, as with `lastIndex` of `0`.
   A match from a later `lastIndex` is not modeled, so `recheck` misses a pattern that is slow only there, where a look-behind, `\b`, `\B` or a multiline `^` sees the text before the starting position (e.g. `/(?<=a)(?:b|b)*$/y` with `lastIndex` of `1` on `'a' + 'b'.repeat(n) + '!'`).
 
+### Optimizations
+
+`recheck` does not implement the following optimizations specific to V8, so an attack that `recheck` reports may not work on V8, and the runtime-attack verification checks whether it does.
+They are the ones of V8 14.6 (Node.js 26) that we know to make an attack of `recheck` fast, and such an attack still works on a JavaScript engine without them (e.g. QuickJS).
+
+- When the input has only Latin-1 characters (U+0000 to U+00FF), V8 drops the parts of the pattern that need another character.
+  For example, `/«[^∆]*∆\w+»/` fails at once on `'«'.repeat(n)`, while it takes quadratic time on `'«'.repeat(n) + '∆'`.
+- Before V8 tries a branch or leaves a repetition, it checks the next characters of the input against the ones that the pattern reads next, and it looks past a look-around for them.
+  For example, `/^c\s+(?!.*c)[abc]/s` does not run the look-ahead on `'c' + '\t'.repeat(n) + 'c'`, since a tab is not in `[abc]`, while `/^c\s+(?!.*c)[\sabc]/s` takes quadratic time on it.
+  It makes a look-behind before a literal fast in the same way (e.g. `/(?<!a.*)SomeText/s`).
+- V8 removes a repetition whose body matches only the empty string, so a look-around in it does not run (e.g. `((?=.*a))*`).
+- V8 fails a back-reference at once when the captured string is longer than the rest of the input (e.g. `/\b(\w+).\1/`).
+- V8 merges three or more branches of literals that have a common prefix.
+  For example, `/^(?:ab|ac|ab)*$/` takes linear time on `'ab'.repeat(n) + '!'`, while `/^(?:ab|ab)*$/` takes exponential time.
+
+A small change of the attack string can avoid these optimizations, so the pattern may still be vulnerable on V8 when the runtime-attack verification refutes an attack.
+`recheck` avoids the first one by taking a character outside Latin-1 for a set of characters (see the [`alphabetRepresentative`](../parameters.mdx#alphabetrepresentative) parameter).
+When the attacks of the automaton checker are refuted, the `auto` checker looks for another attack with the fuzz checker.
+
+For example, with `--alphabet-representative=smallest`, the attack of the automaton checker for the following pattern has only Latin-1 characters, and V8 refutes it.
+Then the fuzz checker finds an attack with `∆`, and V8 confirms it.
+
+```console
+$ recheck --alphabet-representative=smallest --runtime-attack-timeout=1s '/«(\w+|[^∆]*∆\w+∆[^»]*)»/'
+Input         : /«(\w+|[^∆]*∆\w+∆[^»]*)»/
+Dialect       : javascript
+Status        : vulnerable
+Complexity    : 2nd degree polynomial (fuzz)
+Attack string : '«∆0∆0'.repeat(24495)
+Hotspot       : /«(\w+|[^∆]*∆\w+∆[^»]*)»/
+Runtime attack: confirmed (timed out on node v26.13.0, timeout: 1000 ms)
+Checker       : fuzz
+
+Upper bound:
+- Complexity: 2nd degree polynomial
+  Hotspot   : /«(\w+|[^∆]*∆\w+∆[^»]*)»/
+
+Refuted attacks:
+- Complexity    : 2nd degree polynomial
+  Attack string : '«\x00'.repeat(38730)
+  Runtime attack: refuted (finished in 0 ms on node v26.13.0, timeout: 1000 ms)
+```
+
 ## Runtime-Attack Verification
 
 - Command: `node -`.

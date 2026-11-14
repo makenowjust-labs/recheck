@@ -7,7 +7,6 @@ import scala.util.Try
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.fuzz.DynamicSeeder.*
-import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 
@@ -28,9 +27,9 @@ class DynamicSeederSuite extends munit.FunSuite:
     assertEquals(seed("^(a|b)$", "i"), Set("''", "'A'", "'B'"))
     assertEquals(seed("^(A|B)$", "iu"), Set("''", "'A'", "'B'"))
     assertEquals(seed("^[ab]$", ""), Set("''", "'a'"))
-    assertEquals(seed("^[^ab]$", ""), Set("''", "'\\x00'"))
+    assertEquals(seed("^[^ab]$", ""), Set("''", "'あ'"))
     assertEquals(seed("^(a)\\1$", ""), Set("''", "'a'", "'aa'"))
-    assertEquals(seed("^a*$", ""), Set("''", "'\\x00'", "'a'"))
+    assertEquals(seed("^a*$", ""), Set("''", "'あ'", "'a'"))
     // A counted repetition of a read has no loop, so it makes no repeated part.
     assertEquals(seed("^a{2}$", ""), Set("''", "'a'", "'aa'"))
     assertEquals(seed("^(a?){50}a{50}$", ""), Set("''", "'a'", "'aa'", "'a'.repeat(2)"))
@@ -39,7 +38,7 @@ class DynamicSeederSuite extends munit.FunSuite:
 
   test("DynamicSeeder.Patch.InsertChar#apply"):
     assertEquals(
-      Patch.InsertChar(1, Set(CharSet.single('x'))).apply(UnitMode.UTF16.decode("012")),
+      Patch.InsertChar(1, Set('x'.toInt)).apply(UnitMode.UTF16.decode("012")),
       Seq(UnitMode.UTF16.decode("0x12"), UnitMode.UTF16.decode("0x2"))
     )
 

@@ -78,9 +78,18 @@ The following constructs are not supported.
 
 ## Approximations
 
-- PCRE2 has auto-possessification and JIT that `recheck` does not model, so an attack that `recheck` reports may not work on PCRE2, and the runtime-attack verification checks whether it does.
 - `\G` matches only at the start of the input, since `recheck` models a search from there, not one from a later position (e.g. the second match of `preg_match_all`).
-- PCRE2 skips the attempts that cannot match by its start-of-match optimizations (e.g. `(*COMMIT)abc` matches `xyzabc` in PCRE2, unless the pattern starts with `(*NO_START_OPT)`), and `recheck` does not model them.
+
+### Optimizations
+
+`recheck` does not implement the following optimizations specific to PCRE2, so many attacks that `recheck` reports do not work on PCRE2.
+
+- Auto-possessification.
+- The start-of-match optimizations, by which PCRE2 skips the attempts that cannot match (e.g. `(*COMMIT)abc` matches `xyzabc` in PCRE2, unless the pattern starts with `(*NO_START_OPT)`).
+- The JIT compiler (e.g. `.+\/$` is safe with the JIT, and vulnerable with `RECHECK_PHP='php -d pcre.jit=0'`).
+
+Enable the [runtime-attack verification](../runtime-attack-verification.mdx) to report only the patterns that are slow on PCRE2.
+The result depends on the settings of PHP, so run it with the ones of your environment (see [Runtime Command](../runtime-attack-verification.mdx#runtime-command)).
 
 ## Runtime-Attack Verification
 

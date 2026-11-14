@@ -7,6 +7,7 @@ import scala.concurrent.duration.Duration
 import scala.util.hashing.MurmurHash3
 
 import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.TimeoutException
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.Barrier
@@ -68,10 +69,15 @@ object Interpreter:
           try interpreter.run()
           catch case _: TimeoutException => interpreter.result(Status.Timeout, None)
 
-  /** Options is the options for running an interpreter. */
+  /** Options is the options for running an interpreter.
+    *
+    * With `usesAcceleration`, the run stops memoizing when the hits of the memoization table are fewer than
+    * `accelerationHitRatio` of its lookups.
+    */
   final case class Options(
       limit: Int = Int.MaxValue,
       usesAcceleration: Boolean = false,
+      accelerationHitRatio: Double = Parameters.DefaultAccelerationHitRatio,
       needsLoopAnalysis: Boolean = false,
       needsFailedPoints: Boolean = false,
       needsCoverage: Boolean = false,
@@ -350,14 +356,16 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   private var memoLookups: Int = 0
   private var memoHits: Int = 0
 
-  /** Counts a lookup of the memoization table, and stops memoizing if the hits are less than 1% of the lookups.
+  /** Counts a lookup of the memoization table, and stops memoizing if the hits are fewer than
+    * `options.accelerationHitRatio` of the lookups.
     *
     * The steps stay the same without memoizing, which only saves the time of running the states memoized.
     */
   private def countMemoLookup(hits: Boolean): Unit =
     memoLookups += 1
     if hits then memoHits += 1
-    if (memoLookups & (Interpreter.MemoProbeSize - 1)) == 0 && memoHits * 100 < memoLookups then memoizes = false
+    if (memoLookups & (Interpreter.MemoProbeSize - 1)) == 0 && memoHits < memoLookups * options.accelerationHitRatio
+    then memoizes = false
 
   /** Constructs a result of matching. */
   private[vm] def result(status: Status, captures: Option[Seq[Int]]): Result =

@@ -4,6 +4,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 
 import codes.quine.labs.recheck.automaton.EpsNFABuilder
+import codes.quine.labs.recheck.common.AlphabetRepresentative
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.UnsupportedException
@@ -25,7 +26,8 @@ object StaticSeeder:
       maxNFASize: Int,
       maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
       limit: Int,
-      maxSize: Int = Parameters.DefaultMaxGeneStringSize
+      maxSize: Int = Parameters.DefaultMaxGeneStringSize,
+      alphabetRepresentative: AlphabetRepresentative = Parameters.DefaultAlphabetRepresentative
   )(using
       ctx: Context
   ): Set[FString] = ctx.interrupt:
@@ -36,10 +38,10 @@ object StaticSeeder:
         lookBehindsAsLookAheads = true,
         maxNFASize
       )
-      val orderedNFA = simplified.orderedNFA.mapAlphabet(_.representative)
+      val orderedNFA = simplified.orderedNFA.mapAlphabet(alphabetRepresentative.of)
       val pairs = simplified.epsNFA.alphabet.pairs
-      val highs = pairs.collect { case (c, k) if k.high => c.representative }.toSet
-      val lows = pairs.collect { case (c, k) if k.low => c.representative }.toSet
+      val highs = pairs.collect { case (c, k) if k.high => alphabetRepresentative.of(c) }.toSet
+      val lows = pairs.collect { case (c, k) if k.low => alphabetRepresentative.of(c) }.toSet
       val seeder = new StaticSeeder(
         orderedNFA.alphabet,
         orderedNFA.stateSet,

@@ -9,6 +9,8 @@ import io.circe.Json
 import io.circe.syntax.*
 
 import codes.quine.labs.recheck.common.AccelerationMode
+import codes.quine.labs.recheck.common.AlphabetRepresentative
+import codes.quine.labs.recheck.common.AttackStringCharacteristics
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
@@ -452,6 +454,7 @@ class CodecSuite extends munit.FunSuite:
           "logger" := Json.arr(),
           "maxAttackStringSize" := 123,
           "attackLimit" := 123,
+          "attackStringCharacteristics" := "char-class",
           "randomSeed" := 123,
           "maxIteration" := 123,
           "seeder" := "dynamic",
@@ -468,13 +471,20 @@ class CodecSuite extends munit.FunSuite:
           "mutationSize" := 123,
           "attackTimeout" := 123,
           "maxDegree" := 123,
+          "maxExtraDegree" := 123,
+          "maxIncubationBoundedWidth" := 123,
+          "maxBoostIteration" := 123,
+          "boundedWidthRatio" := 1.5,
           "accelerationMode" := "off",
+          "accelerationHitRatio" := 0.125,
+          "alphabetRepresentative" := "smallest",
           "maxRepeatCount" := 123,
           "maxNFASize" := 123,
           "maxDFASize" := 123,
           "maxPatternSize" := 123,
           "dialect" := Json.obj("name" := "perl", "utf8" := false, "source" := "string"),
-          "maxRefutedAttacks" := 123
+          "maxRefutedAttacks" := 123,
+          "maxRefutedAttackPartSize" := 123
         )
       ),
       Right(
@@ -484,6 +494,7 @@ class CodecSuite extends munit.FunSuite:
           logger = Some(null),
           maxAttackStringSize = 123,
           attackLimit = 123,
+          attackStringCharacteristics = AttackStringCharacteristics.CharClass,
           randomSeed = 123,
           maxIteration = 123,
           seeder = Seeder.Dynamic,
@@ -500,13 +511,20 @@ class CodecSuite extends munit.FunSuite:
           mutationSize = 123,
           attackTimeout = Duration(123, MILLISECONDS),
           maxDegree = 123,
+          maxExtraDegree = 123,
+          maxIncubationBoundedWidth = 123,
+          maxBoostIteration = 123,
+          boundedWidthRatio = 1.5,
           accelerationMode = AccelerationMode.Off,
+          accelerationHitRatio = 0.125,
+          alphabetRepresentative = AlphabetRepresentative.Smallest,
           maxRepeatCount = 123,
           maxNFASize = 123,
           maxDFASize = 123,
           maxPatternSize = 123,
           dialect = Dialect.Perl(utf8 = false, source = PerlSource.String),
-          maxRefutedAttacks = 123
+          maxRefutedAttacks = 123,
+          maxRefutedAttackPartSize = 123
         )
       )
     )
@@ -538,6 +556,24 @@ class CodecSuite extends munit.FunSuite:
       decodeAccelerationMode.decodeJson("xxx".asJson),
       Left(DecodingFailure("Unknown acceleration mode: xxx", List.empty))
     )
+
+  test("codec.decodeAlphabetRepresentative"):
+    assertEquals(decodeAlphabetRepresentative.decodeJson("pretty".asJson), Right(AlphabetRepresentative.Pretty))
+    assertEquals(decodeAlphabetRepresentative.decodeJson("non-latin1".asJson), Right(AlphabetRepresentative.NonLatin1))
+    assertEquals(decodeAlphabetRepresentative.decodeJson("smallest".asJson), Right(AlphabetRepresentative.Smallest))
+    assertEquals(
+      decodeAlphabetRepresentative.decodeJson("xxx".asJson),
+      Left(DecodingFailure("Unknown alphabet representative: xxx", List.empty))
+    )
+
+  test("codec.decodeAttackStringCharacteristics"):
+    def decode(name: String): Decoder.Result[AttackStringCharacteristics] =
+      decodeAttackStringCharacteristics.decodeJson(name.asJson)
+    assertEquals(decode("none"), Right(AttackStringCharacteristics.None))
+    assertEquals(decode("latin1"), Right(AttackStringCharacteristics.Latin1))
+    assertEquals(decode("char-class"), Right(AttackStringCharacteristics.CharClass))
+    assertEquals(decode("alphabet"), Right(AttackStringCharacteristics.Alphabet))
+    assertEquals(decode("xxx"), Left(DecodingFailure("Unknown attack string characteristics: xxx", List.empty)))
 
   test("codec.decodeSeeder"):
     assertEquals(decodeSeeder.decodeJson("static".asJson), Right(Seeder.Static))

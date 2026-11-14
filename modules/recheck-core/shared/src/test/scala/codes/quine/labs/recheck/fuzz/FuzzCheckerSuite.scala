@@ -11,6 +11,7 @@ import codes.quine.labs.recheck.automaton.Witness
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
+import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.Attacker.Candidate
 import codes.quine.labs.recheck.fuzz.Attacker.Measurement
@@ -51,7 +52,8 @@ class FuzzCheckerSuite extends munit.FunSuite:
         attackLimit = if quick then 10_000 else Parameters.DefaultAttackLimit,
         attackTimeout = attackTimeout,
         maxIteration = maxIteration,
-        avoidsAttack = (_, _) => false
+        avoidsAttack = (_, _, _) => false,
+        automatonAttacks = Seq.empty
       )
       ._1
       .nextOption()
@@ -101,7 +103,8 @@ class FuzzCheckerSuite extends munit.FunSuite:
           seedingLimit = 10000,
           incubationLimit = 10000,
           attackLimit = 10000,
-          avoidsAttack = (_, _) => false
+          avoidsAttack = (_, _, _) => false,
+          automatonAttacks = Seq.empty
         )
         ._1
         .nextOption()
@@ -121,7 +124,8 @@ class FuzzCheckerSuite extends munit.FunSuite:
           attackLimit = 100,
           maxGeneStringSize = 5,
           maxAttackStringSize = 5,
-          avoidsAttack = (_, _) => false
+          avoidsAttack = (_, _, _) => false,
+          automatonAttacks = Seq.empty
         )
         ._1
         .nextOption()
@@ -131,7 +135,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
   def checkerOf(
       ir: IRPattern,
       maxGenerationSize: Int = Parameters.DefaultMaxGenerationSize,
-      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false,
+      avoidsAttack: (AttackComplexity.Vulnerable, AttackPattern, Hotspot) => Boolean = (_, _, _) => false,
       upperBound: Option[Seq[Complexity.Vulnerable[UChar]]] = None
   ): FuzzChecker =
     import Parameters.*
@@ -145,7 +149,13 @@ class FuzzCheckerSuite extends munit.FunSuite:
       DefaultAttackTimeout,
       DefaultMaxAttackStringSize,
       DefaultMaxDegree,
+      DefaultMaxExtraDegree,
+      DefaultMaxIncubationBoundedWidth,
+      DefaultMaxBoostIteration,
+      DefaultBoundedWidthRatio,
       DefaultAccelerationMode,
+      DefaultAccelerationHitRatio,
+      DefaultAlphabetRepresentative,
       avoidsAttack,
       upperBound
     )
@@ -169,6 +179,8 @@ class FuzzCheckerSuite extends munit.FunSuite:
       DefaultMaxIteration,
       DefaultMaxDegree,
       DefaultAccelerationMode,
+      DefaultAccelerationHitRatio,
+      DefaultAlphabetRepresentative,
       upperBound,
       attacker
     )
@@ -177,7 +189,13 @@ class FuzzCheckerSuite extends munit.FunSuite:
     import Parameters.*
     def upperBound(source: String, dialect: Dialect = Dialect.JavaScript, maxInitialGenerationSize: Int = 100) =
       val ir = ReDoS.parse(source, "", dialect)
-      FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, maxInitialGenerationSize)
+      FuzzChecker.upperBound(
+        ir,
+        DefaultMaxRepeatCount,
+        DefaultMaxNFASize,
+        maxInitialGenerationSize,
+        DefaultAlphabetRepresentative
+      )
     // The bound replaces the back-reference with a copy of `a*`, so the worst is cubic.
     val cubic = upperBound("^(a*)a*\\1b").get
     assertEquals(cubic.head.toAttackComplexity, AttackComplexity.Polynomial(3, false))
@@ -193,19 +211,31 @@ class FuzzCheckerSuite extends munit.FunSuite:
     assertEquals(upperBound("^(a?){50}a{50}$"), None)
     // The repetition of any character at the end matches any rest, so it does not make the bound quadratic.
     val tail = ReDoS.parse("^.*?(?:ab).*$", "s", Dialect.JavaScript)
-    assertEquals(FuzzChecker.upperBound(tail, DefaultMaxRepeatCount, DefaultMaxNFASize, 100), Some(Seq.empty))
+    assertEquals(
+      FuzzChecker.upperBound(tail, DefaultMaxRepeatCount, DefaultMaxNFASize, 100, DefaultAlphabetRepresentative),
+      Some(Seq.empty)
+    )
 
   test("FuzzChecker.isLinearBeyondCounts"):
     import Parameters.*
-    def isLinearBeyondCounts(source: String): Boolean =
+    def isLinearBeyondCounts(source: String, boundedWidthRatio: Double = DefaultBoundedWidthRatio): Boolean =
       val ir = ReDoS.parse(source, "", Dialect.JavaScript)
-      val bound = FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100)
-      FuzzChecker.isLinearBeyondCounts(ir, bound, DefaultMaxRepeatCount, DefaultMaxNFASize, DefaultAttackLimit)
+      val bound =
+        FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100, DefaultAlphabetRepresentative)
+      FuzzChecker.isLinearBeyondCounts(
+        ir,
+        bound,
+        DefaultMaxRepeatCount,
+        DefaultMaxNFASize,
+        DefaultAttackLimit,
+        boundedWidthRatio
+      )
 
     // The steps grow quadratically only up to 100 characters after `=` (#1310).
     assert(isLinearBeyondCounts("^.*?=[^&]{100}!"))
     // The steps on so many characters reach the limit.
     assert(!isLinearBeyondCounts("^.*?=[^&]{30000}!"))
+    assert(!isLinearBeyondCounts("^.*?=[^&]{100}!", boundedWidthRatio = 1000))
     // The repetition is not the only loop reading the characters again.
     assert(!isLinearBeyondCounts("^.*?=[^&]{100}[^&]*!"))
     assert(!isLinearBeyondCounts("^.*?=[^&]*!"))
@@ -248,7 +278,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
   test("FuzzChecker#init: the seeds of other suffixes"):
     import Parameters.*
     val ir = ReDoS.parse("^(?:a|a)*(?!.*xyz)", "", Dialect.JavaScript)
-    val bound = FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100)
+    val bound = FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100, DefaultAlphabetRepresentative)
     // The match of the witness succeeds unless `xyz` follows, which makes the look-ahead fail.
     assertEquals(checkerOf(ir, upperBound = bound).init()._1.next()._1, AttackComplexity.Exponential(true))
 
@@ -344,13 +374,15 @@ class FuzzCheckerSuite extends munit.FunSuite:
 
   test("FuzzChecker#Population#toGeneration: strings with an avoided attack rank last"):
     val ir = ReDoS.parse("^(a|a)*$", "", Dialect.JavaScript)
-    val avoidsAttack = (c: AttackComplexity.Vulnerable, _: Hotspot) => c == AttackComplexity.Exponential(true)
+    val avoidsAttack =
+      (c: AttackComplexity.Vulnerable, _: AttackPattern, _: Hotspot) => c == AttackComplexity.Exponential(true)
+    val attack = AttackPattern(Seq((UString(), UString('a'), 0)), UString(), 1)
     val checker = checkerOf(ir, 2, avoidsAttack)
     val strs = Seq(1, 2, 3).map(n => FString(n, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'))))
     val traces = strs.zip(Seq(3.0, 2.0, 1.0)).map((s, rate) => Trace(s, rate, 0, Set.empty))
     val pop = new checker.Population(0, mutable.Set.from(traces), mutable.Set.empty)
-    checker.attacker.attacks(strs(0)) = List((AttackComplexity.Exponential(true), Hotspot.empty))
-    checker.attacker.attacks(strs(1)) = List((AttackComplexity.Polynomial(2, true), Hotspot.empty))
+    checker.attacker.attacks(strs(0)) = List((AttackComplexity.Exponential(true), attack, Hotspot.empty))
+    checker.attacker.attacks(strs(1)) = List((AttackComplexity.Polynomial(2, true), attack, Hotspot.empty))
     assertEquals(pop.toGeneration.traces.map(_.str), IndexedSeq(strs(1), strs(2)))
     // A string with an avoided attack remains when the generation has room.
     val all = new checker.Population(0, mutable.Set.from(traces.take(1)), mutable.Set.empty)

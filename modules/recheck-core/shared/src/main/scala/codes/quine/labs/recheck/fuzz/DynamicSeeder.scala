@@ -5,6 +5,7 @@ import scala.collection.mutable
 import scala.concurrent.duration.Duration
 
 import codes.quine.labs.recheck.common.AccelerationMode
+import codes.quine.labs.recheck.common.AlphabetRepresentative
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.vm.Inst.ReadKind
@@ -15,7 +16,9 @@ import codes.quine.labs.recheck.vm.Interpreter.FailedPoint
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Status
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.ir.alphabet.CharKind
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
 /** DynamicSeeder computes an initial generation for the pattern with dynamic analysis. */
@@ -27,7 +30,9 @@ object DynamicSeeder:
       limit: Int = Parameters.DefaultSeedingLimit,
       timeout: Duration,
       maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
-      accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode
+      accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode,
+      accelerationHitRatio: Double = Parameters.DefaultAccelerationHitRatio,
+      alphabetRepresentative: AlphabetRepresentative = Parameters.DefaultAlphabetRepresentative
   )(using ctx: Context): Set[FString] = ctx.interrupt:
     import ctx.*
 
@@ -39,6 +44,7 @@ object DynamicSeeder:
     val opts = Options(
       limit,
       usesAcceleration = fuzz.usesAcceleration(accelerationMode),
+      accelerationHitRatio = accelerationHitRatio,
       needsLoopAnalysis = true,
       needsFailedPoints = true,
       needsCoverage = true
@@ -47,7 +53,7 @@ object DynamicSeeder:
     interrupt:
       queue.enqueue((UString.empty, None))
       for (ch, _) <- fuzz.alphabet.pairs do
-        val s = UString(ch.representative)
+        val s = UString(alphabetRepresentative.of(ch))
         queue.enqueue((s, None))
         added.add(s)
 
@@ -71,7 +77,7 @@ object DynamicSeeder:
               for failedPoint <- result.failedPoints do
                 if !covered.contains(CoverageItem(failedPoint.target, true)) then
                   for
-                    patched <- Patch.build(failedPoint, fuzz.alphabet).apply(input)
+                    patched <- Patch.build(failedPoint, fuzz.alphabet, alphabetRepresentative).apply(input)
                     if FString(patched).admitsAnyRepeatCount(fuzz.alphabet.mode) && !added.contains(patched)
                   do
                     queue.enqueue((patched, Some(failedPoint.target)))
@@ -87,11 +93,11 @@ object DynamicSeeder:
   private[fuzz] object Patch:
 
     /** InsertChar is a patch to insert (or replace) each character at the `pos`. */
-    final case class InsertChar(pos: Int, chs: Set[CharSet]) extends Patch:
+    final case class InsertChar(pos: Int, chs: Set[UChar]) extends Patch:
 
       def apply(s: UString): Seq[UString] =
-        chs.toSeq.flatMap: cs =>
-          val c = UString(cs.representative)
+        chs.toSeq.flatMap: ch =>
+          val c = UString(ch)
           Seq(s.insert(pos, c), s.slice(0, pos) ++ c ++ s.slice(pos + 1, s.length))
 
     /** InsertString is a patch to insert a string at the `pos`. */
@@ -101,12 +107,14 @@ object DynamicSeeder:
         Seq(t.insert(pos, s))
 
     /** Builds a patch from a failed point. */
-    def build(failed: FailedPoint, alphabet: PatternAlphabet): Patch =
+    def build(failed: FailedPoint, alphabet: PatternAlphabet, alphabetRepresentative: AlphabetRepresentative): Patch =
+      def charsOf(pairs: Set[(CharSet, CharKind)]): Set[UChar] = pairs.map((set, _) => alphabetRepresentative.of(set))
+
       failed.kind match
-        case ReadKind.Any         => InsertChar(failed.pos, alphabet.any.map(_._1))
-        case ReadKind.Char(c)     => InsertChar(failed.pos, Set(CharSet.single(c)))
-        case ReadKind.Class(s)    => InsertChar(failed.pos, alphabet.refine(s).map(_._1))
-        case ReadKind.ClassNot(s) => InsertChar(failed.pos, alphabet.refineInvert(s).map(_._1))
+        case ReadKind.Any         => InsertChar(failed.pos, charsOf(alphabet.any))
+        case ReadKind.Char(c)     => InsertChar(failed.pos, Set(c))
+        case ReadKind.Class(s)    => InsertChar(failed.pos, charsOf(alphabet.refine(s)))
+        case ReadKind.ClassNot(s) => InsertChar(failed.pos, charsOf(alphabet.refineInvert(s)))
         case _: ReadKind.Ref      =>
           // A reference to an unset capture has nothing to insert.
           failed.capture.fold(InsertChar(failed.pos, Set.empty))(InsertString(failed.pos, _))

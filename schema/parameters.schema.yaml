@@ -30,6 +30,19 @@ description: "Parameters is the set of the parameters of the analysis."
 type: object
 additionalProperties: false
 properties:
+  accelerationHitRatio:
+    title: "Acceleration Hit Ratio"
+    description: |-
+      The ratio of the hits to the lookups of the memoization table under which a run of the VM stops the acceleration.
+
+      A run looks up the table again and again, and it stops memoizing when the hits are fewer than this ratio of the lookups so far.
+      With `0`, it never stops.
+    type: number
+    default: 0.01
+    x-scala-type: "Double"
+    x-cli: "acceleration-hit-ratio"
+    x-since: "5.0.0"
+
   accelerationMode:
     title: "Acceleration Mode"
     description: |-
@@ -47,6 +60,29 @@ properties:
     x-cli-metavar: "mode"
     x-since: "4.2.0"
 
+  alphabetRepresentative:
+    title: "Alphabet Representative"
+    description: |-
+      The character that stands for a set of characters in an attack string.
+
+      - `pretty` is a character that looks good in an attack string, outside Latin-1 (U+0000 to U+00FF) if the set has one.
+        It is the first one that the set has of `あ`, `α`, `Ω`, `字`, `０`, `、`, `∆` and the ideographic space, or else the smallest letter, number, punctuation or symbol outside Latin-1, the smallest character outside Latin-1, the smallest printable ASCII character, or the smallest character.
+      - `non-latin1` is the smallest character outside Latin-1, or the smallest one if the set has none.
+      - `smallest` is the smallest character.
+
+      An engine may optimize the matching against a string of only Latin-1 characters (e.g. V8), so an attack string with another character is more likely to work there.
+    type: string
+    enum: ["pretty", "non-latin1", "smallest"]
+    default: "pretty"
+    x-scala-type: "AlphabetRepresentative"
+    x-scala-values:
+      "pretty": "AlphabetRepresentative.Pretty"
+      "non-latin1": "AlphabetRepresentative.NonLatin1"
+      "smallest": "AlphabetRepresentative.Smallest"
+    x-cli: "alphabet-representative"
+    x-cli-metavar: "representative"
+    x-since: "5.0.0"
+
   attackLimit:
     title: "Attack Limit"
     description: |-
@@ -60,6 +96,34 @@ properties:
     x-cli: "attack-limit"
     x-since: "1.0.0"
 
+  attackStringCharacteristics:
+    title: "Attack String Characteristics"
+    description: |-
+      The characteristics of an attack string that tell an attack from a refuted one.
+
+      An attack with the same complexity, hotspots and characteristics as a refuted one is not run on the runtime.
+      An engine may refute an attack and confirm another that differs only in its characters (e.g. V8, which is faster on a string of only Latin-1 characters).
+      Finer characteristics tell more attacks apart, and more of them are run on the runtime.
+
+      - `none` is no characteristics.
+      - `latin1` is whether the string has a character outside Latin-1 (U+0000 to U+00FF).
+      - `char-class` is the sets of characters of the pattern that the characters of the string belong to, where the pattern divides all the characters into the sets that its parts read alike, without the sets of its literal characters.
+      - `alphabet` is those sets with the ones of the literal characters.
+    type: string
+    enum: ["none", "latin1", "char-class", "alphabet"]
+    default: "latin1"
+    x-scala-type: "AttackStringCharacteristics"
+    x-scala-values:
+      {
+        "none": "AttackStringCharacteristics.None",
+        "latin1": "AttackStringCharacteristics.Latin1",
+        "char-class": "AttackStringCharacteristics.CharClass",
+        "alphabet": "AttackStringCharacteristics.Alphabet",
+      }
+    x-cli: "attack-string-characteristics"
+    x-cli-metavar: "characteristics"
+    x-since: "5.0.0"
+
   attackTimeout:
     title: "Attack Timeout"
     description: "The upper limit of matching time on the attack."
@@ -69,6 +133,20 @@ properties:
     x-scala-type: "Duration"
     x-cli: "attack-timeout"
     x-since: "4.2.0"
+
+  boundedWidthRatio:
+    title: "Bounded Width Ratio"
+    description: |-
+      The ratio to the bounded width of the pattern of the length of the repeated parts beyond which the fuzz checker confirms an attack string.
+
+      The bounded width of a pattern is the largest width of what it matches when each repetition without the largest count iterates the least times.
+      The fuzz checker confirms the growth of the steps of an attack string on a repeat count whose repeated parts are longer than the bounded width times this ratio.
+      It also takes the steps of the shorter strings as bounded by this length, when it skips the fuzzing of a pattern whose steps grow linearly beyond the counts of its repetitions.
+    type: number
+    default: 2
+    x-scala-type: "Double"
+    x-cli: "bounded-width-ratio"
+    x-since: "5.0.0"
 
   checker:
     title: "Checker"
@@ -220,7 +298,7 @@ properties:
 
   maxAttackCandidates:
     title: "Max Attack Candidates"
-    description: "The maximum number of strings reaching `incubationLimit` that each generation collects on fuzzing before the attacks."
+    description: "The maximum number of attack candidates, the strings whose steps grow more than linearly as they repeat, that each generation collects on fuzzing before the attacks."
     type: integer
     default: 8
     x-scala-type: "Int"
@@ -248,6 +326,19 @@ properties:
     x-cli: "max-back-reference-strings"
     x-since: "5.0.0"
 
+  maxBoostIteration:
+    title: "Max Boost Iteration"
+    description: |-
+      The maximum number of times that the fuzz checker boosts an attack candidate.
+
+      Each time, it adds a character or a repetition of a character to the string of the steepest candidate, and it goes on from the one whose steps grow steeper.
+      With `0`, it attacks with the candidates as they are.
+    type: integer
+    default: 10
+    x-scala-type: "Int"
+    x-cli: "max-boost-iteration"
+    x-since: "5.0.0"
+
   maxDFASize:
     title: "Max DFA Size"
     description: "The maximum size of the DFA to determine which algorithm is used."
@@ -266,6 +357,18 @@ properties:
     x-cli: "max-degree"
     x-since: "1.1.0"
 
+  maxExtraDegree:
+    title: "Max Extra Degree"
+    description: |-
+      The maximum number of degrees above `maxDegree` that the fuzz checker tells from the exponential growth.
+
+      The fuzz checker runs a string on consecutive repeat counts, and it takes the growth of the steps for a polynomial up to the degree of `maxDegree` plus this value, or else for the exponential one.
+    type: integer
+    default: 3
+    x-scala-type: "Int"
+    x-cli: "max-extra-degree"
+    x-since: "5.0.0"
+
   maxGeneStringSize:
     title: "Max Gene String Size"
     description: "The maximum length of the gene string on fuzzing."
@@ -283,6 +386,19 @@ properties:
     x-scala-type: "Int"
     x-cli: "max-generation-size"
     x-since: "1.0.0"
+
+  maxIncubationBoundedWidth:
+    title: "Max Incubation Bounded Width"
+    description: |-
+      The maximum bounded width of the pattern up to which the fuzz checker measures the growth of a gene string beyond the bounded width on incubation.
+
+      The bounded width of a pattern is the largest width of what it matches when each repetition without the largest count iterates the least times.
+      The steps of a string grow as on an attack string only when its repeated parts are longer than the bounded width, which takes long to run for a large one.
+    type: integer
+    default: 256
+    x-scala-type: "Int"
+    x-cli: "max-incubation-bounded-width"
+    x-since: "5.0.0"
 
   maxInitialGenerationSize:
     title: "Max Initial Generation Size"
@@ -320,12 +436,28 @@ properties:
     x-cli: "max-pattern-size"
     x-since: "1.1.1"
 
+  maxRefutedAttackPartSize:
+    title: "Max Refuted Attack Part Size"
+    description: |-
+      The maximum number of the characters of a run of literal characters in the pattern that tell an attack from a refuted one.
+
+      An attack with the same complexity and hotspots as a refuted one is not run on the runtime.
+      There, a run of literal characters (e.g. `edit_profile`) counts by its characters read first up to this number, so the attacks that differ only in the rest of the run are the same.
+      A larger number tells more attacks apart, and more of them are run on the runtime.
+      An engine may refute an attack that reads the first character of a run only, and confirm another that reads more (e.g. V8).
+    type: integer
+    default: 3
+    x-scala-type: "Int"
+    x-cli: "max-refuted-attack-part-size"
+    x-since: "5.0.0"
+
   maxRefutedAttacks:
     title: "Max Refuted Attacks"
     description: |-
       The maximum number of attacks that the runtime attacks refute.
 
       When the runtime attacks refute this many attacks, the checking stops, and the result is `unknown` with the `runtime-attacks-refuted` error.
+      With the `auto` checker, when it happens while the fuzz checker looks for another attack after the refuted attacks of the automaton checker, the result is `safe` by the automaton checker.
     type: integer
     default: 10
     x-scala-type: "Int"
