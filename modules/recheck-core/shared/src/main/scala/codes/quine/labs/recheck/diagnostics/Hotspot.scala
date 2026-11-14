@@ -32,7 +32,7 @@ object Hotspot:
     new Hotspot(sortedSpots)
 
   /** Builds hotspots from a heatmap and rate. */
-  def build(heatmap: Map[SourceLocation, Int], heatRate: Double): Hotspot =
+  def build(heatmap: Map[SourceLocation, Double], heatRate: Double): Hotspot =
     heatmap.maxByOption(_._2) match
       case Some((SourceLocation(_, _), max)) =>
         Hotspot:

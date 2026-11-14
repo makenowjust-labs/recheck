@@ -35,7 +35,7 @@ properties:
     description: |-
       The acceleration mode of the fuzzing.
 
-      - `auto` turns it on as `on` does, unless the pattern has back-references.
+      - `auto` turns it on as `on` does, unless the pattern has back-references, where it is on only for the runs that confirm an attack string.
       - `on` turns it on, unless the pattern has backtracking control verbs (e.g. `(*PRUNE)`) or non-atomic look-arounds (e.g. `(?*...)`), which memoization does not follow.
       - `off` turns it off.
     type: string

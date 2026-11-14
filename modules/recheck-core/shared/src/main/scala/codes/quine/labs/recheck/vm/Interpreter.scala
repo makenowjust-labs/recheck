@@ -4,6 +4,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.compiletime.uninitialized
 import scala.concurrent.duration.Duration
+import scala.util.hashing.MurmurHash3
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.TimeoutException
@@ -113,10 +114,15 @@ object Interpreter:
       override def toString: String = "timeout"
 
   /** CoverageLocation is a location in coverage. */
-  final case class CoverageLocation(instID: Int, counters: Vector[Int])
+  final case class CoverageLocation(instID: Int, counters: Vector[Int]):
+
+    // The sets of the coverage hash each location many times.
+    override val hashCode: Int = MurmurHash3.caseClassHash(this)
 
   /** CoverageItem is an item of matching coverage. */
-  final case class CoverageItem(loc: CoverageLocation, ok: Boolean)
+  final case class CoverageItem(loc: CoverageLocation, ok: Boolean):
+
+    override val hashCode: Int = MurmurHash3.caseClassHash(this)
 
   /** FailedPoint is a failed point on matching. */
   final case class FailedPoint(target: CoverageLocation, pos: Int, kind: ReadKind, capture: Option[UString])
@@ -177,8 +183,12 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       var canaries: Vector[Int],
       var rollback: Option[Rollback],
       var fallback: Option[Frame],
-      var junctions: Vector[Junction]
+      /** The junctions that the matching is in, from the latest. */
+      var junctions: List[Junction]
   ):
+
+    /** The size of `junctions`. */
+    var junctionsSize: Int = 0
 
     /** The largest index of the closed captures, which Perl uses to unset the captures on backtracking. */
     var lastParen: Int = 0
@@ -261,6 +271,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
     override def clone(): Frame =
       val frame = new Frame(label, pos, captures, opens, counters, canaries, rollback, fallback, junctions)
+      frame.junctionsSize = junctionsSize
       frame.lastParen = lastParen
       frame.time = tick()
       frame
@@ -292,7 +303,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   private val memoTable: mutable.Map[MatchState, Diff] = mutable.Map.empty
 
   /** A loop map table from block ID to positions. */
-  private val loops: mutable.Map[Int, Seq[Int]] = mutable.Map.empty[Int, Seq[Int]].withDefaultValue(Seq.empty)
+  private val loops: mutable.Map[Int, mutable.ArrayBuffer[Int]] = mutable.Map.empty
 
   // TODO: Record the coverage items with counters by numbers too, as [[coveredInsts]] does the ones without counters.
   /** A coverage set, of the items that [[coveredInsts]] does not have. */
@@ -352,12 +363,11 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   private[vm] def result(status: Status, captures: Option[Seq[Int]]): Result =
     val loops = this.loops.iterator
       .flatMap:
-        case (_, seq) => seq.sliding(2).collect { case Seq(i, j) if i < j => (i, j) }
+        case (_, seq) => (1 until seq.size).iterator.collect { case k if seq(k - 1) < seq(k) => (seq(k - 1), seq(k)) }
       .toSeq
     val heatmap =
       heats.indices.iterator.collect { case k if heats(k) > 0 => program.heatLocations(k) -> heats(k) }.toMap
-    val covered = coveredInsts.iterator.map(k => CoverageItem(CoverageLocation(k / 2, Vector.empty), k % 2 == 1))
-    val coverage = this.coverage.toSet ++ covered
+    val coverage = this.coverage.toSet ++ coveredInsts.iterator.map(program.coverageItems(_))
     Result(status, captures, steps, loops, failedPoints.toSet, coverage, heatmap.withDefaultValue(0))
 
   /** Runs matching from the start of the input. */
@@ -371,7 +381,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       Vector.fill(program.meta.canariesSize)(0),
       None,
       None,
-      Vector.empty
+      Nil
     )
 
     try runLoop(frame)
@@ -401,7 +411,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         // it tries to retrieve a result from memoization table, or adds a junction information.
         var memoized = false
         var memoizedCaptures: Option[Vector[Int]] = None
-        if memoizes && program.meta.predecessors(frame.label.index).size >= 2 then
+        if memoizes && program.meta.isJunction(frame.label.index) then
           val state = frame.toState
           val diff = memoTable.get(state)
           countMemoLookup(diff.isDefined)
@@ -409,19 +419,18 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             case Some(diff) =>
               memoized = true
               memoizedCaptures = Some(diff.failedCaptures)
-              for (index, (begin, end)) <- diff.held do held(index) = (begin, end, tick())
+              if diff.held.nonEmpty then for (index, (begin, end)) <- diff.held do held(index) = (begin, end, tick())
               steps = Math.addExact(steps, diff.steps)
               if options.needsHeatmap then
                 val diffHeats = diff.heats.get
                 for k <- diffHeats.indices do heats(k) += diffHeats(k)
             case None =>
               val junction = Junction(state, steps, Option.when(options.needsHeatmap)(IArray.from(heats)), tick())
-              frame.junctions = junction +: frame.junctions
+              frame.junctions = junction :: frame.junctions
+              frame.junctionsSize += 1
 
-        if options.needsLoopAnalysis then
-          val ps = program.meta.predecessors(frame.label.index)
-          val isLoop = ps.exists(_.index >= frame.label.index) && ps.exists(_.index < frame.label.index)
-          if isLoop then loops(frame.label.index) :+= frame.pos
+        if options.needsLoopAnalysis && program.meta.isLoopHead(frame.label.index) then
+          loops.getOrElseUpdate(frame.label.index, mutable.ArrayBuffer.empty).addOne(frame.pos)
 
         val failed = memoized || !block(frame, frame.label.block) ||
           (frame.label.block.terminator match
@@ -551,8 +560,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             case Inst.Tx(next, rollback, fallback, barrier) =>
               val nextRollback = rollback match
                 case Some(rollback) =>
-                  Rollback.HasSuccessor(rollback, frame.pos, frame.rollback, frame.fallback, frame.junctions.size)
-                case None => Rollback.Fallback(frame.fallback, frame.junctions.size)
+                  Rollback.HasSuccessor(rollback, frame.pos, frame.rollback, frame.fallback, frame.junctionsSize)
+                case None => Rollback.Fallback(frame.fallback, frame.junctionsSize)
               val nextFallback = fallback match
                 case Some(fallback) =>
                   val fallbackFrame = frame.clone()
@@ -570,9 +579,11 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           failedCaptures = captures
           backtrack(frame.fallback) match
             case Some(fallback) =>
-              if memoizes && frame.junctions.size > fallback.junctions.size then
-                val d = frame.junctions.size - fallback.junctions.size
-                for jx <- frame.junctions.take(d) do
+              if memoizes && frame.junctionsSize > fallback.junctionsSize then
+                var junctions = frame.junctions
+                var d = frame.junctionsSize - fallback.junctionsSize
+                while d > 0 do
+                  val jx = junctions.head
                   val diffHeats = Option.when(options.needsHeatmap):
                     val jxHeats = jx.heats.get
                     IArray.tabulate(heats.length)(k => heats(k) - jxHeats(k))
@@ -580,8 +591,10 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                     if held.isEmpty then Map.empty
                     else held.iterator.collect { case (i, (b, e, t)) if t > jx.time => (i, (b, e)) }.toMap
                   memoTable(jx.state) = Diff(steps - jx.steps, diffHeats, captures, diffHeld)
+                  junctions = junctions.tail
+                  d -= 1
               frame = fallback
-              restoreHeld(frame)
+              if held.nonEmpty then restoreHeld(frame)
             case None => return result(Status.Fail, None)
 
     // $COVERAGE-OFF$
@@ -596,7 +609,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** Drops the junctions reached in a transaction that ends, keeping the `size` ones before it. */
   private def dropJunctions(frame: Frame, size: Int): Unit =
     // The transaction drops the backtracking points in it, so a failure after it does not tell that they fail.
-    if frame.junctions.size > size then frame.junctions = frame.junctions.takeRight(size)
+    if frame.junctionsSize > size then
+      frame.junctions = frame.junctions.drop(frame.junctionsSize - size)
+      frame.junctionsSize = size
 
   /** Returns the frame that backtracking resumes from the fallback, where the frames of the verbs act. */
   @tailrec

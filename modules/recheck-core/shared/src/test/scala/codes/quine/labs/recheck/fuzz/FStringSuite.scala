@@ -7,7 +7,6 @@ import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.fuzz.FString.*
-import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
 class FStringSuite extends munit.FunSuite:
@@ -101,17 +100,57 @@ class FStringSuite extends munit.FunSuite:
       FString(1, IndexedSeq(Repeat(0, 2), Wrap('a'), Repeat(0, 1))).toUString
     }
 
-  test("FString#skeleton"):
-    def skeleton(n: Int, seq: FChar*): String = FString(n, seq.toIndexedSeq).skeleton.toString
-    assertEquals(skeleton(9, Repeat(0, 1), Wrap('0')), skeleton(4, Repeat(0, 1), Wrap('0'), Repeat(0, 1), Wrap('0')))
-    assertEquals(skeleton(9, Wrap('0'), Repeat(0, 1), Wrap('0')), skeleton(1, Repeat(0, 1), Wrap('0')))
-    assertNotEquals(skeleton(9, Repeat(0, 1), Wrap('0'), Wrap('!')), skeleton(9, Repeat(0, 1), Wrap('0')))
+  test("FString#normalize"):
+    def normalize(n: Int, seq: FChar*): FString = FString(n, seq.toIndexedSeq).normalize
+    val zeros = FString(3, IndexedSeq(Repeat(1, 1), Wrap('0')))
+    // A copy of the part after a repetition goes into its count.
+    assertEquals(normalize(3, Repeat(0, 1), Wrap('0'), Wrap('0')), zeros)
+    // A repetition moves before a character that its part ends with.
+    assertEquals(normalize(3, Wrap('0'), Repeat(0, 1), Wrap('0')), zeros)
     assertEquals(
-      skeleton(3, Wrap('_'), Repeat(0, 3), Wrap('*'), Wrap('a'), Wrap('\t')),
-      FString(1, IndexedSeq('_', '*', 'a', '\t').map(Wrap(_))).toUString.toString
+      normalize(3, Wrap('a'), Repeat(0, 2), Wrap('b'), Wrap('a'), Wrap('b')),
+      FString(3, IndexedSeq(Repeat(1, 2), Wrap('a'), Wrap('b')))
     )
-    // A constant string has no runs to merge.
-    assertEquals(skeleton(1, Wrap('a'), Wrap('a')), UString('a', 'a').toString)
+    // Repetitions of the same part stay, since one repeat count does not tell their sum.
+    val twice = FString(3, IndexedSeq(Repeat(0, 1), Wrap('0'), Repeat(0, 1), Wrap('0')))
+    assertEquals(twice.normalize, twice)
+    // A repetition of `m < -1` takes no copy, which would be lost on the repeat counts where it repeats no times.
+    val negative = FString(3, IndexedSeq(Repeat(-2, 1), Wrap('0'), Wrap('0')))
+    assertEquals(negative.normalize, negative)
+    // The characters are the same on every repeat count.
+    val strs = Seq(
+      FString(1, IndexedSeq(Wrap('a'), Repeat(0, 2), Wrap('b'), Wrap('a'), Wrap('b'), Wrap('a'), Wrap('b'))),
+      FString(1, IndexedSeq(Wrap('0'), Repeat(-1, 1), Wrap('0'), Wrap('0'), Repeat(2, 1), Wrap('0'))),
+      FString(1, IndexedSeq(Repeat(-3, 1), Wrap('0'), Wrap('0'), Wrap('1'), Repeat(0, 2), Wrap('0'), Wrap('1')))
+    )
+    for str <- strs; n <- 1 to 5 do assertEquals(str.copy(n = n).normalize.toUString, str.copy(n = n).toUString)
+
+  test("FString#fingerprint"):
+    import Fingerprint.Item
+    def fingerprint(n: Int, seq: FChar*): Fingerprint = FString(n, seq.toIndexedSeq).fingerprint
+    def repeated(part: Char*): Item = Item.Repeated(part.map(_.toInt).toIndexedSeq)
+    // The repeat counts and how the copies of a part are split do not matter.
+    val zeros = Fingerprint(IndexedSeq(repeated('0')))
+    assertEquals(fingerprint(9, Repeat(0, 1), Wrap('0')), zeros)
+    assertEquals(fingerprint(4, Repeat(0, 1), Wrap('0'), Repeat(0, 1), Wrap('0')), zeros)
+    assertEquals(fingerprint(9, Wrap('0'), Repeat(0, 1), Wrap('0')), zeros)
+    assertEquals(fingerprint(9, Repeat(-5, 2), Wrap('0'), Wrap('0'), Wrap('0')), zeros)
+    assertNotEquals(fingerprint(9, Repeat(0, 1), Wrap('0'), Wrap('!')), zeros)
+    // A repeated part is the shortest one, as early as it can be.
+    val abs = Fingerprint(IndexedSeq(repeated('a', 'b')))
+    assertEquals(fingerprint(9, Repeat(0, 2), Wrap('a'), Wrap('b')), abs)
+    assertEquals(fingerprint(9, Repeat(0, 4), Wrap('a'), Wrap('b'), Wrap('a'), Wrap('b')), abs)
+    assertEquals(fingerprint(9, Wrap('a'), Repeat(0, 2), Wrap('b'), Wrap('a'), Wrap('b')), abs)
+    // The strings of different structures differ.
+    assertEquals(
+      fingerprint(9, Repeat(0, 1), Wrap('a'), Repeat(0, 1), Wrap('b')),
+      Fingerprint(IndexedSeq(repeated('a'), repeated('b')))
+    )
+    assertEquals(fingerprint(1, Wrap('a'), Wrap('b')), Fingerprint(IndexedSeq(Item.Fixed('a'), Item.Fixed('b'))))
+    assertEquals(
+      fingerprint(9, Wrap('a'), Repeat(0, 1), Wrap('b')),
+      Fingerprint(IndexedSeq(Item.Fixed('a'), repeated('b')))
+    )
 
   test("FString#admitsAnyRepeatCount"):
     val (high, low) = (Wrap(0xd800), Wrap(0xdc00))

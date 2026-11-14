@@ -17,6 +17,11 @@ final case class FuzzProgram(program: Program, alphabet: PatternAlphabet, parts:
     case AccelerationMode.On   => program.meta.allowsMemoization
     case AccelerationMode.Off  => false
 
+  /** Whether the VM memoizes the failed states in the mode on a run that confirms an attack string. */
+  def usesAccelerationOnAttack(mode: AccelerationMode): Boolean = mode match
+    case AccelerationMode.Auto | AccelerationMode.On => program.meta.allowsMemoization
+    case AccelerationMode.Off                        => false
+
 object FuzzProgram:
 
   /** Builds a program from the pattern, which runs as the engine of its dialect. */

@@ -1,5 +1,7 @@
 package codes.quine.labs.recheck.vm
 
+import codes.quine.labs.recheck.vm.Interpreter.CoverageItem
+import codes.quine.labs.recheck.vm.Interpreter.CoverageLocation
 import codes.quine.labs.recheck.vm.Program.Meta
 import codes.quine.labs.resyntax.ast.SourceLocation
 
@@ -18,6 +20,16 @@ final case class Program(blocks: Vector[(Label, Block)], meta: Meta):
     val locations = collection.mutable.LinkedHashMap.empty[SourceLocation, Int]
     for read <- reads; loc <- read.loc do read.heatIndex = locations.getOrElseUpdate(loc, locations.size)
     locations.keys.toIndexedSeq
+
+  /** The coverage items without counters, by `2 * id + 1` for the instruction ID if it succeeds or else `2 * id`. */
+  private[vm] lazy val coverageItems: IArray[CoverageItem] =
+    val ids = blocks.iterator
+      .flatMap((_, block) => block.insts.iterator ++ Iterator(block.terminator))
+      .flatMap:
+        case inst @ Inst.TryLA(read, _, _) => Iterator(inst.id, read.id)
+        case inst @ Inst.TryLB(read, _, _) => Iterator(inst.id, read.id)
+        case inst                          => Iterator(inst.id)
+    IArray.tabulate((ids.max + 1) * 2)(k => CoverageItem(CoverageLocation(k / 2, Vector.empty), k % 2 == 1))
 
   override def toString: String =
     val sb = new StringBuilder
@@ -44,6 +56,15 @@ object Program:
       canariesSize: Int,
       predecessors: Vector[Set[Label]]
   ):
+
+    /** Whether each block is a junction, which two or more blocks jump to. */
+    private[vm] val isJunction: IArray[Boolean] = IArray.from(predecessors.map(_.size >= 2))
+
+    /** Whether each block is the head of a loop, which blocks both before it and from it on jump to. */
+    private[vm] val isLoopHead: IArray[Boolean] =
+      IArray.tabulate(predecessors.size)(i =>
+        predecessors(i).exists(_.index >= i) && predecessors(i).exists(_.index < i)
+      )
 
     /** Whether memoizing the failed states keeps the matching result. */
     def allowsMemoization: Boolean =
