@@ -71,9 +71,12 @@ The `RegexOptions` `RightToLeft`, `ECMAScript` and `NonBacktracking` have no fla
 
 ## Approximations
 
-- .NET has optimizations that `recheck` does not model, so an attack that `recheck` reports may not work on .NET, and the runtime-attack verification checks whether it does.
 - `\G` matches only at the start of the input, since `recheck` models a search from there, not one from a later position (e.g. `Match.NextMatch`).
 - Case-insensitive matching follows the invariant culture, not the current culture (e.g. `(?i)i` does not match `İ` as it does in the Turkish culture).
+
+### Optimizations
+
+`recheck` does not implement the optimizations specific to .NET, so an attack that `recheck` reports may not work on .NET, and the runtime-attack verification checks whether it does.
 
 ## Runtime-Attack Verification
 

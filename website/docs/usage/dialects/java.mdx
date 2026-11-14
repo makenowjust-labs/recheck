@@ -75,7 +75,6 @@ The `Pattern` flag `LITERAL` has no flag letter, so it cannot be given (`Pattern
 
 ## Approximations
 
-- Java has optimizations of loops that `recheck` does not model, so an attack that `recheck` reports may not work on Java, and the runtime-attack verification checks whether it does.
 - `\G` matches only at the start of the input, since `recheck` models a search from there, not one from a later position (e.g. the second call of `Matcher#find`).
 - Java compiles a repetition into a node that depends on its body (`Curly`, `GroupCurly` or `Loop`), and the nodes differ in captures, `\R` and empty iterations.
   `recheck` does not reproduce the differences, and it repeats any node as `Loop` does.
@@ -85,6 +84,12 @@ The `Pattern` flag `LITERAL` has no flag letter, so it cannot be given (`Pattern
   For example, `(?<=\X)a` never matches in Java, and `(?<=(a|aa))b` captures `"a"` of `"aab"` in Java, but `"aa"` in `recheck`.
 - With `x`, Java skips whitespace and comments also inside constructs (e.g. `(?<n a>x)`, `a{1 ,2}` and `\x4 1`), and `recheck` skips them at the same places.
   `recheck` does not reproduce three quirks there: Java drops the `&` of `[a& b]`, reads `\uD83D\ uDE00` as one surrogate pair, and rejects `[a- [b]]`, while `recheck` reads them as `[a&b]`, `\uD83D` followed by `\ ` and `uDE00`, and `[a\-b]`.
+
+### Optimizations
+
+`recheck` does not implement the following optimization specific to Java, so an attack that `recheck` reports may not work on Java, and the runtime-attack verification checks whether it does.
+
+- The optimizations of loops.
 
 ## Runtime-Attack Verification
 
