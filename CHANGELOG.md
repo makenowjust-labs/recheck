@@ -24,6 +24,7 @@ Fixes:
 - [#1989](https://github.com/makenowjust-labs/recheck/pull/1989) Speed up the automaton checker ([@makenowjust](https://github.com/makenowjust))
 - [#1990](https://github.com/makenowjust-labs/recheck/pull/1990) Estimate the growth of the fuzz candidates before the attacks ([@makenowjust](https://github.com/makenowjust))
 - [#1991](https://github.com/makenowjust-labs/recheck/pull/1991) Speed up the VM for the fuzz checker ([@makenowjust](https://github.com/makenowjust))
+- [#1997](https://github.com/makenowjust-labs/recheck/pull/1997) Measure the growth of the fuzz candidates by the differences of the steps ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
