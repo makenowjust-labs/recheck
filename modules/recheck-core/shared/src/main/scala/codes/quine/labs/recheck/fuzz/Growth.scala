@@ -33,15 +33,6 @@ object Growth:
         binomial = binomial * (k - order) / (order + 1)
       steps
 
-  object Polynomial:
-
-    /** Returns the polynomial through the values on the counts from `start` by `stride`, whose degree is one less than
-      * the number of the values.
-      */
-    def through(start: Int, stride: Int, values: IndexedSeq[BigInt]): Polynomial =
-      val firsts = Iterator.iterate(values)(row => row.tail.lazyZip(row).map(_ - _)).takeWhile(_.nonEmpty).map(_.head)
-      Polynomial(start, stride, firsts.toIndexedSeq)
-
   /** Exponential is the growth of the steps beyond the polynomials up to the degree that the steps can tell, as the
     * steps growing exponentially are.
     */

@@ -220,10 +220,71 @@ class AttackerSuite extends munit.FunSuite:
     val attacker = attackerOf(ReDoS.parse(source, "", Dialect.JavaScript))
     val str = FString(1, IndexedSeq(FString.Wrap('x'), FString.Repeat(0, 1), FString.Wrap('b'), FString.Wrap('!')))
     val measurement = attacker.measureFirst(str, Parameters.DefaultIncubationLimit).get
-    // The second `b*` reads the characters again on each backtracking of the first, so it is hot on the attack string.
-    val hot = attacker
-      .hotspotOf(str, measurement, 50000)
-      .spots
-      .collect:
-        case Hotspot.Spot(start, end, Hotspot.Hot) => (start, end)
-    assertEquals(hot, Seq((13, 14)))
+    // Both of `b*` read the repeated `b`, the more the more it repeats, and `x*` reads `x` once.
+    assertEquals(
+      attacker.hotspotOf(str, measurement),
+      Hotspot(
+        Seq(Hotspot.Spot(1, 2, Hotspot.Cold), Hotspot.Spot(11, 12, Hotspot.Hot), Hotspot.Spot(13, 14, Hotspot.Hot))
+      )
+    )
+
+  test("Attacker#hotspotOf: the parts through which the degree of the heat rises are warm"):
+    import Hotspot.{Cold, Hot, Spot, Warm}
+    def hotspot(source: String, str: FString): Hotspot =
+      val attacker = attackerOf(ReDoS.parse(source, "", Dialect.JavaScript))
+      attacker.hotspotOf(str, attacker.measureFirst(str, Parameters.DefaultIncubationLimit).get)
+    def wrap(s: String): IndexedSeq[FString.FChar] = s.map(c => FString.Wrap(c.toInt))
+
+    // Each start of the search reads `{{` on the way to the loop, and each backtracking reads the first `}` after it.
+    assertEquals(
+      hotspot("{{([\\s\\S]+?)}}", FString(1, FString.Repeat(0, 3) +: wrap("{{}"))),
+      Hotspot(Seq(Spot(0, 2, Warm), Spot(3, 9, Hot), Spot(12, 13, Cold)))
+    )
+    // `x` between the two pairs of the loops is read fewer times than the loop before it, unlike `b` between the two
+    // loops of the last pair.
+    val str = FString(1, (FString.Repeat(0, 1) +: wrap("ax")) ++ (FString.Repeat(0, 1) +: wrap("b!")))
+    assertEquals(
+      hotspot("^a*a*x.*b.*b$", str),
+      Hotspot:
+        Seq(
+          Spot(1, 2, Hot),
+          Spot(3, 4, Hot),
+          Spot(5, 6, Cold),
+          Spot(6, 7, Hot),
+          Spot(8, 9, Warm),
+          Spot(9, 10, Hot),
+          Spot(11, 12, Cold)
+        )
+    )
+    // The third `a` is read as many times as the loop before it, but the first `b*` next from it is of the same degree.
+    assertEquals(
+      hotspot("^a*a*ab*b*$", FString(1, (FString.Repeat(0, 1) +: wrap("a")) ++ (FString.Repeat(0, 1) +: wrap("b!")))),
+      Hotspot(Seq(Spot(1, 2, Hot), Spot(3, 4, Hot), Spot(5, 6, Cold), Spot(6, 7, Hot), Spot(8, 9, Hot)))
+    )
+
+  test("Attacker#hotspotOf: the other parts that the runs read are cold"):
+    val source = "^(?:xy|x\\s*\\s*$)"
+    val attacker = attackerOf(ReDoS.parse(source, "", Dialect.JavaScript))
+    val str = FString(1, IndexedSeq(FString.Wrap('x'), FString.Repeat(0, 1), FString.Wrap(' '), FString.Wrap('!')))
+    val measurement = attacker.measureFirst(str, Parameters.DefaultIncubationLimit).get
+    // The first `x` is read too, though the matching does not go on from it to the hot `\s*`, and `y` is not read.
+    assertEquals(
+      attacker.hotspotOf(str, measurement),
+      Hotspot(
+        Seq(
+          Hotspot.Spot(4, 5, Hotspot.Cold),
+          Hotspot.Spot(7, 8, Hotspot.Cold),
+          Hotspot.Spot(8, 10, Hotspot.Hot),
+          Hotspot.Spot(11, 13, Hotspot.Hot)
+        )
+      )
+    )
+
+  test("Attacker#hotspotOf: a string without repetitions"):
+    val attacker = attackerOf(ReDoS.parse("^x(?:c|c)*$", "", Dialect.JavaScript))
+    val str = FString(UString.from('x'.toInt +: Seq.fill(12)('c'.toInt) :+ '!'.toInt))
+    // Both of `c` read the characters more times than the string has, and `x` reads one once.
+    assertEquals(
+      attacker.hotspotOf(str, Measurement(Growth.Exponential, 1, 0, true)),
+      Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Cold), Hotspot.Spot(5, 6, Hotspot.Hot), Hotspot.Spot(7, 8, Hotspot.Hot)))
+    )

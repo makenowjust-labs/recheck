@@ -2,8 +2,6 @@ package codes.quine.labs.recheck.diagnostics
 
 import scala.io.AnsiColor.*
 
-import codes.quine.labs.resyntax.ast.SourceLocation
-
 class HotspotSuite extends munit.FunSuite:
 
   test("Hotspot#highlight"):
@@ -34,19 +32,3 @@ class HotspotSuite extends munit.FunSuite:
     assertEquals(Hotspot.Hot.toString, "hot")
     assertEquals(Hotspot.Warm.toString, "warm")
     assertEquals(Hotspot.Cold.toString, "cold")
-
-  test("Hotspot.build"):
-    val hotspot =
-      Hotspot.build(Map(SourceLocation(0, 1) -> 4.0, SourceLocation(2, 3) -> 2.0, SourceLocation(4, 5) -> 1.0), 0.5)
-    assertEquals(
-      hotspot,
-      Hotspot(
-        Seq(Hotspot.Spot(0, 1, Hotspot.Hot), Hotspot.Spot(2, 3, Hotspot.Hot), Hotspot.Spot(4, 5, Hotspot.Warm))
-      )
-    )
-    assertEquals(Hotspot.build(Map.empty, 0.5), Hotspot.empty)
-    // The heat may be scaled.
-    assertEquals(
-      Hotspot.build(Map(SourceLocation(0, 1) -> 1e300, SourceLocation(1, 2) -> 1.0), 0.5),
-      Hotspot(Seq(Hotspot.Spot(0, 1, Hotspot.Hot), Hotspot.Spot(1, 2, Hotspot.Warm)))
-    )

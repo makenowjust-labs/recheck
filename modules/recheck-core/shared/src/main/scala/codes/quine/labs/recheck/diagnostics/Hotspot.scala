@@ -3,7 +3,6 @@ package codes.quine.labs.recheck.diagnostics
 import scala.io.AnsiColor.*
 
 import codes.quine.labs.recheck.diagnostics.Hotspot.*
-import codes.quine.labs.resyntax.ast.SourceLocation
 
 /** Hotspot is a collection of hotspots in the analyzed RegExp. */
 final case class Hotspot(spots: Seq[Spot]):
@@ -30,16 +29,6 @@ object Hotspot:
         case (ss, spot) => ss :+ spot
     new Hotspot(sortedSpots)
 
-  /** Builds hotspots from a heatmap and rate. */
-  def build(heatmap: Map[SourceLocation, Double], heatRate: Double): Hotspot =
-    heatmap.maxByOption(_._2) match
-      case Some((SourceLocation(_, _), max)) =>
-        Hotspot:
-          heatmap.toSeq.map:
-            case (SourceLocation(start, end), count) =>
-              Hotspot.Spot(start, end, if count >= max * heatRate then Hotspot.Hot else Hotspot.Warm)
-      case None => empty
-
   /** An empty hotspot. */
   def empty: Hotspot = new Hotspot(Seq.empty)
 
@@ -52,21 +41,27 @@ object Hotspot:
     /** The escape sequence of the color of a spot of this temperature in a highlight. */
     def color: String
 
-  /** Hot is the temperature of a part that the matching repeats many times, which causes the explosion. */
+  /** Hot is the temperature of a part in a loop that the matching repeats on the repeated parts of the attack string,
+    * which causes the explosion.
+    */
   case object Hot extends Temperature:
 
     def color: String = RED_B
 
     override def toString: String = "hot"
 
-  /** Warm is the temperature of a part that the matching runs on the way to a hot part. */
+  /** Warm is the temperature of a part between two such loops on the same repeated part, on which the matching goes
+    * from the one to the other.
+    */
   case object Warm extends Temperature:
 
     def color: String = GREEN_B
 
     override def toString: String = "warm"
 
-  /** Cold is the temperature of another part that the matching goes through on the attack string. */
+  /** Cold is the temperature of another part that the matching goes through on the attack string, as one before the
+    * loops or after them up to the failure.
+    */
   case object Cold extends Temperature:
 
     def color: String = BLUE_B

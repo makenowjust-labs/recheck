@@ -126,30 +126,43 @@ It shows where the matching time explodes, so it is where to look at when fixing
 It is a list of spots, and each spot has the following fields.
 
 - `start` and `end` are the range of the spot in `source`, counted in UTF-16 code units, where `end` is exclusive.
-- `temperature` is `hot` or `warm`.
-  A `hot` spot is a part that the matching repeats many times, which causes the explosion.
-  A `warm` spot is a part that the matching runs on the way to a `hot` spot.
+- `temperature` is `hot`, `warm` or `cold`.
+  A `hot` spot is a part in a loop that the matching repeats on the repeated parts of the attack string, which causes the explosion.
+  A `warm` spot is a part between two such loops on the same repeated part, which the matching runs each time it goes from one loop to the other.
+  A `cold` spot is any other part that the matching goes through on the attack string, like a part before the loops, or a part after them that the matching runs until it fails.
 
 For example, the hotspot of `/^x(a|a)*y$/` is the following.
 
 ```json
 [
-  { "start": 1, "end": 2, "temperature": "warm" },
+  { "start": 1, "end": 2, "temperature": "cold" },
   { "start": 3, "end": 4, "temperature": "hot" },
   { "start": 5, "end": 6, "temperature": "hot" }
 ]
 ```
 
-The Playground shows it as follows, with the `hot` spots in red and the `warm` spots in yellow.
+The Playground shows it as follows, with the `hot` spots in red, the `warm` spots in yellow and the `cold` spots in blue.
 
 <Hotspot
   source="^x(a|a)*y$"
   hotspot={[
-    { start: 1, end: 2, temperature: "warm" },
+    { start: 1, end: 2, temperature: "cold" },
     { start: 3, end: 4, temperature: "hot" },
     { start: 5, end: 6, temperature: "hot" },
   ]}
 />
 
-The automaton checker makes the repeated part of the ambiguity `hot`.
-The fuzz checker counts how many times the matching runs each part on the attack string, and it makes a part `hot` when the count is at least [`heatRatio`](parameters.mdx#heatratio) times the largest count.
+The hotspot of `/{{([\s\S]+?)}}/` has a `warm` spot: `{{` is between the loop of the search for the start of a match and the loop of `[\s\S]+?`.
+The first `}` is `cold`, which the matching runs after the loop until it fails.
+
+<Hotspot
+  source="{{([\s\S]+?)}}"
+  hotspot={[
+    { start: 0, end: 2, temperature: "warm" },
+    { start: 3, end: 9, temperature: "hot" },
+    { start: 12, end: 13, temperature: "cold" },
+  ]}
+/>
+
+The automaton checker tells the temperatures from the paths of its attack string in the automaton.
+The fuzz checker counts how many times the matching runs each part on the attack string, and tells the temperatures from how the counts grow as the repeated parts of the attack string repeat more.
