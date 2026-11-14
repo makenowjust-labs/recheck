@@ -112,10 +112,13 @@ The following constructs are not supported.
 
 ### Optimizations
 
-`recheck` does not implement the following optimizations specific to Perl, so an attack that `recheck` reports may not work on Perl, and the runtime-attack verification checks whether it does.
+`recheck` does not implement the following optimizations specific to Perl, so an attack that `recheck` reports may not work on Perl.
 
 - The caches of the super-linear matching.
 - The start-of-match optimizations, by which Perl skips the attempts that cannot match.
+  For example, Perl fails `[BCEIL]<([^>]*)>` at once on an input without `>`, which every match has, where `recheck` reports the repetitions of `B<` as an attack.
+
+Enable the [runtime-attack verification](../runtime-attack-verification.mdx) to report only the patterns that are slow on Perl.
 
 ## Runtime-Attack Verification
 

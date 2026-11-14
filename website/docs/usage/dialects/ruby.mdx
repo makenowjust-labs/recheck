@@ -95,9 +95,11 @@ The encodings EUC-JP (`/e`) and Windows-31J (`/s`) are not supported, and their 
 
 ### Optimizations
 
-`recheck` does not implement the following optimization specific to Ruby, so an attack that `recheck` reports may not work on Ruby, and the runtime-attack verification checks whether it does.
+`recheck` does not implement the following optimization specific to Ruby, so most attacks that `recheck` reports do not work on Ruby.
 
 - The memoization of the matching (since Ruby 3.2).
+
+Enable the [runtime-attack verification](../runtime-attack-verification.mdx) to report only the patterns that are slow on Ruby.
 
 ## Runtime-Attack Verification
 
