@@ -91,10 +91,15 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     val word =
       CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))
     val other2 = word.union(at).complement(UnitMode.UTF16)
+    // The loops are hot, `a` between them is warm, and `a` after them up to the failure is cold.
     assertEquals(
       check("^.*a.*a$", "s"),
       Success(
-        Polynomial(2, Witness(Seq((Seq.empty, Seq(a))), Seq(other1)), Hotspot(Seq(Spot(1, 2, Hot), Spot(3, 5, Hot))))
+        Polynomial(
+          2,
+          Witness(Seq((Seq.empty, Seq(a))), Seq(other1)),
+          Hotspot(Seq(Spot(1, 2, Hot), Spot(3, 4, Warm), Spot(4, 5, Hot), Spot(6, 7, Cold)))
+        )
       )
     )
     assertEquals(
@@ -103,7 +108,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         Polynomial(
           2,
           Witness(Seq((Seq.empty, Seq(a, a))), Seq(a, other1, a, a, a)),
-          Hotspot(Seq(Spot(2, 4, Hot), Spot(6, 7, Hot), Spot(8, 10, Hot)))
+          Hotspot(Seq(Spot(2, 4, Hot), Spot(6, 7, Warm), Spot(8, 10, Hot), Spot(12, 13, Cold)))
         )
       )
     )
@@ -113,7 +118,15 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         Polynomial(
           3,
           Witness(Seq((Seq.empty, Seq(a)), (Seq.empty, Seq(a))), Seq(other1)),
-          Hotspot(Seq(Spot(1, 2, Hot), Spot(3, 5, Hot), Spot(6, 8, Hot)))
+          Hotspot:
+            Seq(
+              Spot(1, 2, Hot),
+              Spot(3, 4, Warm),
+              Spot(4, 5, Hot),
+              Spot(6, 7, Warm),
+              Spot(7, 8, Hot),
+              Spot(9, 10, Cold)
+            )
         )
       )
     )
@@ -123,13 +136,19 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         Polynomial(
           2,
           Witness(Seq((Seq(at), Seq(a, a, other2))), Seq.empty),
-          Hotspot(Seq(Spot(2, 3, Hot), Spot(6, 8, Hot), Spot(10, 14, Hot)))
+          Hotspot(Seq(Spot(2, 3, Hot), Spot(6, 8, Warm), Spot(10, 14, Hot)))
         )
       )
     )
     assertEquals(
       check("^a+(?!a*b)", ""),
-      Success(Polynomial(2, Witness(Seq((Seq(a), Seq(a))), Seq(b)), Hotspot(Seq(Spot(1, 2, Hot), Spot(6, 7, Hot)))))
+      Success(
+        Polynomial(
+          2,
+          Witness(Seq((Seq(a), Seq(a))), Seq(b)),
+          Hotspot(Seq(Spot(1, 2, Hot), Spot(6, 7, Hot), Spot(8, 9, Cold)))
+        )
+      )
     )
     assertEquals(
       check("^a*(?<=a)a*$", ""),
@@ -153,7 +172,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         Polynomial(
           3,
           Witness(Seq((Seq(b), Seq(a)), (Seq.empty, Seq(a)), (Seq.empty, Seq(a))), Seq(b, a)),
-          Hotspot(Seq(Spot(2, 3, Hot), Spot(9, 10, Hot)))
+          Hotspot(Seq(Spot(2, 3, Hot), Spot(8, 9, Cold), Spot(9, 10, Hot)))
         )
       )
     )
@@ -168,7 +187,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         Polynomial(
           2,
           Witness(Seq((Seq(notABCOrLine), Seq(a)), (Seq.empty, Seq(a))), Seq(b, CharSet.single('c'))),
-          Hotspot(Seq(Spot(1, 2, Hot), Spot(9, 10, Hot), Spot(11, 12, Hot), Spot(13, 15, Warm)))
+          Hotspot(Seq(Spot(1, 2, Hot), Spot(9, 10, Hot), Spot(11, 12, Hot), Spot(13, 15, Cold)))
         )
       )
     )
@@ -189,6 +208,21 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         Polynomial(2, Witness(Seq((Seq(a), Seq(a))), Seq(other1)), Hotspot(Seq(Spot(1, 2, Hot), Spot(6, 7, Hot))))
       )
     )
+
+  test("AutomatonChecker.check: temperatures"):
+    def hotspot(source: String, isUpperBound: Boolean = false): Hotspot =
+      check(source, "", isUpperBound = isUpperBound).get match
+        case vulnerable: Vulnerable[CharSet] => vulnerable.hotspot
+        case _: Safe                         => Hotspot.empty
+
+    // The part before the loops, which the witness goes through once, is cold.
+    assertEquals(hotspot("^x(?:a|a)*y$"), Hotspot(Seq(Spot(1, 2, Cold), Spot(5, 6, Hot), Spot(7, 8, Hot))))
+    // `{{` is between the loop of the search and the one of the pattern, and the first `}` is after them.
+    assertEquals(hotspot("{{([\\s\\S]+?)}}"), Hotspot(Seq(Spot(0, 2, Warm), Spot(3, 9, Hot), Spot(12, 13, Cold))))
+    // `a` between the loops is warm, and the last `a` up to the failure is cold, with an upper bound too.
+    val spots = Seq(Spot(1, 2, Cold), Spot(2, 5, Hot), Spot(6, 7, Warm), Spot(7, 10, Hot), Spot(11, 12, Cold))
+    assertEquals(hotspot("^x[^]*a[^]*a$"), Hotspot(spots))
+    assertEquals(hotspot("^x[^]*a[^]*a$", isUpperBound = true), Hotspot(spots))
 
   test("AutomatonChecker.check: complexities of look-behinds"):
     // The complexities of the inner expressions of the look-behinds merge into the others, from the worst.
@@ -226,7 +260,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Exponential(
           Witness(Seq((Seq(b, a), Seq(a))), Seq(b, c, d)),
-          Hotspot(Seq(Spot(1, 2, Hot), Spot(11, 12, Hot), Spot(13, 14, Hot), Spot(16, 18, Warm)))
+          Hotspot(Seq(Spot(1, 2, Hot), Spot(11, 12, Hot), Spot(13, 14, Hot), Spot(16, 18, Cold)))
         )
       )
     )
