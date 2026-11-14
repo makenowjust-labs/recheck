@@ -12,6 +12,7 @@ New Features:
 - [#1983](https://github.com/makenowjust-labs/recheck/pull/1983) Support atomic groups in the automaton checker ([@makenowjust](https://github.com/makenowjust))
 - [#1987](https://github.com/makenowjust-labs/recheck/pull/1987) Add an upper-bound analysis to the fuzz checker ([@makenowjust](https://github.com/makenowjust))
 - [#1988](https://github.com/makenowjust-labs/recheck/pull/1988) Expand the back-references in the automaton checker ([@makenowjust](https://github.com/makenowjust))
+- [#2005](https://github.com/makenowjust-labs/recheck/pull/2005) Add the calibrate-runtime-attack subcommand, which recommends the runtime-attack timeout ([@makenowjust](https://github.com/makenowjust))
 
 Fixes:
 
@@ -29,6 +30,7 @@ Fixes:
 - [#1999](https://github.com/makenowjust-labs/recheck/pull/1999) Speed up the matching loop of the VM and the coverage of the fuzz checker ([@makenowjust](https://github.com/makenowjust))
 - [#2002](https://github.com/makenowjust-labs/recheck/pull/2002) Stop building the automata early when the NFA with look-ahead exceeds the size limit ([@makenowjust](https://github.com/makenowjust))
 - [#2003](https://github.com/makenowjust-labs/recheck/pull/2003) Add the cold temperature of a hotspot, and tell the temperatures by the loops of the attack ([@makenowjust](https://github.com/makenowjust))
+- [#2004](https://github.com/makenowjust-labs/recheck/pull/2004) Keep the hashes of the branches and the stops of the automata ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
