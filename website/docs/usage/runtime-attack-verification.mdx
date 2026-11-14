@@ -174,12 +174,12 @@ When the command cannot run (e.g. the runtime is not installed), the result is `
 By default, the runtime-attack verification runs the runtime of the dialect found by its name in `PATH` (e.g. `ruby` for the `ruby` dialect).
 To use another runtime, set the environment variable of the dialect (e.g. `RECHECK_RUBY`) to the command line to run instead.
 Each dialect's page (see [Dialects](dialects.mdx#supported-dialects)) lists its command and its environment variable.
-`recheck` adds the dialect's arguments after the command line (e.g. `-` for `ruby`), as it does to the default command.
+`recheck` adds the dialect's arguments after the command line (e.g. `--disable-gems -` for `ruby`), as it does to the default command.
 
-For example, the following uses Ruby installed in `/opt/ruby-4.0` with `--disable-gems`.
+For example, the following uses Ruby installed in `/opt/ruby-4.0` with `--yjit`.
 
 ```console
-$ RECHECK_RUBY='/opt/ruby-4.0/bin/ruby --disable-gems' recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
+$ RECHECK_RUBY='/opt/ruby-4.0/bin/ruby --yjit' recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
 ```
 
 The environment variables work with the JavaScript library and the ESLint plugin too, since they pass their environment to `recheck`.

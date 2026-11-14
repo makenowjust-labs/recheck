@@ -4,11 +4,11 @@ import scala.concurrent.duration.FiniteDuration
 
 import codes.quine.labs.recheck.common.Context
 
-/** RubyExecutor runs a Ruby program on `ruby`, or the command line of `RECHECK_RUBY`.
+/** RubyExecutor runs a Ruby program on `ruby` without RubyGems, or the command line of `RECHECK_RUBY`.
   *
   * The program is read as UTF-8.
   */
-object RubyExecutor extends Executor.Stdin("ruby", "RECHECK_RUBY"):
+object RubyExecutor extends Executor.Stdin("ruby", "RECHECK_RUBY", Seq("--disable-gems")):
 
   override def exec(input: String, timeout: Option[FiniteDuration], marker: String, env: Map[String, String])(using
       Context
