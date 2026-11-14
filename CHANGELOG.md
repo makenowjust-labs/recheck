@@ -14,6 +14,7 @@ New Features:
 - [#1988](https://github.com/makenowjust-labs/recheck/pull/1988) Expand the back-references in the automaton checker ([@makenowjust](https://github.com/makenowjust))
 - [#2005](https://github.com/makenowjust-labs/recheck/pull/2005) Add the calibrate-runtime-attack subcommand, which recommends the runtime-attack timeout ([@makenowjust](https://github.com/makenowjust))
 - [#2007](https://github.com/makenowjust-labs/recheck/pull/2007) Add the parameters of the constants of the fuzz checker and of the memoization ([@makenowjust](https://github.com/makenowjust))
+- [#2008](https://github.com/makenowjust-labs/recheck/pull/2008) Add the alphabetRepresentative and attackStringCharacteristics parameters ([@makenowjust](https://github.com/makenowjust))
 
 Fixes:
 
