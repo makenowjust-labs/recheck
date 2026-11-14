@@ -1,6 +1,8 @@
 package codes.quine.labs.recheck.cli
 
 import java.util.concurrent.Semaphore
+import java.util.concurrent.atomic.AtomicInteger
+import scala.concurrent.duration.*
 
 class AgentCommandSuite extends munit.FunSuite:
   test("AgentCommand.run"):
@@ -54,3 +56,32 @@ class AgentCommandSuite extends munit.FunSuite:
         """{"jsonrpc":"2.0+push","id":5,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"unitMode":null,"status":"unknown","error":{"kind":"cancel"},"upperBound":null,"refutedAttacks":[],"checker":null}}"""
       )
     )
+
+  test("AgentCommand#gc"):
+    val check = """"method":"check","params":{"source":"a","flags":"","params":{}}"""
+
+    // Runs the checks, and returns the number of GC until the input ends, which is after the results and after GC
+    // with `waitsGC`.
+    def run(checks: Int, gcDelay: FiniteDuration, waitsGC: Boolean): Int =
+      val count = new AtomicInteger
+      val results = new Semaphore(0)
+      val collected = new Semaphore(0)
+      val io = new RPC.IO:
+        def read(): Iterator[String] =
+          (0 until checks).iterator.map(id => s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":$id,$check}""") ++
+            Iterator(()).flatMap: _ =>
+              results.acquire(checks)
+              if waitsGC then collected.acquire()
+              Iterator.empty
+
+        def write(line: String): Unit = results.release()
+
+      val agent = new AgentCommand(1, io, gcDelay):
+        override def gc(): Unit =
+          count.incrementAndGet()
+          collected.release()
+      agent.run()
+      count.get()
+
+    assertEquals(run(3, 1.hour, false), 0)
+    assertEquals(run(1, 10.millis, true), 1)
