@@ -7,7 +7,11 @@ import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.Paths
 import java.time.LocalDateTime
+import scala.concurrent.duration.Duration
+import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.SECONDS
 
+import cats.data.Validated
 import cats.syntax.apply.*
 import cats.syntax.semigroupk.*
 import com.monovore.decline.Command
@@ -16,13 +20,19 @@ import io.circe.syntax.*
 
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.cli.Main.BatchAction
+import codes.quine.labs.recheck.cli.Main.CalibrateRuntimeAttackAction
 import codes.quine.labs.recheck.cli.Main.CheckAction
 import codes.quine.labs.recheck.cli.Main.GenerateRuntimeAttackScriptAction
 import codes.quine.labs.recheck.cli.Main.command
+import codes.quine.labs.recheck.cli.arguments.given
 import codes.quine.labs.recheck.codec.given
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
+import codes.quine.labs.recheck.diagnostics.RuntimeAttack
+import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
 
 /** Main provides the entrypoint of `recheck` command. */
 object Main:
@@ -32,6 +42,13 @@ object Main:
 
   /** BatchAction holds `recheck batch` subcommand parameters. */
   final case class BatchAction(threadSize: Int) extends Action
+
+  /** CalibrateRuntimeAttackAction holds `recheck calibrate-runtime-attack` subcommand parameters.
+    *
+    * `ratio` is the ratio of the recommended timeout to the estimated time of an attack, and `time` is the time of the
+    * measurement.
+    */
+  final case class CalibrateRuntimeAttackAction(params: Parameters, ratio: Double, time: FiniteDuration) extends Action
 
   /** CheckAction holds `recheck check` subcommand parameters. */
   final case class CheckAction(pattern: InputPattern, params: Parameters, json: Boolean) extends Action
@@ -74,7 +91,27 @@ object Main:
       ):
         Opts.argument[String](metavar = "diagnostics").map(GenerateRuntimeAttackScriptAction.apply)
 
-      agent <+> generateRuntimeAttackScript <+> check
+      val calibrateRuntimeAttack: Opts[Action] = Opts.subcommand(
+        name = "calibrate-runtime-attack",
+        help = "Measures reference matchings on the runtime of the dialect, and recommends the runtime-attack timeout."
+      ):
+        val ratio = Opts
+          .option[Double](
+            long = "ratio",
+            help = "The ratio of the recommended timeout to the estimated time of an attack."
+          )
+          .withDefault(0.02)
+          .validate("--ratio must be positive")(_ > 0)
+        val time = Opts
+          .option[Duration](long = "time", help = "The time of the measurement.")
+          .withDefault(Duration(30, SECONDS))
+          .mapValidated:
+            case d: FiniteDuration if d > Duration.Zero => Validated.validNel(d)
+            case _                                      => Validated.invalidNel("--time must be positive and finite")
+
+        (params, ratio, time).mapN(CalibrateRuntimeAttackAction(_, _, _))
+
+      agent <+> calibrateRuntimeAttack <+> generateRuntimeAttackScript <+> check
 
   // $COVERAGE-OFF$
   /** An entrypoint of `recheck` command. */
@@ -89,6 +126,15 @@ class Main:
 
   // $COVERAGE-OFF$
   def exit(exitCode: Int): Unit = sys.exit(exitCode)
+
+  /** Runs a matching on the runtime for `recheck calibrate-runtime-attack`. */
+  def runRuntimeAttack(logger: Option[Context.Logger])(
+      source: String,
+      dialect: Dialect,
+      mode: UnitMode,
+      string: AttackPattern,
+      timeout: FiniteDuration
+  ): Option[RuntimeAttack] = CalibrateRuntimeAttackCommand.run(logger)(source, dialect, mode, string, timeout)
   // $COVERAGE-ON$
 
   def run(args: Array[String]): Unit = command.parse(args.toSeq, sys.env) match
@@ -102,6 +148,16 @@ class Main:
       diagnostics match
         case _: Diagnostics.Safe                                => () // skip
         case _: Diagnostics.Vulnerable | _: Diagnostics.Unknown => exit(1)
+
+    case Right(action: CalibrateRuntimeAttackAction) =>
+      val run = runRuntimeAttack(action.params.logger)
+      CalibrateRuntimeAttackCommand.calibrate(action.params, action.ratio, action.time)(run) match
+        case Right(calibration) =>
+          Console.out.println(calibration.toString)
+          if calibration.timeout.isEmpty then exit(1)
+        case Left(message) =>
+          Console.err.println(message)
+          exit(1)
 
     case Right(action: GenerateRuntimeAttackScriptAction) =>
       val script = for

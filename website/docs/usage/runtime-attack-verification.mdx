@@ -85,6 +85,62 @@ It does not run in the browser or with the Scala.js build (the `worker` and `pur
 
 :::
 
+## Timeout
+
+The timeout decides which attacks are confirmed, so choose it for the runtime and the machine that run the checks.
+The attack string that the runtime attack runs is sized by [`runtimeAttackLimit`](parameters.mdx#runtimeattacklimit), and the time that the matching of such a string takes differs between runtimes and machines.
+With a timeout that is too long, an effective attack finishes within it and is refuted.
+With one that is too short, an attack that the engine handles fast is confirmed.
+
+The CLI's `calibrate-runtime-attack` subcommand measures the runtime of the dialect, and recommends a timeout.
+
+```console
+$ recheck calibrate-runtime-attack
+Dialect: javascript
+Runtime: node v26.11.1
+References:
+- Pattern: /^a*a*!\?/
+  String : 'a'.repeat(10000) + '!!?'
+  Time   : 185 ms (the median of 16 runs)
+- Pattern: /^[ab]*[ac]*!\?/
+  String : 'a'.repeat(10000) + '!!?'
+  Time   : 205 ms (the median of 16 runs)
+- Pattern: /^(?:a|b)*a(?:a|b)*!\?/
+  String : 'a'.repeat(10000) + '!!?'
+  Time   : 246 ms (the median of 16 runs)
+- Pattern: /^([^!]*),([^!]*)!\?/
+  String : ','.repeat(10000) + '!!?'
+  Time   : 185 ms (the median of 16 runs)
+- Pattern: /[ab]+!\?/
+  String : 'a'.repeat(10000) + '!!?'
+  Time   : 185 ms (the median of 16 runs)
+- Pattern: /^(a?)[ab]*[ac]*\1!\?/
+  String : 'a'.repeat(10000) + '!!?'
+  Time   : 592 ms (the median of 15 runs)
+Attack time           : 5550 ms (estimated for 54773 repeats from the median of the references, 185 ms)
+Runtime attack timeout: 111 ms (0.02 of the attack time)
+
+Run the check with these options to enable the runtime-attack verification:
+
+  recheck --runtime-attack-timeout=111ms <pattern>
+```
+
+It runs the matchings of the references, which take quadratic time on a backtracking engine, on the runtime in turn for 30 seconds.
+From the median of their times, it estimates the time of the matching of a string sized by `runtimeAttackLimit`, and recommends 0.02 of this time, or 100 ms if it is shorter.
+A reference that the engine optimizes or stops is left out, as Ruby 4.0 matches most of them in 1 ms by its memoization.
+The subcommand fails when no reference is left.
+
+The subcommand takes the options of the checking (e.g. `--dialect` and `--runtime-attack-limit`) and the following ones.
+
+| Option    | Description                                                              | Default |
+| --------- | ------------------------------------------------------------------------ | ------- |
+| `--time`  | The time of the measurement.                                             | `30s`   |
+| `--ratio` | The ratio of the recommended timeout to the estimated time of an attack. | `0.02`  |
+
+The last line of the output is the command line of the checking with the recommended timeout.
+With the JavaScript library or the Scala library, give the timeout as `runtimeAttackTimeout` (e.g. `runtimeAttackTimeout: 111` in JavaScript).
+Run the subcommand again when the runtime, the machine or `runtimeAttackLimit` changes.
+
 ## Refuted Attacks
 
 A refuted attack shows that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by the attack.
