@@ -27,6 +27,7 @@ Fixes:
 - [#1997](https://github.com/makenowjust-labs/recheck/pull/1997) Measure the growth of the fuzz candidates by the differences of the steps ([@makenowjust](https://github.com/makenowjust))
 - [#1998](https://github.com/makenowjust-labs/recheck/pull/1998) Prove more patterns safe by the upper bound before fuzzing ([@makenowjust](https://github.com/makenowjust))
 - [#1999](https://github.com/makenowjust-labs/recheck/pull/1999) Speed up the matching loop of the VM and the coverage of the fuzz checker ([@makenowjust](https://github.com/makenowjust))
+- [#2002](https://github.com/makenowjust-labs/recheck/pull/2002) Stop building the automata early when the NFA with look-ahead exceeds the size limit ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
