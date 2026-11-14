@@ -35,6 +35,7 @@ Fixes:
 - [#2003](https://github.com/makenowjust-labs/recheck/pull/2003) Add the cold temperature of a hotspot, and tell the temperatures by the loops of the attack ([@makenowjust](https://github.com/makenowjust))
 - [#2004](https://github.com/makenowjust-labs/recheck/pull/2004) Keep the hashes of the branches and the stops of the automata ([@makenowjust](https://github.com/makenowjust))
 - [#2010](https://github.com/makenowjust-labs/recheck/pull/2010) Memoize the runs that take the heat of a fuzz attack ([@makenowjust](https://github.com/makenowjust))
+- [#2015](https://github.com/makenowjust-labs/recheck/pull/2015) Start the IDA search only from the states of the same look-ahead DFA state ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
