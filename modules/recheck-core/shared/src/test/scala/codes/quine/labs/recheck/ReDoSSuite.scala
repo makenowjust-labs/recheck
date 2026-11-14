@@ -4,6 +4,7 @@ import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.language.implicitConversions
 
+import codes.quine.labs.recheck.common.AttackStringCharacteristics
 import codes.quine.labs.recheck.common.CancellationTokenSource
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
@@ -19,6 +20,7 @@ import codes.quine.labs.recheck.diagnostics.RefutedAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.recheck.diagnostics.UpperBound
+import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.Dialect.*
@@ -43,11 +45,11 @@ class ReDoSSuite extends munit.FunSuite:
 
   def checkFuzz(source: String, flags: String, params: Parameters)(using ctx: Context): Iterator[Diagnostics] =
     val ir = ReDoS.parse(source, flags, params.dialect)(using Context())
-    concat(ReDoS.checkFuzz(source, flags, ir, params, (_, _) => false))
+    concat(ReDoS.checkFuzz(source, flags, ir, params, (_, _, _) => false))
 
   def checkAuto(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
     val ir = ReDoS.parse(source, flags, params.dialect)
-    concat(ReDoS.checkAuto(source, flags, ir, params, (_, _) => false))
+    concat(ReDoS.checkAuto(source, flags, ir, params, (_, _, _) => false))
 
   val params: Parameters = Parameters(randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
 
@@ -480,7 +482,7 @@ class ReDoSSuite extends munit.FunSuite:
       val verify = (d: Diagnostics.Vulnerable) =>
         verified += 1
         d.copy(runtimeAttack = results(verified - 1))
-      ReDoS.verifyCandidates(candidates, () => safe, verify, mutable.ArrayBuffer.empty, maxRefutedAttacks)
+      ReDoS.verifyCandidates(candidates, () => safe, verify, mutable.ArrayBuffer.empty, maxRefutedAttacks, Seq.empty)
 
     // The refuted ones are recorded, and the safe one is the final one when the candidates run out.
     assertEquals(
@@ -527,10 +529,12 @@ class ReDoSSuite extends munit.FunSuite:
     val params =
       Parameters(checker = Checker.Fuzz, maxGeneStringSize = 1000, maxAttackStringSize = 1000, maxIteration = 2)
     val ir = ReDoS.parse("^(?:a|a)*$", "", params.dialect)
+    val sets = ReDoS.characteristicSets(ir, params.attackStringCharacteristics)
     val refutedAttacks = mutable.ArrayBuffer.empty[RefutedAttack]
-    val (candidates, fuzzSafe, fuzzUpperBound) =
-      ReDoS.checkFuzz("^(?:a|a)*$", "", ir, params, ReDoS.isRefuted(refutedAttacks, _, _))
-    val result = ReDoS.verifyCandidates(candidates, fuzzSafe, _.copy(runtimeAttack = finish), refutedAttacks, 100)
+    val avoidsAttack = ReDoS.isRefuted(refutedAttacks, sets, _, _, _)
+    val (candidates, fuzzSafe, fuzzUpperBound) = ReDoS.checkFuzz("^(?:a|a)*$", "", ir, params, avoidsAttack)
+    val verify = (d: Diagnostics.Vulnerable) => d.copy(runtimeAttack = finish)
+    val result = ReDoS.verifyCandidates(candidates, fuzzSafe, verify, refutedAttacks, 100, sets)
     result.withUpperBound(fuzzUpperBound()) match
       case d: Diagnostics.Safe =>
         assertEquals(
@@ -547,23 +551,56 @@ class ReDoSSuite extends munit.FunSuite:
           )
         )
         assert(d.refutedAttacks.nonEmpty)
-        val keys = d.refutedAttacks.map(r => ReDoS.AttackKey(r.complexity, r.hotspot))
+        val keys = d.refutedAttacks.map(r => ReDoS.AttackKey(r.complexity, r.attack, r.hotspot, sets))
         assertEquals(keys.distinct, keys)
       case d => fail(s"not safe: $d")
 
   test("ReDoS.AttackKey"):
+    def attackOf(prefix: String, pump: String, suffix: String): AttackPattern =
+      val mode = UnitMode.UTF16
+      AttackPattern(Seq((mode.decode(prefix), mode.decode(pump), 0)), mode.decode(suffix), 10)
+    val attack = attackOf("", "a", "")
+    def key(complexity: AttackComplexity.Vulnerable, hotspot: Hotspot): ReDoS.AttackKey =
+      ReDoS.AttackKey(complexity, attack, hotspot, Seq.empty)
+
     val hotspot = Hotspot(Seq(Spot(0, 1, Warm), Spot(4, 5, Hot), Spot(6, 7, Hot)))
     assertEquals(
-      ReDoS.AttackKey(AttackComplexity.Exponential(true), hotspot),
-      ReDoS.AttackKey(None, Seq((4, 5), (6, 7)))
+      key(AttackComplexity.Exponential(true), hotspot),
+      ReDoS.AttackKey(None, Seq((4, 5), (6, 7)), Set.empty)
     )
     assertEquals(
-      ReDoS.AttackKey(AttackComplexity.Polynomial(2, false), hotspot),
-      ReDoS.AttackKey(AttackComplexity.Polynomial(2, true), Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot))))
+      key(AttackComplexity.Polynomial(2, false), hotspot),
+      key(AttackComplexity.Polynomial(2, true), Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot))))
     )
     assertNotEquals(
-      ReDoS.AttackKey(AttackComplexity.Polynomial(2, false), hotspot),
-      ReDoS.AttackKey(AttackComplexity.Polynomial(3, false), hotspot)
+      key(AttackComplexity.Polynomial(2, false), hotspot),
+      key(AttackComplexity.Polynomial(3, false), hotspot)
+    )
+
+    // The characteristics are the sets that have a character of the prefixes, the pumps and the suffix.
+    val sets = Seq(CharSet.single('a'), CharSet.single('b'), CharSet.single('c'), CharSet.single('d'))
+    def characteristicsOf(attack: AttackPattern): Set[Int] =
+      ReDoS.AttackKey(AttackComplexity.Polynomial(2, true), attack, Hotspot.empty, sets).characteristics
+    assertEquals(characteristicsOf(attackOf("", "a", "")), Set(0))
+    assertEquals(characteristicsOf(attackOf("b", "aa", "d")), Set(0, 1, 3))
+    assertEquals(characteristicsOf(attackOf("", "x", "")), Set.empty)
+
+  test("ReDoS.characteristicSets"):
+    def setsOf(source: String, characteristics: AttackStringCharacteristics): Seq[CharSet] =
+      ReDoS.characteristicSets(ReDoS.parse(source, "", Dialect.JavaScript), characteristics)
+    val rest = CharSet.range(0x00, 0xffff).diff(CharSet.of('a', 'b', 'c', 'd'))
+
+    assertEquals(setsOf("ab[cd]", AttackStringCharacteristics.None), Seq.empty)
+    assertEquals(setsOf("ab[cd]", AttackStringCharacteristics.Latin1), Seq(CharSet.range(0x100, 0xffff)))
+    assertEquals(setsOf("ab[cd]", AttackStringCharacteristics.CharClass).toSet, Set(CharSet.range('c', 'd'), rest))
+    assertEquals(
+      setsOf("ab[cd]", AttackStringCharacteristics.Alphabet).toSet,
+      Set(CharSet.single('a'), CharSet.single('b'), CharSet.range('c', 'd'), rest)
+    )
+    // A set of characters that is in the set of a literal character is not of `CharClass`.
+    assertEquals(
+      setsOf("a[ab]", AttackStringCharacteristics.CharClass).toSet,
+      Set(CharSet.single('b'), CharSet.range(0x00, 0xffff).diff(CharSet.of('a', 'b')))
     )
 
   test("ReDoS.attackStyle"):

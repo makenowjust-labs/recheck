@@ -96,6 +96,34 @@ properties:
     x-cli: "attack-limit"
     x-since: "1.0.0"
 
+  attackStringCharacteristics:
+    title: "Attack String Characteristics"
+    description: |-
+      The characteristics of an attack string that tell an attack from a refuted one.
+
+      An attack with the same complexity, hotspots and characteristics as a refuted one is not run on the runtime.
+      An engine may refute an attack and confirm another that differs only in its characters (e.g. V8, which is faster on a string of only Latin-1 characters).
+      Finer characteristics tell more attacks apart, and more of them are run on the runtime.
+
+      - `none` is no characteristics.
+      - `latin1` is whether the string has a character outside Latin-1 (U+0000 to U+00FF).
+      - `char-class` is the sets of characters of the pattern that the characters of the string belong to, where the pattern divides all the characters into the sets that its parts read alike, without the sets of its literal characters.
+      - `alphabet` is those sets with the ones of the literal characters.
+    type: string
+    enum: ["none", "latin1", "char-class", "alphabet"]
+    default: "latin1"
+    x-scala-type: "AttackStringCharacteristics"
+    x-scala-values:
+      {
+        "none": "AttackStringCharacteristics.None",
+        "latin1": "AttackStringCharacteristics.Latin1",
+        "char-class": "AttackStringCharacteristics.CharClass",
+        "alphabet": "AttackStringCharacteristics.Alphabet",
+      }
+    x-cli: "attack-string-characteristics"
+    x-cli-metavar: "characteristics"
+    x-since: "5.0.0"
+
   attackTimeout:
     title: "Attack Timeout"
     description: "The upper limit of matching time on the attack."

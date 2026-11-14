@@ -41,9 +41,9 @@ object FuzzChecker:
     * It checks the upper bound first (see [[upperBound]]), and it fuzzes only if the bound is not linear, from the
     * witnesses of the bound and with no attack above it.
     *
-    * `avoidsAttack` tells whether to avoid an attack of the complexity and the hotspot, which runtime-attack
-    * verification refuted, and may change while iterating the results. Strings with an avoided attack rank below the
-    * others in the next generation.
+    * `avoidsAttack` tells whether to avoid an attack of the complexity, the string and the hotspot, which
+    * runtime-attack verification refuted, and may change while iterating the results. Strings with an avoided attack
+    * rank below the others in the next generation.
     */
   def check(
       pattern: IRPattern,
@@ -75,7 +75,7 @@ object FuzzChecker:
       accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode,
       accelerationHitRatio: Double = Parameters.DefaultAccelerationHitRatio,
       alphabetRepresentative: AlphabetRepresentative = Parameters.DefaultAlphabetRepresentative,
-      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
+      avoidsAttack: (AttackComplexity.Vulnerable, AttackPattern, Hotspot) => Boolean
   )(using
       ctx: Context
   ): (Iterator[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)], AttackComplexity.Safe, Option[UpperBound]) =

@@ -302,6 +302,10 @@ final case class IRPattern(
 
     loop(node)
 
+  /** Returns the sets of the literal characters, each of which is one character or the case variants of one. */
+  def literalSets: Set[CharSet] =
+    node.collect { case Chars(set) if IRPattern.isOneCharUpToCase(set) => set }.toSet
+
 object IRPattern:
 
   /** Returns the count of a repetition other than `*`, `+` and `?`, or `0` for them. */

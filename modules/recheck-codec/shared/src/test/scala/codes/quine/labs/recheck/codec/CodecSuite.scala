@@ -10,6 +10,7 @@ import io.circe.syntax.*
 
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.AlphabetRepresentative
+import codes.quine.labs.recheck.common.AttackStringCharacteristics
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
@@ -453,6 +454,7 @@ class CodecSuite extends munit.FunSuite:
           "logger" := Json.arr(),
           "maxAttackStringSize" := 123,
           "attackLimit" := 123,
+          "attackStringCharacteristics" := "char-class",
           "randomSeed" := 123,
           "maxIteration" := 123,
           "seeder" := "dynamic",
@@ -491,6 +493,7 @@ class CodecSuite extends munit.FunSuite:
           logger = Some(null),
           maxAttackStringSize = 123,
           attackLimit = 123,
+          attackStringCharacteristics = AttackStringCharacteristics.CharClass,
           randomSeed = 123,
           maxIteration = 123,
           seeder = Seeder.Dynamic,
@@ -560,6 +563,15 @@ class CodecSuite extends munit.FunSuite:
       decodeAlphabetRepresentative.decodeJson("xxx".asJson),
       Left(DecodingFailure("Unknown alphabet representative: xxx", List.empty))
     )
+
+  test("codec.decodeAttackStringCharacteristics"):
+    def decode(name: String): Decoder.Result[AttackStringCharacteristics] =
+      decodeAttackStringCharacteristics.decodeJson(name.asJson)
+    assertEquals(decode("none"), Right(AttackStringCharacteristics.None))
+    assertEquals(decode("latin1"), Right(AttackStringCharacteristics.Latin1))
+    assertEquals(decode("char-class"), Right(AttackStringCharacteristics.CharClass))
+    assertEquals(decode("alphabet"), Right(AttackStringCharacteristics.Alphabet))
+    assertEquals(decode("xxx"), Left(DecodingFailure("Unknown attack string characteristics: xxx", List.empty)))
 
   test("codec.decodeSeeder"):
     assertEquals(decodeSeeder.decodeJson("static".asJson), Right(Seeder.Static))

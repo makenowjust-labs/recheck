@@ -8,6 +8,7 @@ import scala.util.Random
 import codes.quine.labs.recheck.automaton.AutomatonChecker
 import codes.quine.labs.recheck.automaton.Complexity
 import codes.quine.labs.recheck.automaton.EpsNFABuilder
+import codes.quine.labs.recheck.common.AttackStringCharacteristics
 import codes.quine.labs.recheck.common.CancellationToken
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
@@ -16,6 +17,7 @@ import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.ReDoSException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
+import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.*
 import codes.quine.labs.recheck.diagnostics.Hotspot
@@ -27,10 +29,12 @@ import codes.quine.labs.recheck.verification.RuntimeAttackVerifier
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException
 import codes.quine.labs.resyntax.ast.Node
+import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.ir.IRPattern
+import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.ir.build.IRBuildingException
 import codes.quine.labs.resyntax.ir.build.MultiFoldingLimitException
@@ -47,8 +51,9 @@ object ReDoS:
     * attack is not run or confirms the attack, or else the safe or unknown diagnostics, with the attacks refuted before
     * them.
     *
-    * An attack with the same complexity and hotspot as a refuted one is skipped. When runtime-attack verification
-    * refutes `maxRefutedAttacks` attacks, the result is unknown with [[Diagnostics.ErrorKind.RuntimeAttacksRefuted]].
+    * An attack with the same complexity, hotspot and characteristics of its string as a refuted one is skipped (see
+    * [[AttackKey]]). When runtime-attack verification refutes `maxRefutedAttacks` attacks, the result is unknown with
+    * [[Diagnostics.ErrorKind.RuntimeAttacksRefuted]].
     */
   def check(
       source: String,
@@ -60,7 +65,9 @@ object ReDoS:
 
     def diagnose(ir: IRPattern): Diagnostics =
       val refutedAttacks = mutable.ArrayBuffer.empty[RefutedAttack]
-      val avoidsAttack = (c: AttackComplexity.Vulnerable, h: Hotspot) => isRefuted(refutedAttacks, c, h)
+      val sets = characteristicSets(ir, params.attackStringCharacteristics)
+      val avoidsAttack = (c: AttackComplexity.Vulnerable, a: AttackPattern, h: Hotspot) =>
+        isRefuted(refutedAttacks, sets, c, a, h)
       // The checkers run lazily on iterating the candidates, so that the errors of the checking are caught below.
       val (candidates, safe, upperBound) = params.checker match
         case Checker.Automaton => checkAutomaton(source, flags, ir, params)
@@ -69,7 +76,7 @@ object ReDoS:
       val diagnostics =
         try
           val verify = runRuntimeAttack(source, flags, params.dialect, ir.mode, params.runtimeAttackTimeout)
-          verifyCandidates(candidates, safe, verify, refutedAttacks, params.maxRefutedAttacks)
+          verifyCandidates(candidates, safe, verify, refutedAttacks, params.maxRefutedAttacks, sets)
         catch
           case ex: ReDoSException =>
             Diagnostics.Unknown.from(source, flags, params.dialect, Some(ir.mode), refutedAttacks.toSeq, ex)
@@ -81,17 +88,18 @@ object ReDoS:
   /** Runs `verify` on the candidates in order, and returns the final diagnostics of [[check]].
     *
     * `safe` gives the final diagnostics after the candidates run out. `refutedAttacks` collects the attacks that
-    * runtime attacks refute.
+    * runtime attacks refute. `sets` are the ones of [[AttackKey]], by which a candidate is the same as a refuted one.
     */
   private[recheck] def verifyCandidates(
       candidates: Iterator[Diagnostics.Vulnerable],
       safe: () => Diagnostics.Safe,
       verify: Diagnostics.Vulnerable => Diagnostics.Vulnerable,
       refutedAttacks: mutable.Buffer[RefutedAttack],
-      maxRefutedAttacks: Int
+      maxRefutedAttacks: Int,
+      sets: Seq[CharSet]
   )(using ctx: Context): Diagnostics =
     val untried = candidates.filter: d =>
-      val skipped = isRefuted(refutedAttacks, d.complexity, d.hotspot)
+      val skipped = isRefuted(refutedAttacks, sets, d.complexity, d.attack, d.hotspot)
       if skipped then ctx.log("runtime attack: skip the same attack as a refuted one")
       !skipped
 
@@ -118,14 +126,29 @@ object ReDoS:
 
     verifyNext()
 
-  /** Whether an attack of the complexity and the hotspot is the same as a refuted one. */
+  /** Whether an attack of the complexity, the string and the hotspot is the same as a refuted one (see [[AttackKey]]).
+    */
   private[recheck] def isRefuted(
       refutedAttacks: collection.Seq[RefutedAttack],
+      sets: Seq[CharSet],
       complexity: AttackComplexity.Vulnerable,
+      attack: AttackPattern,
       hotspot: Hotspot
   ): Boolean =
-    val key = AttackKey(complexity, hotspot)
-    refutedAttacks.exists(r => AttackKey(r.complexity, r.hotspot) == key)
+    val key = AttackKey(complexity, attack, hotspot, sets)
+    refutedAttacks.exists(r => AttackKey(r.complexity, r.attack, r.hotspot, sets) == key)
+
+  /** Returns the sets of characters that tell an attack string from another in [[AttackKey]]. */
+  private[recheck] def characteristicSets(ir: IRPattern, characteristics: AttackStringCharacteristics): Seq[CharSet] =
+    def atoms: Seq[CharSet] = PatternAlphabet.of(ir).pairs.map(_._1)
+
+    characteristics match
+      case AttackStringCharacteristics.None      => Seq.empty
+      case AttackStringCharacteristics.Latin1    => Seq(ir.universe.diff(CharSet.range(0x00, 0xff)))
+      case AttackStringCharacteristics.CharClass =>
+        val literals = ir.literalSets
+        atoms.filterNot(atom => literals.exists(atom.subsetOf))
+      case AttackStringCharacteristics.Alphabet => atoms
 
   /** Parses the pattern and the flags in the dialect, and builds its IR.
     *
@@ -157,18 +180,29 @@ object ReDoS:
       case ex: IRBuildingException        => throw new InvalidRegExpException(ex.getMessage)
       case ex: MultiFoldingLimitException => throw new UnsupportedException(ex.getMessage)
 
-  /** AttackKey identifies an attack by the degree of the polynomial complexity (or `None` for the exponential one) and
-    * the hotspot.
+  /** AttackKey identifies an attack by the degree of the polynomial complexity (or `None` for the exponential one), the
+    * hotspot and the characteristics of the attack string.
+    *
+    * The characteristics are the indices of `sets` (see [[characteristicSets]]) that have a character of the attack
+    * string.
     */
-  private[recheck] final case class AttackKey(degree: Option[Int], spots: Seq[(Int, Int)])
+  private[recheck] final case class AttackKey(degree: Option[Int], spots: Seq[(Int, Int)], characteristics: Set[Int])
 
   private[recheck] object AttackKey:
 
-    def apply(complexity: AttackComplexity.Vulnerable, hotspot: Hotspot): AttackKey =
+    def apply(
+        complexity: AttackComplexity.Vulnerable,
+        attack: AttackPattern,
+        hotspot: Hotspot,
+        sets: Seq[CharSet]
+    ): AttackKey =
+      val chars = (attack.pumps.iterator.flatMap((s, t, _) => s.iterator ++ t.iterator) ++ attack.suffix.iterator).toSet
+      val characteristics = sets.indices.filter(i => chars.exists(sets(i).contains)).toSet
       val degree = complexity match
         case AttackComplexity.Polynomial(degree, _) => Some(degree)
         case AttackComplexity.Exponential(_)        => None
-      AttackKey(degree, hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Hot) => (s, e) })
+      val spots = hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Hot) => (s, e) }
+      AttackKey(degree, spots, characteristics)
 
   /** Runs the automaton checker, and returns the vulnerable diagnostics it finds, a function giving the safe
     * diagnostics once they run out, and a function giving the upper bound, which is always `None`.
@@ -238,15 +272,15 @@ object ReDoS:
   /** Runs the fuzz checker, and returns the vulnerable diagnostics it finds, a function giving the safe diagnostics
     * once they run out, and a function giving the upper bound found before fuzzing.
     *
-    * `avoidsAttack` tells whether the fuzz checker avoids an attack of the complexity and the hotspot, which a runtime
-    * attack refuted.
+    * `avoidsAttack` tells whether the fuzz checker avoids an attack of the complexity, the string and the hotspot,
+    * which a runtime attack refuted.
     */
   private[recheck] def checkFuzz(
       source: String,
       flags: String,
       ir: IRPattern,
       params: Parameters,
-      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
+      avoidsAttack: (AttackComplexity.Vulnerable, AttackPattern, Hotspot) => Boolean
   )(using
       ctx: Context
   ): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound]) =
@@ -321,7 +355,7 @@ object ReDoS:
       flags: String,
       ir: IRPattern,
       params: Parameters,
-      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
+      avoidsAttack: (AttackComplexity.Vulnerable, AttackPattern, Hotspot) => Boolean
   )(using
       ctx: Context
   ): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound]) =

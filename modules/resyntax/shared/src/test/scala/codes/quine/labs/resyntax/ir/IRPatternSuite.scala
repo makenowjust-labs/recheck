@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.ir
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.Greedy
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.Lazy
 import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -434,6 +435,15 @@ class IRPatternSuite extends munit.FunSuite:
   )
 
   check("IRPattern#parts", "i", Dialect.Python())(_.parts)("xyz" -> Set(UnitMode.UTF16.decode("XYZ")))
+
+  check("IRPattern#literalSets")(_.literalSets)(
+    "ab[cd]." -> Set(CharSet.single('a'), CharSet.single('b')),
+    "[a]\\d" -> Set(CharSet.single('a')),
+    "\\d" -> Set.empty
+  )
+
+  // A literal character of a case-insensitive pattern has its case variants.
+  check("IRPattern#literalSets", "i")(_.literalSets)("a[bc]" -> Set(CharSet.of('A', 'a')))
 
   check("IRPattern#captureCount")(_.captureCount)(
     "(.)|(.)" -> 2,

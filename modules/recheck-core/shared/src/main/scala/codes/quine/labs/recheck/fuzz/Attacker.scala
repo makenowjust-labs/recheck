@@ -79,7 +79,7 @@ private[fuzz] final class Attacker(
     val accelerationMode: AccelerationMode,
     val accelerationHitRatio: Double,
     val alphabetRepresentative: AlphabetRepresentative,
-    val avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean,
+    val avoidsAttack: (AttackComplexity.Vulnerable, AttackPattern, Hotspot) => Boolean,
     val upperBound: Option[Seq[Complexity.Vulnerable[UChar]]]
 )(using val ctx: Context):
 
@@ -109,8 +109,8 @@ private[fuzz] final class Attacker(
   /** The results of the runs of [[stepsOn]], by its arguments. */
   val runs: mutable.Map[(IndexedSeq[FString.FChar], Int, Int, Duration, Boolean), Option[Long]] = mutable.Map.empty
 
-  /** The complexities and the hotspots of the attacks from each string. */
-  val attacks: mutable.Map[FString, List[(AttackComplexity.Vulnerable, Hotspot)]] = mutable.Map.empty
+  /** The attacks from each string. */
+  val attacks: mutable.Map[FString, List[AttackResult]] = mutable.Map.empty
 
   /** The fingerprints of the candidates whose attacks fail. */
   val failedFingerprints: mutable.Set[FString.Fingerprint] = mutable.Set.empty
@@ -237,8 +237,8 @@ private[fuzz] final class Attacker(
                 |  string: $attack""".stripMargin)
         (complexity, attack.toAttackPattern(pattern.mode), hotspotOf(str, measurement))
     result match
-      case Some((complexity, _, hotspot)) => attacks(str) = (complexity, hotspot) :: attacks.getOrElse(str, Nil)
-      case None                           => failedFingerprints.add(fingerprint)
+      case Some(attacked) => attacks(str) = attacked :: attacks.getOrElse(str, Nil)
+      case None           => failedFingerprints.add(fingerprint)
     result
 
   /** Returns the size of the input of the string on the repeat count. */

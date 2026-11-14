@@ -43,7 +43,7 @@ class AttackerSuite extends munit.FunSuite:
       DefaultAccelerationMode,
       DefaultAccelerationHitRatio,
       DefaultAlphabetRepresentative,
-      (_, _) => false,
+      (_, _, _) => false,
       upperBound
     )
 

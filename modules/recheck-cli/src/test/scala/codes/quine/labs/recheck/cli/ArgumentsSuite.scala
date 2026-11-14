@@ -8,6 +8,7 @@ import cats.data.Validated
 import codes.quine.labs.recheck.cli.arguments.given
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.AlphabetRepresentative
+import codes.quine.labs.recheck.common.AttackStringCharacteristics
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Seeder
 import codes.quine.labs.resyntax.dialect.Dialect
@@ -44,6 +45,15 @@ class ArgumentsSuite extends munit.FunSuite:
       Validated.invalidNel("unknown alphabet representative: xxx")
     )
     assertEquals(alphabetRepresentativeArgument.defaultMetavar, "representative")
+
+  test("arguments.attackStringCharacteristicsArgument"):
+    val argument = attackStringCharacteristicsArgument
+    assertEquals(argument.read("none"), Validated.validNel(AttackStringCharacteristics.None))
+    assertEquals(argument.read("latin1"), Validated.validNel(AttackStringCharacteristics.Latin1))
+    assertEquals(argument.read("char-class"), Validated.validNel(AttackStringCharacteristics.CharClass))
+    assertEquals(argument.read("alphabet"), Validated.validNel(AttackStringCharacteristics.Alphabet))
+    assertEquals(argument.read("xxx"), Validated.invalidNel("unknown attack string characteristics: xxx"))
+    assertEquals(argument.defaultMetavar, "characteristics")
 
   test("arguments.seederArgument"):
     assertEquals(seederArgument.read("static"), Validated.validNel(Seeder.Static))
