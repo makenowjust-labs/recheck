@@ -35,7 +35,6 @@ describe("generateTypescriptType", () => {
 
   test("maps the JSON types to the TypeScript types", () => {
     expect(generateTypescriptType(properties["maxDegree"]!)).toBe("number");
-    expect(generateTypescriptType(properties["heatRatio"]!)).toBe("number");
     expect(generateTypescriptType(properties["timeout"]!)).toBe(
       "number | null",
     );

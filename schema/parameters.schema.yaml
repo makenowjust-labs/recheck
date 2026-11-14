@@ -183,15 +183,6 @@ properties:
     x-exclude: ["eslint-plugin"]
     x-since: "5.0.0"
 
-  heatRatio:
-    title: "Heat Ratio"
-    description: "The ratio of the number of characters read to the maximum number to be considered as a hot spot."
-    type: number
-    default: 0.001
-    x-scala-type: "Double"
-    x-cli: "heat-ratio"
-    x-since: "4.2.0"
-
   incubationLimit:
     title: "Incubation Limit"
     description: |-

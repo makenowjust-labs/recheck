@@ -13,6 +13,19 @@ class GraphSuite extends munit.FunSuite:
     assertEquals(g.neighbors, Map(1 -> IndexedSeq(('a', 2), ('a', 3)), 2 -> IndexedSeq(('b', 3))))
     assertEquals(g.neighbors(4), IndexedSeq.empty) // `withDefaultValue(IndexedSeq.empty)` is used
 
+  test("Graph.line"):
+    assertEquals(Graph.line(2, Seq('a', 'b')), Graph.from(IndexedSeq((2, 'a', 3), (3, 'b', 4))))
+    assertEquals(Graph.line(2, Seq.empty[Char]), Graph.from(IndexedSeq.empty[(Int, Char, Int)]))
+
+  test("Graph.cycle"):
+    assertEquals(Graph.cycle(2, Seq('a', 'b')), Graph.from(IndexedSeq((2, 'a', 3), (3, 'b', 2))))
+    assertEquals(Graph.cycle(2, Seq('a')), Graph.from(IndexedSeq((2, 'a', 2))))
+    assertEquals(Graph.cycle(2, Seq.empty[Char]), Graph.from(IndexedSeq.empty[(Int, Char, Int)]))
+
+  test("Graph#++"):
+    val g = Graph.from(IndexedSeq((1, 'a', 2))) ++ Graph.from(IndexedSeq((1, 'b', 3), (2, 'c', 3)))
+    assertEquals(g, Graph.from(IndexedSeq((1, 'a', 2), (1, 'b', 3), (2, 'c', 3))))
+
   test("Graph#edges"):
     val g = Graph.from(IndexedSeq((1, 'a', 2), (1, 'a', 3), (2, 'b', 3)))
     assertEquals(g.edges, IndexedSeq((1, 'a', 2), (1, 'a', 3), (2, 'b', 3)))
@@ -69,6 +82,25 @@ class GraphSuite extends munit.FunSuite:
     assertEquals(g.reachable(Set(1)), Graph.from(IndexedSeq((1, (), 2), (2, (), 3), (3, (), 1))))
     assertEquals(g.reachable(Set(4, 6)), Graph.from(IndexedSeq((4, (), 5), (6, (), 7))))
     assertEquals(g.reachable(Set(1)).neighbors(4), IndexedSeq.empty) // `withDefaultValue(IndexedSeq.empty)` is used
+
+  test("Graph#product"):
+    val g = Graph.from(IndexedSeq((1, 'a', 1), (1, 'a', 2), (2, 'b', 3), (2, 'c', 4), (3, 'a', 3)))
+    // The other graph has a cycle of `a` and a line of `b` and `a` from it.
+    val h = Graph.cycle(0, Seq('a')) ++ Graph.from(IndexedSeq((0, 'b', 5))) ++ Graph.line(5, Seq('a'))
+    assertEquals(
+      g.product(h, Set((1, 0))),
+      Graph.from(
+        IndexedSeq(
+          ((1, 0), 'a', (1, 0)),
+          ((1, 0), 'a', (2, 0)),
+          ((2, 0), 'b', (3, 5)),
+          ((3, 5), 'a', (3, 6))
+        )
+      )
+    )
+    // The pairs that are not reachable from the first pairs are not in the product.
+    assertEquals(g.product(h, Set((3, 0), (2, 6))), Graph.from(IndexedSeq(((3, 0), 'a', (3, 0)))))
+    assertEquals(g.product(h, Set.empty), Graph.from(IndexedSeq.empty[((Int, Int), Char, (Int, Int))]))
 
   test("Graph#reachableMap"):
     val g = Graph.from(

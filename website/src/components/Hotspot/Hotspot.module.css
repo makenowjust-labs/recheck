@@ -7,3 +7,8 @@
   color: var(--ifm-color-white);
   background: var(--ifm-color-warning);
 }
+
+.hotspotCold {
+  color: var(--ifm-color-white);
+  background: var(--ifm-color-info);
+}

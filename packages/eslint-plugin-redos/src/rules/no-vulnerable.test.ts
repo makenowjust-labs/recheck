@@ -49,7 +49,6 @@ tester.run("no-vulnerable", rule, {
           attackTimeout: 1000,
           checker: "auto",
           crossoverSize: 25,
-          heatRatio: 0.001,
           incubationLimit: 25000,
           incubationTimeout: 250,
           maxAttackStringSize: 300000,

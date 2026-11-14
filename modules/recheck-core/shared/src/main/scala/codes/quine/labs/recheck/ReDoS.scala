@@ -280,7 +280,6 @@ object ReDoS:
         maxAttackCandidates,
         maxIteration,
         maxDegree,
-        heatRatio,
         accelerationMode,
         avoidsAttack
       )

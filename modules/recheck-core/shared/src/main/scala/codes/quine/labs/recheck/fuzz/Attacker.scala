@@ -79,7 +79,6 @@ private[fuzz] final class Attacker(
     val attackTimeout: Duration,
     val maxAttackStringSize: Int,
     val maxDegree: Int,
-    val heatRatio: Double,
     val accelerationMode: AccelerationMode,
     val avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean,
     val upperBound: Option[Seq[Complexity.Vulnerable[UChar]]]
@@ -235,7 +234,7 @@ private[fuzz] final class Attacker(
         val attack = str.copy(n = count)
         log(s"""|fuzz: attack succeeded (growth: ${measurement.growth.show})
                 |  string: $attack""".stripMargin)
-        (complexity, attack.toAttackPattern(pattern.mode), hotspotOf(str, measurement, count))
+        (complexity, attack.toAttackPattern(pattern.mode), hotspotOf(str, measurement))
     result match
       case Some((complexity, _, hotspot)) => attacks(str) = (complexity, hotspot) :: attacks.getOrElse(str, Nil)
       case None                           => failedFingerprints.add(fingerprint)
@@ -410,30 +409,43 @@ private[fuzz] final class Attacker(
           if reaches(middle) then high = middle else low = middle + 1
         Some(p.start + low * p.stride)
 
-  /** Builds the hotspots of the attack string of the repeat count, from the heat of the runs on the repeat counts of
-    * the measurement, which is scaled up to the attack string along its growth on each part.
+  /** Builds the hotspots of the string, from the heat of the runs on the repeat counts of the measurement.
+    *
+    * A part whose heat grows with the repeat count is hot if it is in a loop of the program, or every such part is if
+    * none is in a loop. Another such part is warm if the degree of the heat rises through it: no hot part before it is
+    * of a higher degree, and the next hot parts from it are. The other parts that the runs read are cold.
     */
-  def hotspotOf(str: FString, measurement: Measurement, count: Int): Hotspot = interrupt:
-    // The runs do not memoize, with which the heat takes long.
+  def hotspotOf(str: FString, measurement: Measurement): Hotspot = interrupt:
+    val counts = measurement.growth match
+      case _ if str.isConstant || measurement.last <= measurement.first => Seq(measurement.first.max(1))
+      case p: Growth.Polynomial => (0 to p.degree).map(k => p.start + k * p.stride)
+      case Growth.Exponential   => Seq(measurement.last - 1, measurement.last)
     val opts = Options(attackLimit, needsHeatmap = true)
-    def heatOn(count: Int): Map[SourceLocation, Int] =
+    val heats = counts.map: count =>
       Interpreter.runWithTimeout(fuzz.program, str.copy(n = count).toUString, opts, incubationTimeout).heatmap
+    val read = heats.flatMap(_.keys).toSet
 
-    val heat: Map[SourceLocation, Double] = measurement.growth match
-      case _ if str.isConstant || measurement.last < measurement.first =>
-        heatOn(measurement.first.max(1)).map((loc, heat) => loc -> heat.toDouble)
-      case p: Growth.Polynomial =>
-        val heats = (0 to p.degree).map(k => heatOn(p.start + k * p.stride))
-        heats
-          .flatMap(_.keys)
-          .distinct
-          .map: loc =>
-            val polynomial = Growth.Polynomial.through(p.start, p.stride, heats.map(heat => BigInt(heat(loc))))
-            loc -> polynomial.stepsOn(count).toDouble
-          .toMap
-      case Growth.Exponential =>
-        val last = heatOn(measurement.last)
-        val previous = if measurement.last > measurement.first then heatOn(measurement.last - 1) else last
-        last.map: (loc, heat) =>
-          loc -> heat * Math.pow(heat.toDouble / previous(loc).max(1), (count - measurement.last).max(0).toDouble)
-    Hotspot.build(heat, heatRatio)
+    // A string without counts to compare has the parts reading more times than its characters as the growing ones.
+    val growing =
+      if heats.size == 1 then read.filter(heats.head(_) > sizeOn(str, counts.head))
+      else read.filter(loc => heats.exists(_(loc) != heats.head(loc)))
+
+    val loops = fuzz.program.locationsInLoops(growing, read)
+    val hot = if loops.isEmpty then growing else loops
+
+    def degreeOf(loc: SourceLocation): Int =
+      val differences = Iterator.iterate(heats.map(_(loc).toLong))(ds => ds.zip(ds.tail).map((d1, d2) => d2 - d1))
+      differences.take(heats.size).toSeq.lastIndexWhere(_.exists(_ != 0))
+
+    val warm = (growing -- hot).filter: loc =>
+      val degree = degreeOf(loc)
+      val before = fuzz.program.locationsTo(Set(loc), read) & hot
+      val next = fuzz.program.locationsNext(Set(loc), hot, read)
+      before.forall(degreeOf(_) <= degree) && next.nonEmpty && next.forall(degreeOf(_) > degree)
+
+    val cold = read -- hot -- warm
+
+    def spots(locations: Set[SourceLocation], temperature: Hotspot.Temperature): Seq[Hotspot.Spot] =
+      locations.toSeq.map(loc => Hotspot.Spot(loc.start, loc.end, temperature))
+
+    Hotspot(spots(hot, Hotspot.Hot) ++ spots(warm, Hotspot.Warm) ++ spots(cold, Hotspot.Cold))

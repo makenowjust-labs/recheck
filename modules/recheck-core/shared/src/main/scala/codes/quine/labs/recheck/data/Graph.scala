@@ -13,6 +13,14 @@ object Graph:
   def from[V, L](edges: IndexedSeq[(V, L, V)]): Graph[V, L] =
     Graph(edges.groupMap(_._1)(vlv => (vlv._2, vlv._3)).withDefaultValue(Vector.empty))
 
+  /** Creates a graph of a line of the labels from the vertex `start`, whose vertices are the numbers from it. */
+  def line[L](start: Int, labels: Seq[L]): Graph[Int, L] =
+    from(labels.zipWithIndex.map((l, i) => (start + i, l, start + i + 1)).toIndexedSeq)
+
+  /** Creates a graph of a cycle of the labels from the vertex `start` to it, whose vertices are the numbers from it. */
+  def cycle[L](start: Int, labels: Seq[L]): Graph[Int, L] =
+    from(labels.zipWithIndex.map((l, i) => (start + i, l, start + (i + 1) % labels.size)).toIndexedSeq)
+
 /** Graph is a directed labelled multi-graph implementation. */
 final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]):
 
@@ -26,6 +34,10 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]):
   /** Lists vertices of this graph. */
   def vertices: Set[V] =
     neighbors.keySet | neighbors.values.flatMap(_.map(_._2)).toSet
+
+  /** Computes the union of this graph and the other one. */
+  def ++(that: Graph[V, L]): Graph[V, L] =
+    Graph.from(edges ++ that.edges)
 
   /** Computes a reversed graph of this graph. */
   def reverse(using ctx: Context): Graph[V, L] =
@@ -131,6 +143,26 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]):
         reachable.addAll(vs)
 
     Graph(newEdges.result().withDefaultValue(Vector.empty))
+
+  /** Computes the product of this graph and the other one from the pairs of the vertices.
+    *
+    * Its vertices are the pairs reachable from `inits` by the edges of the same label of both graphs, and its edges are
+    * the pairs of such edges.
+    */
+  def product[W](that: Graph[W, L], inits: Set[(V, W)])(using ctx: Context): Graph[(V, W), L] = ctx.interrupt:
+    val queue = mutable.Queue.from(inits)
+    val reachable = mutable.Set.from(inits)
+    val newEdges = IndexedSeq.newBuilder[((V, W), L, (V, W))]
+
+    while queue.nonEmpty do
+      ctx.interrupt:
+        val (v1, w1) = queue.dequeue()
+        val nexts = that.neighbors(w1).groupMap(_._1)(_._2)
+        for (l, v2) <- neighbors(v1); w2 <- nexts.getOrElse(l, Vector.empty) do
+          newEdges.addOne(((v1, w1), l, (v2, w2)))
+          if reachable.add((v2, w2)) then queue.enqueue((v2, w2))
+
+    Graph.from(newEdges.result())
 
   /** Computes a map from a vertex to vertices being reachable from the vertex.
     *

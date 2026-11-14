@@ -264,8 +264,10 @@ private final class AutomatonChecker[A, Q, P](
   /** A type of [[nfaWLA]] alphabet. */
   private type B = (A, P)
 
-  /** A type of a pair of pumps of witness and hotspots. */
-  private type Pump = (R, Seq[B], R, Seq[SourceLocation])
+  /** Pump is a pump of a witness: the path of its characters from `r1` to `r2`, and the source locations on its loops
+    * and on its path between the two loops, which only an IDA structure has.
+    */
+  private final case class Pump(r1: R, path: Seq[B], r2: R, loops: Seq[SourceLocation], between: Seq[SourceLocation])
 
   /** Runs a checker. */
   def check(): Iterator[Complexity[A]] = interrupt:
@@ -297,7 +299,7 @@ private final class AutomatonChecker[A, Q, P](
           for
             (q1, q2) <- es.diff(es.distinct).headOption
             (back, last) <- graph.path(Set(q2), q1)
-          yield (q1, a +: back.map(_._2), q1, spots((q1, a) +: back, last))
+          yield Pump(q1, a +: back.map(_._2), q1, spots((q1, a) +: back, last), Vector.empty)
         // In other cases, we need to use SCC of a pair graph.
         case None =>
           // A state pair graph with co-transition, whose vertices pack the numbers of the states.
@@ -320,7 +322,7 @@ private final class AutomatonChecker[A, Q, P](
                   val q1 = numberedStates(first(p1))
                   val path = (path1 ++ path2).map: (p, l) =>
                     ((numberedStates(first(p)), numberedStates(second(p))), letters(l))
-                  (q1, path.map(_._2), q1, spotsG2(path, (q1, q1))))
+                  Pump(q1, path.map(_._2), q1, spotsG2(path, (q1, q1)), Vector.empty))
                 eda
               .headOption
           result
@@ -447,30 +449,65 @@ private final class AutomatonChecker[A, Q, P](
                     val (r1, r2) = (numberedStates(q1), numberedStates(q2))
                     val decoded = path.map: (v, l) =>
                       ((numberedStates(third1(v)), numberedStates(third2(v)), numberedStates(third3(v))), letters(l))
-                    (r1, decoded.map(_._2), r2, spotsG3(decoded, (r1, r2, r2)))
+                    val between = spots(decoded.map { case ((_, q2, _), a) => (q2, a) }, r2)
+                    Pump(r1, decoded.map(_._2), r2, spotsG3(decoded, (r1, r2, r2)), between)
           ida
         .nextOption()
     result
 
-  /** Builds a witness object from pump strings and states. */
+  /** Builds a witness object from pump strings and states, with its hotspots.
+    *
+    * The parts on the loops of the pumps are hot, and the ones between the two loops of an IDA structure are warm. The
+    * other parts that the matching goes through on the witness are cold.
+    */
   private def witness(pumps: Seq[Pump]): (Witness[A], Hotspot) =
     log("automaton: either EDA or IDA is found")
-    val (pumpPaths, qs, spots) =
-      pumps.foldLeft((Vector.empty[(Seq[A], Seq[A])], nfaWLA.initSet.toSet, Vector.empty[Hotspot.Spot])):
-        case ((pumpPaths, last, spots), (q1, path, q2, pos)) =>
-          val (prefix, _) = graph.path(last, q1).get
-          val newSpots = spots ++ pos.map { case SourceLocation(s, e) => Hotspot.Spot(s, e, Hotspot.Hot) } ++
-            this.spots(prefix, q1).map { case SourceLocation(s, e) => Hotspot.Spot(s, e, Hotspot.Warm) }
-          (pumpPaths :+ (prefix.map(_._2._1), path.map(_._1)), Set(q2), newSpots)
-    val (tail, last) = graph.path(qs, witnessEnds).get
-    val tailSpots = this.spots(tail, last).map { case SourceLocation(s, e) => Hotspot.Spot(s, e, Hotspot.Warm) }
-    val suffix =
+
+    // The pumps with their prefixes, the states after them, their spots, and the graph of the witness up to the vertex
+    // `v`.
+    final case class PartialWitness(
+        pumpPaths: Vector[(Seq[A], Seq[A])],
+        last: Set[R],
+        spots: Vector[Hotspot.Spot],
+        witnessGraph: Graph[Int, B],
+        v: Int
+    )
+
+    val init = PartialWitness(Vector.empty, nfaWLA.initSet.toSet, Vector.empty, Graph.from(IndexedSeq.empty), 0)
+    val partial = pumps.foldLeft(init): (partial, pump) =>
+      val (prefix, _) = graph.path(partial.last, pump.r1).get
+      val spots = pump.loops.map { case SourceLocation(s, e) => Hotspot.Spot(s, e, Hotspot.Hot) } ++
+        pump.between.map { case SourceLocation(s, e) => Hotspot.Spot(s, e, Hotspot.Warm) }
+      // The first character of the pump enters its cycle, so that the witness goes on from the end of the pump.
+      val v = partial.v + prefix.size
+      val witnessGraph = Graph.line(partial.v, prefix.map(_._2) :+ pump.path.head) ++
+        Graph.cycle(v + 1, pump.path.tail :+ pump.path.head)
+      PartialWitness(
+        partial.pumpPaths :+ (prefix.map(_._2._1), pump.path.map(_._1)),
+        Set(pump.r2),
+        partial.spots ++ spots,
+        partial.witnessGraph ++ witnessGraph,
+        v + pump.path.size
+      )
+
+    val (tail, last) = graph.path(partial.last, witnessEnds).get
+    val suffix: Seq[B] =
       if isUpperBound then
         val read = graph.neighbors.getOrElse(last, Vector.empty).map(_._1._1).toSet
         // The look-ahead DFA has every character, while the NFA has only the characters that it reads.
-        nfaWLA.lookAheadDFA.alphabet.find(a => !read.contains(a)).toVector
-      else nfaWLA.lookAheadDFA.toGraph.path(Set(nfaWLA.lookAheadDFA.init), last._2).get._1.map(_._2).reverse
-    (Witness(pumpPaths, tail.map(_._2._1) ++ suffix), Hotspot(spots ++ tailSpots))
+        nfaWLA.lookAheadDFA.alphabet.find(a => !read.contains(a)).map((_, nfaWLA.lookAheadDFA.init)).toVector
+      else nfaWLA.lookAheadDFA.toGraph.path(Set(nfaWLA.lookAheadDFA.init), last._2).get._1.map(_.swap).reverse
+
+    // The parts that the matching goes through on the witness are cold, unless they are hot or warm.
+    val attackGraph = partial.witnessGraph ++ Graph.line(partial.v, tail.map(_._2) ++ suffix)
+    val coldSpots = graph
+      .product(attackGraph, nfaWLA.initSet.toSet.map((_, 0)))
+      .edges
+      .flatMap:
+        case ((r1, _), b, (r2, _)) => nfaWLA.sourcemap.getOrElse((r1, b, r2), Vector.empty)
+      .map { case SourceLocation(s, e) => Hotspot.Spot(s, e, Hotspot.Cold) }
+
+    (Witness(partial.pumpPaths, (tail.map(_._2) ++ suffix).map(_._1)), Hotspot(partial.spots ++ coldSpots))
 
   /** Gets hotspots positions from a path. */
   private def spots(path: Seq[(R, B)], last: R): Seq[SourceLocation] =
@@ -486,9 +523,8 @@ private final class AutomatonChecker[A, Q, P](
     val spots2 = spots(path.map { case ((_, q2), a) => (q2, a) }, last._2)
     spots1 ++ spots2
 
-  /** Gets hotspots positions from a G3 path. */
+  /** Gets hotspots positions from the loops of a G3 path, which its first and third states go around. */
   private def spotsG3(path: Seq[((R, R, R), B)], last: (R, R, R)): Seq[SourceLocation] =
     val spots1 = spots(path.map { case ((q1, _, _), a) => (q1, a) }, last._1)
-    val spots2 = spots(path.map { case ((_, q2, _), a) => (q2, a) }, last._2)
     val spots3 = spots(path.map { case ((_, _, q3), a) => (q3, a) }, last._3)
-    spots1 ++ spots2 ++ spots3
+    spots1 ++ spots3

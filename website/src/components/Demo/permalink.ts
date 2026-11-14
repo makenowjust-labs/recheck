@@ -17,7 +17,7 @@ type Checker = "automaton" | "fuzz";
 type HotspotSnapshot = {
   start: number;
   end: number;
-  temperature: "heat" | "normal";
+  temperature: "heat" | "normal" | "cold";
 }[];
 
 // The permalinks recorded before the upper bound lack it.
@@ -76,7 +76,9 @@ const makeSnapshotHotspot = (hotspot: Hotspot[]): HotspotSnapshot =>
   hotspot.map(({ start, end, temperature }) => ({
     start,
     end,
-    temperature: temperature === "hot" ? "heat" : "normal",
+    temperature: ({ hot: "heat", warm: "normal", cold: "cold" } as const)[
+      temperature
+    ],
   }));
 
 // A missing upper bound is left out, so that the permalink stays short.
@@ -211,5 +213,7 @@ export const hotspotOf = (snapshot: { hotspot: HotspotSnapshot }): Hotspot[] =>
   snapshot.hotspot.map(({ start, end, temperature }) => ({
     start,
     end,
-    temperature: temperature === "heat" ? "hot" : "warm",
+    temperature: ({ heat: "hot", normal: "warm", cold: "cold" } as const)[
+      temperature
+    ],
   }));
