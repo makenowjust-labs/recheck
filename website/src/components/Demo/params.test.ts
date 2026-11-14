@@ -18,7 +18,6 @@ describe("parseParams", () => {
     expect(parsed.checker).toBe("auto");
     expect(parsed.logger).toBe("off");
     expect(parsed.timeout).toBe(10000);
-    expect(parsed.heatRatio).toBe(0.001);
     expect(parsed.runtimeAttackTimeout).toBe(-1000);
     expect(parsed.dialect).toEqual({ name: "javascript" });
     expect(Object.keys(parsed).sort()).toEqual(
@@ -34,7 +33,6 @@ describe("parseParams", () => {
         checker: "fuzz",
         logger: "on",
         timeout: "3000",
-        heatRatio: "0.5",
         maxDegree: "2",
       },
       dev,
@@ -42,7 +40,6 @@ describe("parseParams", () => {
     expect(parsed.checker).toBe("fuzz");
     expect(parsed.logger).toBe("on");
     expect(parsed.timeout).toBe(3000);
-    expect(parsed.heatRatio).toBe(0.5);
     expect(parsed.maxDegree).toBe(2);
   });
 
@@ -102,7 +99,6 @@ describe("paramsOf", () => {
     expect(params.find(({ name }) => name === "attackTimeout")?.type).toBe(
       "duration",
     );
-    expect(params.find(({ name }) => name === "heatRatio")?.type).toBe("float");
   });
 
   test("hides the parameters newer than the release", () => {

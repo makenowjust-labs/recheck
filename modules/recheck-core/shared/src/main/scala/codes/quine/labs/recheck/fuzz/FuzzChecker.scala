@@ -67,7 +67,6 @@ object FuzzChecker:
       maxAttackCandidates: Int = Parameters.DefaultMaxAttackCandidates,
       maxIteration: Int = Parameters.DefaultMaxIteration,
       maxDegree: Int = Parameters.DefaultMaxDegree,
-      heatRatio: Double = Parameters.DefaultHeatRatio,
       accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode,
       avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
   )(using
@@ -96,7 +95,6 @@ object FuzzChecker:
           attackTimeout,
           maxAttackStringSize,
           maxDegree,
-          heatRatio,
           accelerationMode,
           avoidsAttack,
           bound

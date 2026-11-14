@@ -145,7 +145,6 @@ class FuzzCheckerSuite extends munit.FunSuite:
       DefaultAttackTimeout,
       DefaultMaxAttackStringSize,
       DefaultMaxDegree,
-      DefaultHeatRatio,
       DefaultAccelerationMode,
       avoidsAttack,
       upperBound

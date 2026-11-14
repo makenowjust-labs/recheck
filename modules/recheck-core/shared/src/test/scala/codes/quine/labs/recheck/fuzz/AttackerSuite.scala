@@ -31,7 +31,6 @@ class AttackerSuite extends munit.FunSuite:
       DefaultAttackTimeout,
       DefaultMaxAttackStringSize,
       DefaultMaxDegree,
-      DefaultHeatRatio,
       DefaultAccelerationMode,
       (_, _) => false,
       upperBound

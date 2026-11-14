@@ -79,7 +79,6 @@ private[fuzz] final class Attacker(
     val attackTimeout: Duration,
     val maxAttackStringSize: Int,
     val maxDegree: Int,
-    val heatRatio: Double,
     val accelerationMode: AccelerationMode,
     val avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean,
     val upperBound: Option[Seq[Complexity.Vulnerable[UChar]]]
