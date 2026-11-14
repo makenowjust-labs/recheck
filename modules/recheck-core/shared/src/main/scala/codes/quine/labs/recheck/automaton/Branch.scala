@@ -55,6 +55,16 @@ enum Branch[+Q]:
     case AtomicChoice(alternatives, last) =>
       alternatives.find(_._1.succeeds(p)).fold(last.succeeds(p))(_._2.succeeds(p))
 
+  /** Returns the least number of the leaves that [[explore]] lists, whichever leaves succeed. */
+  def minExplored: Int = this match
+    case Leaf(_) => 1
+    case Succeed => 0
+    // The first branch is explored before the others.
+    case Choice(bs)             => bs.headOption.fold(0)(_.minExplored)
+    case LookAhead(_, inner, _) => inner.minExplored
+    // One of the branches is the committed one.
+    case AtomicChoice(alternatives, last) => (alternatives.map(_._2.minExplored) :+ last.minExplored).min
+
   /** Lists the leaves explored by a backtracking matcher when exactly the leaves satisfying `p` succeed. */
   def explore(p: Q => Boolean): Seq[Q] = exploreAndSucceed(p)._1
 

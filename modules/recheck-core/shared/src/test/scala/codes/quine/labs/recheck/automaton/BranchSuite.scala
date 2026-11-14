@@ -39,6 +39,18 @@ class BranchSuite extends munit.FunSuite:
     assertEquals(atomic.explore(Set(3)), Seq(2, 4))
     assertEquals(atomic.explore(Set.empty), Seq(2, 4))
 
+  test("Branch#minExplored"):
+    assertEquals(Leaf(1).minExplored, 1)
+    assertEquals(Succeed.minExplored, 0)
+    assertEquals(Fail.minExplored, 0)
+    assertEquals(Choice(Vector(Leaf(1), Leaf(2))).minExplored, 1)
+    assertEquals(Choice(Vector(Succeed, Leaf(1))).minExplored, 0)
+    assertEquals(branch.minExplored, 1)
+    assertEquals(atomic.minExplored, 1)
+    // It is not over the leaves that `explore` lists, whichever leaves succeed.
+    for b <- Seq(branch, atomic); succeeding <- Set(1, 2, 3, 4).subsets() do
+      assert(b.minExplored <= b.explore(succeeding).size, s"$b with $succeeding")
+
   test("Branch#map"):
     assertEquals(branch.map(_ * 2), Choice(Vector(LookAhead(true, Leaf(2), Leaf(4)), Leaf(6))))
 
