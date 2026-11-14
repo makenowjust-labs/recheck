@@ -10,6 +10,8 @@ import java.nio.file.Files
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
+import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.MILLISECONDS
 import scala.concurrent.duration.SECONDS
 
 import io.circe.Json
@@ -19,22 +21,38 @@ import io.circe.syntax.*
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.codec.encodeDiagnostics
 import codes.quine.labs.recheck.common.Checker
+import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.diagnostics.RuntimeAttack
+import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
+import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.PerlSource
 
 class MainSuite extends munit.FunSuite:
   private class ExitException(val status: Int) extends SecurityException
 
+  /** Runs the command with the arguments, where `runtimeAttack` gives the result of a matching instead of the runtime.
+    */
   def runMain(
       args: Seq[String],
       newIn: InputStream = InputStream.nullInputStream(),
-      newOut: ByteArrayOutputStream = new ByteArrayOutputStream()
+      newOut: ByteArrayOutputStream = new ByteArrayOutputStream(),
+      runtimeAttack: () => Option[RuntimeAttackResult] = () => None
   ): (String, String, Int) =
     val newErr = new ByteArrayOutputStream()
 
     val main = new Main:
       override def exit(exitCode: Int): Unit = throw new ExitException(exitCode)
+
+      override def runRuntimeAttack(logger: Option[Context.Logger])(
+          source: String,
+          dialect: Dialect,
+          mode: UnitMode,
+          string: AttackPattern,
+          timeout: FiniteDuration
+      ): Option[RuntimeAttack] = runtimeAttack().map(RuntimeAttack("fake 1.0", timeout, _))
 
     // The input is read as UTF-8 like `Main.main`.
     val newInReader = new InputStreamReader(newIn, StandardCharsets.UTF_8)
@@ -123,6 +141,17 @@ class MainSuite extends munit.FunSuite:
       Right(Main.GenerateRuntimeAttackScriptAction("-"))
     )
     assert(clue(Main.command.parse(Seq("generate-runtime-attack-script"))).isLeft)
+    assertEquals(
+      Main.command.parse(Seq("calibrate-runtime-attack")),
+      Right(Main.CalibrateRuntimeAttackAction(Parameters(), 0.02, Duration(30, SECONDS)))
+    )
+    assertEquals(
+      Main.command.parse(Seq("calibrate-runtime-attack", "--dialect=ruby", "--ratio=0.1", "--time=10s")),
+      Right(Main.CalibrateRuntimeAttackAction(Parameters(dialect = Dialect.Ruby()), 0.1, Duration(10, SECONDS)))
+    )
+    assert(clue(Main.command.parse(Seq("calibrate-runtime-attack", "--ratio=0"))).isLeft)
+    assert(clue(Main.command.parse(Seq("calibrate-runtime-attack", "--time=0s"))).isLeft)
+    assert(clue(Main.command.parse(Seq("calibrate-runtime-attack", "--time=Inf"))).isLeft)
     assertEquals(Main.command.parse(Seq("agent", "--thread-size=2")), Right(Main.BatchAction(2)))
     assertEquals(Main.command.parse(Seq("agent")), Right(Main.BatchAction(sys.runtime.availableProcessors())))
 
@@ -131,7 +160,7 @@ class MainSuite extends munit.FunSuite:
       runMain(Seq.empty),
       (
         "",
-        "Missing expected command (agent or generate-runtime-attack-script), or positional argument!\n\n" + Main.command.showHelp + "\n",
+        "Missing expected command (agent or calibrate-runtime-attack or generate-runtime-attack-script), or positional argument!\n\n" + Main.command.showHelp + "\n",
         2
       )
     )
@@ -172,6 +201,41 @@ class MainSuite extends munit.FunSuite:
     val (out, err, status) = runMain(Seq("--json", "--checker=automaton", "/(a|a)*$/"))
     assertEquals((err, status), ("", 1))
     assertEquals(parse(out), Right(encodeDiagnostics(ReDoS.check("(a|a)*$", "", params))))
+
+  test("Main#run: calibrate-runtime-attack"):
+    // A matching takes a while, so that the runs in the time are not too many.
+    val finish = () =>
+      Thread.sleep(5)
+      Some(RuntimeAttackResult.Finish(Duration(200, MILLISECONDS)))
+    val (out, err, status) = runMain(Seq("calibrate-runtime-attack", "--time=100ms"), runtimeAttack = finish)
+    assertEquals((err, status), ("", 0))
+    val lines = out.linesIterator.toSeq
+    assertEquals(lines.take(3), Seq("Dialect: javascript", "Runtime: fake 1.0", "References:"))
+    // The numbers of the runs of the references depend on the clock.
+    assertEquals(
+      lines.takeRight(6),
+      Seq(
+        "Attack time           : 6000 ms (estimated for 54773 repeats from the median of the references, 200 ms)",
+        "Runtime attack timeout: 120 ms (0.02 of the attack time)",
+        "",
+        "Run the check with these options to enable the runtime-attack verification:",
+        "",
+        "  recheck --runtime-attack-timeout=120ms <pattern>"
+      )
+    )
+
+    // It fails when no reference is measured, or when the runtime does not run.
+    val short = () => Some(RuntimeAttackResult.Finish(Duration(1, MILLISECONDS)))
+    val (shortOut, _, shortStatus) = runMain(Seq("calibrate-runtime-attack", "--time=1ms"), runtimeAttack = short)
+    assertEquals(
+      shortOut.linesIterator.toSeq.last,
+      "Runtime attack timeout: none (no reference is measured on this runtime)"
+    )
+    assertEquals(shortStatus, 1)
+    assertEquals(
+      runMain(Seq("calibrate-runtime-attack")),
+      ("", "The runtime of javascript cannot run the references\n", 1)
+    )
 
   test("Main#run: generate-runtime-attack-script"):
     // The input is the output of `--json`.
