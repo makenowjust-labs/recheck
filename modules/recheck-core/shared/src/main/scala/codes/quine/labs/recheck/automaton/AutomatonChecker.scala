@@ -401,9 +401,13 @@ private final class AutomatonChecker[A, Q, P](
     // The product of the transitions in `source`, between them, and in `target`, which is built only from the
     // triples `(q1, q1, q2)` for `q1` in `source` and `q2` in `target`, since only them matter. Its vertices pack the
     // numbers of the states.
+    // A transition goes to a state of the look-ahead DFA state of its letter, so the loops of `q1` and `q2` on the
+    // same letters end at the same look-ahead DFA state.
     val sourceStates = sccStateStarts(source) until sccStateStarts(source + 1)
-    val targetStates = sccStateStarts(target) until sccStateStarts(target + 1)
-    val starts = interrupt(sourceStates.flatMap(q1 => targetStates.map(q2 => stateTriple(q1, q1, q2))))
+    val targetStates = (sccStateStarts(target) until sccStateStarts(target + 1)).groupBy(numberedStates(_)._2)
+    val pairs = interrupt:
+      sourceStates.flatMap(q1 => targetStates.getOrElse(numberedStates(q1)._2, Vector.empty).map((q1, _)))
+    val starts = pairs.map((q1, q2) => stateTriple(q1, q1, q2))
     val g3 = interrupt:
       val seen = mutable.LongMap.empty[Unit]
       for v <- starts do seen(v) = ()
@@ -425,10 +429,7 @@ private final class AutomatonChecker[A, Q, P](
       Graph.from(edges.result())
     // The edges back from `(q1, q2, q2)` to `(q1, q1, q2)` have no letter.
     val g3back = interrupt:
-      Graph.from(
-        sourceStates.flatMap(q1 => targetStates.map(q2 => (stateTriple(q1, q2, q2), -1, stateTriple(q1, q1, q2)))) ++
-          g3.edges
-      )
+      Graph.from(pairs.map((q1, q2) => (stateTriple(q1, q2, q2), -1, stateTriple(q1, q1, q2))) ++ g3.edges)
 
     val result = interrupt:
       g3back.scc.iterator
