@@ -181,18 +181,9 @@ private class EpsNFABuilder(
       i1
     else first
 
-    // A match ends at its first success, which no priority tells in the simplified ε-NFA.
-    // So it does not read the rest of the input, where a path reaching the end of the pattern stops.
-    if pattern.needsSigmaStarAtEnd && !isSimplified then
-      val loop = nextLoop()
-      val a1 = nextQ()
-      val a2 = nextQ()
-      val a3 = nextQ()
-      val a4 = nextQ()
-      emit(a0 -> Eps(Vector(a3, a1)))
-      emit(a1 -> LoopEnter(loop, a2))
-      emit(a2 -> Consume(alphabet.any, a0))
-      emit(a3 -> LoopExit(loop, a4))
+    // A match succeeds at the end of the pattern whatever follows.
+    // The simplified ε-NFA, which has no priorities telling the first success, stops there instead.
+    if pattern.needsSigmaStarAtEnd && !isSimplified then emit(a0 -> Accept())
 
     val lookBehind = Option.when(innerStates.nonEmpty)(LookBehind(innerStates.toSet, innerTau.toMap))
     EpsNFA(alphabet, (0 until counterQ).toSet -- innerStates -- unusedStates, init, tau.toMap, lookBehind)

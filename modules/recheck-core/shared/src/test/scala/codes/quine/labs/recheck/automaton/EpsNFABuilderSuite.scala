@@ -75,20 +75,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
         )
       )
     )
-    assertEquals(
-      build("^"),
-      EpsNFA(
-        buildAlphabet(utf16),
-        Set(0, 1, 2, 3, 4),
-        0,
-        Map(
-          0 -> Eps(Seq(3, 1)),
-          1 -> LoopEnter(0, 2),
-          2 -> Consume(Set((any16, CharKind.Normal)), 0),
-          3 -> LoopExit(0, 4)
-        )
-      )
-    )
+    assertEquals(build("^"), EpsNFA(buildAlphabet(utf16), Set(0), 0, Map(0 -> Accept())))
 
   test("EpsNFABuilder.build: LineBegin, LineEnd, Sequence"):
     assertEquals(build("^$"), EpsNFA(buildAlphabet(utf16), Set(0, 1), 0, Map(0 -> Eps(Seq(1)))))
@@ -353,9 +340,9 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     // A back-reference in the group that it refers to, which would copy the group endlessly, is ε.
     assertEquals(build("(a\\1)", isSimplified = true), build("(a(?:a(?:)|))", isSimplified = true))
     def consumes(nfa: EpsNFA[Int]): Int = nfa.tau.values.count(_.isInstanceOf[Consume[?]])
-    // A match ends at its first success, so the ε-NFA does not read the rest of the input after the pattern.
-    assertEquals(consumes(build("^a", isSimplified = true)), 1)
-    assertEquals(consumes(build("^a")), 2)
+    // The simplified ε-NFA stops at the end of the pattern instead of accepting there.
+    assert(!build("^a", isSimplified = true).tau.values.toSeq.contains(Accept()))
+    assert(build("^a").tau.values.toSeq.contains(Accept()))
     // Java's `\2` without the group refers to no group, so it reads nothing.
     val missing = build("^(a)\\2$", "", Dialect.Java, isSimplified = true)
     assertEquals(consumes(missing), consumes(build("^(a)$", "", Dialect.Java)))
@@ -478,9 +465,13 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     val units = input match
       case s: String  => ReDoS.parse(source, flags, dialect).mode.decode(s).iterator.toSeq
       case u: UString => u.iterator.toSeq
+    var succeeded = false
     val last = units.foldLeft(nfa.inits.toSet): (qs, c) =>
-      qs.flatMap(q => nfa.delta.collect { case ((p, a), ps) if p == q && a.contains(c) => ps.leaves }.flatten)
-    last.exists(nfa.acceptSet.contains)
+      val bs = qs.toSeq.flatMap(q => nfa.delta.collect { case ((p, a), b) if p == q && a.contains(c) => b })
+      // A path reaching an accept succeeds whatever follows.
+      succeeded ||= bs.exists(_.succeeds(_ => false))
+      bs.flatMap(_.leaves).toSet
+    succeeded || last.exists(nfa.acceptSet.contains)
 
   /** Tests whether the automaton of the source accepts the input with its look-ahead assertions, by its look-ahead DFA.
     */

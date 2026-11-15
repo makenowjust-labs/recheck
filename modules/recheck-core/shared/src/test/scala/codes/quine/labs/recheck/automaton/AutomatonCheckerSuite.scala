@@ -135,7 +135,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           2,
-          Witness(Seq((Seq(at), Seq(a, a, other2))), Seq.empty),
+          Witness(Seq((Seq(word.diff(a)), Seq(a, a, other2, a))), Seq.empty),
           Hotspot(Seq(Spot(2, 3, Hot), Spot(6, 8, Warm), Spot(10, 14, Hot)))
         )
       )
@@ -197,8 +197,8 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           2,
-          Witness(Seq((Seq.empty, Seq(a))), Seq.empty),
-          Hotspot(Seq(Spot(3, 4, Hot)))
+          Witness(Seq((Seq.empty, Seq(a))), Seq(CharSet.range(0x00, 0xff).diff(CharSet.of('a', 'b')), b)),
+          Hotspot(Seq(Spot(3, 4, Hot), Spot(8, 9, Cold)))
         )
       )
     )

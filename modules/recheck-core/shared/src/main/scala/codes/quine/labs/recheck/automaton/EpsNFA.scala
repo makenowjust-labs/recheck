@@ -309,8 +309,8 @@ object EpsNFA:
     */
   final case class LookBehindAssert[Q](negative: Boolean, init: Q, to: Q) extends Transition[Q]
 
-  /** Accept is an end of an expression that succeeds there whatever follows, as the inner expression of a look-around
-    * or the test of an atomic group.
+  /** Accept is an end of an expression that succeeds there whatever follows, as the pattern, the inner expression of a
+    * look-around or the test of an atomic group.
     */
   final case class Accept[Q]() extends Transition[Q]
 
