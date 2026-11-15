@@ -39,6 +39,7 @@ Fixes:
 - [#2015](https://github.com/makenowjust-labs/recheck/pull/2015) Start the IDA search only from the states of the same look-ahead DFA state ([@makenowjust](https://github.com/makenowjust))
 - [#2014](https://github.com/makenowjust-labs/recheck/pull/2014) Run Ruby without RubyGems on the runtime attack ([@makenowjust](https://github.com/makenowjust))
 - [#2013](https://github.com/makenowjust-labs/recheck/pull/2013) Enforce GC of the agent only after no check runs for a second ([@makenowjust](https://github.com/makenowjust))
+- [#2025](https://github.com/makenowjust-labs/recheck/pull/2025) Print the version once before the timeouts in the test of Platform.compile ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
