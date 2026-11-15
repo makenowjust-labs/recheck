@@ -20,6 +20,7 @@ export type Variant = {
   required?: string[];
   additionalProperties?: boolean;
   "x-scala-type"?: string;
+  "x-since"?: string;
 };
 
 /** Setting is a property of a variant object: `name` with `const`, or a setting with `enum` or `type`. */

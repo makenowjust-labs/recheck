@@ -140,4 +140,19 @@ describe("isAtLeast", () => {
     ).toBe(true);
     expect(isAtLeast({ type: "dev" }, "5.0.0")).toBe(true);
   });
+
+  test("compares a release with a prerelease version as semver does", () => {
+    expect(
+      isAtLeast({ type: "release", version: "5.0.0-beta.1" }, "5.0.0-beta.2"),
+    ).toBe(false);
+    expect(
+      isAtLeast({ type: "release", version: "5.0.0-beta.2" }, "5.0.0-beta.2"),
+    ).toBe(true);
+    expect(
+      isAtLeast({ type: "release", version: "5.0.0" }, "5.0.0-beta.2"),
+    ).toBe(true);
+    expect(
+      isAtLeast({ type: "release", version: "4.6.2" }, "5.0.0-beta.2"),
+    ).toBe(false);
+  });
 });

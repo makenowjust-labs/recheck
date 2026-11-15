@@ -57,13 +57,17 @@ const compareVersions = (a: Version, b: Version): number => {
 
 /** Checks whether the build has the changes of the release version, as a later release or an unreleased build.
  *
- * A prerelease counts as its release (e.g. `5.0.0-beta.1` has the changes of `5.0.0`).
+ * A prerelease counts as its release for a release version (e.g. `5.0.0-beta.1` has the changes of `5.0.0`), but not
+ * for a later prerelease version (e.g. `5.0.0-beta.1` does not have the changes of `5.0.0-beta.2`).
  */
 export const isAtLeast = (build: Build, version: string): boolean => {
   if (build.type !== "release") return true;
   const a = parseVersion(build.version);
   const b = parseVersion(version);
-  return a === null || b === null || compareCores(a, b) >= 0;
+  if (a === null || b === null) return true;
+  return b.prerelease === null
+    ? compareCores(a, b) >= 0
+    : compareVersions(a, b) >= 0;
 };
 
 /** Release versions the Playground can load, newest first.
