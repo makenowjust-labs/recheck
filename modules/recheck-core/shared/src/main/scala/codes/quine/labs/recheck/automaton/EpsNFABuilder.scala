@@ -226,7 +226,7 @@ private class EpsNFABuilder(
           case LookBehindAssert(negative, init, q) => LookBehindAssert(negative, init, f(q))
           case AtomicEps(alternatives, last)       =>
             AtomicEps(alternatives.map((test, q) => (f(test), f(q))), f(last))
-          case LookAroundAccept()           => LookAroundAccept()
+          case Accept()                     => Accept()
           case MarkCapture(mark, q)         => MarkCapture(mark, f(q))
           case IterationEnd(loop, q, empty) => IterationEnd(loop, f(q), empty.map(f))
 
@@ -308,7 +308,7 @@ private class EpsNFABuilder(
         val i = nextQ()
         val a = nextQ()
         emit(i -> LookAheadAssert(negative, i0, a))
-        emit(a0 -> LookAroundAccept())
+        emit(a0 -> Accept())
         (i, a)
       case IRNodeData.NonAtomicLookAhead(n) if isSimplified =>
         // Backtracking into it tries the continuation again for each match of the inner expression, which the cost of
@@ -325,7 +325,7 @@ private class EpsNFABuilder(
         val wasBackward = isBackward
         isBackward = true
         val ((i0, a0), _) = withPath(buildInLookAround(buildNode(reverseLookBehindInner(n))))
-        emit(a0 -> LookAroundAccept())
+        emit(a0 -> Accept())
         isBackward = wasBackward
         val i = nextQ()
         val a = nextQ()
@@ -423,8 +423,8 @@ private class EpsNFABuilder(
     *
     * A choice of the group tries the alternatives in order, and commits to the first one that reaches the end of the
     * group ([[AtomicEps]]). The test of an alternative is its state in a copy of the paths of the group, which ends
-    * with a [[LookAroundAccept]] at the end of the group, and which only the [[AtomicEps]] refer to. The last
-    * alternative has no test, since it fails within the group anyway if it does not reach the end.
+    * with an [[Accept]] at the end of the group, and which only the [[AtomicEps]] refer to. The last alternative has no
+    * test, since it fails within the group anyway if it does not reach the end.
     */
   private def buildAtomic(n: IRNode): (Int, Int) =
     val ((i0, a0), groupPath) = withPath(buildNode(n))
@@ -449,7 +449,7 @@ private class EpsNFABuilder(
         case Some(MarkCapture(_, q1))            => Eps(Vector(test(q1)))
         case Some(IterationEnd(loop, q1, empty)) => IterationEnd(loop, test(q1), empty.map(test))
         // `a0` is the end of the group, which has no transition yet.
-        case Some(LookAroundAccept()) | None => LookAroundAccept()
+        case Some(Accept()) | None => Accept()
       emit(test(q) -> t)
     for q <- groupPath do
       transitions.get(q) match

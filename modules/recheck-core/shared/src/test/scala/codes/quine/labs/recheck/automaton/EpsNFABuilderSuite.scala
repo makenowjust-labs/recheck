@@ -294,7 +294,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
         Map(
           0 -> Eps(Seq(3)),
           1 -> Consume(Set((CharSet.single('a'), CharKind.Normal)), 2),
-          2 -> LookAroundAccept(),
+          2 -> Accept(),
           3 -> LookAheadAssert(true, 1, 4),
           4 -> Eps(Seq(5))
         )
@@ -320,7 +320,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
               1 -> Consume(Set((CharSet.single('b'), CharKind.Normal)), 2),
               2 -> Eps(Seq(3)),
               3 -> Consume(Set((CharSet.single('a'), CharKind.Normal)), 4),
-              4 -> LookAroundAccept()
+              4 -> Accept()
             )
           )
         )

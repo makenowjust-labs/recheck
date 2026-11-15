@@ -72,7 +72,7 @@ final case class EpsNFA[Q](
           sb.append(s"  ${escape(q0)} [shape=diamond];\n")
           sb.append(s"  ${escape(q0)} -> ${escape(init)} [label=${escape(if negative then "?<!" else "?<=")}];\n")
           sb.append(s"  ${escape(q0)} -> ${escape(q1)};\n")
-        case Some(LookAroundAccept()) =>
+        case Some(Accept()) =>
           sb.append(s"  ${escape(q0)} [shape=doubleoctagon];\n")
         case Some(AtomicEps(alternatives, last)) =>
           sb.append(s"  ${escape(q0)} [shape=diamond];\n")
@@ -272,7 +272,7 @@ object EpsNFA:
       case IterationEnd(loop, q, empty)        => IterationEnd(loop, f(q), empty.map(f))
       case LookAheadAssert(negative, init, q)  => LookAheadAssert(negative, f(init), f(q))
       case LookBehindAssert(negative, init, q) => LookBehindAssert(negative, f(init), f(q))
-      case LookAroundAccept()                  => LookAroundAccept()
+      case Accept()                            => Accept()
       case AtomicEps(alternatives, last)       => AtomicEps(alternatives.map((test, q) => (f(test), f(q))), f(last))
 
   /** Eps is an ε-NFA transition without consuming a character. */
@@ -309,13 +309,15 @@ object EpsNFA:
     */
   final case class LookBehindAssert[Q](negative: Boolean, init: Q, to: Q) extends Transition[Q]
 
-  /** LookAroundAccept is an end of the inner expression of a look-around. */
-  final case class LookAroundAccept[Q]() extends Transition[Q]
+  /** Accept is an end of an expression that succeeds there whatever follows, as the inner expression of a look-around
+    * or the test of an atomic group.
+    */
+  final case class Accept[Q]() extends Transition[Q]
 
   /** LookBehind is the ε-NFA of the inner expressions of look-behinds, which reads the input backward.
     *
-    * An inner expression starts from the `init` of its [[LookBehindAssert]], and ends at a [[LookAroundAccept]]. Its
-    * assertions see the character before the position as the next one.
+    * An inner expression starts from the `init` of its [[LookBehindAssert]], and ends at an [[Accept]]. Its assertions
+    * see the character before the position as the next one.
     *
     * It does not nest: its transitions have no [[LookBehindAssert]], since a look-behind in an inner expression reads
     * the input in the same direction, and [[EpsNFABuilder]] builds it as a look-ahead of the reversed inner expression.
@@ -326,10 +328,10 @@ object EpsNFA:
     def mapState[R](f: Q => R): LookBehind[R] = LookBehind(stateSet.map(f), tau.map((q, t) => f(q) -> t.mapState(f)))
 
   /** AtomicEps is an ε-NFA transition of a choice in an atomic group, which tries the alternatives `(test, to)` in
-    * order, and commits to the first one whose `test` reaches a [[LookAroundAccept]], or else to `last`.
+    * order, and commits to the first one whose `test` reaches an [[Accept]], or else to `last`.
     *
-    * `test` is the state of `to` in a copy of the group, which ends with the [[LookAroundAccept]] instead of going on
-    * after the group.
+    * `test` is the state of `to` in a copy of the group, which ends with an [[Accept]] instead of going on after the
+    * group.
     */
   final case class AtomicEps[Q](alternatives: Seq[(Q, Q)], last: Q) extends Transition[Q]
 
@@ -357,7 +359,7 @@ object EpsNFA:
       */
     def atEnd(d: Set[Int])(stop: Stop[Q]): Branch[Int] = stop match
       case Stop.Read(_, _)        => Branch.Fail
-      case Stop.InnerEnd(ss)      => if ss.contains(inputTerminator) then Branch.Succeed else Branch.Fail
+      case Stop.Accept(ss)        => if ss.contains(inputTerminator) then Branch.Succeed else Branch.Fail
       case Stop.LookBehind(q, ss) =>
         if !ss.contains(inputTerminator) then Branch.Fail
         else
@@ -375,9 +377,9 @@ object EpsNFA:
     /** Returns the characters on which the leaf may have a transition. */
     def charsOf(stop: Stop[Q]): Set[CharSet] = stop match
       case Stop.Read(q, _) => consumeMap(q).set.map(_._1)
-      // An end of an inner expression and a look-behind succeed without consuming a character.
-      case Stop.InnerEnd(_) | Stop.LookBehind(_, _) => charKinds.keySet
-      case Stop.End                                 => Set.empty
+      // An accept and a look-behind succeed without consuming a character.
+      case Stop.Accept(_) | Stop.LookBehind(_, _) => charKinds.keySet
+      case Stop.End                               => Set.empty
 
     /** Returns the transition of the leaf on the character at the state `d` of the DFA of `lookBehind`, as a branch of
       * the next states with the locations read there.
@@ -392,7 +394,7 @@ object EpsNFA:
             yield
               val s1 = s.forgetMarks
               Branch.Leaf(((s1, closure(s1, q1), d1), loc))
-        case Stop.InnerEnd(ss)      => successBefore(s0, ss, charKinds(ch), d1)
+        case Stop.Accept(ss)        => successBefore(s0, ss, charKinds(ch), d1)
         case Stop.LookBehind(q, ss) =>
           val k = charKinds(ch)
           val next = advance(s0, k)
@@ -411,12 +413,10 @@ object EpsNFA:
             else Branch.choice(allowed.map(s => Branch.lookAhead(false, pending(s, d1), tried)))
         case Stop.End => Branch.Fail
 
-    /** Returns the next state pending the guess `s`, which is an end of an inner expression that the rest of the input
-      * confirms.
-      */
+    /** Returns the next state pending the guess `s`, which is an accept that the rest of the input confirms. */
     private def pending(s: CharKindState, d1: Set[Int]): Branch[(R, Option[SourceLocation])] =
       val s1 = s.forgetMarks
-      Branch.Leaf(((s1, Branch.Leaf(Stop.InnerEnd(nextStates(s1))), d1), None))
+      Branch.Leaf(((s1, Branch.Leaf(Stop.Accept(nextStates(s1))), d1), None))
 
     /** Returns a success before a character of the kind, where `ss` are the next states that the assertions allow.
       *
@@ -490,14 +490,14 @@ object EpsNFA:
               Branch.choice(Seq(buildClosure(s0, ss, init, loops), buildClosure(s0, ss, q1, loops)))
             case Some(LookBehindAssert(_, _, q1)) if isSimplified =>
               Branch.choice(Seq(Branch.Leaf(Stop.LookBehind(q, ss)), buildClosure(s0, ss, q1, loops)))
-            case Some(LookAroundAccept()) if isSimplified            => Branch.Leaf(Stop.End)
+            case Some(Accept()) if isSimplified                      => Branch.Leaf(Stop.End)
             case Some(AtomicEps(alternatives, last)) if isSimplified =>
               Branch.choice((alternatives.map(_._2) :+ last).map(buildClosure(s0, ss, _, loops)))
             case Some(LookAheadAssert(negative, init, q1)) =>
               Branch.lookAhead(negative, buildClosure(s0, ss, init, loops), buildClosure(s0, ss, q1, loops))
             case Some(LookBehindAssert(negative, _, q1)) =>
               Branch.lookAhead(negative, Branch.Leaf(Stop.LookBehind(q, ss)), buildClosure(s0, ss, q1, loops))
-            case Some(LookAroundAccept())            => Branch.Leaf(Stop.InnerEnd(ss))
+            case Some(Accept())                      => Branch.Leaf(Stop.Accept(ss))
             case Some(AtomicEps(alternatives, last)) =>
               Branch.atomicChoice(
                 alternatives.map((t, q1) => (buildClosure(s0, ss, t, loops), buildClosure(s0, ss, q1, loops))),
@@ -516,16 +516,16 @@ object EpsNFA:
     def closure(s0: CharKindState, q: Q): Branch[Stop[Q]] =
       closureCache.getOrElseUpdate((s0, q), buildClosure(s0, nextStates(s0), q, Set.empty))
 
-  /** Stop is a leaf of an ε-closure, where the matching reads a character, ends an inner expression, tries a
-    * look-behind, or ends.
-    */
+  /** Stop is a leaf of an ε-closure, where the matching reads a character, accepts, tries a look-behind, or ends. */
   enum Stop[+Q]:
 
     /** Read is a state reading a character, with the next states that the assertions on the way allow. */
     case Read(q: Q, allowed: Set[CharKindState])
 
-    /** InnerEnd is an end of the inner expression of a look-around, with the next states that the assertions allow. */
-    case InnerEnd(allowed: Set[CharKindState])
+    /** Accept is an end of an expression that succeeds there whatever follows, with the next states that the assertions
+      * allow.
+      */
+    case Accept(allowed: Set[CharKindState])
 
     /** LookBehind is a state trying a look-behind assertion, with the next states that the assertions allow. */
     case LookBehind(q: Q, allowed: Set[CharKindState])
