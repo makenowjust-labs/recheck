@@ -737,8 +737,15 @@ private[build] final class IRCharResolver(
       case ClassItemData.ClassPOSIX(invert, name) =>
         val set = posix(name, flags, item.loc)
         if invert then ClassSet(set.complement(universe)) else ClassSet(set)
-      case ClassItemData.ClassRange(begin, end)    => range(begin.data, end.data, flags, item.loc)
-      case ClassItemData.ClassCaseCommand(_)       => ClassSet.empty
+      case ClassItemData.ClassRange(begin, end) => range(begin.data, end.data, flags, item.loc)
+      case ClassItemData.ClassCaseCommand(_)    => ClassSet.empty
+      // .NET's `e` adds `\d`, `\s` and `\w` to a class as ranges, which `i` closes as the other ranges (e.g. `[\W]`
+      // matches `k` for U+212A).
+      case ClassItemData.ClassBackslashClass(
+            kind @ (EscapeClassKind.Digit | EscapeClassKind.NonDigit | EscapeClassKind.Space |
+            EscapeClassKind.NonSpace | EscapeClassKind.Word | EscapeClassKind.NonWord)
+          ) if flags.ignoreCase && featureSet.closesCaselessClassEscape =>
+        ClassSet(equivalence(flags).closure(escapeClassSet(kind, flags, item.loc, inClass = true).chars))
       case ClassItemData.ClassBackslashClass(kind) =>
         foldInput(escapeClassSet(kind, flags, item.loc, inClass = true), flags)
       // POSIX's collating elements and equivalence classes depend on the locale's collation.

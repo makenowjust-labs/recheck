@@ -62,9 +62,11 @@ object FeatureSet:
   private def isUnicode(dialect: Dialect, flagSet: FlagSet, mode: UnitMode): Boolean =
     flagSet.unicode || flagSet.unicodeSets || (dialect.isPCRE && mode.isCodePoint)
 
+  private def isDotNetECMAScript(dialect: Dialect, flagSet: FlagSet): Boolean = dialect.isDotNet && flagSet.evaluate
+
   /** The features of the escapes outside a class. */
   final case class Escape(
-      // Boost.Regex, ICU, JavaScript (without `uv`), Perl, Ruby
+      // .NET (with `e`), Boost.Regex, ICU, JavaScript (without `uv`), Perl, Ruby
       allowsAlphabeticUnknownBackslash: Boolean,
       // Java, PCRE, Ruby
       allowsBackslashControlCurly: Boolean,
@@ -86,7 +88,7 @@ object FeatureSet:
       allowsRawPropertyName: Boolean,
       // Ruby
       allowsNegatedRawPropertyName: Boolean,
-      // JavaScript (without `uv`), PCRE, Perl, Ruby
+      // .NET (with `e`), JavaScript (without `uv`), PCRE, Perl, Ruby
       allowsNonOctalDigitBackslash: Boolean,
       // .NET, PCRE (with `u`), Perl, python-regex
       allowsOctalAbove0377: Boolean,
@@ -100,7 +102,7 @@ object FeatureSet:
       readsUnpairedQuoteEndAsLetter: Boolean,
       // ICU, JavaScript (without `uv`)
       allowsUnknownBackslashUpperC: Boolean,
-      // Boost.Regex, ICU, Java, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
+      // .NET (with `e`), Boost.Regex, ICU, Java, JavaScript (without `uv`), PCRE, Perl, Python, python-regex, Ruby
       allowsWordUnknownBackslash: Boolean,
       // python-regex
       fallsBackBrokenBackslashToLiteral: Boolean,
@@ -208,7 +210,7 @@ object FeatureSet:
       hasBoundaryModifier: Boolean,
       // python-regex
       hasPythonRegexProperty: Boolean,
-      // JavaScript (without `uv`)
+      // .NET (with `e`), JavaScript (without `uv`)
       limitsOctalTo0377ByDigits: Boolean,
       // Python, python-regex
       readsThreeOctalDigitsAsOctal: Boolean,
@@ -223,9 +225,11 @@ object FeatureSet:
 
       val isByte = FeatureSet.isByte(mode)
       val isUnicode = FeatureSet.isUnicode(dialect, flagSet, mode)
+      val isDotNetECMAScript = FeatureSet.isDotNetECMAScript(dialect, flagSet)
 
       Escape(
-        allowsAlphabeticUnknownBackslash = isBoostRegex || isICU || (isJavaScript && !isUnicode) || isPerl || isRuby,
+        allowsAlphabeticUnknownBackslash =
+          isDotNetECMAScript || isBoostRegex || isICU || (isJavaScript && !isUnicode) || isPerl || isRuby,
         allowsBackslashControlCurly = isJava || isPCRE || isRuby,
         allowsBackslashXWithoutDigit = isPerl,
         allowsBrokenBackslashControl = isJavaScript && !isUnicode,
@@ -236,7 +240,7 @@ object FeatureSet:
         allowsLoosePropertyName = isPCRE || isPerl,
         allowsRawPropertyName = isDotNet || isJava || isRuby,
         allowsNegatedRawPropertyName = isRuby,
-        allowsNonOctalDigitBackslash = (isJavaScript && !isUnicode) || isPCRE || isPerl || isRuby,
+        allowsNonOctalDigitBackslash = isDotNetECMAScript || (isJavaScript && !isUnicode) || isPCRE || isPerl || isRuby,
         allowsOctalAbove0377 = isDotNet || (isPCRE && isUnicode) || isPerl || isPythonRegex,
         allowsSurrogateEscape =
           isDotNet || isBoostRegex || isICU || isJava || isJavaScript || isPerl || isPython || isPythonRegex,
@@ -246,7 +250,7 @@ object FeatureSet:
         readsUnpairedQuoteEndAsLetter = isBoostRegex || isICU,
         allowsUnknownBackslashUpperC = isICU || isJavaScript && !isUnicode,
         allowsWordUnknownBackslash =
-          isBoostRegex || isICU || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl ||
+          isDotNetECMAScript || isBoostRegex || isICU || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl ||
             isPython || isPythonRegex || isRuby,
         fallsBackBrokenBackslashToLiteral = isPythonRegex,
         hasICUProperty = isICU,
@@ -311,7 +315,7 @@ object FeatureSet:
         hasBoundaryGModifier = isJava || isPerl,
         hasBoundaryModifier = isPerl,
         hasPythonRegexProperty = isPythonRegex,
-        limitsOctalTo0377ByDigits = isJavaScript && !isUnicode,
+        limitsOctalTo0377ByDigits = isDotNetECMAScript || isJavaScript && !isUnicode,
         readsThreeOctalDigitsAsOctal = isPython || isPythonRegex,
         rejectsNonASCIIUnicodeEscape = isRuby && isByte
       )
@@ -328,6 +332,8 @@ object FeatureSet:
       allowsClassDiff: Boolean,
       // JavaScript
       allowsClassEmpty: Boolean,
+      // .NET (with `e`)
+      allowsNegatedClassEmpty: Boolean,
       // Java, JavaScript (with `v`), Ruby
       allowsClassIntersection: Boolean,
       // Java, JavaScript (with `v`), Ruby
@@ -382,6 +388,7 @@ object FeatureSet:
       import dialect.*
 
       val isUnicode = FeatureSet.isUnicode(dialect, flagSet, mode)
+      val isDotNetECMAScript = FeatureSet.isDotNetECMAScript(dialect, flagSet)
 
       CharClass(
         allowsBrokenClassRangeBegin = isDotNet || isJava || (isJavaScript && !isUnicode) || isPerl,
@@ -391,6 +398,7 @@ object FeatureSet:
             isPerl || isPython || isPythonRegex || isRuby,
         allowsClassDiff = isJavaScript && flagSet.unicodeSets,
         allowsClassEmpty = isJavaScript,
+        allowsNegatedClassEmpty = isDotNetECMAScript,
         allowsClassIntersection = isJava || isJavaScript && flagSet.unicodeSets || isRuby,
         allowsClassNest = isJava || isJavaScript && flagSet.unicodeSets || isRuby,
         allowsClassPOSIX = isBoostRegex || isPCRE || isPerl || isRuby,
@@ -619,6 +627,8 @@ object FeatureSet:
       readsBackReferenceDigitsWhileGroupExists: Boolean,
       // ICU, Java, PCRE, Perl, Ruby
       readsBackReferenceDigitsByPreviousGroups: Boolean,
+      // .NET (with `e`)
+      readsBackReferenceDigitsByOpenedGroupNumbers: Boolean,
       // ICU
       readsBackReferenceDigitsBelowGroupCount: Boolean,
       // Boost.Regex
@@ -635,6 +645,7 @@ object FeatureSet:
       import dialect.*
 
       val isUnicode = FeatureSet.isUnicode(dialect, flagSet, mode)
+      val isDotNetECMAScript = FeatureSet.isDotNetECMAScript(dialect, flagSet)
 
       Reference(
         allowsNamelessBackslashKG = isRuby,
@@ -660,6 +671,7 @@ object FeatureSet:
         hasRCall = isBoostRegex || isPCRE || isPerl || isPythonRegex,
         readsBackReferenceDigitsWhileGroupExists = isJava,
         readsBackReferenceDigitsByPreviousGroups = isICU || isJava || isPCRE || isPerl || isRuby,
+        readsBackReferenceDigitsByOpenedGroupNumbers = isDotNetECMAScript,
         readsBackReferenceDigitsBelowGroupCount = isICU,
         readsBackReferenceSingleDigit = isBoostRegex,
         rejectsInvalidBackReference = isJavaScript && isUnicode,
@@ -947,7 +959,7 @@ object FeatureSet:
       skipsCommentInQuantifier: Boolean,
       // Boost.Regex
       skipsSpaceInQuantifier: Boolean,
-      // Boost.Regex, ICU, Java, PCRE, Perl, Python, python-regex
+      // Boost.Regex, .NET, ICU, Java, PCRE, Perl, Python, python-regex
       skipsVerticalTab: Boolean,
       // ICU, PCRE, Perl
       skipsPatternWhiteSpace: Boolean,
@@ -984,7 +996,7 @@ object FeatureSet:
         skipsCommentInGroupOpening = isICU || isJava,
         skipsCommentInQuantifier = isICU || isPythonRegex,
         skipsSpaceInQuantifier = isBoostRegex,
-        skipsVerticalTab = isBoostRegex || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex,
+        skipsVerticalTab = isBoostRegex || isDotNet || isICU || isJava || isPCRE || isPerl || isPython || isPythonRegex,
         skipsPatternWhiteSpace = isICU || isPCRE || isPerl,
         skipsPythonSpace = (isBoostRegex && !isByte) || isPythonRegex,
         endsCommentAtNUL = isJava,

@@ -46,7 +46,7 @@ class ParserGroupSuite extends munit.FunSuite with ParserHelper:
   check("(?<a\u0903\u200d>a)", "", Perl())(Group(NamedCapture(Angle, "a\u0903\u200d"), Literal('a')))
   error("(?<a\u0903>a)", "", DotNet)("Invalid identifier at 4")
   error("(?<a\u00b7>a)", "", DotNet, Perl())("Invalid identifier at 4")
-  // The non-ASCII names are checked with .NET 10.0.14 and Perl 5.44.0.
+  // The non-ASCII names are checked with .NET 11.0.0 and Perl 5.44.0.
   check("(?<a\u200d>a)", "", DotNet)(Group(NamedCapture(Angle, "a\u200d"), Literal('a')))
   // U+A7CE is a letter of Unicode 17.
   check("(?<\ua7ce>a)", "", Perl())(Group(NamedCapture(Angle, "\ua7ce"), Literal('a')))

@@ -416,7 +416,7 @@ class InterpreterSuite extends munit.FunSuite:
     assertEquals(Interpreter.Status.Limit.toString, "limit")
     assertEquals(Interpreter.Status.Timeout.toString, "timeout")
 
-  // The expected results are checked on Node 26, Python 3.15, Ruby 4.0, Java 27, .NET 10, Perl 5.44 and PHP 8.5 with
+  // The expected results are checked on Node 26, Python 3.15, Ruby 4.0, Java 27, .NET 11, Perl 5.44 and PHP 8.5 with
   // PCRE2.
 
   test("Interpreter.run: atomic groups and possessive repeats"):
@@ -703,7 +703,7 @@ class InterpreterSuite extends munit.FunSuite:
     val ir = ReDoS.parse("a(?R)?", "", PCRE)
     interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(ProgramBuilder.build(ir, false))
 
-  // The expected spans are checked on Ruby 4.0, Java 27, .NET 10, Perl 5.44 and PHP 8.5 with PCRE2 10.49 without JIT.
+  // The expected spans are checked on Ruby 4.0, Java 27, .NET 11, Perl 5.44 and PHP 8.5 with PCRE2 10.49 without JIT.
 
   test("Interpreter.run: \\K"):
     check("a\\Kb", "ab", PCRE, Perl(), Ruby())(Seq(g(1, 2)))
@@ -735,7 +735,24 @@ class InterpreterSuite extends munit.FunSuite:
     check("(?:x|\\G)a", "ab", PCRE, Perl(), Ruby(), Java, DotNet)(Seq(g(0, 1)))
     check("(?:a|\\G)b", "xb", PCRE, Perl(), Ruby(), Java, DotNet)(NoMatch)
 
+  test("Interpreter.run: lazy repetitions of an empty body"):
+    // .NET 10 got these wrong, and .NET 11 fixes them (dotnet/runtime#120872).
+    check("a()+?a?", "aab", DotNet)(Seq(g(0, 2), g(1, 1)))
+    check(".()+?b", "aab", DotNet)(Seq(g(1, 3), g(2, 2)))
+    check(".(|)+?b..", "a1b{a,1}#", DotNet)(Seq(g(1, 5), g(2, 2)))
+    check("(b?)+?b?|", "aab", DotNet)(Seq(g(0, 0), g(0, 0)))
+    check("()+?a.+.|", "a1b{a,1}#", DotNet)(Seq(g(0, 9), g(0, 0)))
+    check("..|()+?.", "a", DotNet)(Seq(g(0, 1), g(0, 0)))
+    check("^(.)+()+?b", "wtfb", DotNet)(Seq(g(0, 4), g(2, 3), g(3, 3)))
+    check("(.)()+?b", "wtfb", DotNet)(Seq(g(2, 4), g(2, 3), g(3, 3)))
+    check("(?:(?:0?)+?(?:a?)+?)?", "0a", DotNet)(Seq(g(0, 2)))
+    check("(?<!a*(?:a?)+?)", "x", DotNet)(NoMatch)
+
   test("Interpreter.run: conditionals"):
+    // An inline flag in the yes branch reaches the no branch, but Ruby reads all after `(?i)` as the yes branch.
+    check("^(a)?(?(1)(?i)A|b)$", "B", PCRE, Perl(), DotNet)(Seq(g(0, 1)))
+    check("^(a)?(?(1)(?i)A|b)$", "B", Ruby())(NoMatch)
+    check("^(?(?=a)(?i)A|b)C$", "bC", PCRE, Perl(), DotNet)(Seq(g(0, 2)))
     check("^(a)?(?(1)b|c)$", "ab", PCRE, Perl(), Python(), Ruby(), DotNet)(Seq(g(0, 2), g(0, 1)))
     check("^(a)?(?(1)b|c)$", "c", PCRE, Perl(), Python(), Ruby(), DotNet)(Seq(g(0, 1)))
     check("^(a)?(?(1)b|c)$", "b", PCRE, Perl(), Python(), Ruby(), DotNet)(NoMatch)
@@ -947,7 +964,7 @@ class InterpreterSuite extends munit.FunSuite:
     check("^(?:()|a){1,2}\\1$", "a", Java, Perl(), DotNet)(Seq(g(0, 1), g(1, 1)))
     check("^(?:()|a){1,2}\\1$", "a", PCRE, Python())(Seq(g(0, 1), g(0, 0)))
     check("^(?:()|a){2,}\\1$", "a", Java, PCRE, Perl(), Python(), DotNet)(Seq(g(0, 1), g(1, 1)))
-    check("^(?:()|a)*?\\1$", "a", Java, PCRE, Perl(), Python())(Seq(g(0, 1), g(1, 1)))
+    check("^(?:()|a)*?\\1$", "a", Java, PCRE, Perl(), Python(), DotNet)(Seq(g(0, 1), g(1, 1)))
     check("^(?:()|a)+\\1$", "a", Java, PCRE, Perl(), Python(), DotNet)(Seq(g(0, 1), g(1, 1)))
     check("^(?:()|a)+\\1$", "a", JavaScript)(Seq(g(0, 1)))
     check("^(?:()|a){3}\\1$", "aa", Java, Perl())(Seq(g(0, 2), g(2, 2)))

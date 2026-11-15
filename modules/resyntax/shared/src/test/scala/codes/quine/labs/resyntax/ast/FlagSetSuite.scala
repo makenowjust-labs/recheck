@@ -25,10 +25,11 @@ class FlagSetSuite extends munit.FunSuite:
   check("a", Perl(), Python(), Ruby())(_.ascii)
   check("c", Java, Perl())(_.continue)
   check("d", Java, JavaScript, Perl(), Ruby())(_.hasIndices)
-  check("e", Perl())(_.evaluate)
+  check("e", DotNet, Perl())(_.evaluate)
+  check("eim", DotNet)(_ == FlagSet(evaluate = true, ignoreCase = true, multiline = true))
   check("g", JavaScript, Perl())(_.global)
   check("i", DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())(_.ignoreCase)
-  check("l", Perl())(_.localeLower)
+  check("l", DotNet, Perl())(_.localeLower)
   check("m", DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())(_.multiline)
   check("n", DotNet, PCRE, Perl(), Ruby())(_.explicitCapture)
   check("o", Perl(), Ruby())(_.once)
@@ -55,6 +56,10 @@ class FlagSetSuite extends munit.FunSuite:
   error(" ", DotNet, Java, JavaScript, Perl(), Python(), Ruby())("Unknown flag ' ' at 0")
   // `new RegExp('a', 'uv')` is a `SyntaxError`.
   error("uv", JavaScript)("Incompatible flags 'u' and 'v'")
+  // `new Regex("a", RegexOptions.ECMAScript | RegexOptions.Singleline)` throws `ArgumentOutOfRangeException`.
+  error("es", DotNet)("Incompatible flags 'e' and 's'")
+  error("lex", DotNet)("Incompatible flags 'e' and 'l'")
+  error("en", DotNet)("Incompatible flags 'e' and 'n'")
   // `re.compile('a', re.A | re.U)` and `re.compile(b'a', re.A | re.L)` raise `ValueError`.
   error("au", Python())("Incompatible flags 'a' and 'u'")
   error("La", Python())("Incompatible flags 'a' and 'L'")

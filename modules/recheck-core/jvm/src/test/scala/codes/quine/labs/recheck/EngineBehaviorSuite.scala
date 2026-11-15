@@ -92,26 +92,35 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     val model = options.map((flags, _) => marks(candidates, chars("\\w", flags, Dialect.Ruby())))
     assertEquals(cases(RubyExecutor, script), model)
 
-  // Checked with .NET 10.0.14.
+  // Checked with .NET 11.0.0.
   runtimeTest(".NET: the named blocks", "dotnet"):
     val names =
-      """|AlphabeticPresentationForms Arabic ArabicPresentationForms-A ArabicPresentationForms-B Armenian Arrows
-         |BasicLatin Bengali BlockElements Bopomofo BopomofoExtended BoxDrawing BraillePatterns Buhid CJKCompatibility
-         |CJKCompatibilityForms CJKCompatibilityIdeographs CJKRadicalsSupplement CJKSymbolsandPunctuation
-         |CJKUnifiedIdeographs CJKUnifiedIdeographsExtensionA Cherokee CombiningDiacriticalMarks
-         |CombiningDiacriticalMarksforSymbols CombiningHalfMarks CombiningMarksforSymbols ControlPictures CurrencySymbols
-         |Cyrillic CyrillicSupplement Devanagari Dingbats EnclosedAlphanumerics EnclosedCJKLettersandMonths Ethiopic
-         |GeneralPunctuation GeometricShapes Georgian Greek GreekExtended GreekandCoptic Gujarati Gurmukhi
-         |HalfwidthandFullwidthForms HangulCompatibilityJamo HangulJamo HangulSyllables Hanunoo Hebrew
-         |HighPrivateUseSurrogates HighSurrogates Hiragana IPAExtensions IdeographicDescriptionCharacters Kanbun
-         |KangxiRadicals Kannada Katakana KatakanaPhoneticExtensions Khmer KhmerSymbols Lao Latin-1Supplement
-         |LatinExtended-A LatinExtended-B LatinExtendedAdditional LetterlikeSymbols Limbu LowSurrogates Malayalam
-         |MathematicalOperators MiscellaneousMathematicalSymbols-A MiscellaneousMathematicalSymbols-B
-         |MiscellaneousSymbols MiscellaneousSymbolsandArrows MiscellaneousTechnical Mongolian Myanmar NumberForms Ogham
-         |OpticalCharacterRecognition Oriya PhoneticExtensions PrivateUse PrivateUseArea Runic Sinhala
-         |SmallFormVariants SpacingModifierLetters Specials SuperscriptsandSubscripts SupplementalArrows-A
-         |SupplementalArrows-B SupplementalMathematicalOperators Syriac Tagalog Tagbanwa TaiLe Tamil Telugu Thaana Thai
-         |Tibetan UnifiedCanadianAboriginalSyllabics VariationSelectors YiRadicals YiSyllables YijingHexagramSymbols
+      """|AlphabeticPresentationForms Arabic ArabicExtended-A ArabicExtended-B ArabicPresentationForms-A
+         |ArabicPresentationForms-B ArabicSupplement Armenian Arrows Balinese Bamum BasicLatin Batak Bengali
+         |BlockElements Bopomofo BopomofoExtended BoxDrawing BraillePatterns Buginese Buhid CJKCompatibility
+         |CJKCompatibilityForms CJKCompatibilityIdeographs CJKRadicalsSupplement CJKStrokes CJKSymbolsandPunctuation
+         |CJKUnifiedIdeographs CJKUnifiedIdeographsExtensionA Cham Cherokee CherokeeSupplement CombiningDiacriticalMarks
+         |CombiningDiacriticalMarksExtended CombiningDiacriticalMarksSupplement CombiningDiacriticalMarksforSymbols
+         |CombiningHalfMarks CombiningMarksforSymbols CommonIndicNumberForms ControlPictures Coptic CurrencySymbols
+         |Cyrillic CyrillicExtended-A CyrillicExtended-B CyrillicExtended-C CyrillicSupplement Devanagari
+         |DevanagariExtended Dingbats EnclosedAlphanumerics EnclosedCJKLettersandMonths Ethiopic EthiopicExtended
+         |EthiopicExtended-A EthiopicSupplement GeneralPunctuation GeometricShapes Georgian GeorgianExtended
+         |GeorgianSupplement Glagolitic Greek GreekExtended GreekandCoptic Gujarati Gurmukhi HalfwidthandFullwidthForms
+         |HangulCompatibilityJamo HangulJamo HangulJamoExtended-A HangulJamoExtended-B HangulSyllables Hanunoo Hebrew
+         |HighPrivateUseSurrogates HighSurrogates Hiragana IPAExtensions IdeographicDescriptionCharacters Javanese
+         |Kanbun KangxiRadicals Kannada Katakana KatakanaPhoneticExtensions KayahLi Khmer KhmerSymbols Lao
+         |Latin-1Supplement LatinExtended-A LatinExtended-B LatinExtended-C LatinExtended-D LatinExtended-E
+         |LatinExtendedAdditional Lepcha LetterlikeSymbols Limbu Lisu LowSurrogates Malayalam Mandaic
+         |MathematicalOperators MeeteiMayek MeeteiMayekExtensions MiscellaneousMathematicalSymbols-A
+         |MiscellaneousMathematicalSymbols-B MiscellaneousSymbols MiscellaneousSymbolsandArrows MiscellaneousTechnical
+         |ModifierToneLetters Mongolian Myanmar MyanmarExtended-A MyanmarExtended-B NKo NewTaiLue NumberForms Ogham
+         |OlChiki OpticalCharacterRecognition Oriya Phags-pa PhoneticExtensions PhoneticExtensionsSupplement PrivateUse
+         |PrivateUseArea Rejang Runic Samaritan Saurashtra Sinhala SmallFormVariants SpacingModifierLetters Specials
+         |Sundanese SundaneseSupplement SuperscriptsandSubscripts SupplementalArrows-A SupplementalArrows-B
+         |SupplementalMathematicalOperators SupplementalPunctuation SylotiNagri Syriac SyriacSupplement Tagalog Tagbanwa
+         |TaiLe TaiTham TaiViet Tamil Telugu Thaana Thai Tibetan Tifinagh UnifiedCanadianAboriginalSyllabics
+         |UnifiedCanadianAboriginalSyllabicsExtended Vai VariationSelectors VedicExtensions VerticalForms YiRadicals
+         |YiSyllables YijingHexagramSymbols
          |""".stripMargin.split("\\s+").toSeq
     val program =
       s"""|using System;
@@ -293,7 +302,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
           |""".stripMargin
     assertEquals(cases(RubyExecutor, script), extendedModel(extendedCases, "x", Dialect.Ruby()))
 
-  // Checked with .NET 10.0.14.
+  // Checked with .NET 11.0.0.
   runtimeTest(".NET: the extended mode", "dotnet"):
     val style = AttackPatternStyle.CSharp
     val runs = extendedCases.map: (source, subjects) =>
@@ -501,7 +510,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
           |""".stripMargin
     assertEquals(cases(JavaExecutor(SourceFile("Main.java", program))), openCaptureModel(all, Dialect.Java))
 
-  // Checked with .NET 10.0.14.
+  // Checked with .NET 11.0.0.
   runtimeTest(".NET: back-references in an open capture", "dotnet"):
     val style = AttackPatternStyle.CSharp
     val all = openCaptureCases ++ openCaptureBacktrackCases ++ openCaptureTestCases ++ openCaptureLookBehindCases
@@ -529,6 +538,162 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
           |}
           |""".stripMargin
     assertEquals(cases(DotNetExecutor(SourceFile("Main.cs", program))), openCaptureModel(all, Dialect.DotNet))
+
+  /** The cases of .NET's syntax and matching: the pattern, the flags and the subject. */
+  val dotNetCases: Seq[(String, String, String)] = Seq(
+    // An inline option in a branch of a conditional reaches the other branch, but not the rest.
+    ("(?(a)(?i)AB|c)", "", "ab"),
+    ("(?(a)(?i)A|b)", "", "B"),
+    ("(?(a)(?i)A|b)C", "", "ac"),
+    ("(?(a)b|(?i)C)d", "", "cD"),
+    // `l` (AnyNewLine) makes `\r\n`, `\n`, VT, FF, `\r`, U+0085, U+2028 and U+2029 line terminators for `^`, `$`, `\Z` and
+    // `.`, where no line assertion matches between `\r` and `\n`.
+    ("a$", "", "a\r"),
+    ("a$", "l", "a\r"),
+    ("a$", "l", "a\r\n"),
+    ("a$", "l", "a\u000b"),
+    ("a$", "l", "a\n\n"),
+    ("a\\r$", "l", "a\r\n"),
+    ("a\\Z", "lm", "a\u0085"),
+    ("a$", "lm", "a\r\nb"),
+    ("a\\r$", "lm", "a\r\nb"),
+    ("a$", "lm", s"a${0x2028.toChar}b"),
+    ("^b", "lm", "a\rb"),
+    ("^\\n", "lm", "a\r\n"),
+    ("^$", "lm", "a\n"),
+    ("(?m)^$", "l", "a\r"),
+    ("\\Z", "lm", "\r\n"),
+    (".", "l", "\r"),
+    (".", "l", "\u000c"),
+    (".", "ls", "\r"),
+    ("(?-s:.)", "ls", 0x2029.toChar.toString),
+    // `e` (ECMAScript) allows only `i` and `m` with it, and has classes of ASCII with `İ` in `\w`, which a class closes
+    // under `i`.
+    ("a", "es", "a"),
+    ("a", "el", "a"),
+    ("a", "eim", "A"),
+    ("^\\w$", "e", 0x130.toChar.toString),
+    ("^\\w$", "e", 0xe9.toChar.toString),
+    ("^\\w$", "ei", 0x212a.toChar.toString),
+    ("^[\\w]$", "ei", 0x212a.toChar.toString),
+    ("^[^\\w]$", "ei", 0x212a.toChar.toString),
+    ("^[\\W]$", "ei", "k"),
+    ("^\\d$", "e", 0x660.toChar.toString),
+    ("^\\s$", "e", "\u000b"),
+    ("^\\s$", "e", 0xa0.toChar.toString),
+    ("a\\b", "e", s"a${0xe9.toChar}"),
+    ("a\\B", "e", s"a${0x130.toChar}"),
+    ("\\p{L}", "e", "a"),
+    ("(?s).", "e", "\n"),
+    // `e` reads an unknown escape as the character, and `\N` by the most digits that make a group opened before it, or
+    // as an octal escape below 0o400 or the character.
+    ("\\q", "e", "q"),
+    ("\\q", "", "q"),
+    ("\\8", "e", "8"),
+    ("[\\8]", "e", "8"),
+    ("\\1(a)", "e", "\u0001a"),
+    ("(a)\\10", "e", "aa0"),
+    ("(a)\\10", "", "a\b"),
+    ("(?<n>a)\\2(b)", "e", "aab"),
+    ("(?<n>a)(b)\\2", "e", "aba"),
+    ("(a)(?<n>b)\\2(c)", "e", s"ab${2.toChar}c"),
+    ("(a)(?<n>b)\\3", "e", "abb"),
+    ("\\400", "e", " 0"),
+    ("[\\400]", "e", "0"),
+    // `e` matches a back-reference to an unset group with the empty string.
+    ("(a)|\\1b", "e", "b"),
+    ("(a)|\\1b", "", "b"),
+    ("(a\\1)", "e", "a"),
+    ("(?<x>\\k<x>a)", "e", "a"),
+    ("((a+)(\\1) ?)+", "e", "aa aaaa aaaaaa "),
+    ("((a+)(\\1) ?)+", "", "aa aaaa aaaaaa "),
+    // `e` reads `[^]` as an empty negated class, but not `[]`.
+    ("[^]", "e", "\n"),
+    ("[^]a]", "e", "\na"),
+    ("[]a]", "e", "]"),
+    ("[a-[^]]", "e", "a"),
+    // A lazy repetition whose body matches the empty string, which .NET 11 fixes (dotnet/runtime#120872).
+    (".(|)+?b..", "", "a1b{a,1}#"),
+    ("a()+?a?", "", "aab"),
+    ("(b?)+?b?|", "", "aab"),
+    ("(b?)+?b?|", "", "baaaba"),
+    ("()+?a.+.|", "", "a1b{a,1}#"),
+    ("..|()+?.", "", "a"),
+    (".()+?b", "", "aab"),
+    ("^(.)+()+?b", "", "wtfb"),
+    ("(.)()+?b", "", "wtfb"),
+    ("(?:(?:0?)+?(?:a?)+?)?", "", "0a"),
+    ("(?<!a*(?:a?)+?)", "", "x")
+  )
+
+  /** Returns recheck's results of .NET's cases: the spans of the groups of the first match, `none` or `error`. */
+  def dotNetModel(patterns: Seq[(String, String, String)]): Seq[String] =
+    patterns.map: (source, flags, subject) =>
+      try
+        val ir = ReDoS.parse(source, flags, Dialect.DotNet)
+        val result = Interpreter.run(ProgramBuilder.build(ir, false), ir.mode.decode(subject), Interpreter.Options())
+        result.captures.filter(_ => result.status == Interpreter.Status.Ok) match
+          case Some(captures) => captures.grouped(2).map(g => s"${g(0)},${g(1)}").mkString(" ")
+          case None           => "none"
+      catch case _: InvalidRegExpException => "error"
+
+  // Checked with .NET 11.0.0.
+  runtimeTest(".NET: the syntax and the matching", "dotnet"):
+    val program =
+      """|using System;
+         |using System.Text;
+         |using System.Text.RegularExpressions;
+         |
+         |static string Decode(string hex)
+         |{
+         |    var s = new StringBuilder();
+         |    if (hex == "-") return "";
+         |    for (var i = 0; i < hex.Length; i += 4) s.Append((char)Convert.ToUInt16(hex.Substring(i, 4), 16));
+         |    return s.ToString();
+         |}
+         |
+         |string flags;
+         |while ((flags = Console.ReadLine()) != null)
+         |{
+         |    var pattern = Decode(Console.ReadLine());
+         |    var subject = Decode(Console.ReadLine());
+         |    var options = RegexOptions.None;
+         |    foreach (var c in flags)
+         |    {
+         |        options |= c switch
+         |        {
+         |            'e' => RegexOptions.ECMAScript,
+         |            'i' => RegexOptions.IgnoreCase,
+         |            'l' => RegexOptions.AnyNewLine,
+         |            'm' => RegexOptions.Multiline,
+         |            'n' => RegexOptions.ExplicitCapture,
+         |            's' => RegexOptions.Singleline,
+         |            'x' => RegexOptions.IgnorePatternWhitespace,
+         |            _ => throw new ArgumentException(flags),
+         |        };
+         |    }
+         |    Match m;
+         |    try
+         |    {
+         |        m = new Regex(pattern, options).Match(subject);
+         |    }
+         |    catch (ArgumentException)
+         |    {
+         |        Console.WriteLine("case:error");
+         |        continue;
+         |    }
+         |    var spans = new string[m.Groups.Count];
+         |    for (var i = 0; i < spans.Length; i++)
+         |    {
+         |        var g = m.Groups[i];
+         |        spans[i] = g.Success ? g.Index + "," + (g.Index + g.Length) : "-1,-1";
+         |    }
+         |    Console.WriteLine("case:" + (m.Success ? string.Join(" ", spans) : "none"));
+         |}
+         |""".stripMargin
+    val input =
+      dotNetCases.map((source, flags, subject) => s"$flags\n${utf16Hex(source)}\n${utf16Hex(subject)}\n").mkString
+    assertEquals(cases(DotNetExecutor(SourceFile("Cases.cs", program)), input), dotNetModel(dotNetCases))
 
   // Checked with Ruby 4.0.9.
   runtimeTest("Ruby: back-references in an open capture", "ruby"):

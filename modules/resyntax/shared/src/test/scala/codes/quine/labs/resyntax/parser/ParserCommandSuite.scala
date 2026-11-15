@@ -82,6 +82,13 @@ class ParserCommandSuite extends munit.FunSuite with ParserHelper:
   check("(?(*nlb:a)b)", "", PCRE, Perl()):
     Command(Conditional(LookAround(NegativeLookBehind(Abbrev), Literal('a')), Literal('b')))
   check("(?(.)b)", "", DotNet)(Command(Conditional(LookAround(Dot), Literal('b'))))
+  // .NET 11 accepts inline options in the branches (dotnet/runtime#124699).
+  locally:
+    val ignoreCase = Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None)))
+    check("(?(a)(?i)AB|c)", "", DotNet):
+      Command(Conditional(LookAround(Literal('a')), Sequence(ignoreCase, Literal('A'), Literal('B')), Literal('c')))
+    check("(?(a)b|(?i)C)", "", DotNet):
+      Command(Conditional(LookAround(Literal('a')), Literal('b'), Sequence(ignoreCase, Literal('C'))))
   check("(?(?C1)(?=a)b)", "", PCRE):
     Command(
       Conditional(

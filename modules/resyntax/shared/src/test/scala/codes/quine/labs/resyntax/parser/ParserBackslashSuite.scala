@@ -75,7 +75,7 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   // Java reads `\uD83D\ uDE00` as a surrogate pair, which recheck does not reproduce.
   check("\\uD83D\\ uDE00", "x", Java):
     Sequence((Seq(Backslash(Escape(UnicodeHex4, 0xd83d)), Backslash(Unknown(' '))) ++ "uDE00".map(c => Literal(c)))*)
-  // .NET rejects an unknown escape of a character of `RegexCharClass.IsBoundaryWordChar` (checked with .NET 10.0.14).
+  // .NET rejects an unknown escape of a character of `RegexCharClass.IsBoundaryWordChar` (checked with .NET 11.0.0).
   error("\\\u0301", "", DotNet)("Invalid backslash escape at 1")
   check("\\\u2160", "", DotNet)(Backslash(Unknown(0x2160)))
   // It reads a UTF-16 unit, so a supplementary letter is not one.
@@ -552,6 +552,9 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
     check("()" * 9 + "\\10()", "", PCRE, Perl(), Ruby())(Sequence(Seq.fill(9)(empty) ++ Seq(octal10, empty)*))
     check("()" * 9 + "\\10()", "", Java)(Sequence(Seq.fill(9)(empty) ++ Seq(ref1, Literal('0'), empty)*))
     check("()" * 9 + "\\10()", "", DotNet)(Sequence(Seq.fill(9)(empty) ++ Seq(ref10, empty)*))
+    // .NET's `e` reads the most digits that make a group opened before it.
+    check("()" * 9 + "\\10()", "e", DotNet)(Sequence(Seq.fill(9)(empty) ++ Seq(ref1, Literal('0'), empty)*))
+    check("()" * 10 + "\\10", "e", DotNet)(Sequence(Seq.fill(10)(empty) :+ ref10*))
     check("()" * 9 + "(\\10)", "", DotNet, Java, PCRE, Perl(), Ruby())(
       Sequence(Seq.fill(9)(empty) :+ Group(IndexedCapture, ref10)*)
     )
@@ -589,6 +592,33 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   check("()\\89", "", Ruby())(Sequence(Group(IndexedCapture, Sequence()), Backslash(Unknown('8')), Literal('9')))
   check("\\9", "", Ruby())(Backslash(EscapeBackReference(BareBackReference, IndexedReference(9))))
   check("\\412", "", JavaScript)(Sequence(Backslash(Escape(BareOctal, 33, Some("41"))), Literal('2')))
+  // .NET's `e` reads a back-reference to no group opened before it as an octal escape, which stops below 0o400, or as
+  // the character (.NET 11.0.0).
+  check("\\1()", "e", DotNet):
+    Sequence(Backslash(Escape(BareOctal, 1, Some("1"))), Group(IndexedCapture, Sequence()))
+  // .NET numbers the named groups after the unnamed ones: `(?<n>a)\2(b)` reads `\2` as `n`, and `(a)(?<n>a)\2(c)` reads
+  // it as U+0002 before `(c)`, the second group.
+  locally:
+    val n = Group(NamedCapture(Angle, "n"), Literal('a'))
+    val ref1 = Backslash(EscapeBackReference(BareBackReference, IndexedReference(1)))
+    val ref2 = Backslash(EscapeBackReference(BareBackReference, IndexedReference(2)))
+    check("(?<n>a)\\2(b)", "e", DotNet)(Sequence(n, ref2, Group(IndexedCapture, Literal('b'))))
+    check("(a)(?<n>a)\\2(c)", "e", DotNet):
+      Sequence(
+        Group(IndexedCapture, Literal('a')),
+        n,
+        Backslash(Escape(BareOctal, 2, Some("2"))),
+        Group(IndexedCapture, Literal('c'))
+      )
+    check("(?<2>a)\\2", "e", DotNet)(Sequence(Group(NamedCapture(Angle, "2"), Literal('a')), ref2))
+    check("(a)" * 12 + "\\13", "e", DotNet):
+      Sequence(Seq.fill(12)(Group(IndexedCapture, Literal('a'))) ++ Seq(ref1, Literal('3'))*)
+  check("\\412", "e", DotNet)(Sequence(Backslash(Escape(BareOctal, 33, Some("41"))), Literal('2')))
+  check("\\8", "e", DotNet)(Backslash(Unknown('8')))
+  check("[\\8]", "e", DotNet)(Class(false, ClassBackslashValue(Unknown('8'))))
+  check("\\q", "e", DotNet)(Backslash(Unknown('q')))
+  check("\\_", "e", DotNet)(Backslash(Unknown('_')))
+  error("\\q", "", DotNet)("Invalid backslash escape at 1")
   check("()\\1", "", All*):
     Sequence(Group(IndexedCapture, Sequence()), Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))))
   check("\\1", "", DotNet, Java, PCRE, Perl(), Python(), Ruby()):

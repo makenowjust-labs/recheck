@@ -48,6 +48,16 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
   // ICU's `d` changes `$`, but not `\Z`: `(?d)a\Z` matches `a\f`.
   check("$\\Z", "d", ICU)(Sequence(Assert(ChompTextEnd(LT.LF)), Assert(ChompTextEnd(LT.ICU))))
 
+  // .NET's `l` (AnyNewLine) has the line terminators of ICU: `(?m)^` matches after the last one, and not between `\r`
+  // and `\n` (.NET 11.0.0).
+  check("^", "lm", DotNet)(Assert(LineBegin(LT.DotNetAnyNewLine, AfterTerminator)))
+  check("$", "lm", DotNet)(Assert(LineEnd(LT.DotNetAnyNewLine)))
+  check("$\\Z", "l", DotNet):
+    Sequence(Assert(ChompTextEnd(LT.DotNetAnyNewLine)), Assert(ChompTextEnd(LT.DotNetAnyNewLine)))
+  checkChars(".(?s).", "l", DotNet): _ =>
+    val terminators = CharSet.of(0x0a, 0x0b, 0x0c, 0x0d, 0x85, 0x2028, 0x2029)
+    Seq(Chars(UnitMode.UTF16.universe.diff(terminators)), Chars(UnitMode.UTF16.universe))
+
   // Boost.Regex's `^` and `$` are multi-line, and its `.` matches line terminators, unless `M` (`no_mod_m`) and `S`
   // (`no_mod_s`) turn them off; the line terminators are `\n`, `\f` and `\r`, and U+0085, U+2028 and U+2029 in
   // `u32regex`, where `\r\n` is atomic (Boost.Regex 1.92.0).

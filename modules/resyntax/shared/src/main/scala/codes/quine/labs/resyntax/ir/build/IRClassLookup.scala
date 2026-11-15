@@ -64,16 +64,17 @@ object IRClassLookup:
   /** Returns the table of the kind in the unit mode, where `perlUnicodeRules` makes Perl's `/d` use Unicode rules. */
   private[build] def from(kind: IRClassLookupKind, mode: UnitMode, perlUnicodeRules: Boolean): IRClassLookup =
     kind match
-      case IRClassLookupKind.JavaScript  => JavaScript(mode)
-      case IRClassLookupKind.Java        => Java
-      case IRClassLookupKind.DotNet      => DotNet
-      case IRClassLookupKind.PCRE        => PCRE
-      case IRClassLookupKind.Perl        => Perl(native = !perlUnicodeRules)
-      case IRClassLookupKind.Python      => Python(mode)
-      case IRClassLookupKind.PythonRegex => PythonRegex(mode)
-      case IRClassLookupKind.Ruby        => Ruby(mode)
-      case IRClassLookupKind.ICU         => ICU
-      case IRClassLookupKind.BoostRegex  => BoostRegex(mode)
+      case IRClassLookupKind.JavaScript       => JavaScript(mode)
+      case IRClassLookupKind.Java             => Java
+      case IRClassLookupKind.DotNet           => DotNet
+      case IRClassLookupKind.DotNetECMAScript => DotNetECMAScript
+      case IRClassLookupKind.PCRE             => PCRE
+      case IRClassLookupKind.Perl             => Perl(native = !perlUnicodeRules)
+      case IRClassLookupKind.Python           => Python(mode)
+      case IRClassLookupKind.PythonRegex      => PythonRegex(mode)
+      case IRClassLookupKind.Ruby             => Ruby(mode)
+      case IRClassLookupKind.ICU              => ICU
+      case IRClassLookupKind.BoostRegex       => BoostRegex(mode)
 
   private enum Rule:
 
@@ -121,6 +122,16 @@ object IRClassLookup:
     def word(flags: IRCharFlagSet): CharSet = DotNetCharClass.Word
 
     override def boundaryWord(flags: IRCharFlagSet): CharSet = DotNetCharClass.BoundaryWord
+
+  /** DotNetECMAScript is the table of .NET's `ECMAScript`, whose classes are of ASCII with `İ` in `\w` and `\b`. */
+  private[build] case object DotNetECMAScript extends IRClassLookup:
+
+    def digit(flags: IRCharFlagSet): CharSet = ASCIIDigit
+
+    def space(flags: IRCharFlagSet): CharSet = ASCIISpace
+
+    // .NET's `RegexCharClass.ECMAWordClass` and `IsECMAWordChar` have U+0130 (.NET 11.0.0).
+    def word(flags: IRCharFlagSet): CharSet = ASCIIWord.union(CharSet.single(0x130))
 
   /** PCRE is the table of PCRE, whose classes are of Unicode in UCP mode, except the ones that `a` restricts. */
   private[build] case object PCRE extends IRClassLookup:

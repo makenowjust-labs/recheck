@@ -5,7 +5,7 @@ node = "26.13.1"
 pnpm = "12.21.0"
 python = "3.15.2"
 ruby = "4.0.9"
-dotnet = "10.0.403"
+dotnet = "11.0.100"
 perl = "5.44.0.0"
 
 # The tests of icu compile programs with ICU 79.1: the prebuilt binaries on Linux (x64 only), and static libraries built
@@ -58,6 +58,9 @@ _.python.venv = { path = ".venv", create = true }
 [settings]
 # A virtual environment made by uv has no pip.
 python.venv_stdlib = true
+# mise installs every version of .NET into one shared root by default, where the dotnet host picks the newest SDK, so a
+# version installed here would switch the other checkouts on the machine to it.
+dotnet.isolated = true
 
 [tasks.python-requirements]
 description = "Install the Python packages of requirements.txt into the virtual environment"

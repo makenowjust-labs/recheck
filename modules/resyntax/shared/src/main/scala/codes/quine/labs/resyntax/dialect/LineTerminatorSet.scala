@@ -22,8 +22,12 @@ object LineTerminatorSet:
     /** Atomic means `\r\n` is one line terminator, and no line assertion matches between `\r` and `\n`. */
     case object Atomic extends CRLF
 
-  /** LF is `\n` only, used by .NET, Perl, Python, Ruby, Java with `d`, and PCRE by default. */
+  /** LF is `\n` only, used by .NET without `l`, Perl, Python, Ruby, Java with `d`, and PCRE by default. */
   val LF: LineTerminatorSet = LineTerminatorSet(Set(0x0a), CRLF.Ignored)
+
+  /** DotNetAnyNewLine is the line terminators of .NET's `RegexOptions.AnyNewLine`, which have VT and FF too. */
+  val DotNetAnyNewLine: LineTerminatorSet =
+    LineTerminatorSet(Set(0x0a, 0x0b, 0x0c, 0x0d, 0x85, 0x2028, 0x2029), CRLF.Atomic)
 
   /** CR is `\r` only, used by PCRE with `(*CR)`. */
   val CR: LineTerminatorSet = LineTerminatorSet(Set(0x0d), CRLF.Ignored)

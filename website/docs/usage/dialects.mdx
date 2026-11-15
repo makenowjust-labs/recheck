@@ -68,7 +68,7 @@ The ESLint plugin (`eslint-plugin-redos`) checks JavaScript regular expressions 
 | [`python-regex`](dialects/python-regex.mdx) | Python's `regex` package 2026.9.29             | `code-point` (`str`), or `byte` (`bytes`)          |
 | [`ruby`](dialects/ruby.mdx)                 | Ruby 4.0 `Regexp` (Onigmo)                     | `scalar-value` (`UTF-8`), or `byte` (`ASCII-8BIT`) |
 | [`java`](dialects/java.mdx)                 | Java 27 `java.util.regex.Pattern`              | `utf16-code-point`                                 |
-| [`dotnet`](dialects/dotnet.mdx)             | .NET 10 `System.Text.RegularExpressions.Regex` | `utf16`                                            |
+| [`dotnet`](dialects/dotnet.mdx)             | .NET 11 `System.Text.RegularExpressions.Regex` | `utf16`                                            |
 | [`perl`](dialects/perl.mdx)                 | Perl 5.44 regular expressions                  | `code-point` (`utf8`), or `byte` (no `utf8`)       |
 | [`pcre`](dialects/pcre.mdx)                 | PCRE2 10.49 as PHP's `preg_*` functions use it | `byte`, or `scalar-value` with `u` or `(*UTF)`     |
 | [`icu`](dialects/icu.mdx)                   | ICU4C 79.1 regular expressions                 | `utf16-code-point`                                 |
@@ -128,7 +128,7 @@ Most engines have optimizations that make some vulnerable patterns fast, and `re
 The following is what we measured with `^(a|a)*$` against `'a'.repeat(n) + '!'`.
 
 - V8 (Node.js 26), Python 3.15 and ICU 79.1 take exponential time: about 1 to 2 seconds for `n = 24`.
-- Ruby 4.0, Java 27, .NET 10 and Perl 5.44 finish in less than 1 ms even for `n = 28`.
+- Ruby 4.0, Java 27, .NET 11 and Perl 5.44 finish in less than 1 ms even for `n = 28`.
 - PHP 8.5 (PCRE2 10.49 with the default `pcre.backtrack_limit`) gives up with the backtrack limit error for `n = 20`.
 - Boost.Regex 1.92.0 gives up with its complexity limit (`error_complexity`) for `n = 15`.
 
