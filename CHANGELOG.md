@@ -16,6 +16,7 @@ New Features:
 - [#2007](https://github.com/makenowjust-labs/recheck/pull/2007) Add the parameters of the constants of the fuzz checker and of the memoization ([@makenowjust](https://github.com/makenowjust))
 - [#2008](https://github.com/makenowjust-labs/recheck/pull/2008) Add the alphabetRepresentative and attackStringCharacteristics parameters ([@makenowjust](https://github.com/makenowjust))
 - [#2009](https://github.com/makenowjust-labs/recheck/pull/2009) Look for another attack with the fuzz checker when every attack of the automaton checker is refuted ([@makenowjust](https://github.com/makenowjust))
+- [#2019](https://github.com/makenowjust-labs/recheck/pull/2019) Add the python-regex, icu and boost-regex dialects ([@makenowjust](https://github.com/makenowjust))
 
 Fixes:
 
