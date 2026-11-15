@@ -13,11 +13,14 @@
 # - `x-cli`: the long option name of the CLI, and `x-cli-metavar` its metavar when it differs from the title.
 # - `x-exclude`: the targets not exposing the parameter (`cli`, `eslint-plugin`, `playground`).
 # - `x-since`: the first release having the parameter, so that the Playground hides it on older releases.
+#   A release (e.g. `5.0.0`) includes its prereleases, and a prerelease (e.g. `5.0.0-beta.2`) does not include the earlier
+#   ones.
 # - `x-scala-default`: the Scala value of the default when `x-scala-values` does not give it.
 #
 # Annotations of the variants of `dialect` with settings, and of their settings:
 #
 # - `title`: the name of the dialect in the Playground (e.g. `.NET` for `dotnet`).
+# - `x-since`: the first release having the dialect, if it is later than the `dialect` parameter, as `x-since` above.
 # - `x-scala-type`: the Scala type of the variant (e.g. `Dialect.Python`), or of the setting, which is `Boolean` or an enum
 #   whose companion has `of(name)` (e.g. `Dialect.Python.Type`).
 # - `x-cli-help`: the help of the CLI option of the setting, which is `--<dialect>-<setting>`.
@@ -234,6 +237,7 @@ properties:
         required: ["name"]
         additionalProperties: false
         x-scala-type: "Dialect.PythonRegex"
+        x-since: "5.0.0-beta.2"
       - type: object
         title: "Ruby"
         properties:
@@ -272,6 +276,7 @@ properties:
           name: { const: "icu" }
         required: ["name"]
         additionalProperties: false
+        x-since: "5.0.0-beta.2"
       - type: object
         title: "Boost.Regex"
         properties:
@@ -285,6 +290,7 @@ properties:
         required: ["name"]
         additionalProperties: false
         x-scala-type: "Dialect.BoostRegex"
+        x-since: "5.0.0-beta.2"
     default: "javascript"
     x-scala-type: "Dialect"
     x-typescript-type: "DialectParameter"

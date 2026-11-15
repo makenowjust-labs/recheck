@@ -7,7 +7,7 @@ import Select from '../form/Select';
 import TextArea from '../form/TextArea';
 import { formatBuild } from './builds';
 import styles from './Demo.module.css';
-import { DEFAULT_DIALECT, DIALECT_TITLES, dialectOf, paramsOf, selectValues, titleOf } from './params';
+import { DEFAULT_DIALECT, DIALECT_TITLES, dialectOf, dialectsOf, paramsOf, selectValues, titleOf } from './params';
 
 import type { Build } from './builds';
 import type { Param } from './params';
@@ -63,10 +63,20 @@ const DemoParams: React.FC<{ build: Build }> = ({ build }) => {
 };
 
 const DemoDialect: React.FC<{ build: Build; disabled: boolean }> = ({ build, disabled }) => {
-  const { watch } = useFormContext();
+  const { watch, setValue } = useFormContext();
+  const selected = watch('dialect');
+  const dialects = dialectsOf(build);
+
+  // A dialect that the build does not have is replaced with the default one.
+  React.useEffect(() => {
+    if (selected !== undefined && !dialects.includes(String(selected))) {
+      setValue('dialect', DEFAULT_DIALECT);
+    }
+  }, [selected, dialects.join()]);
+
   const param = paramsOf(build).find(({ name }) => name === 'dialect');
   if (param === undefined) return null;
-  const dialect = String(watch('dialect') ?? param.defaultValue);
+  const dialect = dialectOf({ dialect: selected }, build);
   return (
     <div className={`margin-top--sm ${styles.dialect}`}>
       <label htmlFor="dialect">{param.title}</label>
@@ -74,7 +84,7 @@ const DemoDialect: React.FC<{ build: Build; disabled: boolean }> = ({ build, dis
         <Select
           id="dialect"
           name="dialect"
-          values={selectValues(param, DEFAULT_DIALECT)}
+          values={dialects}
           labels={DIALECT_TITLES}
           defaultValue={String(param.defaultValue)}
           disabled={disabled}

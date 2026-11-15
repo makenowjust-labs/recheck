@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { expect, test as base } from "@playwright/test";
 
-import { parseParams } from "../src/components/Demo/params";
+import { dialectsOf, parseParams } from "../src/components/Demo/params";
 import { encode } from "../src/components/Demo/permalink";
 
 import type { Page } from "@playwright/test";
@@ -130,6 +130,56 @@ test("reports a release that cannot be loaded", async ({ page }) => {
     /^Failed to load recheck v/,
   );
   await expect(resultTitles(page)).toHaveCount(0);
+});
+
+test("reports a check that fails", async ({ page }) => {
+  await page.route(CDN_MODULE, (route) =>
+    route.fulfill({
+      body: 'export const check = async () => { throw new Error("broken"); };',
+      contentType: "text/javascript",
+      headers: { "access-control-allow-origin": "*" },
+    }),
+  );
+  await open(page);
+  await check(page);
+  await expect(page.locator(".alert--danger")).toContainText(
+    /^Failed to check with recheck v.*: broken$/,
+  );
+  await expect(resultTitles(page)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Check" })).toBeEnabled();
+});
+
+test("offers the dialects of the selected build", async ({ page }) => {
+  await open(page);
+  const version = page.getByLabel("recheck version");
+  const labels = await version.locator("option").allTextContents();
+  const dialect = page.locator('select[name="dialect"]');
+
+  await version.selectOption(labels.at(-1)!);
+  await dialect.selectOption("icu");
+  await expect(dialect).toHaveValue("icu");
+
+  // A release without a dialect neither offers it nor keeps it selected.
+  for (const label of labels.slice(0, -1)) {
+    const build: Build = { type: "release", version: label.slice(1) };
+    await version.selectOption(label);
+    const expected = dialectsOf(build);
+    if (expected.length === 1) {
+      await expect(dialect).toHaveCount(0);
+      continue;
+    }
+    await expect(dialect.locator("option")).toHaveCount(expected.length);
+    expect(
+      await dialect
+        .locator("option")
+        .evaluateAll((options) =>
+          options.map((option) => (option as HTMLOptionElement).value),
+        ),
+    ).toEqual(expected);
+    if (!expected.includes("icu")) {
+      await expect(dialect).toHaveValue("javascript");
+    }
+  }
 });
 
 test("shows the parameters of the selected dialect", async ({ page }) => {

@@ -12,6 +12,8 @@ import { decode, encode, makeSnapshot, sameRequest, summarize } from './permalin
 import type { Diagnostics } from 'recheck';
 import type { InvalidInput, Snapshot } from './permalink';
 
+const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
 const Demo: React.FC = () => {
   const { siteConfig } = useDocusaurusContext();
   const builds = React.useMemo(() => availableBuilds(siteConfig.customFields ?? {}), [siteConfig.customFields]);
@@ -22,7 +24,7 @@ const Demo: React.FC = () => {
   const [current, setCurrent] = React.useState<Snapshot | null>(null);
   const [log, setLog] = React.useState<string[]>([]);
   const [recorded, setRecorded] = React.useState<Snapshot | null>(null);
-  const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
   const abortControllerRef = React.useRef<AbortController | null>(null);
 
   const build = findBuild(builds, String(methods.watch('version'))) ?? defaultBuild;
@@ -40,7 +42,7 @@ const Demo: React.FC = () => {
     setRunning(true);
     setCurrent(null);
     setLog([]);
-    setLoadError(null);
+    setError(null);
 
     const input = String(values['input']);
     const build = findBuild(builds, String(values['version'])) ?? defaultBuild;
@@ -55,7 +57,7 @@ const Demo: React.FC = () => {
     try {
       checker = await loadChecker(build);
     } catch (error) {
-      setLoadError(`Failed to load recheck ${formatBuild(build)}: ${error instanceof Error ? error.message : error}`);
+      setError(`Failed to load recheck ${formatBuild(build)}: ${messageOf(error)}`);
       setRunning(false);
       return;
     }
@@ -68,18 +70,25 @@ const Demo: React.FC = () => {
       const { logger, ...checkParams } = params;
       const controller = new AbortController();
       abortControllerRef.current = controller;
-      result = await checker.check(extracted.source, extracted.flags, {
-        ...checkParams,
-        logger:
-          logger === 'on'
-            ? (message: string) => {
-                console.log(message);
-                setLog((log) => log.concat(message));
-              }
-            : undefined,
-        signal: controller.signal,
-      });
-      abortControllerRef.current = null;
+      try {
+        result = await checker.check(extracted.source, extracted.flags, {
+          ...checkParams,
+          logger:
+            logger === 'on'
+              ? (message: string) => {
+                  console.log(message);
+                  setLog((log) => log.concat(message));
+                }
+              : undefined,
+          signal: controller.signal,
+        });
+      } catch (error) {
+        setError(`Failed to check with recheck ${formatBuild(build)}: ${messageOf(error)}`);
+        setRunning(false);
+        return;
+      } finally {
+        abortControllerRef.current = null;
+      }
     }
 
     const snapshot = makeSnapshot({
@@ -111,9 +120,9 @@ const Demo: React.FC = () => {
           </div>
         ) : null}
 
-        {loadError !== null ? (
+        {error !== null ? (
           <div className="alert alert--danger margin-vert--lg" role="alert">
-            {loadError}
+            {error}
           </div>
         ) : null}
 

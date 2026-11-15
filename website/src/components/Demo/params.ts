@@ -1,5 +1,5 @@
 import type { Parameters } from "recheck";
-import type { Property, Setting } from "recheck-parameters";
+import type { Property, Setting, Variant } from "recheck-parameters";
 
 import { propertiesFor } from "recheck-parameters";
 
@@ -143,20 +143,32 @@ export const params: Param[] = [...schemaParams, loggerParam]
 /** The default dialect, which is the only one of the builds without the `dialect` parameter. */
 export const DEFAULT_DIALECT = "javascript";
 
+/** The variants of `dialect` by their names. */
+const DIALECT_VARIANTS: [string, Variant][] = propertiesFor("playground")
+  .flatMap(([name, property]) =>
+    name === "dialect" ? (property.oneOf ?? []) : [],
+  )
+  .flatMap((variant): [string, Variant][] => {
+    const name = variant.properties?.["name"]?.const;
+    return name === undefined ? [] : [[name, variant]];
+  });
+
 /** The names of the dialects to show, by their values (e.g. `.NET` for `dotnet`). */
 export const DIALECT_TITLES: Record<string, string> = Object.fromEntries(
-  propertiesFor("playground")
-    .flatMap(([name, property]) =>
-      name === "dialect" ? (property.oneOf ?? []) : [],
-    )
-    .flatMap(({ title, properties }) => {
-      const name = properties?.["name"]?.const;
-      if (name === undefined) return [];
-      /* v8 ignore next -- Every variant of `dialect` in the schema has a title. */
-      if (title === undefined)
-        throw new Error(`The dialect ${name} has no title`);
-      return [[name, title]];
-    }),
+  DIALECT_VARIANTS.map(([name, { title }]) => {
+    /* v8 ignore next -- Every variant of `dialect` in the schema has a title. */
+    if (title === undefined)
+      throw new Error(`The dialect ${name} has no title`);
+    return [name, title];
+  }),
+);
+
+/** The first release having each dialect that is later than the `dialect` parameter. */
+const DIALECT_SINCE: Record<string, string> = Object.fromEntries(
+  DIALECT_VARIANTS.flatMap(([name, variant]) => {
+    const since = variant["x-since"];
+    return since === undefined ? [] : [[name, since]];
+  }),
 );
 
 export const paramsOf = (
@@ -169,6 +181,16 @@ export const paramsOf = (
       (dialects === null || dialects.includes(dialect)),
   );
 
+/** The dialects that the build has, in the schema order. */
+export const dialectsOf = (build: Build): string[] => {
+  const param = paramsOf(build).find(({ name }) => name === "dialect");
+  if (param === undefined) return [DEFAULT_DIALECT];
+  return selectValues(param, DEFAULT_DIALECT).filter((name) => {
+    const since = DIALECT_SINCE[name];
+    return since === undefined || isAtLeast(build, since);
+  });
+};
+
 export const selectValues = (param: Param, dialect: string): string[] => {
   const { type } = param;
   if (type === "boolean") return BOOLEAN_VALUES;
@@ -180,14 +202,14 @@ export const selectValues = (param: Param, dialect: string): string[] => {
 export const titleOf = (param: Param, dialect: string): string =>
   param.titleByDialect?.[dialect] ?? param.title;
 
-/** The dialect of the form values, or the default one if the build does not have the `dialect` parameter. */
+/** The dialect of the form values, or the default one if the build does not have it. */
 export const dialectOf = (
   values: Record<string, unknown>,
   build: Build,
-): string =>
-  paramsOf(build).some(({ name }) => name === "dialect")
-    ? String(values["dialect"] ?? DEFAULT_DIALECT)
-    : DEFAULT_DIALECT;
+): string => {
+  const dialect = String(values["dialect"] ?? DEFAULT_DIALECT);
+  return dialectsOf(build).includes(dialect) ? dialect : DEFAULT_DIALECT;
+};
 
 // `logger` is a Playground option rather than a `recheck` parameter.
 export type CheckParams = Parameters & { logger: "on" | "off" };

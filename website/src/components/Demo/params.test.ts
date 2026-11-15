@@ -1,5 +1,7 @@
 import {
   DIALECT_TITLES,
+  dialectOf,
+  dialectsOf,
   extract,
   formValues,
   params,
@@ -117,6 +119,37 @@ describe("paramsOf", () => {
       perl,
     );
     expect(paramsOf(dev, "perl")).toEqual(perl);
+  });
+
+  test("hides the dialects newer than the release", () => {
+    const beta1: Build = { type: "release", version: "5.0.0-beta.1" };
+    const newer = ["python-regex", "icu", "boost-regex"];
+    expect(dialectsOf(beta1)).toEqual([
+      "javascript",
+      "java",
+      "dotnet",
+      "pcre",
+      "python",
+      "ruby",
+      "perl",
+    ]);
+    for (const build of [
+      { type: "release", version: "5.0.0-beta.2" },
+      { type: "release", version: "5.0.0" },
+      dev,
+    ] satisfies Build[]) {
+      expect(dialectsOf(build)).toEqual(expect.arrayContaining(newer));
+    }
+    expect(dialectsOf({ type: "release", version: "4.6.2" })).toEqual([
+      "javascript",
+    ]);
+    // A dialect that the build does not have falls back to the default one.
+    expect(dialectOf({ dialect: "icu" }, beta1)).toBe("javascript");
+    expect(dialectOf({ dialect: "icu" }, dev)).toBe("icu");
+    expect(
+      parseParams({ dialect: "boost-regex", dialectType: "u32regex" }, beta1)
+        .dialect,
+    ).toEqual({ name: "javascript" });
   });
 
   test("hides the parameters of the other dialects", () => {
