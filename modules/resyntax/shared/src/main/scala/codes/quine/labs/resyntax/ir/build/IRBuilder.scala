@@ -95,7 +95,7 @@ object IRBuilder:
       featureSet.anchored,
       featureSet.longestMatch,
       mode,
-      notEmpty(starts)
+      featureSet.notEmpty
     )
 
   /** Returns the node without what only its source has: the blanks of the extended mode are removed, Ruby's `\u{...}`
@@ -397,11 +397,6 @@ object IRBuilder:
         case _                                            => false
       .collect { case NodeData.Command(CommandKind.StartOption(name, _)) => name }
       .toSeq
-
-  private def notEmpty(startOptions: Seq[String]): IRNotEmpty =
-    if startOptions.contains("NOTEMPTY") then IRNotEmpty.Anywhere
-    else if startOptions.contains("NOTEMPTY_ATSTART") then IRNotEmpty.AtStart
-    else IRNotEmpty.Never
 
   private def hasCall(node: Node): Boolean =
     NodeKey.exists(node):

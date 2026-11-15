@@ -14,6 +14,10 @@ final case class FlagSet(
     anchored: Boolean = false,
     // `D` (PCRE)
     dollarEndOnly: Boolean = false,
+    // `E` (Boost.Regex)
+    notEmpty: Boolean = false,
+    // `I` (Boost.Regex)
+    notEmptyAtStart: Boolean = false,
     // `J` (PCRE)
     dupNames: Boolean = false,
     // `L` (Python, python-regex)
@@ -93,6 +97,8 @@ final case class FlagSet(
     Seq(
       anchored -> "A",
       dollarEndOnly -> "D",
+      notEmpty -> "E",
+      notEmptyAtStart -> "I",
       dupNames -> "J",
       localeUpper -> "L",
       noMultiline -> "M",
@@ -177,6 +183,12 @@ object FlagSet:
       case 'D' =>
         validateFlag(dialect.isPCRE)
         flagSet.copy(dollarEndOnly = true)
+      case 'E' =>
+        validateFlag(isBoostRegex)
+        flagSet.copy(notEmpty = true)
+      case 'I' =>
+        validateFlag(isBoostRegex)
+        flagSet.copy(notEmptyAtStart = true)
       case 'J' =>
         validateFlag(dialect.isPCRE)
         flagSet.copy(dupNames = true)

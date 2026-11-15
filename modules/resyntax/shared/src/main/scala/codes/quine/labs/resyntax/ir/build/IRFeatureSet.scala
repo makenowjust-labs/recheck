@@ -199,6 +199,8 @@ final case class IRFeatureSet(
     anchored: Boolean,
     // Boost.Regex (with `p`), python-regex (with `p`)
     longestMatch: Boolean,
+    // Boost.Regex (with `E`): Anywhere, Boost.Regex (with `I`): AtStart, PCRE (with `(*NOTEMPTY)`): Anywhere, PCRE (with `(*NOTEMPTY_ATSTART)`): AtStart, the others: Never
+    notEmpty: IRNotEmpty,
     // PCRE (with `(*UCP)`)
     ucp: Boolean,
     // PCRE (with `(*CASELESS_RESTRICT)`)
@@ -662,6 +664,11 @@ object IRFeatureSet:
       validatesCharName = isICU || isJava || isPython || isPythonRegex,
       anchored = isJavaScript && flagSet.sticky || isPCRE && flagSet.anchored,
       longestMatch = (isBoostRegex || isPythonRegex) && flagSet.preserve,
+      notEmpty =
+        if isBoostRegex && flagSet.notEmpty || isPCRE && startOptions.contains("NOTEMPTY") then IRNotEmpty.Anywhere
+        else if isBoostRegex && flagSet.notEmptyAtStart || isPCRE && startOptions.contains("NOTEMPTY_ATSTART") then
+          IRNotEmpty.AtStart
+        else IRNotEmpty.Never,
       ucp = isPCRE && startOptions.contains("UCP"),
       caselessRestrict = isPCRE && startOptions.contains("CASELESS_RESTRICT"),
       turkishCasing = isPCRE && startOptions.contains("TURKISH_CASING"),

@@ -627,6 +627,11 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("(*PRUNE)", "", BoostRegex())(
     Unsupported(NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Prune), None)))
   )
+  // `E` (`match_not_null`) rejects an empty match, and `I` (`match_not_initial_null`) one at the start.
+  checkPattern("a", "E", BoostRegex())(pattern => assertEquals(pattern.notEmpty, IRNotEmpty.Anywhere))
+  checkPattern("a", "I", BoostRegex())(pattern => assertEquals(pattern.notEmpty, IRNotEmpty.AtStart))
+  checkPattern("a", "EI", BoostRegex())(pattern => assertEquals(pattern.notEmpty, IRNotEmpty.Anywhere))
+  checkPattern("a", "", BoostRegex())(pattern => assertEquals(pattern.notEmpty, IRNotEmpty.Never))
   check("(a)(?(1)b)", "", BoostRegex())(
     Sequence(
       Capture(1, None, char('a')),

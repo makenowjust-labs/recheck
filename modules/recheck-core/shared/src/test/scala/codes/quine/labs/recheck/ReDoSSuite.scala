@@ -372,6 +372,15 @@ class ReDoSSuite extends munit.FunSuite:
       Checker.Automaton
     )
     assertSafe(check("(?:|(?:a|a)*c)", PCRE), Checker.Automaton)
+    // Boost.Regex's `E` (`match_not_null`) and `I` (`match_not_initial_null`) are the same, which reach the complexity
+    // limit at n = 14.
+    for flags <- Seq("E", "I") do
+      assertVulnerable(
+        check("(?:|(?:a|a)*c)", BoostRegex(), flags),
+        AttackComplexity.Exponential(false),
+        Checker.Automaton
+      )
+    assertSafe(check("(?:|(?:a|a)*c)", BoostRegex()), Checker.Automaton)
 
   test("ReDoS.check: longest match"):
     // python-regex's `p` tries every path at the start position, which doubles for each `a` even on a match (2.9 s at
