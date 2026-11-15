@@ -170,10 +170,12 @@ class PlatformSuite extends munit.FunSuite:
 
   test("Platform.compile: timeout"):
     val program = SourceFile("Main.sh", s"# ${System.nanoTime()}")
-    def compile(version: String, compile: String): String =
+    def compile(version: String, compile: String, timeout: Duration = 200.millis): String =
       val args = (s: String, o: String) => Seq("-c", compile, "sh", s, o)
-      Platform.compile("sh", None, program, Seq(Seq("-c", version)), args, identity, Map.empty, 200.millis)
+      Platform.compile("sh", None, program, Seq(Seq("-c", version)), args, identity, Map.empty, timeout)
 
+    // The version of `echo 1.0` is printed once in this process, so that the timeouts below come after it.
+    intercept[UnexpectedException](compile("echo 1.0", "exit 1", 1.minute))
     // The command printing the version and the compilation are killed at the timeout.
     interceptMessage[UnexpectedException]("cannot run `sh -c sleep 5`: timed out")(compile("sleep 5", "true"))
     interceptMessage[UnexpectedException]("cannot compile `sh -c sleep 5 sh Main.sh Main`: timed out"):
