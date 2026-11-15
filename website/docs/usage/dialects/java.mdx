@@ -93,10 +93,12 @@ The `Pattern` flag `LITERAL` has no flag letter, so it cannot be given (`Pattern
 
 ## Runtime-Attack Verification
 
-- Command: `java --source 17 <file>.java`.
+- Command: `java -m jdk.compiler/com.sun.tools.javac.Main --release 17 -d <dir> <file>.java` once, and then `java -cp <dir> <class>`.
 - Matching: `Matcher#find`.
 - Engine limits: none.
 - Engine errors: `StackOverflowError`, `OutOfMemoryError`.
 - Environment variable: `RECHECK_JAVA`.
 
-`java` runs the program as a single-file source-code program, which needs a JDK 17 or later.
+`java` compiles the program with `javac` of the JDK, so it needs a JDK 17 or later, not only a JRE.
+`RECHECK_JAVA` replaces `java` in both commands, so that the same JDK compiles and runs the program.
+`recheck` compiles the program once for each command line and version of `java`, and the next runs reuse the compiled program.

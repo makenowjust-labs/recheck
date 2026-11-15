@@ -86,15 +86,18 @@ The `attack` field also has these fields.
 - `pattern` is an expression that evaluates to the actual string in the host language of the [dialect](dialects.mdx).
   The attack string of `/^(a|a)*$/` looks like the following.
 
-  | Dialect      | Language   | `attack.pattern`                                                                  |
-  | ------------ | ---------- | --------------------------------------------------------------------------------- |
-  | `javascript` | JavaScript | `'a'.repeat(31) + 'あ'`                                                           |
-  | `python`     | Python     | `'a' * 31 + 'あ'`, or `b'a' * 31 + b'!'` for `bytes`                              |
-  | `ruby`       | Ruby       | `"a" + "a" * 31 + "あ\n\n"`, or `"a".b + "a".b * 31 + "!\n\n".b` for `ASCII-8BIT` |
-  | `java`       | Java       | `"a".repeat(31) + "あ"`                                                           |
-  | `dotnet`     | C#         | `string.Concat(Enumerable.Repeat("a", 31)) + "あ"` (`System.Linq`)                |
-  | `perl`       | Perl       | `"a" x 31 . "\x{3042}"`                                                           |
-  | `pcre`       | PHP        | `str_repeat('a', 31) . '!'`                                                       |
+  | Dialect        | Language   | `attack.pattern`                                                                        |
+  | -------------- | ---------- | --------------------------------------------------------------------------------------- |
+  | `javascript`   | JavaScript | `'a'.repeat(31) + 'あ'`                                                                 |
+  | `python`       | Python     | `'a' * 31 + 'あ'`, or `b'a' * 31 + b'!'` for `bytes`                                    |
+  | `python-regex` | Python     | `'a' * 31 + 'あ'`, or `b'a' * 31 + b'!'` for `bytes`                                    |
+  | `ruby`         | Ruby       | `"a" + "a" * 31 + "あ\n\n"`, or `"a".b + "a".b * 31 + "!\n\n".b` for `ASCII-8BIT`       |
+  | `java`         | Java       | `"a".repeat(31) + "あ"`                                                                 |
+  | `dotnet`       | C#         | `string.Concat(Enumerable.Repeat("a", 31)) + "あ"` (`System.Linq`)                      |
+  | `perl`         | Perl       | `"a" x 31 . "\x{3042}"`                                                                 |
+  | `pcre`         | PHP        | `str_repeat('a', 31) . '!'`                                                             |
+  | `icu`          | Java       | `"a".repeat(31) + "あ"`                                                                 |
+  | `boost-regex`  | Python     | `b'a' + b'a' * 31 + b'!\r'` for `char`, or `'a' + 'a' * 31 + 'あ\u2028'` for `u32regex` |
 
   The character that stands for a set of characters (here `あ` for the characters other than `a`) follows the [`alphabetRepresentative`](parameters.mdx#alphabetrepresentative) parameter.
 

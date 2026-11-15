@@ -9,7 +9,8 @@
     {
       "description": "An update of a runtime that recheck checks against needs the checked versions in the tests and the docs updated too.",
       "matchManagers": [
-        "mise"
+        "mise",
+        "pip_requirements"
       ],
       "matchDepNames": [
         "java",
@@ -17,7 +18,8 @@
         "python",
         "ruby",
         "dotnet",
-        "perl"
+        "perl",
+        "regex"
       ],
       "automerge": false
     },

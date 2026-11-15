@@ -66,7 +66,14 @@ object ReDoS:
 
     try
       val ir = parse(source, flags, params.dialect)
-      val verify = runRuntimeAttack(source, flags, params.dialect, ir.mode, params.runtimeAttackTimeout)
+      val verify = runRuntimeAttack(
+        source,
+        flags,
+        params.dialect,
+        ir.mode,
+        params.runtimeAttackTimeout,
+        params.runtimeAttackCompileTimeout
+      )
       diagnose(source, flags, ir, params, verify)
     catch case ex: ReDoSException => Diagnostics.Unknown.from(source, flags, params.dialect, None, Seq.empty, ex)
 
@@ -448,11 +455,15 @@ object ReDoS:
       flags: String,
       dialect: Dialect,
       mode: UnitMode,
-      timeout: Duration
+      timeout: Duration,
+      compileTimeout: Duration
   )(
       d: Diagnostics.Vulnerable
   )(using ctx: Context): Diagnostics.Vulnerable =
-    try d.copy(runtimeAttack = RuntimeAttackVerifier.verify(source, flags, dialect, mode, d.attack, timeout, sys.env))
+    try
+      val runtimeAttack =
+        RuntimeAttackVerifier.verify(source, flags, dialect, mode, d.attack, timeout, compileTimeout, sys.env)
+      d.copy(runtimeAttack = runtimeAttack)
     catch
       case ex: ReDoSException =>
         ex.checker = Some(d.checker)

@@ -92,6 +92,8 @@ jobs:
       - uses: ./.github/actions/mise
       - name: Generate the locales of the tests
         run: sudo locale-gen en_US en_US.UTF-8 tr_TR.UTF-8
+      - name: Install the Python packages of requirements.txt
+        run: mise run python-requirements
       - uses: ./.github/actions/sbt-cache
       - name: Test
         run: sbt "coverage; test; coverageAggregate"

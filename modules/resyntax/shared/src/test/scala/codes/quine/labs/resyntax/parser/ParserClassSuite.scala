@@ -475,3 +475,262 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
   check("[a\\Eb]", "", PCRE)(
     Class(false, ClassUnion(ClassLiteral('a'), ClassCaseCommand(CaseCommandKind.EndCaseCommand), ClassLiteral('b')))
   )
+
+  // python-regex's classes (`parse_set` of `_regex_core.py`), whose `V1` has the set operators and nested classes.
+  check("[a-\\d]", "", PythonRegex()):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassBackslashClass(Digit)))
+  check("[\\d-z]", "", PythonRegex()):
+    Class(false, ClassUnion(ClassBackslashClass(Digit), ClassLiteral('-'), ClassLiteral('z')))
+  check("[a-]", "", PythonRegex())(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'))))
+  check("[]a]", "", PythonRegex())(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  check("[^]a]", "", PythonRegex())(Class(true, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  check("[a-a]", "", PythonRegex())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('a'))))
+  error("[z-a]", "", PythonRegex())("Out of order class range at 1")
+  error("[]", "", PythonRegex())("Unclosed ']' at 2")
+  error("[a", "", PythonRegex())("Unclosed ']' at 2")
+  check("[ ^a]", "x", PythonRegex())(Class(false, ClassUnion(ClassLiteral(' '), ClassLiteral('^'), ClassLiteral('a'))))
+  check("[[:alpha:]]", "", PythonRegex())(Class(false, ClassPOSIX(false, "alpha")))
+  check("[[:^Lu:]]", "", PythonRegex())(Class(false, ClassPOSIX(true, "Lu")))
+  check("[[:sc=Latin:]]", "", PythonRegex())(Class(false, ClassPOSIX(false, "sc=Latin")))
+  check("[[:alpha]]", "", PythonRegex()):
+    Sequence(Class(false, ClassUnion("[:alpha".map(c => ClassLiteral(c))*)), Literal(']'))
+  check("[[a]]", "", PythonRegex())(
+    Sequence(Class(false, ClassUnion(ClassLiteral('['), ClassLiteral('a'))), Literal(']'))
+  )
+  error("[a--b]", "", PythonRegex())("Out of order class range at 1")
+  check("[a-z--aeiou]", "V1", PythonRegex()):
+    Class(
+      false,
+      ClassDiff(ClassRange(ClassLiteral('a'), ClassLiteral('z')), ClassUnion("aeiou".map(c => ClassLiteral(c))*))
+    )
+  check("[ab||cd]", "V1", PythonRegex()):
+    Class(
+      false,
+      ClassExplicitUnion(
+        ClassUnion(ClassLiteral('a'), ClassLiteral('b')),
+        ClassUnion(ClassLiteral('c'), ClassLiteral('d'))
+      )
+    )
+  check("[a~~b]", "V1", PythonRegex())(Class(false, ClassSymmetricDiff(ClassLiteral('a'), ClassLiteral('b'))))
+  check("[a&&b||c]", "V1", PythonRegex()):
+    Class(false, ClassExplicitUnion(ClassIntersection(ClassLiteral('a'), ClassLiteral('b')), ClassLiteral('c')))
+  check("[\\w&&[a-z]]", "V1", PythonRegex()):
+    Class(
+      false,
+      ClassIntersection(ClassBackslashClass(Word), ClassNest(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+    )
+  check("[a[b]c]", "V1", PythonRegex())(
+    Class(false, ClassUnion(ClassLiteral('a'), ClassNest(false, ClassLiteral('b')), ClassLiteral('c')))
+  )
+  check("[a[^b]]", "V1", PythonRegex())(Class(false, ClassUnion(ClassLiteral('a'), ClassNest(true, ClassLiteral('b')))))
+  // A nested class of one character is an end of a range, which the AST keeps as the character.
+  checkPrinted("[a-[c]]", "[a-c]", "V1", PythonRegex())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('c'))))
+  check("[a-c--e]", "V1", PythonRegex()):
+    Class(false, ClassDiff(ClassRange(ClassLiteral('a'), ClassLiteral('c')), ClassLiteral('e')))
+  check("[--a]", "V1", PythonRegex())(Class(false, ClassRange(ClassLiteral('-'), ClassLiteral('a'))))
+  check("[||a]", "V1", PythonRegex()):
+    Class(false, ClassUnion(ClassLiteral('|'), ClassLiteral('|'), ClassLiteral('a')))
+  check("[[:alpha:]--a]", "V1", PythonRegex())(Class(false, ClassDiff(ClassPOSIX(false, "alpha"), ClassLiteral('a'))))
+  error("[a--]", "V1", PythonRegex())("Unclosed ']' at 5")
+  error("[[]]", "V1", PythonRegex())("Unclosed ']' at 4")
+  // `(?V1)` parses the pattern again from the start in `V1`.
+  check("(?V1)[a--b]", "", PythonRegex()):
+    Sequence(
+      Command(InlineFlag(FlagSetDiff(FlagSet(version1 = true), None))),
+      Class(false, ClassDiff(ClassLiteral('a'), ClassLiteral('b')))
+    )
+  error("[z-a](?V1)", "", PythonRegex())("Out of order class range at 1")
+
+  // ICU's classes, whose operators `--` and `&&` bind looser than a union and a `-` or `&` between classes (ICU 79.1).
+  check("[a-c]", "", ICU)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('c'))))
+  check("[^a]", "", ICU)(Class(true, ClassLiteral('a')))
+  check("[]a]", "", ICU)(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  check("[^]a]", "", ICU)(Class(true, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  // The AST does not keep an empty `\Q\E`, as the blanks before `]` and `^`.
+  checkPrinted("[\\Q\\E]]", "[]]", "", ICU)(Class(false, ClassLiteral(']')))
+  error("[]", "", ICU)("Unclosed ']' at 2")
+  check("[a-]", "", ICU)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'))))
+  check("[-a]", "", ICU)(Class(false, ClassUnion(ClassLiteral('-'), ClassLiteral('a'))))
+  check("[&a]", "", ICU)(Class(false, ClassUnion(ClassLiteral('&'), ClassLiteral('a'))))
+  error("[--a]", "", ICU)("Invalid class set operation at 1")
+  error("[&&a]", "", ICU)("Invalid class set operation at 1")
+  check("[a-c-e]", "", ICU):
+    Class(false, ClassUnion(ClassRange(ClassLiteral('a'), ClassLiteral('c')), ClassLiteral('-'), ClassLiteral('e')))
+  check("[\\w-a]", "", ICU)(Class(false, ClassUnion(ClassBackslashClass(Word), ClassLiteral('-'), ClassLiteral('a'))))
+  check("[a&b]", "", ICU)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('&'), ClassLiteral('b'))))
+  check("[a-[b]]", "", ICU):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassNest(false, ClassLiteral('b'))))
+  check("[a-c--b]", "", ICU):
+    Class(false, ClassDiff(ClassRange(ClassLiteral('a'), ClassLiteral('c')), ClassLiteral('b')))
+  check("[a&&b--c]", "", ICU):
+    Class(false, ClassDiff(ClassIntersection(ClassLiteral('a'), ClassLiteral('b')), ClassLiteral('c')))
+  check("[\\w&&\\d]", "", ICU)(Class(false, ClassIntersection(ClassBackslashClass(Word), ClassBackslashClass(Digit))))
+  check("[a----b]", "", ICU):
+    Class(false, ClassDiff(ClassLiteral('a'), ClassRange(ClassLiteral('-'), ClassLiteral('b'))))
+  check("[a&&&b]", "", ICU):
+    Class(false, ClassIntersection(ClassLiteral('a'), ClassUnion(ClassLiteral('&'), ClassLiteral('b'))))
+  error("[a--]", "", ICU)("Invalid class set operation at 4")
+  // A `-` or `&` between a class or a property and a nested class is an operator of the precedence of a union.
+  check("[[a]-[b]]", "", ICU):
+    Class(false, ClassNestDiff(ClassNest(false, ClassLiteral('a')), ClassNest(false, ClassLiteral('b'))))
+  check("[[a]--[b]]", "", ICU):
+    Class(false, ClassDiff(ClassNest(false, ClassLiteral('a')), ClassNest(false, ClassLiteral('b'))))
+  check("[[a]&[b]]", "", ICU):
+    Class(false, ClassNestIntersection(ClassNest(false, ClassLiteral('a')), ClassNest(false, ClassLiteral('b'))))
+  check("[[a]&&[b]]", "", ICU):
+    Class(false, ClassIntersection(ClassNest(false, ClassLiteral('a')), ClassNest(false, ClassLiteral('b'))))
+  check("[\\p{L}&[a]c]", "", ICU):
+    Class(
+      false,
+      ClassUnion(
+        ClassNestIntersection(ClassBackslashClass(UnicodeProperty("L")), ClassNest(false, ClassLiteral('a'))),
+        ClassLiteral('c')
+      )
+    )
+  check("[x[a]-[b]&&[c]]", "", ICU):
+    Class(
+      false,
+      ClassIntersection(
+        ClassNestDiff(
+          ClassUnion(ClassLiteral('x'), ClassNest(false, ClassLiteral('a'))),
+          ClassNest(false, ClassLiteral('b'))
+        ),
+        ClassNest(false, ClassLiteral('c'))
+      )
+    )
+  check("[[a]-b]", "", ICU)(
+    Class(false, ClassUnion(ClassNest(false, ClassLiteral('a')), ClassLiteral('-'), ClassLiteral('b')))
+  )
+  check("[[a]&]", "", ICU)(Class(false, ClassUnion(ClassNest(false, ClassLiteral('a')), ClassLiteral('&'))))
+  check("[[a]--b]", "", ICU)(Class(false, ClassDiff(ClassNest(false, ClassLiteral('a')), ClassLiteral('b'))))
+  check("[\\w&&b]", "", ICU)(Class(false, ClassIntersection(ClassBackslashClass(Word), ClassLiteral('b'))))
+  check("[^[a]]", "", ICU)(Class(true, ClassNest(false, ClassLiteral('a'))))
+  check("[[^a]]", "", ICU)(Class(false, ClassNest(true, ClassLiteral('a'))))
+  // ICU's `[:name:]` is a property, also out of a class.
+  check("[:Letter:]", "", ICU)(Class(false, ClassPOSIX(false, "Letter")))
+  check("[[:^gc=L:]]", "", ICU)(Class(false, ClassNest(false, ClassPOSIX(true, "gc=L"))))
+  checkPrinted("[ :L :]", "[:L:]", "x", ICU)(Class(false, ClassPOSIX(false, "L")))
+  check("[:a]", "", ICU)(Class(false, ClassUnion(ClassLiteral(':'), ClassLiteral('a'))))
+  check("[:a:b]", "", ICU):
+    Class(false, ClassUnion(ClassLiteral(':'), ClassLiteral('a'), ClassLiteral(':'), ClassLiteral('b')))
+  check("[:\\x41:]", "", ICU):
+    Class(false, ClassUnion(ClassLiteral(':'), ClassBackslashValue(Escape(Hex2, 'A')), ClassLiteral(':')))
+  error("[:a", "", ICU)("Unclosed ']' at 3")
+  // The escapes in ICU's class.
+  check("[\\b\\R\\X\\1\\-]", "", ICU):
+    Class(false, ClassUnion("bRX1-".map(c => ClassBackslashValue(Unknown(c)))*))
+  check("[\\x41\\cA\\0101\\t]", "", ICU):
+    Class(
+      false,
+      ClassUnion(
+        ClassBackslashValue(Escape(Hex2, 'A')),
+        ClassBackslashValue(Escape(Control('A'), 0x01)),
+        ClassBackslashValue(Escape(BareOctal, 'A')),
+        ClassBackslashValue(Escape(Single('t'), '\t'))
+      )
+    )
+  check("[\\h\\V\\N{x}\\P{L}]", "", ICU):
+    Class(
+      false,
+      ClassUnion(
+        ClassBackslashClass(Horizontal),
+        ClassBackslashClass(NonVertical),
+        ClassBackslashClass(CharName("x")),
+        ClassBackslashClass(NonUnicodeProperty("L"))
+      )
+    )
+  check("[\\N{x}-z]", "", ICU):
+    Class(false, ClassUnion(ClassBackslashClass(CharName("x")), ClassLiteral('-'), ClassLiteral('z')))
+  check("[\\Qa-c\\E]", "", ICU):
+    val parts = "a-c".map(c => classPart(ClassLiteral(c), c.toString))
+    Class(false, ClassCaseRegion(CaseCommandKind.QuoteCommand, parts, Closed))
+  check("[\\Q]\\E]", "", ICU):
+    Class(false, ClassCaseRegion(CaseCommandKind.QuoteCommand, Seq(classPart(ClassLiteral(']'), "]")), Closed))
+  // A quote of more than one character at an end of a range is the characters.
+  checkPrinted("[\\Qab\\E-c]", "[ab-c]", "", ICU):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassRange(ClassLiteral('b'), ClassLiteral('c'))))
+  error("[\\Qa", "", ICU)("Unclosed ']' at 4")
+  error("[\\", "", ICU)("Invalid backslash escape at 1")
+  error("[\\pL]", "", ICU)("Invalid backslash escape at 3")
+  // A range ends at a character, an escape of a character or another escape's letter, but not at a class.
+  check("[a-\\x{63}]", "", ICU):
+    Class(false, ClassRange(ClassLiteral('a'), ClassBackslashValue(Escape(HexBracket, 'c'))))
+  check("[a-\\y]", "", ICU)(Class(false, ClassRange(ClassLiteral('a'), ClassBackslashValue(Unknown('y')))))
+  check("[a-\\Qc\\E]", "", ICU):
+    Class(
+      false,
+      ClassRange(
+        ClassItem.Value(ClassLiteral('a')),
+        formValue(CaseCommandKind.QuoteCommand, ClassLiteral('c'), "c", Closed)
+      )
+    )
+  checkPrinted("[a-\\N{x}]", "[a\\N{x}]", "", ICU):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassBackslashClass(CharName("x"))))
+  check("[a&-c]", "", ICU)(
+    Class(false, ClassUnion(ClassLiteral('a'), ClassRange(ClassLiteral('&'), ClassLiteral('c'))))
+  )
+  error("[a-\\w]", "", ICU)("Invalid class range at 3")
+  error("[a-\\p{L}]", "", ICU)("Invalid class range at 3")
+  error("[c-a]", "", ICU)("Out of order class range at 1")
+  error("[a-", "", ICU)("Unclosed ']' at 3")
+  error("[a", "", ICU)("Unclosed ']' at 2")
+  checkPrinted("[a - c # comment\n]", "[a-c # comment\n]", "x", ICU):
+    Class(false, ClassUnion(ClassRange(ClassLiteral('a'), ClassLiteral('c')), ClassBlank(" # comment\n")))
+
+  // Boost.Regex's escape in a class is a class of its letter or a character (Boost.Regex 1.92.0).
+  check("[\\d\\L\\V\\v\\b\\pL\\Q\\E\\R\\k]", "", BoostRegex()):
+    Class(
+      false,
+      ClassUnion(
+        ClassBackslashClass(Digit),
+        ClassBackslashClass(NonLower),
+        ClassBackslashClass(NonVertical),
+        ClassBackslashValue(Escape(Single('v'), 0x0b)),
+        ClassBackslashValue(Escape(Single('b'), 0x08)),
+        ClassBackslashValue(Unknown('p')),
+        ClassLiteral('L'),
+        ClassBackslashValue(Unknown('Q')),
+        ClassBackslashValue(Unknown('E')),
+        ClassBackslashValue(Unknown('R')),
+        ClassBackslashValue(Unknown('k'))
+      )
+    )
+  check("[\\x41\\0101\\cA\\N{x}]", "", BoostRegex()):
+    Class(
+      false,
+      ClassUnion(
+        ClassBackslashValue(Escape(Hex2, 'A')),
+        ClassBackslashValue(Escape(BareOctal, 'A')),
+        ClassBackslashValue(Escape(Control('A'), 0x01)),
+        ClassBackslashClass(CharName("x"))
+      )
+    )
+  error("[\\1]", "", BoostRegex())("Invalid backslash escape at 2")
+  error("[\\", "", BoostRegex())("Invalid backslash escape at 1")
+  // The end of a range is a letter even of a class (e.g. `[a-\d]` is `[a-d]`), and a `-` after a range ends the class.
+  check("[a-\\d]", "", BoostRegex())(Class(false, ClassRange(ClassLiteral('a'), ClassBackslashValue(Unknown('d')))))
+  check("[a-c-]", "", BoostRegex()):
+    Class(false, ClassUnion(ClassRange(ClassLiteral('a'), ClassLiteral('c')), ClassLiteral('-')))
+  error("[a-c-e]", "", BoostRegex())("Invalid class range at 5")
+  error("[\\d-z]", "", BoostRegex())("Invalid class range at 1")
+  // `[:name:]`, `[.name.]` and `[=name=]` have any name, and need their closing.
+  check("[[:alpha:][:^Lu:][.space.][=a=]]", "", BoostRegex()):
+    Class(
+      false,
+      ClassUnion(
+        ClassPOSIX(false, "alpha"),
+        ClassPOSIX(true, "Lu"),
+        ClassCollatingElement("space"),
+        ClassEquivalence("a")
+      )
+    )
+  error("[[:alpha]]", "", BoostRegex())("Unclosed ']' at 10")
+  error("[a[:]", "", BoostRegex())("Unclosed ']' at 5")
+  error("[[:", "", BoostRegex())("Unclosed ']' at 3")
+  error("[[.a]]", "", BoostRegex())("Unclosed ']' at 6")
+  check("[[.a.]-c]", "", BoostRegex()):
+    Class(false, ClassUnion(ClassCollatingElement("a"), ClassLiteral('-'), ClassLiteral('c')))
+  check("[a-[.c.]]", "", BoostRegex()):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassCollatingElement("c")))
+  check("[[a]", "", BoostRegex())(Class(false, ClassUnion(ClassLiteral('['), ClassLiteral('a'))))
+  check("[[:<:]]", "", BoostRegex())(Class(false, ClassPOSIX(false, "<")))

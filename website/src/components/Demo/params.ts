@@ -27,6 +27,8 @@ export type Param = {
   dialects: string[] | null;
   /** The key of a setting of the dialect, which goes into the `dialect` object, or `null` for a parameter. */
   setting: string | null;
+  /** The titles of a setting by the dialect, which share the key, or `null` for a parameter. */
+  titleByDialect: Record<string, string> | null;
 };
 
 const paramType = (property: Property): ParamType => {
@@ -86,6 +88,9 @@ const settingParams = (property: Property): Param[] => {
         since: property["x-since"] ?? null,
         dialects: entries.map(([dialect]) => dialect),
         setting: key,
+        titleByDialect: Object.fromEntries(
+          entries.map(([dialect, { title }]) => [dialect, title ?? key]),
+        ),
       },
     ];
   });
@@ -103,6 +108,7 @@ const schemaParams: Param[] = propertiesFor("playground").flatMap(
       since: property["x-since"] ?? null,
       dialects: null,
       setting: null,
+      titleByDialect: null,
     },
     ...(name === "dialect" ? settingParams(property) : []),
   ],
@@ -116,6 +122,7 @@ const loggerParam: Param = {
   since: null,
   dialects: null,
   setting: null,
+  titleByDialect: null,
 };
 
 /** The parameters shown first, in this order; the others follow in the schema order. */
@@ -168,6 +175,10 @@ export const selectValues = (param: Param, dialect: string): string[] => {
   if (typeof type !== "object") return [];
   return "select" in type ? type.select : (type.selectByDialect[dialect] ?? []);
 };
+
+/** The title of the parameter for the dialect, which is of its setting for a setting. */
+export const titleOf = (param: Param, dialect: string): string =>
+  param.titleByDialect?.[dialect] ?? param.title;
 
 /** The dialect of the form values, or the default one if the build does not have the `dialect` parameter. */
 export const dialectOf = (

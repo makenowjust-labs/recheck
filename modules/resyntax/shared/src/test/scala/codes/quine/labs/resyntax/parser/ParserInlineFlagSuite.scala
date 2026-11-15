@@ -221,3 +221,70 @@ class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
   error("(?i", "", Java, PCRE, Ruby())("Invalid flag at 3")
   error("(?i!)", "", DotNet, Ruby())("Invalid flag at 3")
   error("(?i-m!)", "", DotNet, Ruby())("Invalid flag at 5")
+
+  // python-regex's inline flags, whose global ones (`b`, `e`, `p`, `r`, `V0` and `V1`) cannot be removed.
+  for (flags, flagSet) <- Seq(
+      "b" -> FlagSet(bestMatch = true),
+      "e" -> FlagSet(evaluate = true),
+      "f" -> FlagSet(fullCase = true),
+      "p" -> FlagSet(preserve = true),
+      "r" -> FlagSet(nonDestructive = true),
+      "w" -> FlagSet(word = true),
+      "L" -> FlagSet(localeUpper = true),
+      "V0" -> FlagSet(version0 = true)
+    )
+  do check(s"(?$flags)", "", PythonRegex())(Command(CommandKind.InlineFlag(FlagSetDiff(flagSet, None))))
+  check("(?u)", "", PythonRegex(Python.Type.Bytes)):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(unicode = true), None)))
+  check("(?)a", "", PythonRegex()):
+    Sequence(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(), None))), Literal('a'))
+  check("a(?i)b", "", PythonRegex()):
+    Sequence(Literal('a'), Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None))), Literal('b'))
+  check("(?V 1)", "x", PythonRegex()):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(version1 = true), None, Some("V 1"))))
+  check("(?r:a)", "", PythonRegex()):
+    Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(nonDestructive = true), None)), Literal('a'))
+  error("(?V2)", "", PythonRegex())("Invalid flag at 2")
+  error("(?V", "", PythonRegex())("Invalid flag at 2")
+  for c <- Seq('V', 'b', 'e', 'f', 'w') do error(s"(?$c)", "", Python())("Invalid flag at 2")
+  error("(?-r)", "", PythonRegex())("Invalid flag at 3")
+  error("(?i-V1)", "", PythonRegex())("Invalid flag at 4")
+  error("(?i-i)", "", PythonRegex())("Invalid flag at 4")
+  error("(?-)", "", PythonRegex())("Invalid flag at 3")
+  error("(?i-:a)", "", PythonRegex())("Invalid flag at 4")
+
+  // ICU's inline flags are `dimswx` and `u`, which skip whitespace only when `x` is on before them (ICU 79.1).
+  check("(?dimswux)", "", ICU):
+    Command(
+      InlineFlag(
+        FlagSetDiff(
+          FlagSet(
+            hasIndices = true,
+            ignoreCase = true,
+            multiline = true,
+            dotAll = true,
+            word = true,
+            unicode = true,
+            verbose = true
+          ),
+          None,
+          Some("dimswux")
+        )
+      )
+    )
+  check("(?i x)", "x", ICU):
+    Command(InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, verbose = true), None, Some("i x"))))
+  error("(?x i)", "", ICU)("Invalid flag at 3")
+  error("(?)", "", ICU)("Invalid flag at 2")
+  check("(?-i-i)", "", ICU):
+    Command(InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(ignoreCase = true)), Some("-i-i"))))
+
+  // Boost.Regex's inline flags are `imsx` (Boost.Regex 1.92.0).
+  check("(?imsx-imsx)", "", BoostRegex()):
+    val flagSet = FlagSet(ignoreCase = true, multiline = true, dotAll = true, verbose = true)
+    Command(InlineFlag(FlagSetDiff(flagSet, Some(flagSet))))
+  check("(?-)", "", BoostRegex())(Command(InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet())))))
+  error("(?)", "", BoostRegex())("Invalid flag at 2")
+  error("(?n)", "", BoostRegex())("Invalid flag at 2")
+  error("(?^i)", "", BoostRegex())("Invalid group at 2")
+  error("(?i-m-s)", "", BoostRegex())("Invalid flag at 5")

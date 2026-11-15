@@ -1,6 +1,9 @@
 package codes.quine.labs.resyntax.ir
 package build
 
+import codes.quine.labs.resyntax.ast.BackslashKind.EscapeClass
+import codes.quine.labs.resyntax.ast.EscapeClassKind.UnicodeProperty
+import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.CompatibilityPropertyTable
 import codes.quine.labs.resyntax.charset.EnumeratedProperty
@@ -331,3 +334,171 @@ class IRPropertyLookupSuite extends munit.FunSuite with IRHelper:
       "XDigit" -> ascii(Digits + "ABCDEFabcdef")
     )
   do chars(s"\\p{$name}", "", Ruby())(expected.diff(UTF16Encoding.Surrogates))
+
+  // python-regex's properties by `lookup_property` of regex 2026.9.29.
+  val PR: Dialect = PythonRegex()
+  val Latin1: CharSet = CharSet.range(0, 0xff)
+  val NonASCII: CharSet = CharSet.range(0x80, 0x10ffff)
+  chars("\\p{L}", "", PR)(gc("L"))
+  chars("\\pL", "", PR)(gc("L"))
+  chars("\\p{L&}", "", PR)(gc("L"))
+  chars("\\p{LC}", "", PR)(gc("LC"))
+  chars("\\p{Lowercase Letter}", "", PR)(gc("Ll"))
+  chars("\\p{gc=Assigned}", "", PR)(gc("Cn").complement(UnitMode.CodePoint))
+  chars("\\p{General_Category=Assigned}", "", PR)(gc("Cn").complement(UnitMode.CodePoint))
+  chars("\\p{Assigned}", "", PR)(gc("Cn").complement(UnitMode.CodePoint))
+  chars("\\p{Script=Greek}", "", PR)(value(PropertyTable.Script, "Greek"))
+  chars("\\p{sc:Thai}", "", PR)(value(PropertyTable.Script, "Thai"))
+  chars("\\p{Hrkt}", "", PR)(CharSet.empty)
+  chars("\\p{Greek}", "", PR)(value(PropertyTable.Script, "Greek"))
+  chars("\\p{IsGreek}", "", PR)(value(PropertyTable.Script, "Greek"))
+  chars("\\p{InBasicLatin}", "", PR)(CharSet.range(0, 0x7f))
+  chars("\\p{IsAlpha}", "", PR)(binary("Alphabetic"))
+  chars("\\p{Alpha=No}", "", PR)(binary("Alphabetic").complement(UnitMode.CodePoint))
+  chars("\\p{Script}", "", PR)(value(PropertyTable.Script, "Zzzz").complement(UnitMode.CodePoint))
+  chars("\\p{NV}", "", PR)(PropertyTable.NumericValue.nan.set.complement(UnitMode.CodePoint))
+  chars("\\p{NFCQC}", "", PR)(value(PropertyTable.NFCQuickCheck, "N").complement(UnitMode.CodePoint))
+  chars("\\p{NV=0.5}", "", PR)(
+    PropertyTable.NumericValue.values.find(v => v.numerator == 1 && v.denominator == 2).get.set
+  )
+  chars("\\p{NV=-1_0/2_0}", "", PR)(
+    PropertyTable.NumericValue.values.find(v => v.numerator == -1 && v.denominator == 2).get.set
+  )
+  chars("\\p{NV=1e1}", "", PR)(
+    PropertyTable.NumericValue.values.find(v => v.numerator == 10 && v.denominator == 1).get.set
+  )
+  chars("\\p{NV=NaN}", "", PR)(PropertyTable.NumericValue.nan.set)
+  chars("\\p{NV=0.33333}", "", PR)(
+    PropertyTable.NumericValue.values.find(v => v.numerator == 1 && v.denominator == 3).get.set
+  )
+  chars("\\p{ccc=230}", "", PR)(value(PropertyTable.CanonicalCombiningClass, "Above"))
+  chars("\\p{Word}", "", PR)(
+    binary("Alphabetic").union(gc("M")).union(gc("Nd")).union(gc("Pc")).union(binary("Join_Control"))
+  )
+  chars("\\p{HorizSpace}", "", PR)(IRClassLookup.pcreHorizontal)
+  chars("\\p{OAlpha}", "", PR)(binary("Alphabetic").diff(gc("L", "Nl")))
+  chars("[[:alnum:]]", "", PR)(binary("Alphabetic").union(IRClassLookup.ASCIIDigit))
+  // ASCII reads a character above ASCII as `U+10FFFF`, and the C locale (`L`) has the value `0` above `U+00FF`.
+  chars("\\p{L}", "a", PR)(gc("L").intersect(CharSet.range(0, 0x7f)))
+  chars("\\p{Cn}", "a", PR)(gc("Cn").union(NonASCII))
+  chars("\\P{L}", "", PythonRegex(Python.Type.Bytes))(Latin1.diff(gc("L")).union(CharSet.range(0x80, 0xff)))
+  chars("(?u:\\p{L})", "", PythonRegex(Python.Type.Bytes))(gc("L").intersect(Latin1))
+  chars("\\p{Alpha}", "L", PR)(IRClassLookup.ASCII_POSIX("alpha"))
+  chars("\\p{Alpha=No}", "L", PR)(IRClassLookup.ASCII_POSIX("alpha").complement(UnitMode.CodePoint))
+  chars("\\p{Lu}", "L", PR)(IRClassLookup.ASCII_POSIX("upper"))
+  chars("\\p{P&}", "L", PR)(IRClassLookup.ASCII_POSIX("punct"))
+  chars("\\p{Cn}", "L", PR)(CharSet.range(0x100, 0x10ffff))
+  chars("\\p{Latin}", "L", PR)(CharSet.empty)
+  chars("\\p{Script=Unknown}", "L", PR)(UnitMode.CodePoint.universe)
+  chars("\\p{ASCII}", "L", PR)(CharSet.range(0, 0x7f))
+  chars("\\p{Block}", "L", PR)(CharSet.range(0, 0x7f))
+  chars("\\p{Any}", "L", PR)(Latin1)
+  test("IRBuilder.build: python-regex's unknown properties"):
+    for s <- Seq(
+        "\\p{NV=1e999}",
+        "\\p{NV=1/2/3}",
+        "\\p{IsL}",
+        "\\p{Foo}",
+        "\\p{sc=Foo}",
+        "\\p{Foo=Bar}",
+        "\\p{Jpan}",
+        "\\p{Alpha=Maybe}",
+        "\\p{NV=7/3}"
+      )
+    do interceptMessage[IRBuildingException]("Unknown Unicode property name at 0")(build(s, "", PR))
+
+  // ICU's properties are the ones of `UnicodeSet` with ICU's loose names, and the names of `java.util.regex` (ICU 79.1).
+  def icuGC(names: String*): CharSet = IRPropertyLookup.gc(names*)
+
+  def icuBinary(name: String): CharSet = PropertyTable.binary(name).get.set
+
+  val CP: UnitMode = UnitMode.CodePoint
+  chars("\\p{ L }", "", ICU)(icuGC("L"))
+  chars("\\p{general category = letter}", "", ICU)(icuGC("L"))
+  chars("\\p{Greek}", "", ICU)(value(PropertyTable.Script, "Greek"))
+  chars("\\p{Alpha}", "", ICU)(icuBinary("Alphabetic"))
+  chars("\\p{alnum}", "", ICU)(icuBinary("alnum"))
+  chars("\\p{punct}", "", ICU)(icuGC("P"))
+  chars("\\p{Assigned}", "", ICU)(icuGC("Cn").complement(CP))
+  chars("\\p{gcm=Lu}", "", ICU)(icuGC("Lu"))
+  chars("\\p{Alphabetic=No}", "", ICU)(icuBinary("Alphabetic").complement(CP))
+  chars("\\p{alpha=t}", "", ICU)(icuBinary("Alphabetic"))
+  chars("\\p{RGI_Emoji}", "", ICU)(icuBinary("RGI_Emoji"))
+  chars("\\P{RGI_Emoji}", "", ICU)(icuBinary("RGI_Emoji").complement(CP))
+  chars("\\p{gc≠L}", "", ICU)(icuGC("L").complement(CP))
+  chars("\\P{gc≠L}", "", ICU)(icuGC("L"))
+  chars("\\p{blk=Basic_Latin}", "", ICU)(CharSet.range(0, 0x7f))
+  chars("\\p{scx=Grek}", "", ICU)(value(PropertyTable.ScriptExtensions, "Greek"))
+  chars("\\p{idtype=Recommended}", "", ICU)(value(PropertyTable.IdentifierType, "Recommended"))
+  chars("\\p{Age=3.0}", "", ICU)(PropertyTable.presentIn(PropertyTable.Age.value("3.0").get))
+  chars("\\p{age= 3.0.0.1}", "", ICU)(PropertyTable.presentIn(PropertyTable.Age.value("3.0").get))
+  chars("\\p{Age=V3_0}", "", ICU)(CharSet.empty)
+  chars("\\p{ccc=230}", "", ICU)(value(PropertyTable.CanonicalCombiningClass, "230"))
+  chars("\\p{ccc=231}", "", ICU)(CharSet.empty)
+  chars("\\p{nv=0.5}", "", ICU)(PropertyTable.NumericValue.values.find(_.toDouble == 0.5).get.set)
+  chars("\\p{word}", "", ICU)(CompatibilityPropertyTable.Word)
+  chars("\\p{all}", "", ICU)(CP.universe)
+  chars("\\p{InGreek}", "", ICU)(value(PropertyTable.Block, "Greek"))
+  chars("\\p{IsLu}", "", ICU)(icuGC("Lu"))
+  chars("\\p{Isassigned}", "", ICU)(icuGC("Cn").complement(CP))
+  chars("\\p{IsTitleCase}", "", ICU)(icuGC("Lt"))
+  chars("\\p{javaLowerCase}", "", ICU)(icuGC("Ll"))
+  for name <- Seq("All", "isgreek", "In", "InFoo", "IsScript=Greek", "é", "gc=", "alpha=maybe", "ccc=256", "ccc=1.5")
+  do error(s"\\p{$name}", "", ICU)("Unknown Unicode property name at 0")
+  for name <- Seq("nv=1/2", "Unicode_1_Name=x", "Lowercase_Mapping=a", "javaFoo", "gc≠Foo", "Block") do
+    error(s"\\p{$name}", "", ICU)("Unknown Unicode property name at 0")
+  for name <- Seq("Name=DIGIT ONE", "lccc=230") do
+    check(s"\\p{$name}", "", ICU)(Unsupported(NodeData.Backslash(EscapeClass(UnicodeProperty(name)))))
+  test("IRBuilder.build: ICU's java names"):
+    val names = Seq(
+      "javaDefined" -> icuGC("Cn").complement(CP),
+      "javaDigit" -> icuGC("Nd"),
+      "javaISOControl" -> CharSet.range(0, 0x1f).union(CharSet.range(0x7f, 0x9f)),
+      "javaJavaIdentifierStart" -> icuGC("L", "Nl", "Sc", "Pc"),
+      "javaLetter" -> icuGC("L"),
+      "javaLetterOrDigit" -> icuGC("L", "Nd"),
+      "javaMirrored" -> icuBinary("Bidi_Mirrored"),
+      "javaSpaceChar" -> icuGC("Z"),
+      "javaSupplementaryCodePoint" -> CharSet.range(0x10000, 0x10ffff),
+      "javaTitleCase" -> icuGC("Lt"),
+      "javaUnicodeIdentifierStart" -> icuGC("L", "Nl"),
+      "javaUpperCase" -> icuGC("Lu"),
+      "javaValidCodePoint" -> CP.universe
+    )
+    for (name, set) <- names do assertEquals(build(s"\\p{$name}", "", ICU).node.data, Chars(set), name)
+    val ignorable = build("\\p{javaIdentifierIgnorable}", "", ICU).node.data
+    assertEquals(
+      ignorable,
+      Chars(CharSet.range(0, 8).union(CharSet.range(0x0e, 0x1b)).union(CharSet.range(0x7f, 0x9f)).union(icuGC("Cf")))
+    )
+    for name <- Seq("javaJavaIdentifierPart", "javaUnicodeIdentifierPart", "javaWhitespace") do
+      val Chars(set) = build(s"\\p{$name}", "", ICU).node.data: @unchecked
+      assert(set.contains('_') == (name != "javaWhitespace"), name)
+
+  // Boost.Regex's names are its class names, and in `u32regex` the general categories of ICU (Boost.Regex 1.92.0).
+  val BoostChar: Dialect = BoostRegex()
+  val BoostU32: Dialect = BoostRegex(BoostRegex.Type.U32Regex)
+  val SV: UnitMode = UnitMode.ScalarValue
+  chars("\\pL", "", BoostChar)(CharSet.range('a', 'z'))
+  chars("\\p{Alpha}", "", BoostChar)(IRClassLookup.ASCII_POSIX("alpha"))
+  chars("\\p{WORD}", "", BoostChar)(IRClassLookup.ASCIIWord)
+  chars("\\p{blank}", "", BoostChar)(CharSet.of('\t', '\u000b', ' '))
+  chars("\\p{unicode}", "", BoostChar)(CharSet.empty)
+  chars("\\pL", "", BoostU32)(IRPropertyLookup.gc("Ll"))
+  chars("\\p{L*}", "", BoostU32)(IRPropertyLookup.gc("L"))
+  chars("\\p{Uppercase-Letter}", "", BoostU32)(IRPropertyLookup.gc("Lu"))
+  chars("\\p{ t i t l e c a s e }", "", BoostU32)(IRPropertyLookup.gc("Lt"))
+  chars("\\p{Other}", "", BoostU32)(IRPropertyLookup.gc("C").intersect(SV.universe))
+  chars("\\p{assigned}", "", BoostU32)(IRPropertyLookup.gc("Cn").complement(SV))
+  chars("\\p{print}", "", BoostU32)(IRPropertyLookup.gc("L", "M", "N", "P", "S", "Z"))
+  chars("\\p{xdigit}", "", BoostU32):
+    IRPropertyLookup
+      .gc("Nd")
+      .union(IRClassLookup.ASCII_POSIX("xdigit"))
+      .union(CharSet.range(0xff21, 0xff26))
+      .union(CharSet.range(0xff41, 0xff46))
+  chars("\\p{h}", "", BoostU32)(IRPropertyLookup.gc("Zs").union(CharSet.of('\t')).union(CharSet.range(0x1c, 0x1f)))
+  for name <- Seq("Lu", "Greek", "Alphabetic", "L&", "^alpha", " alpha ", "any") do
+    error(s"\\p{$name}", "", BoostChar)("Unknown Unicode property name at 0")
+  for name <- Seq("Greek", "Alphabetic", "L&", "gc=Lu", "White_Space") do
+    error(s"\\p{$name}", "", BoostU32)("Unknown Unicode property name at 0")

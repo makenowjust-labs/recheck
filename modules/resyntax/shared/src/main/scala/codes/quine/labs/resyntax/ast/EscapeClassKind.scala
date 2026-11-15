@@ -28,11 +28,26 @@ object EscapeClassKind:
   /** NonHorizontal is `\H` class. */
   case object NonHorizontal extends EscapeClassKind
 
+  /** POSIXBlank is python-regex's `\h` class, which is POSIX's `[[:blank:]]`. */
+  case object POSIXBlank extends EscapeClassKind
+
   /** Vertical is `\v` class. */
   case object Vertical extends EscapeClassKind
 
   /** NonVertical is `\V` class. */
   case object NonVertical extends EscapeClassKind
+
+  /** Lower is Boost.Regex's `\l` class, which is `[[:lower:]]`. */
+  case object Lower extends EscapeClassKind
+
+  /** NonLower is Boost.Regex's `\L` class. */
+  case object NonLower extends EscapeClassKind
+
+  /** Upper is Boost.Regex's `\u` class, which is `[[:upper:]]`. */
+  case object Upper extends EscapeClassKind
+
+  /** NonUpper is Boost.Regex's `\U` class. */
+  case object NonUpper extends EscapeClassKind
 
   /** HexDigit is `\h` class. */
   case object HexDigit extends EscapeClassKind
@@ -72,6 +87,9 @@ object EscapeClassKind:
 
   /** NonUnicodePropertyValue is `\P{XXX=YYY}` class. */
   final case class NonUnicodePropertyValue(name: String, value: String) extends EscapeClassKind
+
+  /** NamedList is python-regex's `\L<name>` class, the strings of a list given on compiling the pattern. */
+  final case class NamedList(name: String) extends EscapeClassKind
 
   /** QuoteSet is `\q{...}` class. */
   final case class QuoteSet(strings: Seq[Seq[QuoteLiteral]]) extends EscapeClassKind

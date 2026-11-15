@@ -153,3 +153,8 @@ class CaptureAnalyzerSuite extends munit.FunSuite with IRHelper:
   captures("(?<n>a)(?<n>b)", "", Perl(), Ruby())(2, Map("n" -> Seq(1, 2)))
   captures("(?<n>a)|(?<n>b)", "", DotNet)(1, Map("n" -> Seq(1)))
   captures("(?<x>a)(?<y>b)(?<x>c)", "", Perl(), Ruby())(3, Map("x" -> Seq(1, 3), "y" -> Seq(2)))
+  // python-regex's group of a name takes the index of the earlier one, and a new name skips the indices of names.
+  captures("(?<n>a)|(?<n>b)", "", PythonRegex())(1, Map("n" -> Seq(1)))
+  captures("(?<x>a)(b)(?<x>c)", "", PythonRegex())(2, Map("x" -> Seq(1)))
+  captures("(?|(?<x>a)|(?<y>b))", "", PythonRegex())(2, Map("x" -> Seq(1), "y" -> Seq(2)))
+  captures("(?|(?<x>a)|(b))", "", PythonRegex())(1, Map("x" -> Seq(1)))

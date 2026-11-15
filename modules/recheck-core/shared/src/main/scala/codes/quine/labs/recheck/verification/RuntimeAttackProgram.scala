@@ -2,13 +2,16 @@ package codes.quine.labs.recheck.verification
 
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
+import codes.quine.labs.recheck.exec.BoostRegexExecutor
 import codes.quine.labs.recheck.exec.DotNetExecutor
 import codes.quine.labs.recheck.exec.Executor
+import codes.quine.labs.recheck.exec.ICUExecutor
 import codes.quine.labs.recheck.exec.JavaExecutor
 import codes.quine.labs.recheck.exec.NodeExecutor
 import codes.quine.labs.recheck.exec.PHPExecutor
 import codes.quine.labs.recheck.exec.PerlExecutor
 import codes.quine.labs.recheck.exec.PythonExecutor
+import codes.quine.labs.recheck.exec.PythonRegexExecutor
 import codes.quine.labs.recheck.exec.RubyExecutor
 import codes.quine.labs.recheck.exec.SourceFile
 import codes.quine.labs.resyntax.charset.UString
@@ -56,18 +59,21 @@ object RuntimeAttackProgram:
     dialect match
       case Dialect.JavaScript        => Right(javascript(pattern, flags, mode, attack))
       case _: Dialect.Python         => Right(python(pattern, flags, mode, attack))
+      case _: Dialect.PythonRegex    => Right(pythonRegex(pattern, flags, mode, attack))
       case _: Dialect.Ruby           => Right(ruby(pattern, flags, mode, attack))
       case Dialect.Java              => Right(java(pattern, flags, mode, attack))
       case Dialect.DotNet            => Right(dotnet(pattern, flags, mode, attack))
       case perlDialect: Dialect.Perl => perl(source, pattern, flags, perlDialect, mode, attack)
       case Dialect.PCRE              => php(source, pattern, flags, mode, attack)
+      case Dialect.ICU               => Right(icu(pattern, flags, mode, attack))
+      case boost: Dialect.BoostRegex => Right(boostRegex(pattern, flags, boost, attack))
 
   /** Returns the units of the mode that the engine of the dialect reads from the source.
     *
     * A Python bytes pattern takes each character as a byte, and another pattern matching bytes takes the UTF-8 bytes.
     */
   private def encodeSource(source: String, dialect: Dialect, mode: UnitMode): UString = dialect match
-    case _: Dialect.Python if mode == UnitMode.Byte => UnitMode.Byte.decode(source)
+    case _: Dialect.Python | _: Dialect.PythonRegex if mode == UnitMode.Byte => UnitMode.Byte.decode(source)
     // A source may have a lone surrogate even in `ScalarValue` mode, so the code points stay as they are.
     case _ if mode.isCodePoint => UnitMode.UTF16CodePoint.decode(source)
     case _                     => mode.fromCodePoints(IArray.from(UnitMode.UTF16CodePoint.decode(source).iterator))
@@ -92,22 +98,29 @@ object RuntimeAttackProgram:
       val command = program.executor.scriptCommandLine(name)
       val php = "<?php\n"
       val content = dialect match
-        case Dialect.Java       => s"// Run: $command\n" + javaProgram(javaString(program.script))
-        case Dialect.DotNet     => s"// Run: $command\n" + dotnetProgram(quote(program.script))
-        case Dialect.PCRE       => s"$php// Run: $command\n" + program.script.stripPrefix(php)
+        case Dialect.Java              => s"// Run: $command\n" + javaProgram(javaString(program.script))
+        case Dialect.DotNet            => s"// Run: $command\n" + dotnetProgram(quote(program.script))
+        case Dialect.PCRE              => s"$php// Run: $command\n" + program.script.stripPrefix(php)
+        case Dialect.ICU               => s"// Run: $command\n" + icuProgram(cppString(program.script))
+        case boost: Dialect.BoostRegex =>
+          s"// Run: $command\n" + boostRegexProgram(cppString(program.script), hasICU(boost))
         case Dialect.JavaScript => s"// Run: $command\n" + program.script
-        case _: Dialect.Python | _: Dialect.Ruby | _: Dialect.Perl => s"# Run: $command\n" + program.script
+        case _: Dialect.Python | _: Dialect.PythonRegex | _: Dialect.Ruby | _: Dialect.Perl =>
+          s"# Run: $command\n" + program.script
       Script(name, command, content)
 
   /** Returns the file name of the standalone program of the dialect. */
   private def scriptName(dialect: Dialect): String = dialect match
-    case Dialect.JavaScript => "runtime-attack.cjs"
-    case _: Dialect.Python  => "runtime-attack.py"
-    case _: Dialect.Ruby    => "runtime-attack.rb"
-    case Dialect.Java       => "runtime-attack.java"
-    case Dialect.DotNet     => "runtime-attack.cs"
-    case _: Dialect.Perl    => "runtime-attack.pl"
-    case Dialect.PCRE       => "runtime-attack.php"
+    case Dialect.JavaScript     => "runtime-attack.cjs"
+    case _: Dialect.Python      => "runtime-attack.py"
+    case _: Dialect.PythonRegex => "runtime-attack.py"
+    case _: Dialect.Ruby        => "runtime-attack.rb"
+    case Dialect.Java           => "runtime-attack.java"
+    case Dialect.DotNet         => "runtime-attack.cs"
+    case _: Dialect.Perl        => "runtime-attack.pl"
+    case Dialect.PCRE           => "runtime-attack.php"
+    case Dialect.ICU            => "runtime-attack.cpp"
+    case _: Dialect.BoostRegex  => "runtime-attack.cpp"
 
   /** Returns a Java expression of the data, which is a join of literals for a long data. */
   private def javaString(data: String): String =
@@ -169,6 +182,50 @@ object RuntimeAttackProgram:
           |""".stripMargin
     RuntimeAttackProgram(PythonExecutor, script)
 
+  /** Returns the Python program using the `regex` package for `python3`, using `search` in the C locale.
+    *
+    * The program writes why to the standard error and exits with `1` when it cannot import the package.
+    */
+  private def pythonRegex(
+      pattern: UString,
+      flags: String,
+      mode: UnitMode,
+      attack: AttackPattern
+  ): RuntimeAttackProgram =
+    val style = AttackPatternStyle.Python(bytes = mode == UnitMode.Byte)
+    // The version flags `V0` and `V1` are the letter `V` and a digit.
+    val options = flags
+      .replace("V0", "0")
+      .replace("V1", "1")
+      .distinct
+      .collect:
+        case c @ ('a' | 'b' | 'e' | 'f' | 'i' | 'm' | 'p' | 'r' | 's' | 'u' | 'w' | 'x' | 'L') => s"regex.${c.toUpper}"
+        case '0'                                                                               => "regex.V0"
+        case '1'                                                                               => "regex.V1"
+    val input = attack.toString(style)
+    val script =
+      s"""|import locale, platform, sys, time
+          |locale.setlocale(locale.LC_ALL, 'C')
+          |try:
+          |    import regex
+          |except ImportError as e:
+          |    sys.stderr.write('The `regex` package is not available for ' + sys.executable + ' (' + str(e) + ')\\n')
+          |    sys.exit(1)
+          |sys.stdout.write('$RuntimeLine python-regex ' + regex.__version__ + ' (python ' + platform.python_version() + ')\\n')
+          |pattern = regex.compile(${style.literal(pattern)}, ${union(options, "0")})
+          |string = $input
+          |sys.stdout.write('$StartLine\\n')
+          |sys.stdout.flush()
+          |start = time.perf_counter_ns()
+          |try:
+          |    pattern.search(string)
+          |except (RecursionError, MemoryError) as e:
+          |    sys.stdout.write('$EngineErrorLine ' + type(e).__name__ + '\\n')
+          |    sys.exit(0)
+          |sys.stdout.write('$TimeLine ' + str((time.perf_counter_ns() - start) // 1000000) + '\\n')
+          |""".stripMargin
+    RuntimeAttackProgram(PythonRegexExecutor, script)
+
   /** Returns the Ruby program for `ruby`, using `Regexp#match?` without `Regexp.timeout`. */
   private def ruby(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
     val style = AttackPatternStyle.Ruby(bytes = mode == UnitMode.Byte)
@@ -202,10 +259,10 @@ object RuntimeAttackProgram:
           |""".stripMargin
     RuntimeAttackProgram(RubyExecutor, script)
 
-  /** Returns the data for the Java program for `java` as a single-file source program, using `Matcher#find`. */
+  /** Returns the data for the Java program for `java`, using `Matcher#find`. */
   private def java(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
     val options = flags.distinct.filter(c => "cdimsuxU".contains(c))
-    RuntimeAttackProgram(JavaExecutor(JavaSource), encodeData(options, pattern, mode, attack))
+    RuntimeAttackProgram(JavaExecutor(JavaSource), encodeData(options, pattern, attack, utf16Units(mode)))
 
   /** The Java program, which reads the data of [[encodeData]] from the standard input. */
   private val JavaSource: SourceFile =
@@ -264,12 +321,12 @@ object RuntimeAttackProgram:
         |}
         |""".stripMargin
 
-  /** Returns the data for the C# program for `dotnet run` (.NET 10 or later), using `Regex.Match` in the invariant
+  /** Returns the data for the C# program for `dotnet` (.NET 10 SDK or later), using `Regex.Match` in the invariant
     * culture.
     */
   private def dotnet(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
     val options = flags.distinct.filter(c => "imnsx".contains(c))
-    RuntimeAttackProgram(DotNetExecutor(DotNetSource), encodeData(options, pattern, mode, attack))
+    RuntimeAttackProgram(DotNetExecutor(DotNetSource), encodeData(options, pattern, attack, utf16Units(mode)))
 
   /** The C# program, which reads the data of [[encodeData]] from the standard input. */
   private val DotNetSource: SourceFile =
@@ -328,10 +385,250 @@ object RuntimeAttackProgram:
         |Console.WriteLine("$TimeLine " + stopwatch.ElapsedMilliseconds);
         |""".stripMargin
 
-  /** Returns the data of a pattern and an attack string of the mode for the programs reading it from the standard
-    * input.
+  /** Returns the data for the C++ program using ICU4C's `uregex_find`, with ICU's default limits: no time limit and a
+    * backtrack stack of 8,000,000 bytes.
+    */
+  private def icu(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
+    val options = flags.distinct.filter(c => "dimswx".contains(c))
+    RuntimeAttackProgram(ICUExecutor(ICUSource), encodeData(options, pattern, attack, utf16Units(mode)))
+
+  /** The C++ program, which reads the data of [[encodeData]] from the standard input. */
+  private val ICUSource: SourceFile =
+    SourceFile("RecheckRuntimeAttack.cpp", icuProgram("std::string(std::istreambuf_iterator<char>(std::cin), {})"))
+
+  /** Returns a C++ expression of the data, which joins literals of at most [[CppLiteralSize]] characters. */
+  private def cppString(data: String): String =
+    data.grouped(CppLiteralSize).map(quote).mkString("std::string(", "\n    ", ")")
+
+  // MSVC limits a string literal to 16380 bytes.
+  private val CppLiteralSize: Int = 10000
+
+  /** Returns the C++ program reading the data of [[encodeData]] from the expression.
     *
-    * For example, the data of `/^a*$/i` and `'a'.repeat(31) + '!'` is the following.
+    * It hides ICU's C++ API, which needs C++17, so that a compiler of an older standard by default compiles it.
+    */
+  private def icuProgram(data: String): String =
+    s"""|#define U_SHOW_CPLUSPLUS_API 0
+        |#define U_SHOW_CPLUSPLUS_HEADER_API 0
+        |#include <unicode/uchar.h>
+        |#include <unicode/uregex.h>
+        |#include <unicode/uversion.h>
+        |
+        |#include <chrono>
+        |#include <cstdio>
+        |#include <cstdlib>
+        |#include <iostream>
+        |#include <iterator>
+        |#include <sstream>
+        |#include <string>
+        |#include <vector>
+        |
+        |static std::vector<UChar> decode(const std::string &hex) {
+        |  std::vector<UChar> s;
+        |  if (hex == "-") return s;
+        |  for (size_t i = 0; i + 4 <= hex.size(); i += 4) {
+        |    s.push_back(static_cast<UChar>(std::strtoul(hex.substr(i, 4).c_str(), nullptr, 16)));
+        |  }
+        |  return s;
+        |}
+        |
+        |int main() {
+        |  UVersionInfo version, unicode;
+        |  char versionString[U_MAX_VERSION_STRING_LENGTH], unicodeString[U_MAX_VERSION_STRING_LENGTH];
+        |  u_getVersion(version);
+        |  u_versionToString(version, versionString);
+        |  u_getUnicodeVersion(unicode);
+        |  u_versionToString(unicode, unicodeString);
+        |  std::printf("$RuntimeLine icu %s (Unicode %s)\\n", versionString, unicodeString);
+        |  std::fflush(stdout);
+        |  std::istringstream lines($data);
+        |  std::string flagsLine, patternLine, line;
+        |  std::getline(lines, flagsLine);
+        |  std::getline(lines, patternLine);
+        |  uint32_t flags = 0;
+        |  for (char c : flagsLine) {
+        |    switch (c) {
+        |      case 'd': flags |= UREGEX_UNIX_LINES; break;
+        |      case 'i': flags |= UREGEX_CASE_INSENSITIVE; break;
+        |      case 'm': flags |= UREGEX_MULTILINE; break;
+        |      case 's': flags |= UREGEX_DOTALL; break;
+        |      case 'w': flags |= UREGEX_UWORD; break;
+        |      case 'x': flags |= UREGEX_COMMENTS; break;
+        |      default: break;
+        |    }
+        |  }
+        |  std::vector<UChar> pattern = decode(patternLine);
+        |  std::vector<UChar> input;
+        |  while (std::getline(lines, line)) {
+        |    size_t colon = line.find(':');
+        |    long count = std::atol(line.substr(0, colon).c_str());
+        |    std::vector<UChar> part = decode(line.substr(colon + 1));
+        |    for (long i = 0; i < count; i++) input.insert(input.end(), part.begin(), part.end());
+        |  }
+        |  UErrorCode status = U_ZERO_ERROR;
+        |  UParseError parseError;
+        |  static const UChar empty[1] = {0};
+        |  // `uregex_open` rejects the length 0, but takes -1 for a NUL-terminated pattern.
+        |  URegularExpression *regex = uregex_open(pattern.empty() ? empty : pattern.data(),
+        |                                         pattern.empty() ? -1 : static_cast<int32_t>(pattern.size()), flags,
+        |                                         &parseError, &status);
+        |  if (U_FAILURE(status)) {
+        |    std::fprintf(stderr, "%s at %d\\n", u_errorName(status), parseError.offset);
+        |    return 1;
+        |  }
+        |  uregex_setText(regex, input.empty() ? empty : input.data(), static_cast<int32_t>(input.size()), &status);
+        |  std::printf("$StartLine\\n");
+        |  std::fflush(stdout);
+        |  auto start = std::chrono::steady_clock::now();
+        |  uregex_find(regex, 0, &status);
+        |  auto time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+        |  if (status == U_REGEX_TIME_OUT) {
+        |    std::printf("$EngineLimitLine %s\\n", u_errorName(status));
+        |  } else if (status == U_REGEX_STACK_OVERFLOW || status == U_MEMORY_ALLOCATION_ERROR) {
+        |    std::printf("$EngineErrorLine %s\\n", u_errorName(status));
+        |  } else if (U_FAILURE(status)) {
+        |    std::fprintf(stderr, "%s\\n", u_errorName(status));
+        |    return 1;
+        |  } else {
+        |    std::printf("$TimeLine %lld\\n", static_cast<long long>(time.count()));
+        |  }
+        |  uregex_close(regex);
+        |  return 0;
+        |}
+        |""".stripMargin
+
+  /** Returns the data for the C++ program using Boost.Regex's `regex_search` with `match_results`, or `u32regex_search`
+    * for `u32regex`, with Boost.Regex's default limits: the complexity limit gives an engine limit, and the stack limit
+    * and the memory give engine errors.
+    */
+  // The method of the matching will be `match_continuous` for a match at the start, and `regex_match` for a full match.
+  private def boostRegex(pattern: UString, flags: String, dialect: Dialect.BoostRegex, attack: AttackPattern) =
+    val options = flags.distinct.filter(c => "MNScix".contains(c))
+    val executor =
+      if hasICU(dialect) then BoostRegexExecutor(BoostRegexICUSource, hasICU = true)
+      else BoostRegexExecutor(BoostRegexSource, hasICU = false)
+    RuntimeAttackProgram(executor, encodeData(options, pattern, attack, wideUnits))
+
+  private def hasICU(dialect: Dialect.BoostRegex): Boolean = dialect.`type` == Dialect.BoostRegex.Type.U32Regex
+
+  /** The C++ expression of the standard input. */
+  private val StdinData: String = "std::string(std::istreambuf_iterator<char>(std::cin), {})"
+
+  /** The C++ programs of Boost.Regex over `char` and of `u32regex`, which read the data of [[encodeData]] from the
+    * standard input.
+    */
+  private val BoostRegexSource: SourceFile =
+    SourceFile("RecheckRuntimeAttack.cpp", boostRegexProgram(StdinData, hasICU = false))
+
+  private val BoostRegexICUSource: SourceFile =
+    SourceFile("RecheckRuntimeAttack.cpp", boostRegexProgram(StdinData, hasICU = true))
+
+  /** Returns the C++ program of Boost.Regex reading the data of [[encodeData]] from the expression, which uses
+    * `u32regex` with `hasICU`.
+    */
+  private def boostRegexProgram(data: String, hasICU: Boolean): String =
+    val headers = if hasICU then "#include <boost/regex/icu.hpp>\n#include <unicode/uversion.h>\n" else ""
+    val icuVersion = if hasICU then "  std::printf(\" (ICU %s)\", U_ICU_VERSION);\n" else ""
+    val subject = if hasICU then "" else "  std::string subject(input.begin(), input.end());\n"
+    val regex = if hasICU then "boost::u32regex" else "boost::regex"
+    val compile =
+      if hasICU then "regex = boost::make_u32regex(pattern.begin(), pattern.end(), options);"
+      else "regex.assign(std::string(pattern.begin(), pattern.end()), options);"
+    val matchResults =
+      if hasICU then "boost::match_results<std::vector<std::uint32_t>::const_iterator>" else "boost::smatch"
+    val search =
+      if hasICU then "boost::u32regex_search(input.cbegin(), input.cend(), match, regex);"
+      else "boost::regex_search(subject, match, regex);"
+    s"""|#include <boost/regex.hpp>
+        |#include <boost/version.hpp>
+        |$headers
+        |#include <chrono>
+        |#include <cstdint>
+        |#include <cstdio>
+        |#include <cstdlib>
+        |#include <iostream>
+        |#include <iterator>
+        |#include <new>
+        |#include <sstream>
+        |#include <string>
+        |#include <vector>
+        |
+        |static std::vector<std::uint32_t> decode(const std::string &hex) {
+        |  std::vector<std::uint32_t> s;
+        |  if (hex == "-") return s;
+        |  for (std::size_t i = 0; i + 8 <= hex.size(); i += 8) {
+        |    s.push_back(static_cast<std::uint32_t>(std::strtoul(hex.substr(i, 8).c_str(), nullptr, 16)));
+        |  }
+        |  return s;
+        |}
+        |
+        |int main() {
+        |  std::printf("$RuntimeLine boost-regex %d.%d.%d", BOOST_VERSION / 100000, BOOST_VERSION / 100 % 1000,
+        |              BOOST_VERSION % 100);
+        |$icuVersion  std::printf("\\n");
+        |  std::fflush(stdout);
+        |  std::istringstream lines($data);
+        |  std::string flagsLine, patternLine, line;
+        |  std::getline(lines, flagsLine);
+        |  std::getline(lines, patternLine);
+        |  boost::regbase::flag_type options = boost::regbase::perl;
+        |  for (char c : flagsLine) {
+        |    switch (c) {
+        |      case 'M': options |= boost::regbase::no_mod_m; break;
+        |      case 'N': options |= boost::regbase::newline_alt; break;
+        |      case 'S': options |= boost::regbase::no_mod_s; break;
+        |      case 'c': options |= boost::regbase::collate; break;
+        |      case 'i': options |= boost::regbase::icase; break;
+        |      case 'x': options |= boost::regbase::mod_x; break;
+        |      default: break;
+        |    }
+        |  }
+        |  std::vector<std::uint32_t> pattern = decode(patternLine);
+        |  std::vector<std::uint32_t> input;
+        |  while (std::getline(lines, line)) {
+        |    std::size_t colon = line.find(':');
+        |    long count = std::atol(line.substr(0, colon).c_str());
+        |    std::vector<std::uint32_t> part = decode(line.substr(colon + 1));
+        |    for (long i = 0; i < count; i++) input.insert(input.end(), part.begin(), part.end());
+        |  }
+        |$subject  $regex regex;
+        |  try {
+        |    $compile
+        |  } catch (const boost::regex_error &e) {
+        |    std::fprintf(stderr, "%s\\n", e.what());
+        |    return 1;
+        |  }
+        |  $matchResults match;
+        |  std::printf("$StartLine\\n");
+        |  std::fflush(stdout);
+        |  auto start = std::chrono::steady_clock::now();
+        |  try {
+        |    $search
+        |  } catch (const boost::regex_error &e) {
+        |    if (e.code() == boost::regex_constants::error_complexity) {
+        |      std::printf("$EngineLimitLine %s\\n", e.what());
+        |      return 0;
+        |    }
+        |    if (e.code() != boost::regex_constants::error_stack) {
+        |      std::fprintf(stderr, "%s\\n", e.what());
+        |      return 1;
+        |    }
+        |    std::printf("$EngineErrorLine %s\\n", e.what());
+        |    return 0;
+        |  } catch (const std::bad_alloc &e) {
+        |    std::printf("$EngineErrorLine %s\\n", e.what());
+        |    return 0;
+        |  }
+        |  auto time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+        |  std::printf("$TimeLine %lld\\n", static_cast<long long>(time.count()));
+        |  return 0;
+        |}
+        |""".stripMargin
+
+  /** Returns the data of a pattern and an attack string for the programs reading it from the standard input, whose
+    * strings are the units of `units`.
+    *
+    * For example, the data of `/^a*$/i` and `'a'.repeat(31) + '!'` in UTF-16 units is the following.
     *
     * {{{
     * i
@@ -340,9 +637,7 @@ object RuntimeAttackProgram:
     * 1:0021
     * }}}
     */
-  private def encodeData(flags: String, pattern: UString, mode: UnitMode, attack: AttackPattern): String =
-    def units(s: UString): String = mode.encode(s).map(c => hex(c, 4)).mkString
-
+  private def encodeData(flags: String, pattern: UString, attack: AttackPattern, units: UString => String): String =
     val lines = Seq.newBuilder[String]
     lines.addOne(if flags.isEmpty then "-" else flags)
     lines.addOne(if pattern.isEmpty then "-" else units(pattern))
@@ -351,6 +646,14 @@ object RuntimeAttackProgram:
       lines.addOne(s"${math.max(0, attack.n + m)}:${units(t)}")
     if attack.suffix.nonEmpty then lines.addOne(s"1:${units(attack.suffix)}")
     lines.result().mkString("", "\n", "\n")
+
+  /** Returns the UTF-16 units of the string of the mode in four hexadecimal digits each (e.g. `0061` of `a`). */
+  private def utf16Units(mode: UnitMode)(s: UString): String = mode.encode(s).map(c => hex(c, 4)).mkString
+
+  /** Returns the units of the string in eight hexadecimal digits each (e.g. `00000061` of `a`), which are the bytes or
+    * the code points of the string.
+    */
+  private def wideUnits(s: UString): String = s.iterator.map(c => hex(c, 8)).mkString
 
   /** Returns the Perl program for `perl` in the C locale, or why the pattern cannot be put in the program as the
     * dialect tells.

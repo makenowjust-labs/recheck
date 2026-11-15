@@ -140,6 +140,10 @@ object Program:
       capturesSize: Int,
       countersSize: Int,
       canariesSize: Int,
+      /** The captures that make an iteration of a repetition not empty when they change, even if it does not advance
+        * (python-regex's back-referenced captures).
+        */
+      referencedCaptures: Seq[Int],
       predecessors: Vector[Set[Label]]
   ):
 

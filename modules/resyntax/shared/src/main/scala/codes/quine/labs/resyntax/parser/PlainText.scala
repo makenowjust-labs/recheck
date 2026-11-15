@@ -36,8 +36,9 @@ private[resyntax] object PlainText:
   /** Returns the text of the value after the letters of an escape (e.g. `7F` after `\x`). */
   def escape(style: EscapeStyle, value: Int, featureSet: FeatureSet): String = style match
     // Ruby's `\c\` takes a backslash escape as `\C-` does.
-    case EscapeStyle.Control('\\') if featureSet.hasBackslashMetaControl => EscapeStyle.ControlDash.plainText(value)
-    case _                                                               => style.plainText(value)
+    case EscapeStyle.Control('\\') if featureSet.escape.hasBackslashMetaControl =>
+      EscapeStyle.ControlDash.plainText(value)
+    case _ => style.plainText(value)
 
   /** Returns the text of inline flags (e.g. `im-s`).
     *
@@ -46,7 +47,7 @@ private[resyntax] object PlainText:
   def flagSetDiff(diff: FlagSetDiff, group: Boolean, verbose: Boolean, featureSet: FeatureSet): String =
     val text = diff.plainText
     // .NET rejects `(?)`, and reads `(?+)` as inline flags without flags.
-    if text.isEmpty && featureSet.allowsInlineFlagSign then "+"
+    if text.isEmpty && featureSet.inlineFlag.allowsInlineFlagSign then "+"
     // Java reads `(? :` in the extended mode as an inline flag group without flags, but `(?:` as a non-capture group.
-    else if text.isEmpty && group && verbose && featureSet.skipsCommentInConstruct then " "
+    else if text.isEmpty && group && verbose && featureSet.comment.skipsCommentInConstruct then " "
     else text

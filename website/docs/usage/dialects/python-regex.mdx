@@ -1,0 +1,133 @@
+---
+id: python-regex
+title: Python regex
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+Describes how `recheck` checks a regular expression of the `python-regex` dialect.
+
+## Engine
+
+`recheck` follows the syntax and the semantics of the third-party [`regex`](https://pypi.org/project/regex/) package of Python (2026.9.29), not of the `re` module (see [Python](python.mdx) for `re`).
+
+## Settings
+
+- `type` is the string type of the pattern and its input, `str` (default) or `bytes`.
+
+<Tabs>
+<TabItem value="cli" label="CLI">
+
+```console
+$ recheck --dialect=python-regex '/^(a|a)*$/'
+$ recheck --dialect=python-regex --python-regex-type=bytes '/^(a|a)*$/'
+```
+
+</TabItem>
+<TabItem value="js" label="JavaScript">
+
+```tsx
+import { check } from "recheck";
+
+await check("^(a|a)*$", "", { dialect: "python-regex" });
+await check("^(a|a)*$", "", {
+  dialect: { name: "python-regex", type: "bytes" },
+});
+```
+
+</TabItem>
+<TabItem value="scala" label="Scala">
+
+```scala
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.resyntax.dialect.Dialect
+
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.PythonRegex()))
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.PythonRegex(Dialect.Python.Type.Bytes)))
+```
+
+</TabItem>
+</Tabs>
+
+## Flags and Units
+
+The matching unit is `code-point` for a `str` pattern (the default `type`), and `byte` for a `bytes` pattern (see [Matching Units](../dialects.mdx#matching-units)).
+
+`recheck` supports the following `regex` flags, written as their inline letters.
+The version flags are two letters, `V0` or `V1` (e.g. `iV1`), and the version is `V0` without them, as in `regex`.
+
+| Flag | `regex` flag                     | Inline  | Notes                                                                                  |
+| ---- | -------------------------------- | ------- | -------------------------------------------------------------------------------------- |
+| `a`  | `regex.ASCII` (`regex.A`)        | `(?a)`  | An error with `u` or `L`.                                                              |
+| `b`  | `regex.BESTMATCH` (`regex.B`)    | `(?b)`  | No effect, since fuzzy matching is not supported.                                      |
+| `e`  | `regex.ENHANCEMATCH` (`regex.E`) | `(?e)`  | No effect, since fuzzy matching is not supported.                                      |
+| `f`  | `regex.FULLCASE` (`regex.F`)     | `(?f)`  | Folds a character to several characters under `i` (e.g. `ß` matches `ss`), unless `a`. |
+| `i`  | `regex.IGNORECASE` (`regex.I`)   | `(?i)`  |                                                                                        |
+| `L`  | `regex.LOCALE` (`regex.L`)       | `(?L)`  | The C locale. An error with `a` or `u`.                                                |
+| `m`  | `regex.MULTILINE` (`regex.M`)    | `(?m)`  |                                                                                        |
+| `p`  | `regex.POSIX` (`regex.P`)        | `(?p)`  | Not supported.                                                                         |
+| `r`  | `regex.REVERSE` (`regex.R`)      | `(?r)`  | Not supported.                                                                         |
+| `s`  | `regex.DOTALL` (`regex.S`)       | `(?s)`  |                                                                                        |
+| `u`  | `regex.UNICODE` (`regex.U`)      | `(?u)`  | The default of a `str` pattern, and an error in a `bytes` pattern out of a group.      |
+| `w`  | `regex.WORD` (`regex.W`)         | `(?w)`  | Not supported with `\b`, `\B`, `\m`, `\M`, `.`, `^` or `$`.                            |
+| `x`  | `regex.VERBOSE` (`regex.X`)      | `(?x)`  |                                                                                        |
+| `V0` | `regex.VERSION0` (`regex.V0`)    | `(?V0)` | An error with `V1`.                                                                    |
+| `V1` | `regex.VERSION1` (`regex.V1`)    | `(?V1)` | Turns `f` on, and has the set operations and the nested sets in a class.               |
+
+As in `regex`, an inline flag in the middle of a pattern applies up to the end of its group, and `b`, `e`, `p`, `r`, `V0` and `V1` apply to the whole pattern wherever they are.
+
+## Syntax Limitations
+
+The following constructs are not supported, and they are reported as `unsupported`.
+
+- Recursion and calls of groups (e.g. `(?R)`, `(?1)` and `(?&name)`).
+- Conditionals (e.g. `(?(1)a|b)`, `(?(?=a)a|b)` and `(?(DEFINE)...)`).
+- Fuzzy constraints (e.g. `(?:abc){e<=1}`).
+- Named lists (e.g. `\L<name>`), whose strings are given on compiling the pattern.
+- The backtracking control verbs `(*PRUNE)` and `(*SKIP)`.
+- The flags `p` (`POSIX`) and `r` (`REVERSE`), and `w` (`WORD`) with `\b`, `\B`, `\m`, `\M`, `.`, `^` or `$`.
+- `\N{...}` (e.g. `\N{EM DASH}`), as in the other dialects having it.
+
+## Approximations
+
+- `L` follows the C locale, whatever locale the environment has.
+- Under `i` with `f` or `V1`, a run of literals matches the folding of the characters only at the boundaries of the literals (e.g. `ﬃ` does not match `"ﬀi"`, and `sß` does not match `"ßs"`), and a class does not join the literals after it (e.g. `[ﬀ]i` does not match `"ﬃ"`).
+- `recheck` does not reproduce the following behaviors of `regex`.
+  - An escape class or a property out of a group after an encoding flag (e.g. `\w(?a)`) takes the flag, and a group without an encoding flag in a group with one (e.g. `(?a:(?i:\w))`) takes the encoding of the whole pattern; `recheck` takes the encoding at the position of the escape or the property.
+  - `\X` uses the encoding of the whole pattern (e.g. `(?a:\X)` is a grapheme cluster); `recheck` uses the encoding at its position.
+  - Under `i`, a class of only one property or escape class matches as the property alone (e.g. `(?i)^[\p{Lu}]$` matches `"ĸ"`, but `(?i)^[\p{Lu}x]$` does not); `recheck` takes it as a class.
+  - Under `i` with `a`, a property of letter cases (e.g. `\p{Ll}`, `\p{Lu}` and `\p{Lowercase}`) matches non-ASCII characters (e.g. `(?ia)\p{Ll}` matches `"é"`, though `(?a)\p{Ll}` does not); `recheck` keeps it within ASCII.
+  - A character matching its folding to several characters can be matched in two ways (e.g. `^(?:ß)*$` with `iV1` takes exponential time on `"ß"` repeated and `"!"`); `recheck` matches it in one way.
+  - Under `L`, `\p{Cn}` matches the characters up to `U+00FF`, and `\p{Assigned}` and `\p{LC}` match none.
+  - In a `bytes` pattern, `\777` never matches, and `\xDF` matches `ss` under `i` with `V1`; `recheck` takes `\777` as `\xFF`, and folds no byte to several bytes.
+  - A code point that `Bidi_Class` or `East_Asian_Width` has no value for in the data of `regex` has the first value of the property (`R` or `W`); `recheck` follows the defaults of the Unicode Character Database.
+  - Without `V1`, `\g<1>` in the group 1 is the literal `g<1>`; `recheck` reports it as `invalid`, as `\1` there.
+  - `VERSION0` and `VERSION1` together raise `KeyError`; `recheck` reports them as `invalid`.
+- A repetition with a huge minimum count (e.g. `a{1000000}`) takes long for `regex` to compile, which the [`timeout`](../parameters.mdx#timeout) of the whole check stops.
+
+### Optimizations
+
+`recheck` does not implement the following optimizations specific to `regex`, so an attack that `recheck` reports may not work on `regex`, and the runtime-attack verification checks whether it does.
+
+- A repetition of a single character (e.g. `a+` or `\w*`) remembers the positions where the rest of the pattern failed, which makes `^(a+)+$` and `^(\w+\s?)*$` fast.
+- A pattern fails at once on an input without a string that every match has (e.g. `^(?:a|a)*c` on an input without `c`).
+
+## Runtime-Attack Verification
+
+- Command: `python3 -I -`, with the `regex` package installed.
+- Matching: `search` of a compiled pattern.
+- Engine limits: none.
+- Engine errors: `RecursionError`, `MemoryError`.
+- Environment variable: `RECHECK_PYTHON_REGEX`.
+
+`-I` ignores `PYTHONPATH` and the user's site packages, so the Python needs the package in its own site packages, such as the Python of a virtual environment.
+
+```console
+$ python3 -m venv .venv
+$ .venv/bin/pip install regex
+$ RECHECK_PYTHON_REGEX="$PWD/.venv/bin/python" recheck --dialect=python-regex '/^(a|a)*$/'
+```
+
+A Python without the package makes the runtime-attack verification fail with an `unexpected` error telling it.

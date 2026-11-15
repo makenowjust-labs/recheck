@@ -155,3 +155,5 @@ dist
 .pnp.*
 
 .hugo_build.lock
+
+.venv/

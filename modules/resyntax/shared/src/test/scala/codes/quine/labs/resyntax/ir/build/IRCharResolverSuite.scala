@@ -1,11 +1,17 @@
 package codes.quine.labs.resyntax.ir
 package build
 
+import codes.quine.labs.resyntax.ast.BackslashKind.EscapeClass
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
+import codes.quine.labs.resyntax.ast.ClassItemData
+import codes.quine.labs.resyntax.ast.EscapeClassKind.CharName
+import codes.quine.labs.resyntax.ast.EscapeClassKind.NamedList
 import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
+import codes.quine.labs.resyntax.charset.CompatibilityPropertyTable
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UTF16Encoding
@@ -807,3 +813,160 @@ class IRCharResolverSuite extends munit.FunSuite:
     assertEquals(IRCharResolver.prune(IRNode(Disjunction(Seq(never, never)))), None)
     assertEquals(IRCharResolver.prune(IRNode(Repeat(never, IRQuantifier.Exact(0)))), Some(IRNode(Empty)))
     assertEquals(IRCharResolver.prune(IRNode(Repeat(never, IRQuantifier.Exact(2)))), None)
+
+  // python-regex's simple case folding, where `I`, `i`, `İ` and `ı` match without transitivity (regex 2026.9.29).
+  val PR: Dialect = PythonRegex()
+  val PRBytes: Dialect = PythonRegex(Python.Type.Bytes)
+  chars("I", "i", PR)(of("Iiı"))
+  chars("i", "i", PR)(of("Iiİ"))
+  chars("İ", "i", PR)(of("iİ"))
+  chars("ı", "i", PR)(of("Iı"))
+  chars("k", "i", PR)(of("KkK"))
+  chars("[a-z]", "i", PR)(
+    CharSet.of(0x130, 0x17f, 0x212a).union(CharSet.range('A', 'Z')).union(CharSet.range('a', 'z'))
+  )
+  chars("k", "ia", PR)(of("Kk"))
+  chars("k", "iL", PR)(of("Kk"))
+  chars("\\xe9", "i", PRBytes)(of("é"))
+  // python-regex masks an octal escape to a byte under `a` and `L` and in a bytes pattern.
+  chars("\\777", "", PR)(CharSet.single(0x1ff))
+  chars("\\777", "a", PR)(CharSet.single(0xff))
+  chars("[\\777]", "L", PR)(CharSet.single(0xff))
+  chars("\\777", "", PRBytes)(CharSet.single(0xff))
+  chars("\\u0100", "", PRBytes)(CharSet.empty)
+  // python-regex's `\R` has no U+0085 in a bytes pattern, and `\X` is a character without Unicode.
+  check("\\R", "", PRBytes)(
+    Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(CharSet.range(0x0a, 0x0d))))
+  )
+  chars("\\X", "a", PR)(UnitMode.CodePoint.universe)
+  chars("\\X", "", PRBytes)(UnitMode.Byte.universe)
+  test("IRBuilder.build: python-regex's \\X is a grapheme cluster in Unicode"):
+    assert(build("\\X", "", PR).node.equalsWithoutLoc(build("\\X", "", Java).node))
+    assert(build("\\X", "u", PR).node.equalsWithoutLoc(build("\\X", "", Java).node))
+  // python-regex's classes are its properties by the encoding.
+  chars("\\h", "", PR)(gc("Zs").union(of("\t")))
+  chars("\\h", "a", PR)(of(" \t"))
+  chars("\\s", "a", PR)(IRClassLookup.ASCIISpace)
+  chars("\\w", "L", PR)(IRClassLookup.ASCIIWord)
+  chars("\\d", "", PRBytes)(IRClassLookup.ASCIIDigit)
+  chars("(?u:\\w)", "", PRBytes)(setOf(build("\\w", "", PR).node.data).intersect(UnitMode.Byte.universe))
+  chars("[a-c~~b-d]", "V1", PR)(of("ad"))
+  chars("[a]", "iV1", PR)(of("Aa"))
+  chars("[[:alpha:]]", "", PR)(PropertyTable.binary("Alphabetic").get.set)
+  chars("[[:punct:]]", "a", PR)(IRClassLookup.ASCII_POSIX("punct"))
+  chars("[[:sc=Greek:]]", "", PR)(PropertyTable.Script.value("Greek").get.set)
+  chars("[[:upper:]]", "ia", PR)(CharSet.range('A', 'Z').union(CharSet.range('a', 'z')))
+  test("IRBuilder.build: python-regex's unknown POSIX class"):
+    interceptMessage[IRBuildingException]("Unknown POSIX class name at 1")(build("[[:bogus:]]", "", PR))
+  // A property is the cased letters for `Lu` out of a class under `i`, and closed in a class.
+  chars("\\p{Lu}", "i", PR)(gc("LC"))
+  chars("\\P{Lu}", "i", PR)(gc("LC").complement(UnitMode.CodePoint))
+  chars("\\p{Lowercase}", "i", PR)(PropertyTable.binary("Cased").get.set)
+  chars("\\p{Lu}", "ia", PR)(CharSet.range('A', 'Z'))
+  chars("\\p{Lu}", "iL", PR)(CharSet.range('A', 'Z').union(CharSet.range('a', 'z')))
+  chars("[\\p{Lu}]", "i", PR)(CaseMapping.SimpleFold.closure(gc("Lu")).union(of("ıİ")))
+  chars("\\p{ASCII}", "i", PR)(CharSet.range(0, 0x7f))
+  // python-regex folds a class to its distinct foldings to several characters, and `İ` to itself.
+  test("IRBuilder.build: python-regex's foldings of a class"):
+    val node = strip(build("[ßẞİ]", "iV1", PR).node.data)
+    val Disjunction(Seq(klass, ss, dottedCapitalI)) = node: @unchecked
+    assertEquals(klass.data, Chars(of("\u00df\u1e9ei\u0130").union(CharSet.single(0x1df95))))
+    assert(ss.equalsWithoutLoc(IRNode(strip(build("ss", "iV1", PR).node.data))))
+    assert(dottedCapitalI.equalsWithoutLoc(IRNode(strip(build("İ", "iV1", PR).node.data))))
+  // The foldings are of the characters in the class without `i`: `ẞ` in `\P{Ll}`, but not `ᾈ` (`Lt`) in `\p{Lu}`.
+  test("IRBuilder.build: python-regex folds the characters of a class without case-insensitivity"):
+    def foldings(source: String): Seq[IRNode] =
+      val Disjunction(_ +: keys) = strip(build(source, "iV1", PR).node.data): @unchecked
+      keys
+    def folding(source: String): IRNode = IRNode(strip(build(source, "iV1", PR).node.data))
+    assert(foldings("[\\P{Ll}]").exists(_.equalsWithoutLoc(folding("ss"))))
+    assert(foldings("[\\P{Ll}]").exists(_.equalsWithoutLoc(folding("\u1f00\u03b9"))))
+    assert(!foldings("[\\p{Lu}]").exists(_.equalsWithoutLoc(folding("\u1f00\u03b9"))))
+    assert(build("[^\\p{Ll}]", "iV1", PR).node.equalsWithoutLoc(build("[^\\p{Ll}]", "iV0", PR).node))
+  chars("[\u00df]", "iV0", PR)(of("\u00df\u1e9e").union(CharSet.single(0x1df95)))
+  chars("[ß]", "iaV1", PR)(of("ß"))
+  test("IRBuilder.build: python-regex's foldings of a literal follow `f` and `V1`"):
+    assert(build("ß", "iV0f", PR).node.equalsWithoutLoc(build("ß", "iV1", PR).node))
+    assert(build("(?-f)ß", "iV1", PR).node.equalsWithoutLoc(build("(?-f)ß", "iV0", PR).node))
+    assert(!build("ß", "iV0", PR).node.equalsWithoutLoc(build("ß", "iV1", PR).node))
+    assertEquals(strip(build("İ", "iV1", PR).node.data), Chars(of("iİ")))
+  // python-regex's `\N{...}` and `\L<...>` need the tables that recheck does not have.
+  check("\\N{LATIN SMALL LETTER A}", "", PR)(
+    Unsupported(NodeData.Backslash(EscapeClass(CharName("LATIN SMALL LETTER A"))))
+  )
+  check("\\L<x>", "", PR)(Unsupported(NodeData.Backslash(EscapeClass(NamedList("x")))))
+
+  // ICU folds literals and back-references to several characters, but not classes (ICU 79.1).
+  check("ß", "i", ICU)(sharpS)
+  check("\\x73s", "i", ICU)(sharpS)
+  check("s\\Qs\\E", "i", ICU)(sharpS)
+  chars("[ß]", "i", ICU)(sharpSs)
+  chars("İ", "", ICU)(of("İ"))
+  check("İ", "i", ICU)(Disjunction(Sequence(Chars(of("iI")), Chars(of("\u0307"))), Chars(of("İ"))))
+  chars("k", "i", ICU)(of("kK\u212a"))
+  chars("i", "i", ICU)(of("iI"))
+  chars("\\p{Ll}", "i", ICU)(CaseMapping.SimpleFold.closure(gc("Ll")))
+  chars("\\P{Lu}", "i", ICU)(CaseMapping.SimpleFold.closure(gc("Lu")).complement(UnitMode.CodePoint))
+  chars("[:Lu:]", "", ICU)(gc("Lu"))
+  chars("[[:^Lu:]a]", "", ICU)(gc("Lu").complement(UnitMode.CodePoint))
+  chars("[[a-c]-[b]]", "", ICU)(of("ac"))
+  chars("[[a-c]&[bx]]", "", ICU)(of("b"))
+  chars("[[a-c]-[b]&[ab]]", "", ICU)(of("a"))
+  // ICU's literals in a row are a UTF-16 string, where a high and a low surrogate make a pair.
+  chars("\\x{D83D}\\x{DE00}", "", ICU)(CharSet.single(0x1f600))
+  check("\\x{D83D}a", "", ICU)(Sequence(Chars(CharSet.single(0xd83d)), Chars(of("a"))))
+  check("\\Q\\E", "", ICU)(Empty)
+  // ICU's `.` with `s` reads `\r\n` as one character.
+  check(".", "s", ICU)(
+    Disjunction(
+      Sequence(Chars(of("\r")), Chars(of("\n"))),
+      Sequence(Chars(UnitMode.CodePoint.universe), Assert(IRAssertKind.NotBetweenCRLF))
+    )
+  )
+  chars(".", "", ICU)(of("\n\u000b\u000c\r\u0085\u2028\u2029").complement(UnitMode.CodePoint))
+  chars(".", "d", ICU)(of("\n").complement(UnitMode.CodePoint))
+  // ICU's classes are of Unicode, and `\h` is `[\t\p{Zs}]`.
+  chars("\\w", "", ICU)(CompatibilityPropertyTable.Word)
+  chars("\\d", "", ICU)(gc("Nd"))
+  chars("\\s", "", ICU)(PropertyTable.binary("White_Space").get.set)
+  chars("\\h", "", ICU)(gc("Zs").union(of("\t")))
+
+  // Boost.Regex's classes are of the C locale over `char`, and of ICU in `u32regex` (Boost.Regex 1.92.0).
+  val BoostU32: Dialect = BoostRegex(BoostRegex.Type.U32Regex)
+  val Bytes: CharSet = UnitMode.Byte.universe
+  chars("\\w", "", BoostRegex())(IRClassLookup.ASCIIWord)
+  chars("\\s", "", BoostRegex())(of("\t\n\u000b\f\r "))
+  chars("\\h", "", BoostRegex())(of("\t "))
+  chars("\\v", "", BoostRegex())(CharSet.range(0x0a, 0x0d))
+  chars("[\\v]", "", BoostRegex())(of("\u000b"))
+  chars("\\l", "", BoostRegex())(CharSet.range('a', 'z'))
+  chars("\\u", "", BoostRegex())(CharSet.range('A', 'Z'))
+  chars("\\U", "", BoostRegex())(CharSet.range('A', 'Z').complement(UnitMode.Byte))
+  chars("[[:unicode:]]", "", BoostRegex())(CharSet.empty)
+  chars("\\w", "", BoostU32)(gc("L").union(gc("Nd")).union(gc("Mn")).union(of("_")))
+  chars("\\s", "", BoostU32)(
+    gc("Z").union(CharSet.range(0x09, 0x0d)).union(CharSet.range(0x1c, 0x1f)).union(of("\u0085"))
+  )
+  chars("\\v", "", BoostU32)(CharSet.range(0x0a, 0x0d).union(CharSet.of(0x85, 0x2028, 0x2029)))
+  chars("[[:cntrl:]]", "", BoostU32)(gc("Cc").union(gc("Cf")).union(gc("Zl")).union(gc("Zp")))
+  // Under `i`, the class matches a character whose case folding the class has, and the lower or the upper case letters
+  // are all the letters (e.g. `(?i)[@-Z]` matches `[`, and `(?i)\p{Lt}` matches no `Lt` character).
+  chars("\\l", "i", BoostRegex())(of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"))
+  chars("\\L", "i", BoostRegex())(of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz").complement(UnitMode.Byte))
+  chars("[@-Z]", "i", BoostRegex())(CharSet.range('@', 'z'))
+  chars("[^a]", "i", BoostRegex())(of("aA").complement(UnitMode.Byte))
+  error("[Z-a]", "i", BoostRegex())("Range out of order in character class at 1")
+  chars("k", "i", BoostU32)(CharSet.of('k', 'K', 0x212a))
+  chars("[a-z]", "i", BoostU32)(CaseMapping.SimpleFold.preimage(CharSet.range('a', 'z')))
+  chars("\\p{Lt}", "i", BoostU32)(CaseMapping.SimpleFold.preimage(gc("Lt")))
+  chars("\\p{Lu}", "i", BoostU32)(CaseMapping.SimpleFold.preimage(gc("L")).intersect(Scalars))
+  // Collation is unsupported: the collating elements, the equivalence classes, and the ranges with `c` (`collate`).
+  check("[[.a.]]", "", BoostRegex())(Unsupported(NodeData.Class(false, ClassItemData.ClassCollatingElement("a"))))
+  check("[[=a=]]", "", BoostRegex())(Unsupported(NodeData.Class(false, ClassItemData.ClassEquivalence("a"))))
+  check("[a-c]", "c", BoostRegex())(
+    Unsupported(
+      NodeData.Class(false, ClassItemData.ClassRange(ClassItemData.ClassLiteral('a'), ClassItemData.ClassLiteral('c')))
+    )
+  )
+  chars("[ac]", "c", BoostRegex())(of("ac"))
+  check("\\N{space}", "", BoostRegex())(Unsupported(NodeData.Backslash(EscapeClass(CharName("space")))))

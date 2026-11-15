@@ -73,14 +73,14 @@ private[build] final class IRCharResolver(
 
   /** Returns the marks that `\b` and `\B` take as word characters after a base at the flags, if any. */
   def wordMarks(flags: IRCharFlagSet): Option[IRWordMarkSet] =
-    // Java's `\b` with `U` has the non-spacing marks in its word set already.
-    Option.when(featureSet.hasMarkWordBoundary && !flags.unicodeClass):
-      val marks = IRClassLookup.javaWordMarks
-      IRWordMarkSet(
-        marks.marks.intersect(universe),
-        marks.extenders.intersect(universe),
-        marks.bases.intersect(universe)
-      )
+    classes
+      .wordMarks(flags)
+      .map: marks =>
+        IRWordMarkSet(
+          marks.marks.intersect(universe),
+          marks.extenders.intersect(universe),
+          marks.bases.intersect(universe)
+        )
 
   /** Checks whether the node is a literal character, which [[literals]] resolves with the others of its part. */
   def isLiteral(node: Node): Boolean = node.data match
@@ -144,12 +144,16 @@ private[build] final class IRCharResolver(
         case NodeData.Backslash(BackslashKind.Unknown(value)) =>
           lits += Lit(value, None, flags, node.loc)
         case NodeData.Backslash(BackslashKind.Escape(style, value, _)) =>
-          lits += Lit(value, Some(style), flags, node.loc)
+          lits += Lit(escapeValue(style, value, flags), Some(style), flags, node.loc)
         // A part has only the nodes that `isLiteral` accepts.
         // $COVERAGE-OFF$
         case data => throw new IllegalArgumentException(s"Not a literal: $data")
       // $COVERAGE-ON$
-    val merged = if readsByteEscapesAsUTF8 then mergeRubyBytes(lits.toIndexedSeq) else lits.toIndexedSeq
+    val merged =
+      if readsByteEscapesAsUTF8 then mergeRubyBytes(lits.toIndexedSeq)
+      else if featureSet.joinsLiteralsAsUTF16 && mode == UnitMode.UTF16CodePoint then
+        mergeSurrogatePairs(lits.toIndexedSeq)
+      else lits.toIndexedSeq
     val units = merged.flatMap: lit =>
       unitsOf(lit) match
         case Seq() => Seq(lit.copy(value = NoUnit))
@@ -179,7 +183,7 @@ private[build] final class IRCharResolver(
           if classItem(item, flags.copy(ignoreCase = false)).chars.intersect(universe).size != 1 =>
         Some(classItem(item, flags).chars)
       case NodeData.Backslash(BackslashKind.EscapeClass(kind)) if isProperty(kind) =>
-        Some(escapeClassSet(kind, flags, node.loc).chars)
+        Some(escapeClassSet(kind, flags, node.loc, inClass = false).chars)
       case _ => None
     set.map(s => rubyFoldings(s.intersect(universe))).filter(_.nonEmpty).map(keys => 1 +: keys.map(_.length))
 
@@ -187,17 +191,29 @@ private[build] final class IRCharResolver(
     if u.value == NoUnit then IRNode(IRNodeData.Chars(CharSet.empty), u.loc)
     else IRNode(IRNodeData.Chars(equivalence(u.flags).closure(CharSet.single(u.value)).intersect(universe)), u.loc)
 
-  /** Whether a literal takes part in Ruby's and Perl's multi-character case folding.
-    *
-    * Perl compiles an escape into the same node as the literals around it. Ruby passes an escape of an ASCII character
-    * to Onigmo as an escape, which is a node apart (e.g. `\x73s` and `\u0073s` do not match `ß`), but writes the others
-    * as the characters (e.g. `\u00DF` and `\xC3\x9F` are `ß`).
+  /** Returns the value of an escape, where python-regex masks an octal escape (e.g. `\777`) to a byte under `a` and `L`
+    * and in a bytes pattern.
     */
+  private def escapeValue(style: EscapeStyle, value: Int, flags: IRCharFlagSet): Int =
+    val isByteCharset = !mode.isCodePoint || (flags.charset match
+      case _: IRCharset.ASCII | IRCharset.Locale => true
+      case _                                     => false)
+    if featureSet.masksOctalEscapeByCharset && style == EscapeStyle.BareOctal && isByteCharset then value & 0xff
+    else value
+
+  /** Whether characters match their foldings to several characters under the flags. */
+  private def foldsMulti(flags: IRCharFlagSet): Boolean =
+    flags.ignoreCase && flags.fullCaseFolding && featureSet.multiCharFoldingKind.foldsIn(mode)
+
+  /** Returns the full case folding of a character in the dialect, which may keep `İ` (U+0130) as it is. */
+  private def fullFolding(c: Int): UString =
+    if c == DottedCapitalI && !featureSet.multiCharFoldingKind.foldsDottedCapitalI then UString(c)
+    else FullCaseFolding(c)
+
+  /** Whether a literal takes part in Ruby's and Perl's multi-character case folding. */
   private def foldsMultiChar(u: Lit): Boolean =
-    u.flags.ignoreCase && u.value != NoUnit && (featureSet.multiCharFoldingKind match
-      case IRMultiCharFoldingKind.Perl     => true
-      case IRMultiCharFoldingKind.Ruby     => mode.isCodePoint && (u.escape.isEmpty || u.value >= 0x80)
-      case IRMultiCharFoldingKind.OneToOne => false)
+    val kind = featureSet.multiCharFoldingKind
+    foldsMulti(u.flags) && u.value != NoUnit && (u.escape.isEmpty || u.value >= 0x80 || kind.foldsASCIIEscapes)
 
   /** Resolves a part with the multi-character case folding of Ruby and Perl.
     *
@@ -212,11 +228,10 @@ private[build] final class IRCharResolver(
     // Perl's `aa` forbids a non-ASCII character to match a folding with ASCII characters (e.g. `ß` and `ss`), and `l` one with characters below `U+0100`.
     val minFoldedValue =
       if flags.caselessRestrict then 0x80
-      else if featureSet.multiCharFoldingKind == IRMultiCharFoldingKind.Perl && flags.charset == IRCharset.Locale then
-        0x100
+      else if featureSet.multiCharFoldingKind.isRestrictedByCharset && flags.charset == IRCharset.Locale then 0x100
       else 0
     val folded = mutable.ArrayBuffer.empty[(Int, Int)]
-    for (u, i) <- units.zipWithIndex; c <- FullCaseFolding(u.value).iterator do folded += ((c, i))
+    for (u, i) <- units.zipWithIndex; c <- fullFolding(u.value).iterator do folded += ((c, i))
     def char(i: Int, loc: SourceLocation): IRNode =
       IRNode(IRNodeData.Chars(eq.closure(CharSet.single(folded(i)._1))), loc)
 
@@ -228,12 +243,11 @@ private[build] final class IRCharResolver(
       // A key must start and end at literal boundaries.
       if (i == 0 || folded(i - 1)._2 != folded(i)._2) &&
         (i + key.length == folded.length || folded(i + key.length)._2 != folded(i + key.length - 1)._2)
-      // Onigmo joins several literals only when each of them folds to one character (e.g. `ﬀi` does not match `ﬃ`).
-      if featureSet.multiCharFoldingKind != IRMultiCharFoldingKind.Ruby ||
+      if featureSet.multiCharFoldingKind.joinsMultiCharFoldings ||
         folded(i)._2 == folded(i + key.length - 1)._2 ||
         folded(i + key.length - 1)._2 - folded(i)._2 + 1 == key.length
       // A native string under Perl's `/d` has no character to match a Latin-1 character's folding (e.g. `\xDF`).
-      chars = (if native then set.diff(IRClassLookup.Latin1) else set).intersect(universe)
+      chars = (if native then set.diff(IRClassLookup.Latin1) else set).diff(unfoldedChars).intersect(universe)
       if chars.nonEmpty
     yield (i, key.length, chars)
     if occurrences.size > MaxMultiFoldings then
@@ -286,14 +300,37 @@ private[build] final class IRCharResolver(
 
   private def isRubyByteLit(lit: Lit): Boolean = lit.escape.exists(isRubyByte(_, lit.value))
 
+  /** Joins a high surrogate and a low surrogate in a row into a pair, as ICU's UTF-16 string of the literals has them
+    * (e.g. `\x{D83D}\x{DE00}` matches `😀`).
+    */
+  private def mergeSurrogatePairs(lits: IndexedSeq[Lit]): IndexedSeq[Lit] =
+    val out = mutable.ArrayBuffer.empty[Lit]
+    var i = 0
+    while i < lits.length do
+      val lit = lits(i)
+      if i + 1 < lits.length && UTF16Encoding.isHighSurrogate(lit.value) &&
+        UTF16Encoding.isLowSurrogate(lits(i + 1).value)
+      then
+        val pair = UTF16Encoding.decodeSurrogatePair(lit.value, lits(i + 1).value)
+        out += lit.copy(value = pair, loc = SourceLocation(lit.loc.start, lits(i + 1).loc.end))
+        i += 2
+      else
+        out += lit
+        i += 1
+    out.toIndexedSeq
+
+  /** The characters that the dialect does not fold to several characters (e.g. `İ` in python-regex). */
+  private val unfoldedChars: CharSet =
+    if featureSet.multiCharFoldingKind.foldsDottedCapitalI then CharSet.empty else CharSet.single(DottedCapitalI)
+
   private def unitsOf(lit: Lit): Seq[UChar] = mode match
     case UnitMode.UTF16CodePoint | UnitMode.CodePoint | UnitMode.ScalarValue => Seq(lit.value)
     case UnitMode.UTF16                                                      => UTF16Encoding.encode(lit.value)
     case UnitMode.Byte                                                       =>
       // The parser reads a byte source by bytes, so only an escape can be above `0xFF`.
       if lit.value <= 0xff then Seq(lit.value)
-      // Perl makes the pattern UTF-8 for it, and it never matches a byte string.
-      else if featureSet.hasNativeString then Seq.empty
+      // Perl makes the pattern UTF-8 for it, and python-regex reads the escape (e.g. `\u0100`), and it never matches.
+      else if featureSet.hasNativeString || featureSet.allowsWideEscapeInByteMode then Seq.empty
       // The parsers of the other dialects reject a code point above `0xFF` in byte mode.
       // $COVERAGE-OFF$
       else throw new IllegalArgumentException(s"Character value is too large in byte mode: ${lit.value}")
@@ -307,7 +344,13 @@ private[build] final class IRCharResolver(
   private def complement(set: CharSet): IRNodeData = IRNodeData.Chars(set.complement(universe))
 
   private def dot(flags: IRCharFlagSet): IRNodeData =
-    if flags.dotAll then chars(universe)
+    // ICU's `.` with `s` reads `\r\n` as one character, and does not backtrack into it, so a character alone does not end between `\r` and `\n`.
+    if flags.dotAll && featureSet.dotAllMatchesCRLF then
+      IRNodeData.Disjunction(
+        IRNodeData.Sequence(chars(CharSet.single(0x0d)), chars(CharSet.single(0x0a))),
+        IRNodeData.Sequence(chars(universe), IRNodeData.Assert(IRAssertKind.NotBetweenCRLF))
+      )
+    else if flags.dotAll then chars(universe)
     else
       val terminators = flags.lineTerminators
       val set = complement(CharSet.of(terminators.chars.toSeq*))
@@ -318,7 +361,10 @@ private[build] final class IRCharResolver(
 
   private def escapeClass(kind: EscapeClassKind, flags: IRCharFlagSet, loc: SourceLocation): IRNodeData = kind match
     case EscapeClassKind.GeneralNewline =>
-      val set = if flags.bsrAnyCRLF then CharSet.of(0x0a, 0x0d) else IRClassLookup.Vertical
+      val set =
+        if flags.bsrAnyCRLF then CharSet.of(0x0a, 0x0d)
+        else if featureSet.hasASCIIGeneralNewline then CharSet.range(0x0a, 0x0d)
+        else IRClassLookup.Vertical
       val alternatives = IRNodeData.Disjunction(
         IRNodeData.Sequence(chars(CharSet.single(0x0d)), chars(CharSet.single(0x0a))),
         chars(set)
@@ -327,8 +373,20 @@ private[build] final class IRCharResolver(
       if featureSet.backtracksIntoGeneralNewline then alternatives else IRNodeData.Atomic(alternatives)
     case EscapeClassKind.NonNewline if featureSet.nonNewlineExcludesLineTerminators => dot(flags.copy(dotAll = false))
     case EscapeClassKind.GraphemeCluster                                            =>
-      if featureSet.hasPCREGraphemeCluster then pcreGraphemeCluster else graphemeCluster
-    case _ => output(escapeClassSet(kind, flags, loc), flags)
+      if featureSet.hasPCREGraphemeCluster then pcreGraphemeCluster
+      else if featureSet.hasBoostRegexGraphemeCluster then boostRegexGraphemeCluster
+      // python-regex's encodings other than Unicode have a boundary at every position.
+      else if featureSet.hasCharsetGraphemeCluster && !isUnicodeCharset(flags) then chars(universe)
+      else graphemeCluster
+    case EscapeClassKind.CodeUnit if featureSet.readsCodeUnitAsDot => dot(flags)
+    case _ => output(foldInput(escapeClassSet(kind, flags, loc, inClass = false), flags), flags)
+
+  /** Whether the flags read characters by Unicode, not by ASCII or a locale (python-regex). */
+  private def isUnicodeCharset(flags: IRCharFlagSet): Boolean =
+    flags.charset match
+      case IRCharset.Unicode => true
+      case IRCharset.Default => mode.isCodePoint
+      case _                 => false
 
   /** graphemeCluster is the IR of `\X`, which matches an extended grapheme cluster by the regular expression of UAX #29
     * (Table 1b) in an atomic group.
@@ -390,6 +448,18 @@ private[build] final class IRCharResolver(
     )
     IRNodeData.Atomic(IRCharResolver.prune(cluster).getOrElse(IRNode(IRNodeData.Chars(CharSet.empty))))
 
+  /** boostRegexGraphemeCluster is the IR of Boost.Regex's `\X`, which matches a character other than a combining
+    * character and the combining characters after it, and does not backtrack into them.
+    *
+    * The combining characters are Boost.Regex's old table (e.g. U+0300 to U+0361), and no byte is one.
+    */
+  private lazy val boostRegexGraphemeCluster: IRNodeData =
+    import Grammar.*
+    if mode == UnitMode.Byte then chars(universe)
+    else
+      val combining = IRClassLookup.boostRegexCombining
+      IRNodeData.Atomic(seq(c(combining.complement(universe)), star(c(combining))))
+
   private def gcb(names: String*): CharSet =
     CharSet.union(names.map(PropertyTable.GraphemeClusterBreak.value(_).get.set)).intersect(universe)
 
@@ -398,7 +468,12 @@ private[build] final class IRCharResolver(
     val Seq(l, v, t, lv, lvt) = Seq("L", "V", "T", "LV", "LVT").map(n => c(gcb(n)))
     alt(seq(star(l), alt(plus(v), seq(lv, star(v)), lvt), star(t)), plus(l), plus(t))
 
-  private def escapeClassSet(kind: EscapeClassKind, flags: IRCharFlagSet, loc: SourceLocation): ClassSet =
+  private def escapeClassSet(
+      kind: EscapeClassKind,
+      flags: IRCharFlagSet,
+      loc: SourceLocation,
+      inClass: Boolean
+  ): ClassSet =
     def set(s: CharSet): ClassSet = ClassSet(s.intersect(universe))
 
     def not(s: CharSet): ClassSet = ClassSet(s.complement(universe))
@@ -411,26 +486,34 @@ private[build] final class IRCharResolver(
       case EscapeClassKind.Word          => set(classes.word(flags))
       case EscapeClassKind.NonWord       => not(classes.word(flags))
       case EscapeClassKind.Horizontal    => set(classes.horizontal)
+      case EscapeClassKind.POSIXBlank    => set(classes.blank(flags))
       case EscapeClassKind.NonHorizontal => not(classes.horizontal)
       case EscapeClassKind.Vertical      => set(classes.vertical)
       case EscapeClassKind.NonVertical   => not(classes.vertical)
       case EscapeClassKind.HexDigit      => set(classes.hexDigit)
       case EscapeClassKind.NonHexDigit   => not(classes.hexDigit)
-      case EscapeClassKind.NonNewline    => not(CharSet.single(0x0a))
-      case EscapeClassKind.CodeUnit      =>
+      // Boost.Regex's `\l` and `\u` are its class names `l` and `u`.
+      case EscapeClassKind.Lower      => property("l", None, false, flags, loc, inClass)
+      case EscapeClassKind.NonLower   => property("l", None, true, flags, loc, inClass)
+      case EscapeClassKind.Upper      => property("u", None, false, flags, loc, inClass)
+      case EscapeClassKind.NonUpper   => property("u", None, true, flags, loc, inClass)
+      case EscapeClassKind.NonNewline => not(CharSet.single(0x0a))
+      case EscapeClassKind.CodeUnit   =>
         if mode == UnitMode.Byte then set(universe) else throw new NotModeledException
       // Java and Python look up a Unicode name, which starts with a letter and has letters, digits, spaces and hyphens.
       case EscapeClassKind.CharName(name) if featureSet.validatesCharName && !isUnicodeNameLike(name) =>
         throw new IRBuildingException("Unknown character name", loc)
-      case EscapeClassKind.GeneralNewline | EscapeClassKind.GraphemeCluster | EscapeClassKind.CharName(_) =>
+      case EscapeClassKind.GeneralNewline | EscapeClassKind.GraphemeCluster | EscapeClassKind.CharName(_) |
+          EscapeClassKind.NamedList(_) =>
         throw new NotModeledException
-      case EscapeClassKind.UnicodeProperty(name)                => property(name, None, false, flags, loc)
-      case EscapeClassKind.UnicodeBareProperty(name)            => property(name, None, false, flags, loc)
-      case EscapeClassKind.UnicodePropertyValue(name, value)    => property(name, Some(value), false, flags, loc)
-      case EscapeClassKind.NonUnicodeProperty(name)             => property(name, None, true, flags, loc)
-      case EscapeClassKind.NonUnicodeBareProperty(name)         => property(name, None, true, flags, loc)
-      case EscapeClassKind.NonUnicodePropertyValue(name, value) => property(name, Some(value), true, flags, loc)
-      case EscapeClassKind.QuoteSet(strings)                    =>
+      case EscapeClassKind.UnicodeProperty(name)             => property(name, None, false, flags, loc, inClass)
+      case EscapeClassKind.UnicodeBareProperty(name)         => property(name, None, false, flags, loc, inClass)
+      case EscapeClassKind.UnicodePropertyValue(name, value) => property(name, Some(value), false, flags, loc, inClass)
+      case EscapeClassKind.NonUnicodeProperty(name)          => property(name, None, true, flags, loc, inClass)
+      case EscapeClassKind.NonUnicodeBareProperty(name)      => property(name, None, true, flags, loc, inClass)
+      case EscapeClassKind.NonUnicodePropertyValue(name, value) =>
+        property(name, Some(value), true, flags, loc, inClass)
+      case EscapeClassKind.QuoteSet(strings) =>
         val eq = equivalence(flags)
         val values = strings.map: s =>
           UString.from(s.map:
@@ -445,7 +528,8 @@ private[build] final class IRCharResolver(
       value: Option[String],
       negated: Boolean,
       flags: IRCharFlagSet,
-      loc: SourceLocation
+      loc: SourceLocation,
+      inClass: Boolean
   ): ClassSet =
     // Python's parser rejects `\p`.
     // $COVERAGE-OFF$
@@ -480,6 +564,13 @@ private[build] final class IRCharResolver(
               ClassSet(eq.closure(chars), restricted.strings)
             // Onigmo negates the property after closing it under case folding.
             case IRCaselessPropertyKind.ClosedBeforeNegation => complementIfNegated(eq.closure(restricted.chars))
+            // python-regex tests the case variants of a character with a class, and the property itself out of one.
+            case IRCaselessPropertyKind.ClosedInClass =>
+              if inClass then complementIfNegated(eq.closure(restricted.chars))
+              else
+                complementIfNegated(caseKind match
+                  case CaseKind.Replaced(set) => set.intersect(universe)
+                  case _                      => restricted.chars)
 
   // ---------------------------------------------------------------------------------------------------------------
   // Classes
@@ -487,7 +578,10 @@ private[build] final class IRCharResolver(
   private def klass(invert: Boolean, item: ClassItem, flags: IRCharFlagSet, loc: SourceLocation): IRNodeData =
     item.data match
       // PCRE's `[[:<:]]` and `[[:>:]]` are the start and the end of a word (`\b(?=\w)` and `\b(?<=\w)`).
-      case ClassItemData.ClassPOSIX(false, name @ ("<" | ">")) if featureSet.hasClassPOSIXWordBoundary && !invert =>
+      // Boost.Regex ignores their negations (e.g. `[^[:<:]]` and `[[:^<:]]` are `[[:<:]]`).
+      case ClassItemData.ClassPOSIX(negated, name @ ("<" | ">"))
+          if featureSet.hasClassPOSIXWordBoundary &&
+            (featureSet.ignoresClassPOSIXWordBoundaryNegation || !invert && !negated) =>
         val word = classes.word(flags).intersect(universe)
         val boundary = IRNodeData.Assert(IRAssertKind.WordBoundary(wordSet(flags)))
         val look =
@@ -498,14 +592,42 @@ private[build] final class IRCharResolver(
     if invert && flags.unicodeSets && mayContainStrings(item) then
       throw new IRBuildingException("Negated character class may contain strings", loc)
     if invert then output(negate(item, flags), flags)
-    else if featureSet.multiCharFoldingKind == IRMultiCharFoldingKind.Perl && flags.ignoreCase then
-      perlClass(item, flags, loc)
+    else if perlFolds(flags) then perlClass(item, flags, loc)
     else if rubyFolds(flags) then withRubyFoldings(output(classItem(item, flags), flags), flags, loc)
+    else if pythonRegexFolds(flags) then
+      val members = classItem(item, flags.copy(ignoreCase = false)).chars
+      withPythonRegexFoldings(classItem(item, flags).chars, members, flags, loc)
     else output(classItem(item, flags), flags)
+
+  /** Whether Perl matches a class under the flags with the foldings of its values to several characters. */
+  private def perlFolds(flags: IRCharFlagSet): Boolean =
+    featureSet.multiCharFoldingKind.classFoldingKind == IRClassFoldingKind.Perl && foldsMulti(flags)
 
   /** Whether Ruby matches a class under the flags with the foldings of its characters to several characters. */
   private def rubyFolds(flags: IRCharFlagSet): Boolean =
-    featureSet.multiCharFoldingKind == IRMultiCharFoldingKind.Ruby && mode.isCodePoint && flags.ignoreCase
+    featureSet.multiCharFoldingKind.classFoldingKind == IRClassFoldingKind.Ruby && foldsMulti(flags)
+
+  /** Whether python-regex matches a class under the flags with the foldings of its characters to several characters. */
+  private def pythonRegexFolds(flags: IRCharFlagSet): Boolean =
+    featureSet.multiCharFoldingKind.classFoldingKind == IRClassFoldingKind.PythonRegex && foldsMulti(flags)
+
+  /** Adds the distinct full case foldings of python-regex's class after the class, in the order of the characters (e.g.
+    * `[ßẞx]` is `[ßẞx]|ss`).
+    *
+    * The foldings are of the characters folding to several characters that the class has without case-insensitivity
+    * (`members`), and the class itself matches one character by the simple case folding (e.g. `[\P{Ll}]` is
+    * `[\P{Ll}]|ss|...` by `ẞ`, though `ß` and `ẞ` are out of the case-insensitive `[\P{Ll}]`).
+    */
+  private def withPythonRegexFoldings(
+      set: CharSet,
+      members: CharSet,
+      flags: IRCharFlagSet,
+      loc: SourceLocation
+  ): IRNodeData =
+    val data = chars(set)
+    val keys = multiFoldingChars.intersect(members).iterator.map(fullFolding).distinct.toSeq
+    if keys.isEmpty then data
+    else IRNodeData.Disjunction(IRNode(data, loc) +: keys.map(key => IRNode(foldString(key, flags, loc), loc)))
 
   /** Adds the foldings of the characters of Ruby's class to several characters after the class, as Onigmo tries them
     * (e.g. `[ßx]` is `[ßẞx]|ss|ss`).
@@ -598,26 +720,38 @@ private[build] final class IRCharResolver(
 
   private def classItem(item: ClassItem, flags: IRCharFlagSet): ClassSet =
     item.data match
-      case ClassItemData.ClassUnion(items)              => classUnion(items, flags)
-      case ClassItemData.ClassIntersection(left, right) => classItem(left, flags).intersect(classItem(right, flags))
-      case ClassItemData.ClassDiff(left, right)         => classItem(left, flags).diff(classItem(right, flags))
-      case ClassItemData.ClassNest(invert, inner)       =>
+      case ClassItemData.ClassUnion(items)               => classUnion(items, flags)
+      case ClassItemData.ClassIntersection(left, right)  => classItem(left, flags).intersect(classItem(right, flags))
+      case ClassItemData.ClassDiff(left, right)          => classItem(left, flags).diff(classItem(right, flags))
+      case ClassItemData.ClassSymmetricDiff(left, right) =>
+        val l = classItem(left, flags)
+        val r = classItem(right, flags)
+        l.diff(r).union(r.diff(l))
+      case ClassItemData.ClassNest(invert, inner) =>
         if invert && flags.unicodeSets && mayContainStrings(inner) then
           throw new IRBuildingException("Negated character class may contain strings", item.loc)
         if invert then negate(inner, flags) else classItem(inner, flags)
+      // ICU's and Boost.Regex's `[:name:]` is a property, the same as `\p{name}`.
+      case ClassItemData.ClassPOSIX(invert, name) if featureSet.hasPropertyClassPOSIX =>
+        foldInput(property(name, None, invert, flags, item.loc, inClass = true), flags)
       case ClassItemData.ClassPOSIX(invert, name) =>
         val set = posix(name, flags, item.loc)
         if invert then ClassSet(set.complement(universe)) else ClassSet(set)
       case ClassItemData.ClassRange(begin, end)    => range(begin.data, end.data, flags, item.loc)
       case ClassItemData.ClassCaseCommand(_)       => ClassSet.empty
-      case ClassItemData.ClassBackslashClass(kind) => escapeClassSet(kind, flags, item.loc)
+      case ClassItemData.ClassBackslashClass(kind) =>
+        foldInput(escapeClassSet(kind, flags, item.loc, inClass = true), flags)
+      // POSIX's collating elements and equivalence classes depend on the locale's collation.
+      case ClassItemData.ClassCollatingElement(_) | ClassItemData.ClassEquivalence(_) => throw new NotModeledException
       case value: ClassItemData.ClassValue if readsByteEscapesAsUTF8 && isRubyByteValue(value) =>
         throw new IRBuildingException("Invalid multibyte escape", item.loc)
       case value: ClassItemData.ClassValue => ClassSet(closeChars(valueUnits(value, flags, item.loc), flags))
-      // `IRBuilder.build` removes the blanks and expands Ruby's `\u{...}` and the case regions.
+      // `IRBuilder.build` removes the blanks, expands Ruby's `\u{...}` and the case regions, makes `||` a union, and
+      // makes ICU's `&` and `-` before a nested class an intersection and a difference.
       // $COVERAGE-OFF$
-      case ClassItemData.ClassBlank(_) | ClassItemData.ClassUnicodeList(_, _) |
-          ClassItemData.ClassCaseRegion(_, _, _) =>
+      case ClassItemData.ClassBlank(_) | ClassItemData.ClassUnicodeList(_, _) | ClassItemData.ClassCaseRegion(_, _, _) |
+          ClassItemData.ClassExplicitUnion(_, _) | ClassItemData.ClassNestIntersection(_, _) |
+          ClassItemData.ClassNestDiff(_, _) =>
         throw new IllegalStateException(s"Unexpected source item: $item")
       // $COVERAGE-ON$
 
@@ -684,7 +818,8 @@ private[build] final class IRCharResolver(
   private def classLit(value: ClassItemData.ClassValue, flags: IRCharFlagSet, loc: SourceLocation): Lit = value match
     case ClassItemData.ClassLiteral(v)                                        => Lit(v, None, flags, loc)
     case ClassItemData.ClassBackslashValue(BackslashKind.Unknown(v))          => Lit(v, None, flags, loc)
-    case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v, _)) => Lit(v, Some(style), flags, loc)
+    case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v, _)) =>
+      Lit(escapeValue(style, v, flags), Some(style), flags, loc)
 
   private def valueUnits(value: ClassItemData.ClassValue, flags: IRCharFlagSet, loc: SourceLocation): Seq[UChar] =
     val units = unitsOf(classLit(value, flags, loc))
@@ -701,12 +836,20 @@ private[build] final class IRCharResolver(
       flags: IRCharFlagSet,
       loc: SourceLocation
   ): ClassSet =
+    // Boost.Regex's `c` (`collate`) compares the characters of a range by the locale's collation.
+    if featureSet.collatesClassRange then throw new NotModeledException
     val b = valueUnits(begin, flags, loc)
     val e = valueUnits(end, flags, loc)
     // Perl's range with an endpoint above `0xFF` is between code points, and a byte string has only its bytes.
     if b.isEmpty || e.isEmpty then
       if begin.value > end.value then throw new IRBuildingException("Range out of order in character class", loc)
       return ClassSet(equivalence(flags).closeRange(CharSet.range(begin.value, end.value).intersect(universe)))
+    // Boost.Regex's range under `i` is between the case foldings of its ends (e.g. `(?i)[@-Z]` is `(?i)[@-z]`).
+    if featureSet.matchesClassByFoldedInput && flags.ignoreCase then
+      val folding = boostRegexFolding(mode)
+      val (first, last) = (folding(b.head), folding(e.head))
+      if first > last then throw new IRBuildingException("Range out of order in character class", loc)
+      return foldInput(ClassSet(CharSet.range(first, last)), flags)
     // A range alone in a class has no neighbors to make a multibyte character with its byte escape.
     if readsByteEscapesAsUTF8 && Seq(begin, end).exists(isRubyByteValue) then
       throw new IRBuildingException("Invalid multibyte escape", loc)
@@ -717,6 +860,14 @@ private[build] final class IRCharResolver(
   private def isRubyByteValue(value: ClassItemData.ClassValue): Boolean = value match
     case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v, _)) => isRubyByte(style, v)
     case _                                                                    => false
+
+  /** Returns the characters that Boost.Regex's class item of the set matches under the flags, which tests the case
+    * folding of the input against it (e.g. `(?i)\p{Lt}` matches nothing, since an `Lt` character folds to an `Ll` one).
+    */
+  private def foldInput(set: ClassSet, flags: IRCharFlagSet): ClassSet =
+    if featureSet.matchesClassByFoldedInput && flags.ignoreCase then
+      ClassSet(boostRegexFolding(mode).preimage(set.chars).intersect(universe))
+    else set
 
   private def posix(name: String, flags: IRCharFlagSet, loc: SourceLocation): CharSet =
     val set = classes.posix(name, flags).getOrElse(throw new IRBuildingException("Unknown POSIX class name", loc))
@@ -785,6 +936,12 @@ private[build] object IRCharResolver:
 
   def multiFolding(c: Int): Option[UString] = Some(FullCaseFolding(c)).filter(_.length >= 2)
 
+  /** The characters that fold to several characters (e.g. `ß`). */
+  lazy val multiFoldingChars: CharSet = CharSet.union(multiFoldings.map(_._2))
+
+  /** `İ` (U+0130), whose full case folding is `i` and U+0307. */
+  val DottedCapitalI: Int = 0x130
+
   /** Checks whether the escape class is a property, which is a class in Onigmo, but not a negated one. */
   def isProperty(kind: EscapeClassKind): Boolean = kind match
     case _: EscapeClassKind.UnicodeProperty | _: EscapeClassKind.UnicodeBareProperty |
@@ -848,6 +1005,12 @@ private[build] object IRCharResolver:
     */
   lazy val dotNetKey: CaseMapping = CaseMapping.SimpleLower.updated(Seq(0x130 -> 0x130))
 
+  /** Returns the case folding of Boost.Regex in the unit mode: ASCII's over `char` (the C locale), and the simple case
+    * folding in `u32regex`.
+    */
+  def boostRegexFolding(mode: UnitMode): CaseMapping =
+    if mode == UnitMode.Byte then IRCaseEquivalence.asciiFold else CaseMapping.SimpleFold
+
   /** Determines the equivalence that a back-reference with the flags compares by.
     *
     * Perl's `/d` rules there are the rules of a native string, since the builder gives a reference `/u` instead when
@@ -876,20 +1039,26 @@ private[build] object IRCharResolver:
   ): IRCaseEquivalence =
     import IRCaseEquivalence.*
     val asciiOnly = flags.charset match
-      case IRCharset.ASCII(_, _, _, _, _) => kind == IRCaseEquivalenceKind.Python
-      case _                              => false
+      case IRCharset.ASCII(_, _, _, _, _) =>
+        kind == IRCaseEquivalenceKind.Python || kind == IRCaseEquivalenceKind.PythonRegex
+      // python-regex's `L` takes the C locale, which folds only ASCII letters.
+      case IRCharset.Locale => kind == IRCaseEquivalenceKind.PythonRegex
+      case _                => false
     if !flags.ignoreCase then Identity
     else
       kind match
         case IRCaseEquivalenceKind.JavaScript => Keyed(CaseMapping.ecmaScriptCanonicalize(mode), mode)
         case IRCaseEquivalenceKind.Java       => if flags.unicodeCase then JavaUnicode else JavaASCII
         case IRCaseEquivalenceKind.DotNet     => Keyed(dotNetKey, mode)
-        case IRCaseEquivalenceKind.Python if asciiOnly || mode == UnitMode.Byte => Keyed(asciiFold, mode)
-        case IRCaseEquivalenceKind.Python                                       => Keyed(pythonKey, mode)
-        case IRCaseEquivalenceKind.Ruby if mode == UnitMode.Byte                => Keyed(asciiFold, mode)
-        case IRCaseEquivalenceKind.Ruby                                         => Keyed(CaseMapping.SimpleFold, mode)
-        case IRCaseEquivalenceKind.Perl if flags.charset == IRCharset.Locale    => PerlLocale(mode)
-        case IRCaseEquivalenceKind.Perl if perlNative                           => PerlNative(mode)
+        case IRCaseEquivalenceKind.Python if asciiOnly || mode == UnitMode.Byte      => Keyed(asciiFold, mode)
+        case IRCaseEquivalenceKind.Python                                            => Keyed(pythonKey, mode)
+        case IRCaseEquivalenceKind.PythonRegex if asciiOnly || mode == UnitMode.Byte => Keyed(asciiFold, mode)
+        case IRCaseEquivalenceKind.PythonRegex                                       => PythonRegex(mode)
+        case IRCaseEquivalenceKind.Ruby if mode == UnitMode.Byte                     => Keyed(asciiFold, mode)
+        case IRCaseEquivalenceKind.Ruby | IRCaseEquivalenceKind.ICU          => Keyed(CaseMapping.SimpleFold, mode)
+        case IRCaseEquivalenceKind.BoostRegex                                => Keyed(boostRegexFolding(mode), mode)
+        case IRCaseEquivalenceKind.Perl if flags.charset == IRCharset.Locale => PerlLocale(mode)
+        case IRCaseEquivalenceKind.Perl if perlNative                        => PerlNative(mode)
         case IRCaseEquivalenceKind.Perl if flags.caselessRestrict => PCRERestrict(CaseMapping.SimpleFold, mode)
         case IRCaseEquivalenceKind.Perl                           => Keyed(CaseMapping.SimpleFold, mode)
         // PCRE folds non-ASCII characters only in UTF or UCP mode; PHP's `u` sets both.
@@ -905,14 +1074,12 @@ private[build] object IRCharResolver:
       flags: IRCharFlagSet
   ): IRBackReferenceFolding =
     import IRBackReferenceFolding.*
-    if !flags.ignoreCase then Simple
+    val foldsDottedCapitalI = kind.foldsDottedCapitalI
+    if !flags.ignoreCase || !flags.fullCaseFolding || !kind.foldsIn(mode) then Simple
+    else if !kind.isRestrictedByCharset then Full(0, foldsDottedCapitalI)
     else
-      kind match
-        case IRMultiCharFoldingKind.Ruby if mode.isCodePoint => Full(0)
-        case IRMultiCharFoldingKind.Perl                     =>
-          flags.charset match
-            case IRCharset.Default                            => Simple
-            case IRCharset.Locale                             => Full(0x100)
-            case _: IRCharset.ASCII if flags.caselessRestrict => Full(0x80)
-            case _                                            => Full(0)
-        case _ => Simple
+      flags.charset match
+        case IRCharset.Default                            => Simple
+        case IRCharset.Locale                             => Full(0x100, foldsDottedCapitalI)
+        case _: IRCharset.ASCII if flags.caselessRestrict => Full(0x80, foldsDottedCapitalI)
+        case _                                            => Full(0, foldsDottedCapitalI)

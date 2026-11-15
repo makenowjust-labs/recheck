@@ -33,6 +33,9 @@ private[build] sealed abstract class IRClassLookup:
   /** Returns the word characters of `\b` and `\B` under the flags. */
   def boundaryWord(flags: IRCharFlagSet): CharSet = word(flags)
 
+  /** Returns the marks that `\b` and `\B` take as word characters after a base under the flags, if any. */
+  def wordMarks(flags: IRCharFlagSet): Option[IRWordMarkSet] = None
+
   /** Returns the characters of `\h` as a horizontal space (Java, PCRE and Perl). */
   def horizontal: CharSet = pcreHorizontal
 
@@ -49,18 +52,28 @@ private[build] sealed abstract class IRClassLookup:
     throw new IllegalArgumentException(s"No POSIX class in $this")
   // $COVERAGE-ON$
 
+  /** Returns the characters of `\h` as a blank (python-regex) under the flags. */
+  // The parsers of the other dialects read `\h` otherwise.
+  // $COVERAGE-OFF$
+  def blank(flags: IRCharFlagSet): CharSet =
+    throw new IllegalArgumentException(s"No blank class in $this")
+  // $COVERAGE-ON$
+
 object IRClassLookup:
 
   /** Returns the table of the kind in the unit mode, where `perlUnicodeRules` makes Perl's `/d` use Unicode rules. */
   private[build] def from(kind: IRClassLookupKind, mode: UnitMode, perlUnicodeRules: Boolean): IRClassLookup =
     kind match
-      case IRClassLookupKind.JavaScript => JavaScript(mode)
-      case IRClassLookupKind.Java       => Java
-      case IRClassLookupKind.DotNet     => DotNet
-      case IRClassLookupKind.PCRE       => PCRE
-      case IRClassLookupKind.Perl       => Perl(native = !perlUnicodeRules)
-      case IRClassLookupKind.Python     => Python(mode)
-      case IRClassLookupKind.Ruby       => Ruby(mode)
+      case IRClassLookupKind.JavaScript  => JavaScript(mode)
+      case IRClassLookupKind.Java        => Java
+      case IRClassLookupKind.DotNet      => DotNet
+      case IRClassLookupKind.PCRE        => PCRE
+      case IRClassLookupKind.Perl        => Perl(native = !perlUnicodeRules)
+      case IRClassLookupKind.Python      => Python(mode)
+      case IRClassLookupKind.PythonRegex => PythonRegex(mode)
+      case IRClassLookupKind.Ruby        => Ruby(mode)
+      case IRClassLookupKind.ICU         => ICU
+      case IRClassLookupKind.BoostRegex  => BoostRegex(mode)
 
   private enum Rule:
 
@@ -93,6 +106,10 @@ object IRClassLookup:
     def space(flags: IRCharFlagSet): CharSet = pick(ruleOf(flags), ASCIISpace, CompatibilityPropertyTable.Space)
 
     def word(flags: IRCharFlagSet): CharSet = pick(ruleOf(flags), ASCIIWord, CompatibilityPropertyTable.Word)
+
+    // Java's `\b` with `U` has the non-spacing marks in its word set already.
+    override def wordMarks(flags: IRCharFlagSet): Option[IRWordMarkSet] =
+      Option.when(!flags.unicodeClass)(javaWordMarks)
 
   /** DotNet is the table of .NET, whose classes are of Unicode. */
   private[build] case object DotNet extends IRClassLookup:
@@ -198,6 +215,32 @@ object IRClassLookup:
 
     def word(flags: IRCharFlagSet): CharSet = pick(ruleOf(flags), ASCIIWord, pythonWord)
 
+  /** PythonRegex is the table of python-regex, whose classes are its properties (e.g. `\w` is `\p{Word}`) under the
+    * encoding of the flags.
+    */
+  private[build] final case class PythonRegex(mode: UnitMode) extends IRClassLookup:
+
+    private def property(name: String, flags: IRCharFlagSet): CharSet =
+      val PropertyResult.Found(set, _) = IRPropertyLookup.pythonRegex(None, name, false, flags, mode): @unchecked
+      set.chars
+
+    def digit(flags: IRCharFlagSet): CharSet = property("Digit", flags)
+
+    def space(flags: IRCharFlagSet): CharSet = property("Space", flags)
+
+    def word(flags: IRCharFlagSet): CharSet = property("Word", flags)
+
+    override def blank(flags: IRCharFlagSet): CharSet = property("Blank", flags)
+
+    // The parser keeps the value of `[[:name=value:]]` after `=`.
+    override def posix(name: String, flags: IRCharFlagSet): Option[CharSet] =
+      val result = name.indexOf('=') match
+        case -1 => IRPropertyLookup.pythonRegex(None, name, true, flags, mode)
+        case i  => IRPropertyLookup.pythonRegex(Some(name.take(i)), name.drop(i + 1), true, flags, mode)
+      result match
+        case PropertyResult.Found(set, _) => Some(set.chars)
+        case _                            => None
+
   /** Ruby is the table of Ruby, whose escape classes are of Unicode with `u`, and POSIX classes without `a`. */
   private[build] final case class Ruby(mode: UnitMode) extends IRClassLookup:
 
@@ -226,6 +269,94 @@ object IRClassLookup:
             case _: IRCharset.ASCII => Rule.ASCII
             case _                  => Rule.Unicode
       IRPropertyLookup.rubyPOSIX(name).map(u => pick(rule, asciiSet.get, u))
+
+  /** ICU is the table of ICU, whose classes are of Unicode.
+    *
+    * Its `\b` takes a character of `Grapheme_Extend` or `Cf` as the word character before it, if any, as
+    * `isWordBoundary` of `rematch.cpp` skips them.
+    */
+  private[build] case object ICU extends IRClassLookup:
+
+    def digit(flags: IRCharFlagSet): CharSet = gc("Nd")
+
+    def space(flags: IRCharFlagSet): CharSet = CompatibilityPropertyTable.Space
+
+    def word(flags: IRCharFlagSet): CharSet = CompatibilityPropertyTable.Word
+
+    override def boundaryWord(flags: IRCharFlagSet): CharSet = CompatibilityPropertyTable.Word.diff(icuWordExtenders)
+
+    override def wordMarks(flags: IRCharFlagSet): Option[IRWordMarkSet] = Some(icuWordMarks)
+
+    override def horizontal: CharSet = gc("Zs").union(of("\t"))
+
+  /** BoostRegex is the table of Boost.Regex, whose escape classes are its class names (e.g. `\w` is `[[:w:]]`). */
+  private[build] final case class BoostRegex(mode: UnitMode) extends IRClassLookup:
+
+    private def lookup(name: String, ignoreCase: Boolean): CharSet =
+      val PropertyResult.Found(set, _) = IRPropertyLookup.boostRegex(name, ignoreCase, mode): @unchecked
+      set.chars
+
+    def digit(flags: IRCharFlagSet): CharSet = lookup("d", flags.ignoreCase)
+
+    def space(flags: IRCharFlagSet): CharSet = lookup("s", flags.ignoreCase)
+
+    def word(flags: IRCharFlagSet): CharSet = lookup("w", flags.ignoreCase)
+
+    override def horizontal: CharSet = lookup("h", ignoreCase = false)
+
+    override def vertical: CharSet = lookup("v", ignoreCase = false)
+
+  /** The combining characters of Boost.Regex's `\X` in `u32regex`, which are the fixed table of
+    * `is_combining_implementation` of `regex_traits_defaults.hpp`.
+    */
+  lazy val boostRegexCombining: CharSet =
+    val ranges = Seq(
+      0x0300 -> 0x0361,
+      0x0483 -> 0x0486,
+      0x0903 -> 0x0903,
+      0x093e -> 0x0940,
+      0x0949 -> 0x094c,
+      0x0982 -> 0x0983,
+      0x09be -> 0x09c0,
+      0x09c7 -> 0x09cc,
+      0x09d7 -> 0x09d7,
+      0x0a3e -> 0x0a40,
+      0x0a83 -> 0x0a83,
+      0x0abe -> 0x0ac0,
+      0x0ac9 -> 0x0acc,
+      0x0b02 -> 0x0b03,
+      0x0b3e -> 0x0b3e,
+      0x0b40 -> 0x0b40,
+      0x0b47 -> 0x0b4c,
+      0x0b57 -> 0x0b57,
+      0x0b83 -> 0x0b83,
+      0x0bbe -> 0x0bbf,
+      0x0bc1 -> 0x0bcc,
+      0x0bd7 -> 0x0bd7,
+      0x0c01 -> 0x0c03,
+      0x0c41 -> 0x0c44,
+      0x0c82 -> 0x0c83,
+      0x0cbe -> 0x0cbe,
+      0x0cc0 -> 0x0cc4,
+      0x0cc7 -> 0x0ccb,
+      0x0cd5 -> 0x0cd6,
+      0x0d02 -> 0x0d03,
+      0x0d3e -> 0x0d40,
+      0x0d46 -> 0x0d4c,
+      0x0d57 -> 0x0d57,
+      0x0f7f -> 0x0f7f,
+      0x20d0 -> 0x20e1,
+      0x3099 -> 0x309a,
+      0xfe20 -> 0xfe23
+    )
+    CharSet.union(ranges.map((start, end) => CharSet.range(start, end)))
+
+  /** The characters that ICU's `\b` skips: `Grapheme_Extend` and `Cf`. */
+  private lazy val icuWordExtenders: CharSet = binary("Grapheme_Extend").union(gc("Cf"))
+
+  /** The marks of ICU's `\b`, where a character that it skips is a word character after a word character. */
+  lazy val icuWordMarks: IRWordMarkSet =
+    IRWordMarkSet(icuWordExtenders, icuWordExtenders, CompatibilityPropertyTable.Word.diff(icuWordExtenders))
 
   /** The marks of Java's `\b` without `U`, where a non-spacing mark is a word character after a letter or a digit. */
   lazy val javaWordMarks: IRWordMarkSet =

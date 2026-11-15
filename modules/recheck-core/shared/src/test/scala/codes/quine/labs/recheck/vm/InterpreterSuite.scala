@@ -476,16 +476,20 @@ class InterpreterSuite extends munit.FunSuite:
 
   test("Interpreter.run: back-references and capture tests in an open capture"):
     // They see the capture before it opens, which is from the previous iteration.
-    check("^(a|b\\1)+$", "aba", PCRE, Perl(), Java, DotNet)(Seq(g(0, 3), g(1, 3)))
-    check("^(a|b\\1)+$", "abab", PCRE, Perl(), Java, DotNet, Ruby())(NoMatch)
-    check("^(a|b\\1)+$", "aabaa", PCRE, Perl(), Java, DotNet)(Seq(g(0, 5), g(4, 5)))
-    check("^(a\\1?)+$", "aaa", PCRE, Perl(), Java, DotNet)(Seq(g(0, 3), g(1, 3)))
-    check("^(a|ab\\1)*$", "aaba", PCRE, Perl(), Java, DotNet)(Seq(g(0, 4), g(1, 4)))
-    check("^(a|(b\\1))+$", "aabaa", PCRE, Perl(), Java, DotNet)(Seq(g(0, 5), g(4, 5), g(2, 4)))
+    check("^(a|b\\1)+$", "aba", PCRE, Perl(), Java, DotNet, ICU)(Seq(g(0, 3), g(1, 3)))
+    check("^(a|b\\1)+$", "abab", PCRE, Perl(), Java, DotNet, ICU, Ruby())(NoMatch)
+    check("^(a|b\\1)+$", "aabaa", PCRE, Perl(), Java, DotNet, ICU)(Seq(g(0, 5), g(4, 5)))
+    check("^(a\\1?)+$", "aaa", PCRE, Perl(), Java, DotNet, ICU)(Seq(g(0, 3), g(1, 3)))
+    check("^(a|ab\\1)*$", "aaba", PCRE, Perl(), Java, DotNet, ICU)(Seq(g(0, 4), g(1, 4)))
+    check("^(a|(b\\1))+$", "aabaa", PCRE, Perl(), Java, DotNet, ICU)(Seq(g(0, 5), g(4, 5), g(2, 4)))
     check("^(a(?(1)b|c))+$", "acab", PCRE, Perl(), Python(), DotNet)(Seq(g(0, 4), g(2, 4)))
     check("^(a(?(1)b|c))+$", "acac", PCRE, Perl(), Python(), DotNet)(NoMatch)
     // A capture in a look-behind matched backward opens at its end.
     check("(?<=^(a|\\1b)+)$", "aba", DotNet)(Seq(g(3, 3), g(0, 2)))
+    // python-regex refers to an open capture only in V1.
+    check("(?V1)^(a|b\\1)+$", "aba", PythonRegex())(Seq(g(0, 3), g(1, 3)))
+    check("(?V1)^(a|b\\1)+$", "abab", PythonRegex())(NoMatch)
+    check("(?V1)(?<=^(a|\\1b)+)$", "aba", PythonRegex())(Seq(g(3, 3), g(0, 2)))
     // JavaScript resets the capture on each iteration, so it is unset and the reference matches the empty string.
     check("^(a|b\\1)+$", "abab", JavaScript)(Seq(g(0, 4), g(3, 4)))
     check("^(a\\1)", "a", JavaScript)(Seq(g(0, 1), g(0, 1)))
@@ -501,6 +505,10 @@ class InterpreterSuite extends munit.FunSuite:
     // Python's `re` sees an open capture as unset when its old end is before its new start (e.g. this matches
     // `"acxacx"` in Python 3.15.2), which is not reproduced.
     check("^(?:(a(?(1)b|c))x)+$", "acxabx", PCRE, Perl(), Python(), DotNet)(Seq(g(0, 6), g(3, 5)))
+    // Boost.Regex sets only the start of a capture on entering it, so a reference in it matches the empty string (e.g.
+    // this matches `"abab"` in Boost.Regex 1.92.0), which is not reproduced.
+    check("^(a|b\\1)+$", "aba", BoostRegex())(Seq(g(0, 3), g(1, 3)))
+    check("^(a|b\\1)+$", "abab", BoostRegex())(NoMatch)
 
   test("Interpreter.run: Perl's captures on backtracking"):
     def perlOnly(source: String, input: String)(using munit.Location): Unit =
@@ -961,6 +969,35 @@ class InterpreterSuite extends munit.FunSuite:
     )
     check("^(?:b?(?:|(a))|b?)+", "aaca", Java, PCRE, Python(), DotNet)(Seq(g(0, 0)))
     check("^(?:b?(?:|(a))|b?)+", "aaca", JavaScript)(Seq(g(0, 2), g(1, 2)))
+
+  test("Interpreter.run: python-regex's empty iterations"):
+    // python-regex's iteration that changes a capture that a back-reference refers to is not empty (regex 2026.9.29).
+    val pr = PythonRegex()
+    check("^(?:()|a){2}\\1$", "a", pr)(Seq(g(0, 1), g(0, 0)))
+    check("^(?:()|a){0,2}\\1$", "a", pr)(Seq(g(0, 1), g(0, 0)))
+    check("^(?:()|a){1,2}\\1$", "a", pr)(Seq(g(0, 1), g(0, 0)))
+    check("^(?:()|a){2,}\\1$", "a", pr)(Seq(g(0, 1), g(1, 1)))
+    check("^(?:()|a)*?\\1$", "a", pr)(Seq(g(0, 1), g(0, 0)))
+    check("^(?:()|a)+\\1$", "a", pr)(Seq(g(0, 1), g(1, 1)))
+    check("^(?:()|a){3}\\1$", "aa", pr)(Seq(g(0, 2), g(0, 0)))
+    check("^(?:()|a){1,3}\\1$", "aa", pr)(Seq(g(0, 2), g(0, 0)))
+    check("(?:(a?))?\\1\\1$", "aa", pr)(Seq(g(2, 2), g(2, 2)))
+    check("^(?:(a?)|()(a?))+\\3c", "cc", pr)(Seq(g(0, 1), g(0, 0), g(0, 0), g(0, 0)))
+    check("(?:()(a?)|()(a?)){2}\\4\\1b", "bb", pr)(Seq(g(0, 1), g(0, 0), g(0, 0), g(0, 0), g(0, 0)))
+    // An empty iteration ends the repetition even before the minimum.
+    check("^(?:x?|(a)){3}", "a", pr)(Seq(g(0, 0)))
+
+  test("Interpreter.run: python-regex's case-insensitive back-references"):
+    val pr = PythonRegex()
+    accepts("\\A(I)\\1\\z", pr, "I\u0131", "i")
+    refutes("\\A(i)\\1\\z", pr, "i\u0131", "i")
+    accepts("\\A(\u00df)\\1\\z", pr, "\u00dfss", "iV1")
+    refutes("\\A(\u00df)\\1\\z", pr, "\u00dfss", "iV0")
+    refutes("\\A(s)\\1\\z", pr, "s\u00df", "iV1")
+    // `İ` keeps its simple folding, which matches `i`.
+    accepts("\\A(\u0130)\\1\\z", pr, "\u0130i", "iV1")
+    refutes("\\A(\u0130)\\1\\z", pr, "\u0130i\u0307", "iV1")
+    accepts("(?<=[\u00df])y", pr, "ssy", "iV1")
 
   test("Interpreter.run: look-behinds"):
     // .NET and JavaScript match a look-behind backward, and the others forward from the starts before the position.

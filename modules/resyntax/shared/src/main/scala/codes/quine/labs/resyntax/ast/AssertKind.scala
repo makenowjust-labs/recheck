@@ -24,3 +24,9 @@ object AssertKind:
 
   /** UpperEnd is an end assertion (e.g. `\Z`). */
   case object UpperEnd extends AssertKind
+
+  /** WordStart is a start-of-word assertion (e.g. python-regex's `\m`). */
+  case object WordStart extends AssertKind
+
+  /** WordEnd is an end-of-word assertion (e.g. python-regex's `\M`). */
+  case object WordEnd extends AssertKind

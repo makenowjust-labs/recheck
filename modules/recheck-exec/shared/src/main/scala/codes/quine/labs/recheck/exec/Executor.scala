@@ -1,5 +1,7 @@
 package codes.quine.labs.recheck.exec
 
+import scala.annotation.unused
+import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 
 import codes.quine.labs.recheck.common.Context
@@ -23,17 +25,14 @@ sealed abstract class Executor:
   /** The arguments of the command running the input. */
   protected def args: Seq[String]
 
-  /** The program file whose path follows the arguments, or `None` if the input is the program. */
-  protected def file: Option[SourceFile] = None
-
   /** The environment variables to set in addition to the inherited ones. */
   protected def variables: Map[String, String] = Map.empty
 
   /** Returns the command line of the runtime, which is the value of the variable or the command. */
   def runtime(env: Map[String, String]): String = replacement(env).getOrElse(command)
 
-  /** Returns the command line running the input, with the name of the program file. */
-  def commandLine(env: Map[String, String]): String = (runtime(env) +: (args ++ file.map(_.name))).mkString(" ")
+  /** Returns the command line running the input. */
+  def commandLine(env: Map[String, String]): String = (runtime(env) +: args).mkString(" ")
 
   /** Returns the command line running a program file of the name, which has the input in itself. */
   def scriptCommandLine(name: String): String = (command +: options :+ name).mkString(" ")
@@ -41,14 +40,20 @@ sealed abstract class Executor:
   /** Runs the input on the runtime in the environment variables.
     *
     * The timeout counts from the time when the process prints the marker as a line, so that the startup of the runtime
-    * is not counted. Waiting for the marker is limited only by the context.
+    * is not counted. Waiting for the marker is limited only by the context. `compileTimeout` limits the compilation of
+    * an executor compiling the program (see [[Executor.Compiled]]).
     */
-  def exec(input: String, timeout: Option[FiniteDuration], marker: String, env: Map[String, String])(using
-      Context
-  ): ExecResult =
-    Platform.run(command, args, replacement(env), variables, file, input, timeout, marker)
+  def exec(
+      input: String,
+      timeout: Option[FiniteDuration],
+      @unused compileTimeout: Duration,
+      marker: String,
+      env: Map[String, String]
+  )(using Context): ExecResult =
+    Platform.run(command, args, replacement(env), variables, input, timeout, marker)
 
-  private def replacement(env: Map[String, String]): Option[String] =
+  /** Returns the command line replacing the command in the environment variables, if any. */
+  protected def replacement(env: Map[String, String]): Option[String] =
     env.get(variable).map(_.trim).filter(_.nonEmpty)
 
 object Executor:
@@ -66,17 +71,78 @@ object Executor:
 
     protected val args: Seq[String] = options ++ stdin
 
-  /** File is an executor running a program file, whose input is the data of the program on the standard input.
+  /** Compiled is an executor running a program file that the command compiles once, whose input is the data of the
+    * program on the standard input.
     *
-    * The file is written once into a directory of this user, and stays there.
+    * The command compiles the program into an output, which is a binary running by itself or a directory that the
+    * command runs. The output is written into a directory of this user, and stays there for the same source, the same
+    * command line and the same version of the command, while it has its entry file (see [[entry]]). The compilation
+    * does not count toward the timeout of the context, and `compileTimeout` of [[exec]] limits it.
     */
-  abstract class File private[exec] (
+  abstract class Compiled private[exec] (
       val command: String,
       val variable: String,
-      val options: Seq[String],
       program: SourceFile,
       override protected val variables: Map[String, String] = Map.empty
   ) extends Executor:
 
-    protected val args: Seq[String] = options
-    override protected val file: Option[SourceFile] = Some(program)
+    val options: Seq[String] = Seq.empty
+
+    protected val args: Seq[String] = Seq.empty
+
+    /** The arguments of the runs of the command printing its version, whose outputs tell an output from another. */
+    protected def versionArgs: Seq[Seq[String]]
+
+    /** Returns the arguments of the command compiling the program file `source` into `output`, which the command
+      * creates.
+      */
+    protected def compileArgs(source: String, output: String): Seq[String]
+
+    /** Returns the arguments of the command running the program compiled into `output`, or `None` if `output` is a
+      * binary running by itself.
+      */
+    protected def runArgs(output: String): Option[Seq[String]] = None
+
+    /** Returns the file of the program compiled into `output` that a run reads, which is `output` itself for a binary.
+      *
+      * An output without it (e.g. emptied by a cleaner of the temporary directory) is compiled again.
+      */
+    protected def entry(output: String): String = output
+
+    /** Returns the command line compiling the program and running it. */
+    override def commandLine(env: Map[String, String]): String = compileRunCommandLine(runtime(env), program.name)
+
+    /** Returns the command line compiling a program file of the name and running it. */
+    override def scriptCommandLine(name: String): String = compileRunCommandLine(command, name)
+
+    override def exec(
+        input: String,
+        timeout: Option[FiniteDuration],
+        compileTimeout: Duration,
+        marker: String,
+        env: Map[String, String]
+    )(using ctx: Context): ExecResult =
+      val output = ctx.pauseTimeout:
+        Platform.compile(
+          command,
+          replacement(env),
+          program,
+          versionArgs,
+          compileArgs,
+          entry,
+          variables,
+          compileTimeout
+        )
+      runArgs(output) match
+        case Some(args) => Platform.run(command, args, replacement(env), variables, input, timeout, marker)
+        case None       => Platform.run(output, Seq.empty, None, variables, input, timeout, marker)
+
+    private def compileRunCommandLine(runtime: String, name: String): String =
+      val output = outputName(name)
+      val run = runArgs(output).fold(s"./$output")(args => (runtime +: args).mkString(" "))
+      s"${(runtime +: compileArgs(name, output)).mkString(" ")} && $run"
+
+  /** Returns the name of the output compiled from a source file, which is the name without the extension. */
+  private[exec] def outputName(name: String): String =
+    val dot = name.lastIndexOf('.')
+    if dot < 0 then name else name.take(dot)

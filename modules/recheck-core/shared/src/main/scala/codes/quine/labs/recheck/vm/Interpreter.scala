@@ -143,7 +143,8 @@ object Interpreter:
     *   0, -1, 0, 1, // the begin and the end of each capture, or -1 (only when the program reads the captures)
     *   0, 1,        // the position where each capture opens, or -1 (likewise)
     *   1,           // the largest index of the closed captures (likewise)
-    *   1, 0         // 1 if the canary register holds the position, or 0
+    *   1, 0,        // 1 if the iteration of the canary register is empty, or 0
+    *   0, 1         // the referenced captures in each canary register (only when python-regex refers to them)
     * )
     * }}}
     */
@@ -187,6 +188,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       var opens: Vector[Int],
       var counters: Vector[Int],
       var canaries: Vector[Int],
+      var canaryCaptures: Vector[Vector[Int]],
       var rollback: Option[Rollback],
       var fallback: Option[Frame],
       /** The junctions that the matching is in, from the latest. */
@@ -255,10 +257,24 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         case (b, e) if b == -1 || e == -1 => None
         case (b, e)                       => Some(input.slice(b, e))
 
+    /** Returns the begin and the end of each referenced capture. */
+    def referencedCaptureValues: Vector[Int] =
+      referencedCaptures.iterator.flatMap(i => Iterator(captures(i * 2), captures(i * 2 + 1))).toVector
+
+    /** Sets the position, and the referenced captures, to the canary register. */
+    def setCanary(index: Int): Unit =
+      canaries = canaries.updated(index, pos)
+      if referencedCaptures.nonEmpty then canaryCaptures = canaryCaptures.updated(index, referencedCaptureValues)
+
+    /** Checks whether the iteration since the canary register neither advanced nor changed the referenced captures. */
+    def isEmptyIteration(index: Int): Boolean =
+      canaries(index) == pos && (referencedCaptures.isEmpty || canaryCaptures(index) == referencedCaptureValues)
+
     /** Converts this frame into a corresponding state. */
     def toState: MatchState =
       val capturesSize = if program.meta.hasRef then captures.size + opens.size + 1 else 0
-      val values = new Array[Int](2 + counters.size + capturesSize + canaries.size)
+      val canarySize = canaries.size * (1 + referencedCaptures.size * 2)
+      val values = new Array[Int](2 + counters.size + capturesSize + canarySize)
       var size = 0
 
       def add(n: Int): Unit =
@@ -272,11 +288,13 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         captures.foreach(add)
         opens.foreach(add)
         add(lastParen)
-      for canary <- canaries do add(if canary == pos then 1 else 0)
+      for i <- canaries.indices do add(if isEmptyIteration(i) then 1 else 0)
+      if referencedCaptures.nonEmpty then canaryCaptures.foreach(_.foreach(add))
       MatchState(values)
 
     override def clone(): Frame =
-      val frame = new Frame(label, pos, captures, opens, counters, canaries, rollback, fallback, junctions)
+      val frame =
+        new Frame(label, pos, captures, opens, counters, canaries, canaryCaptures, rollback, fallback, junctions)
       frame.junctionsSize = junctionsSize
       frame.lastParen = lastParen
       frame.time = tick()
@@ -350,6 +368,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** Whether it memoizes the failed states, which it stops when the memoization table rarely hits. */
   private var memoizes: Boolean = options.usesAcceleration
 
+  private val referencedCaptures: Seq[Int] = program.meta.referencedCaptures
+
   require(!memoizes || program.meta.allowsMemoization, "The program does not allow memoization")
 
   /** The lookups of the memoization table, and the hits of them. */
@@ -387,6 +407,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       Vector.fill(program.meta.capturesSize + 1)(-1),
       Vector.fill(program.meta.countersSize)(0),
       Vector.fill(program.meta.canariesSize)(0),
+      Vector.fill(program.meta.canariesSize)(Vector.fill(referencedCaptures.size * 2)(-1)),
       None,
       None,
       Nil
@@ -532,7 +553,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                   false
                 case _ => true
             case Inst.CmpCanary(reg, empty, advanced) =>
-              frame.label = if frame.canaries(reg.index) == frame.pos then empty else advanced
+              frame.label = if frame.isEmptyIteration(reg.index) then empty else advanced
               false
             case Inst.Cmp(reg, n, lt, ge) =>
               val r = frame.counters(reg.index)
@@ -683,10 +704,10 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   private def inst(frame: Frame, inst: Inst.NonTerminator): Boolean =
     inst match
       case Inst.SetCanary(reg) =>
-        frame.canaries = frame.canaries.updated(reg.index, frame.pos)
+        frame.setCanary(reg.index)
         true
       case Inst.RejectEmptyIteration(reg) =>
-        frame.canaries(reg.index) != frame.pos
+        !frame.isEmptyIteration(reg.index)
       case Inst.Reset(reg) =>
         frame.counters = frame.counters.updated(reg.index, 0)
         true

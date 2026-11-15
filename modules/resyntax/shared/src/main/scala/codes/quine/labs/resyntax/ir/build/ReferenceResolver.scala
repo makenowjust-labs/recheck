@@ -17,7 +17,7 @@ private[build] final class ReferenceResolver(table: CaptureTable, featureSet: IR
     if featureSet.requiresClosedGroupReference then
       if n > site.opened then fail("Reference to non-existent group", loc)
       validateClosedGroups(Seq(n), site, loc)
-    else if table.defined.contains(n) then Seq(n)
+    else if table.defined.contains(n) then validateOpenGroups(Seq(n), site, loc)
     else if featureSet.allowsBackReferenceToMissingGroup then Seq.empty
     else fail("Reference to non-existent group", loc)
 
@@ -27,13 +27,14 @@ private[build] final class ReferenceResolver(table: CaptureTable, featureSet: IR
       name.toIntOption match
         // .NET accepts `\k<0>`, which never matches because the whole match is not set yet (e.g. `a\k<0>` on `aa`).
         case Some(0)                              => Seq.empty
-        case Some(n) if table.defined.contains(n) => Seq(n)
+        case Some(n) if table.defined.contains(n) => validateOpenGroups(Seq(n), site, loc)
         case _                                    => fail("Reference to non-existent group", loc)
     else
       val indices = groupName(name, site, loc)
       // Ruby takes only the groups of the name opened before the reference (e.g. `\k<n>` of `(?<n>a)|\k<n>|(?<n>b)`).
       val before = if featureSet.requiresNameDefinedBefore then indices.filter(_ <= site.opened) else indices
-      if featureSet.requiresClosedGroupReference then validateClosedGroups(before, site, loc) else before
+      if featureSet.requiresClosedGroupReference then validateClosedGroups(before, site, loc)
+      else validateOpenGroups(before, site, loc)
 
   /** Resolves a name for a back-reference or a conditional test. */
   def groupName(name: String, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
@@ -79,6 +80,12 @@ private[build] final class ReferenceResolver(table: CaptureTable, featureSet: IR
   def escapeCall(ref: Reference.BaseReference, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
     val indices = resolveCall(ref, site, loc)
     if featureSet.rejectsCallToSharedName && indices.size > 1 then fail("Call to a name shared by groups", loc)
+    indices
+
+  /** Rejects a reference to a group that is not closed, as python-regex does without `V1`. */
+  private def validateOpenGroups(indices: Seq[Int], site: ReferenceSite, loc: SourceLocation): Seq[Int] =
+    if featureSet.rejectsOpenGroupReference && indices.exists(site.open.contains) then
+      fail("Reference to an open group", loc)
     indices
 
   /** Rejects a reference to a group that is not closed, or that is in the same look-behind, as Python does. */

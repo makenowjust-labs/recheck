@@ -90,8 +90,8 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
   private val charFlags = mutable.Map.empty[NodeKey, IRCharFlagSet]
 
   private val recordsCharFlags = featureSet.lookBehindRule match
-    case IRLookBehindRule.Perl | IRLookBehindRule.Ruby => true
-    case _                                             => false
+    case IRLookBehindRule.Perl | IRLookBehindRule.Ruby | IRLookBehindRule.ICU => true
+    case _                                                                    => false
 
   private var branchResetDepth: Int = 0
 
@@ -128,7 +128,7 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
     case NodeData.Command(kind)       => walkCommand(node, kind)
     case NodeData.Backslash(_: BackslashKind.EscapeBackReference | _: BackslashKind.EscapeCall) =>
       markSite(node)
-    case NodeData.Literal(_) | NodeData.Class(_, _) |
+    case NodeData.Literal(_) | NodeData.Class(_, _) | NodeData.Dot |
         NodeData.Backslash(_: BackslashKind.BackslashValue | _: BackslashKind.EscapeClass) if recordsCharFlags =>
       charFlags(NodeKey(node)) = context.charFlags
     case _ => ()
@@ -218,8 +218,12 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
         if !nameIndices.contains(name) then nameIndices(name) = Vector.empty
         scoped(walk(child))
     else
-      val index = next
-      next += 1
+      // python-regex's group takes the index of the earlier group of its name, or the next index that has no name.
+      val earlier = if featureSet.sharesIndexOfName then nameIndices.get(name).flatMap(_.headOption) else None
+      val index = earlier.getOrElse:
+        if featureSet.sharesIndexOfName then while indexNames.contains(next) do next += 1
+        next += 1
+        next - 1
       addName(node, name, index)
       capture(node, index, child)
 

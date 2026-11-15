@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.ir
 package build
 
+import codes.quine.labs.resyntax.ast.BacktrackStrategy.Greedy
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
@@ -17,7 +18,7 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
 
   // `\n^` with `m` matches `a\n` in .NET, JavaScript and Python, but not in Java, Perl, PCRE and Ruby.
   // `^` with `m` matches the empty string except in Java.
-  check("^", "m", DotNet, Python())(Assert(LineBegin(LT.LF, AfterTerminator)))
+  check("^", "m", DotNet, Python(), PythonRegex())(Assert(LineBegin(LT.LF, AfterTerminator)))
   check("^", "m", JavaScript)(Assert(LineBegin(LT.JavaScript, AfterTerminator)))
   check("^", "m", Java)(Assert(LineBegin(LT.Java, Never)))
   check("^", "m", PCRE, Perl())(Assert(LineBegin(LT.LF, InputBegin)))
@@ -26,7 +27,7 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
 
   // `a$` matches `a\n` except in JavaScript; Java also before `\r\n`, `\r`, U+0085 and U+2028 at the end.
   check("$", "", JavaScript)(Assert(TextEnd))
-  check("$", "", DotNet, PCRE, Perl(), Python())(Assert(ChompTextEnd(LT.LF)))
+  check("$", "", DotNet, PCRE, Perl(), Python(), PythonRegex())(Assert(ChompTextEnd(LT.LF)))
   check("$", "", Java)(Assert(ChompTextEnd(LT.Java)))
   check("$", "", Ruby())(Assert(LineEnd(LT.LF)))
   check("$", "m", DotNet, PCRE, Perl(), Python(), Ruby())(Assert(LineEnd(LT.LF)))
@@ -39,6 +40,34 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
   check("\\Z", "", DotNet, PCRE, Perl(), Ruby())(Assert(ChompTextEnd(LT.LF)))
   check("\\Z", "D", PCRE)(Assert(ChompTextEnd(LT.LF)))
   check("\\Z", "", Java)(Assert(ChompTextEnd(LT.Java)))
+
+  // ICU's line terminators have VT and FF: `a$` matches `a\f`, and `(?m)^` matches only the empty string at the end.
+  check("^", "m", ICU)(Assert(LineBegin(LT.ICU, InputBegin)))
+  check("$", "", ICU)(Assert(ChompTextEnd(LT.ICU)))
+  check("$", "dm", ICU)(Assert(LineEnd(LT.LF)))
+  // ICU's `d` changes `$`, but not `\Z`: `(?d)a\Z` matches `a\f`.
+  check("$\\Z", "d", ICU)(Sequence(Assert(ChompTextEnd(LT.LF)), Assert(ChompTextEnd(LT.ICU))))
+
+  // Boost.Regex's `^` and `$` are multi-line, and its `.` matches line terminators, unless `M` (`no_mod_m`) and `S`
+  // (`no_mod_s`) turn them off; the line terminators are `\n`, `\f` and `\r`, and U+0085, U+2028 and U+2029 in
+  // `u32regex`, where `\r\n` is atomic (Boost.Regex 1.92.0).
+  val U32Regex: BoostRegex = BoostRegex(BoostRegex.Type.U32Regex)
+  check("^$", "", BoostRegex()):
+    Sequence(Assert(LineBegin(LT.BoostRegexChar, AfterTerminator)), Assert(LineEnd(LT.BoostRegexChar)))
+  check("^$", "", U32Regex)(
+    Sequence(Assert(LineBegin(LT.BoostRegexU32, AfterTerminator)), Assert(LineEnd(LT.BoostRegexU32)))
+  )
+  check("^$", "M", BoostRegex())(Sequence(Assert(TextBegin), Assert(TextEnd)))
+  check("(?-m)^(?m)^", "", BoostRegex()):
+    Sequence(Empty, Assert(TextBegin), Empty, Assert(LineBegin(LT.BoostRegexChar, AfterTerminator)))
+  check("\\Z", "", BoostRegex()):
+    val terminators = IRNodeData.Repeat(IRNode(Chars(CharSet.of('\n', '\f', '\r'))), IRQuantifier.Unbounded(0, Greedy))
+    IRNodeData.LookAhead(false, Sequence(terminators, Assert(TextEnd)))
+  checkChars(".", "", BoostRegex(), U32Regex)(d => Seq(any(".", "", d)))
+  checkChars(".(?s).", "S", BoostRegex()): _ =>
+    Seq(Chars(UnitMode.Byte.universe.diff(CharSet.of('\n', '\f', '\r'))), Chars(UnitMode.Byte.universe))
+  checkChars(".", "S", U32Regex): _ =>
+    Seq(Chars(UnitMode.ScalarValue.universe.diff(CharSet.of(0x0a, 0x0c, 0x0d, 0x85, 0x2028, 0x2029))))
 
   // Java's `d` (UNIX_LINES): `(?d)a$` does not match `a\r`.
   check("$", "d", Java)(Assert(ChompTextEnd(LT.LF)))
@@ -58,13 +87,15 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
   check("(*LF)(*CR)$", "", PCRE)(Sequence(Empty, Empty, Assert(ChompTextEnd(LT.CR))))
 
   // Inline flags apply to the rest of the enclosing group, including the following alternatives.
-  checkWith("(?m:^)^", "", All*)(d =>
+  checkWith("(?m:^)^", "", (All :+ BoostRegex())*)(d =>
     val begin = d match
-      case JavaScript               => LineBegin(LT.JavaScript, AfterTerminator)
-      case DotNet | _: Python       => LineBegin(LT.LF, AfterTerminator)
-      case Java                     => LineBegin(LT.Java, Never)
-      case PCRE | _: Perl | _: Ruby => LineBegin(LT.LF, InputBegin)
-    Sequence(Assert(begin), Assert(if d == Ruby() then begin else TextBegin))
+      case JavaScript                          => LineBegin(LT.JavaScript, AfterTerminator)
+      case DotNet | _: Python | _: PythonRegex => LineBegin(LT.LF, AfterTerminator)
+      case Java                                => LineBegin(LT.Java, Never)
+      case PCRE | _: Perl | _: Ruby            => LineBegin(LT.LF, InputBegin)
+      case ICU                                 => LineBegin(LT.ICU, InputBegin)
+      case _: BoostRegex                       => LineBegin(LT.BoostRegexChar, AfterTerminator)
+    Sequence(Assert(begin), Assert(if d == Ruby() || d.isBoostRegex then begin else TextBegin))
   )
   // `(?:(?m))^a` does not match `b\na`, but `(?:(?m)x|^)a` matches it.
   check("(?:(?m))^", "", DotNet, PCRE, Perl())(Sequence(Empty, Assert(TextBegin)))
@@ -115,6 +146,11 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
     for d <- All do
       assertEquals(flagsOf(d).charset, IRCharset.Default)
       assertEquals(flagsOf(d).ignoreCase, false)
+      assertEquals(flagsOf(d).fullCaseFolding, true)
+    // python-regex folds characters to several ones with `f`, but not with `a`.
+    assertEquals(flagsOf(PythonRegex()).fullCaseFolding, false)
+    assertEquals(flagsOf(PythonRegex(), "f").fullCaseFolding, true)
+    assertEquals(flagsOf(PythonRegex(), "af").fullCaseFolding, false)
   checkChars("(*UTF)(*UCP)\\d", "", PCRE)(d => charsIn("\\d", "u", d))
   // `(*UTF)(*TURKISH_CASING)(?i)i` matches `İ` but not `I`.
   checkChars("(*UTF)(*TURKISH_CASING)(?i)i", "", PCRE)(_ => Seq(Chars(CharSet.of('i', 0x0130))))

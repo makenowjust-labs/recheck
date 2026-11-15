@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.parser
 
 import codes.quine.labs.resyntax.ast.AssertKind.*
+import codes.quine.labs.resyntax.ast.BackReferenceStyle.*
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
 import codes.quine.labs.resyntax.ast.CaseCommandKind
@@ -16,6 +17,7 @@ import codes.quine.labs.resyntax.ast.GroupKind.*
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
+import codes.quine.labs.resyntax.ast.Reference.*
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect.*
 
@@ -276,3 +278,80 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   test("Parser.parse: a high surrogate without a low surrogate after it is a code point by itself"):
     val node = Parser.parse("\uD800a", FlagSet.parse("u", JavaScript), JavaScript, UnitMode.UTF16CodePoint)
     assert(node.equalsWithoutLoc(Node(Sequence(Literal(0xd800), Literal('a')))), node)
+
+  // python-regex reads `{,}` as `*`, and repeats the node before inline flags and comments (regex 2026.9.29).
+  check("a{,}", "", PythonRegex())(Repeat(Node(Literal('a')), Unbounded(0, Greedy), Some("{,}")))
+  // The AST keeps the inline flags after the repeat.
+  checkPrinted("a(?i)*", "a*(?i)", "", PythonRegex()):
+    Sequence(Repeat(Literal('a'), Star(Greedy)), Command(InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None))))
+  error("(?i)*", "", PythonRegex())("Nothing to repeat at 4")
+  error("a*(?#x)?", "", PythonRegex())("Nested quantifier at 7")
+  // python-regex skips the whitespace of `str.isspace` and the comments in the extended mode also in a construct.
+  check("a{ 1, 2 }", "x", PythonRegex())(Repeat(Node(Literal('a')), Bounded(1, 2, Greedy), Some("{ 1, 2 }")))
+  check("a* ?", "x", PythonRegex())(Repeat(Node(Literal('a')), Star(Lazy), Some("* ?")))
+  check("a\u3000\u001cb", "x", PythonRegex())(Sequence(Literal('a'), Blank("\u3000\u001c"), Literal('b')))
+  check("a\u00a0b", "x", PythonRegex(Python.Type.Bytes))(Sequence(Literal('a'), Blank("\u00a0"), Literal('b')))
+  check("a#\u0085b", "x", PythonRegex())(Sequence(Literal('a'), Blank("#\u0085b")))
+  check("a\u2005b", "x", PythonRegex())(Sequence(Literal('a'), Blank("\u2005"), Literal('b')))
+  error("( ?:a)", "x", PythonRegex())("Nothing to repeat at 2")
+  check("\\1 23", "x", PythonRegex())(Backslash(Escape(BareOctal, 0x53, Some("1 23"))))
+  checkPrinted("\\1 2", "\\12", "x", PythonRegex()):
+    Backslash(EscapeBackReference(BareBackReference, IndexedReference(12)))
+
+  // ICU repeats `^` and `$`, but not the other zero-width assertions, and repeats a literal across `\Q\E`.
+  check("^*$?", "", ICU)(Sequence(Repeat(Caret, Star(Greedy)), Repeat(Dollar, Question(Greedy))))
+  error("\\b*", "", ICU)("Nothing to repeat at 2")
+  check("a\\Q\\E*", "", ICU)(Repeat(Node(Literal('a')), Star(Greedy), Some("\\Q\\E*")))
+  error("a{16777216}", "", ICU)("Number too big in {} quantifier at 2")
+  error("a}", "", ICU)("Incomplete quantifier at 1")
+  error("a{2}{3}", "", ICU)("Nested quantifier at 7")
+  error("a{,2}", "", ICU)("Incomplete quantifier at 1")
+
+  // Boost.Regex's quantifiers skip any whitespace in braces, and `N` (`newline_alt`) reads `\n` as `|`.
+  check("a{ 1 ,\n2 }", "", BoostRegex())(Repeat(Node(Literal('a')), Bounded(1, 2, Greedy), Some("{ 1 ,\n2 }")))
+  check("a{,2}", "", BoostRegex())(Sequence(Literal('a'), Literal('{'), Literal(','), Literal('2'), Literal('}')))
+  check("a{1\n}", "N", BoostRegex())(Repeat(Node(Literal('a')), Exact(1, Greedy), Some("{1\n}")))
+  // `char` reads a number as `std::istream` does, and a negative maximum is none.
+  check("a{+2}b{1,-2}", "", BoostRegex()):
+    Sequence(
+      Repeat(Node(Literal('a')), Exact(2, Greedy), Some("{+2}")),
+      Repeat(Node(Literal('b')), Unbounded(1, Greedy), Some("{1,-2}"))
+    )
+  check("a{-1}", "", BoostRegex())(Sequence(Literal('a'), Literal('{'), Literal('-'), Literal('1'), Literal('}')))
+  check("a{99999999999999999999}", "", BoostRegex()):
+    Sequence(Literal('a') +: Literal('{') +: "99999999999999999999}".map(Literal(_))*)
+  // `u32regex` reads the digits of Unicode (e.g. the fullwidth `\uff12`), but no sign, so `+` repeats `{`.
+  check("a{\uff12}", "", BoostRegex(BoostRegex.Type.U32Regex)):
+    Repeat(Node(Literal('a')), Exact(2, Greedy), Some("{\uff12}"))
+  check("a{b}", "", BoostRegex(BoostRegex.Type.U32Regex)):
+    Sequence(Literal('a'), Literal('{'), Literal('b'), Literal('}'))
+  check("a{+2}", "", BoostRegex(BoostRegex.Type.U32Regex)):
+    Sequence(Literal('a'), Repeat(Literal('{'), Plus(Greedy)), Literal('2'), Literal('}'))
+  // `u32regex` reads a number above `INTMAX_MAX / 10` as none after its digits, which makes the maximum none.
+  check("a{1,9223372036854775807}", "", BoostRegex(BoostRegex.Type.U32Regex)):
+    Repeat(Node(Literal('a')), Unbounded(1, Greedy), Some("{1,9223372036854775807}"))
+  error("a**", "", BoostRegex())("Nested quantifier at 2")
+  // The extended mode skips only whitespace before `?` and `+` of a quantifier.
+  check("a* ?b+ +", "x", BoostRegex()):
+    Sequence(
+      Repeat(Node(Literal('a')), Star(Lazy), Some("* ?")),
+      Repeat(Node(Literal('b')), Plus(Possessive), Some("+ +"))
+    )
+  error("a* #c\n?", "x", BoostRegex())("Nested quantifier at 6")
+  // `(?i)` is an empty group, which a quantifier repeats.
+  check("a(?i)+", "", BoostRegex()):
+    Sequence(Literal('a'), Repeat(Command(InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None))), Plus(Greedy)))
+  error("\\b*", "", BoostRegex())("Nothing to repeat at 2")
+  error("^*", "", BoostRegex())("Nothing to repeat at 1")
+  // The AST does not keep whether an alternative ends with `|` or `\n`.
+  checkPrinted("a\nb", "a|b", "N", BoostRegex())(Disjunction(Literal('a'), Literal('b')))
+  checkPrinted("a\n b #c\nd", "a| b #c\nd", "Nx", BoostRegex()):
+    Disjunction(Literal('a'), Sequence(Blank(" "), Literal('b'), Blank(" #c\n"), Literal('d')))
+  check("a\nb", "", BoostRegex())(Sequence(Literal('a'), Literal('\n'), Literal('b')))
+  // The extended mode skips VT, and in `u32regex` the spaces of ICU, but ends a comment at a line terminator.
+  check("a\u000bb#c\fd", "x", BoostRegex()):
+    Sequence(Literal('a'), Blank("\u000b"), Literal('b'), Blank("#c\f"), Literal('d'))
+  check("a\u3000b#c\u0085d", "x", BoostRegex(BoostRegex.Type.U32Regex)):
+    Sequence(Literal('a'), Blank("\u3000"), Literal('b'), Blank("#c\u0085"), Literal('d'))
+  // Over `char`, the source is the UTF-8 bytes.
+  check("\u00e9", "", BoostRegex())(Sequence(Literal(0xc3), Literal(0xa9)))

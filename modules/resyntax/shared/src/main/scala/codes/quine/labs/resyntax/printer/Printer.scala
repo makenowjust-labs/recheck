@@ -68,9 +68,9 @@ private[printer] final class Printer(featureSet: FeatureSet):
   private val out = new java.lang.StringBuilder
 
   /** Whether the extended mode is on, as the parser's `skipsComment`. */
-  private var verbose: Boolean = featureSet.skipsComment
+  private var verbose: Boolean = featureSet.comment.skipsComment
 
-  private var verboseMore: Boolean = featureSet.verboseMore
+  private var verboseMore: Boolean = featureSet.comment.verboseMore
 
   private var inClass: Boolean = false
 
@@ -150,10 +150,10 @@ private[printer] final class Printer(featureSet: FeatureSet):
     */
   private def strategyContinuation(quantifier: Quantifier): Char => Boolean = quantifier match
     case _ if quantifier.strategy != BacktrackStrategy.Greedy                                   => NotContinued
-    case Quantifier.Exact(_, _) if !featureSet.allowsMeaninglessBacktrackStrategy               => NotContinued
+    case Quantifier.Exact(_, _) if !featureSet.quantifier.allowsMeaninglessBacktrackStrategy    => NotContinued
     case Quantifier.Bounded(_, _, _) | Quantifier.Unbounded(_, _) | Quantifier.MaxBounded(_, _) =>
-      c => c == '?' || c == '+' && featureSet.hasPossessiveCurlyBacktrackStrategy
-    case _ => c => c == '?' || c == '+' && featureSet.hasPossessiveBacktrackStrategy
+      c => c == '?' || c == '+' && featureSet.quantifier.hasPossessiveCurlyBacktrackStrategy
+    case _ => c => c == '?' || c == '+' && featureSet.quantifier.hasPossessiveBacktrackStrategy
 
   /** Writes a case region, where a part with a text is in the command, and a part without one is out of all the
     * commands, which are written again before the next part with a text.
@@ -244,7 +244,7 @@ private[printer] final class Printer(featureSet: FeatureSet):
 
   /** Tests whether the parser skips a space here, as the extended mode does between tokens. */
   private def isSeparable: Boolean =
-    if inClass then verbose && featureSet.skipsCommentInClass || verboseMore else verbose
+    if inClass then verbose && featureSet.comment.skipsCommentInClass || verboseMore else verbose
 
   /** Writes in a scope, whose inline flags do not reach after it as in the parser's `protectContext`. */
   private def scoped(body: => Unit): Unit =
@@ -332,9 +332,11 @@ private[printer] final class Printer(featureSet: FeatureSet):
     case NameStyle.Bare  => name
 
   private def printReference(ref: Reference): String = ref match
-    case Reference.IndexedReference(index)       => index.toString
-    case Reference.NamedReference(name)          => name
-    case Reference.RelativeReference(n)          => printSigned(n)
+    case Reference.IndexedReference(index) => index.toString
+    case Reference.NamedReference(name)    => name
+    // Boost.Regex's `\g{-0}` refers to the next group.
+    case Reference.RelativeReference(1) if featureSet.reference.hasBackslashGKBackReference => "-0"
+    case Reference.RelativeReference(n)                                                     => printSigned(n)
     case Reference.LeveledReference(base, level) => s"${printReference(base)}${printSigned(level)}"
 
   private def printSigned(n: Int): String = if n < 0 then n.toString else s"+$n"
@@ -387,6 +389,9 @@ private[printer] final class Printer(featureSet: FeatureSet):
       write(")")
     case CommandKind.AbsenceRangeClear        => write("(?~|)")
     case CommandKind.StartOption(name, value) => write(s"(*$name${value.fold("")(value => s"=$value")})")
+    case CommandKind.Fuzzy(node, constraint)  =>
+      writeNode(node)
+      write(s"{$constraint}")
 
   private def printBacktrackControlKind(kind: BacktrackControlKind): String = kind match
     case BacktrackControlKind.Accept => "ACCEPT"
@@ -439,6 +444,11 @@ private[printer] final class Printer(featureSet: FeatureSet):
         case AssertKind.Begin                => write("\\A")
         case AssertKind.LowerEnd             => write("\\z")
         case AssertKind.UpperEnd             => write("\\Z")
+        // Boost.Regex's start and end of a word are `\<` and `\>`, and python-regex's are `\m` and `\M`.
+        case AssertKind.WordStart =>
+          write(if featureSet.escape.hasBackslashAngleWordStartEnd then "\\<" else "\\m")
+        case AssertKind.WordEnd =>
+          write(if featureSet.escape.hasBackslashAngleWordStartEnd then "\\>" else "\\M")
     case BackslashKind.CaseCommand(kind) => write(printCaseCommand(kind))
 
   private def printBoundaryModifier(modifier: BoundaryModifier): String = modifier match
@@ -476,7 +486,7 @@ private[printer] final class Printer(featureSet: FeatureSet):
         case EscapeStyle.Meta         => "M-"
         case EscapeStyle.Octal        => "o"
         // Java's bare octal escape starts with `\0`.
-        case EscapeStyle.BareOctal => if featureSet.hasBackslashZeroOctal then "0" else ""
+        case EscapeStyle.BareOctal => if featureSet.escape.hasBackslashZeroOctal then "0" else ""
         case EscapeStyle.UnicodeHex4 | EscapeStyle.UnicodeHex4Pair | EscapeStyle.UnicodeBracket => "u"
         case EscapeStyle.UnicodeHex8                                                            => "U"
         case EscapeStyle.NamedHex                                                               => "N"
@@ -493,8 +503,13 @@ private[printer] final class Printer(featureSet: FeatureSet):
       case EscapeClassKind.NonWord                                     => "W"
       case EscapeClassKind.Horizontal | EscapeClassKind.HexDigit       => "h"
       case EscapeClassKind.NonHorizontal | EscapeClassKind.NonHexDigit => "H"
+      case EscapeClassKind.POSIXBlank                                  => "h"
       case EscapeClassKind.Vertical                                    => "v"
       case EscapeClassKind.NonVertical                                 => "V"
+      case EscapeClassKind.Lower                                       => "l"
+      case EscapeClassKind.NonLower                                    => "L"
+      case EscapeClassKind.Upper                                       => "u"
+      case EscapeClassKind.NonUpper                                    => "U"
       case EscapeClassKind.NonNewline                                  => "N"
       case EscapeClassKind.GeneralNewline                              => "R"
       case EscapeClassKind.CharName(name)                              => s"N{$name}"
@@ -506,6 +521,7 @@ private[printer] final class Printer(featureSet: FeatureSet):
       case EscapeClassKind.NonUnicodeProperty(name)                    => s"P{$name}"
       case EscapeClassKind.NonUnicodeBareProperty(name)                => s"P$name"
       case EscapeClassKind.NonUnicodePropertyValue(name, value)        => s"P{$name=$value}"
+      case EscapeClassKind.NamedList(name)                             => s"L<$name>"
       case EscapeClassKind.QuoteSet(strings)                           =>
         strings.map(_.map(printQuoteLiteral).mkString).mkString("q{", "|", "}")
     write(s"\\$text", if klass == EscapeClassKind.NonNewline then _ == '{' else NotContinued)
@@ -523,11 +539,20 @@ private[printer] final class Printer(featureSet: FeatureSet):
     if featureSet.sourceEncoding == SourceEncoding.Text then String(Character.toChars(value)) else value.toChar.toString
 
   private def writeClass(invert: Boolean, item: ClassItem): Unit =
-    write(if invert then "[^" else "[")
-    inClass = true
-    writeClassItem(item)
-    inClass = false
-    write("]")
+    if isICUPropertyClass(invert, item) then
+      inClass = true
+      writeClassItem(item)
+      inClass = false
+    else
+      write(if invert then "[^" else "[")
+      inClass = true
+      writeClassItem(item)
+      inClass = false
+      write("]")
+
+  /** Tests whether the class is ICU's `[:name:]` alone, which is written without the brackets of the class. */
+  private def isICUPropertyClass(invert: Boolean, item: ClassItem): Boolean =
+    featureSet.charClass.hasICUClass && !invert && item.data.isInstanceOf[ClassItemData.ClassPOSIX]
 
   private def writeClassItem(item: ClassItem): Unit = item.data match
     case ClassItemData.ClassUnion(items)              => items.foreach(writeClassItem)
@@ -538,14 +563,33 @@ private[printer] final class Printer(featureSet: FeatureSet):
     case ClassItemData.ClassDiff(left, right) =>
       writeClassItem(left)
       // .NET's subtraction is `-` before a nested class (e.g. `[a-z-[aeiou]]`).
-      write(if featureSet.hasClassSubtraction then "-" else "--")
+      write(if featureSet.charClass.hasClassSubtraction then "-" else "--")
       writeClassItem(right)
-    case ClassItemData.ClassNest(invert, inner) =>
+    case ClassItemData.ClassNestIntersection(left, right) =>
+      writeClassItem(left)
+      write("&")
+      writeClassItem(right)
+    case ClassItemData.ClassNestDiff(left, right) =>
+      writeClassItem(left)
+      write("-")
+      writeClassItem(right)
+    case ClassItemData.ClassSymmetricDiff(left, right) =>
+      writeClassItem(left)
+      write("~~")
+      writeClassItem(right)
+    case ClassItemData.ClassExplicitUnion(left, right) =>
+      writeClassItem(left)
+      write("||")
+      writeClassItem(right)
+    case ClassItemData.ClassNest(invert, inner) if isICUPropertyClass(invert, inner) => writeClassItem(inner)
+    case ClassItemData.ClassNest(invert, inner)                                      =>
       write(if invert then "[^" else "[")
       writeClassItem(inner)
       write("]")
-    case ClassItemData.ClassPOSIX(invert, name) => write(s"[:${if invert then "^" else ""}$name:]")
-    case ClassItemData.ClassRange(begin, end)   =>
+    case ClassItemData.ClassPOSIX(invert, name)    => write(s"[:${if invert then "^" else ""}$name:]")
+    case ClassItemData.ClassCollatingElement(name) => write(s"[.$name.]")
+    case ClassItemData.ClassEquivalence(name)      => write(s"[=$name=]")
+    case ClassItemData.ClassRange(begin, end)      =>
       writeRangeEnd(begin)
       write("-")
       writeRangeEnd(end)

@@ -173,6 +173,24 @@ class DiagnosticsSuite extends munit.FunSuite:
     assertEquals(
       Diagnostics
         .Unknown(
+          "",
+          "",
+          Dialect.PythonRegex(Dialect.Python.Type.Bytes),
+          None,
+          Diagnostics.ErrorKind.Cancel,
+          Seq.empty,
+          None
+        )
+        .toString,
+      s"""|Input  : //
+          |Dialect: python-regex (type: bytes)
+          |Status : unknown
+          |Error  : cancel
+          |Checker: (none)""".stripMargin
+    )
+    assertEquals(
+      Diagnostics
+        .Unknown(
           "a*a*$",
           "",
           Dialect.Ruby(),

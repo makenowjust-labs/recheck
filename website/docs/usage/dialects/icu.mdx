@@ -1,0 +1,112 @@
+---
+id: icu
+title: ICU
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+Describes how `recheck` checks a regular expression of the `icu` dialect.
+
+## Engine
+
+`recheck` follows the syntax and the semantics of the regular expressions of ICU4C 79.1 (`uregex_*` and `icu::RegexPattern`), which Apple's `NSRegularExpression`, MySQL 8 and R's `stringi` use.
+
+## Settings
+
+The `icu` dialect has no settings.
+
+<Tabs>
+<TabItem value="cli" label="CLI">
+
+```console
+$ recheck --dialect=icu '/^(a|a)*$/'
+```
+
+</TabItem>
+<TabItem value="js" label="JavaScript">
+
+```tsx
+import { check } from "recheck";
+
+await check("^(a|a)*$", "", { dialect: "icu" });
+```
+
+</TabItem>
+<TabItem value="scala" label="Scala">
+
+```scala
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.resyntax.dialect.Dialect
+
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.ICU))
+```
+
+</TabItem>
+</Tabs>
+
+## Flags and Units
+
+The matching unit is `utf16-code-point` (see [Matching Units](../dialects.mdx#matching-units)).
+
+`recheck` supports the following flags of ICU, written as the letters of their inline flags.
+
+| Flag | `uregex` flag             | Inline | Notes                                                                                             |
+| ---- | ------------------------- | ------ | ------------------------------------------------------------------------------------------------- |
+| `d`  | `UREGEX_UNIX_LINES`       | `(?d)` | Only `\n` is a line terminator for `.`, `^` and `$` (not for `\Z`).                               |
+| `i`  | `UREGEX_CASE_INSENSITIVE` | `(?i)` | A literal and a back-reference match the folding to several characters (e.g. `ß` matches `"ss"`). |
+| `m`  | `UREGEX_MULTILINE`        | `(?m)` |                                                                                                   |
+| `s`  | `UREGEX_DOTALL`           | `(?s)` | `.` matches `"\r\n"` as one character.                                                            |
+| `w`  | `UREGEX_UWORD`            | `(?w)` | Not supported with `\b` and `\B` (see [Syntax Limitations](#syntax-limitations)).                 |
+| `x`  | `UREGEX_COMMENTS`         | `(?x)` |                                                                                                   |
+
+`UREGEX_ERROR_ON_UNKNOWN_ESCAPES` and `UREGEX_LITERAL` have no flag letter, so they cannot be given.
+The inline flag `(?u)` has no effect, as in ICU.
+
+## Syntax Limitations
+
+The following constructs are not supported, and they are reported as `unsupported`.
+
+- `\b` and `\B` with `w`, which are the word boundaries of UAX #29 with ICU's dictionaries.
+- `\N{...}` and the property `Name` (e.g. `\N{EM DASH}` and `\p{Name=EM DASH}`), as in the other dialects having them.
+- The properties `Lead_Canonical_Combining_Class` (`lccc`) and `Trail_Canonical_Combining_Class` (`tccc`) with a value.
+
+`recheck` reports a range of a class to `\h`, `\H`, `\v`, `\V`, `\p{...}` or `\P{...}` (e.g. `[a-\h]`) as `invalid`, as a range to `\w` is in ICU, though ICU reads it as a range to the letter (e.g. `[a-h]`).
+
+## Approximations
+
+- ICU tries the starts of a look-behind from the shortest, and `recheck` tries them from the longest, as for Java.
+  For example, `(?<=(a|aa))b` captures `"a"` of `"aab"` in ICU, but `"aa"` in `recheck`.
+- Under `i`, a run of literals matches the folding of the characters only at the boundaries of the literals (e.g. `ﬃ` does not match `"ﬀi"`, and `sß` does not match `"ßs"`).
+- In a class, escapes of a high and a low surrogate other than `\u` (e.g. `[\x{D83D}\x{DE00}]`) are two characters in `recheck`, but one surrogate pair in ICU.
+- `recheck` does not reproduce the following behaviors of ICU.
+  - A possessive repetition whose body matches the empty string overflows the backtrack stack (e.g. `(?:a?)*+b` on `"b"` gives `U_REGEX_STACK_OVERFLOW`); `recheck` matches it.
+  - `find` chooses the starts of a match taking a capture of a look-behind as empty, so `(?<=(a))\1b` does not match `"aab"`; `recheck` matches it.
+  - Under `i`, a class of one character matches as a literal, which matches the folding to several characters (e.g. `(?i)[ﬁ]` matches `"fi"`); `recheck` takes it as a class.
+  - `(?m)^` matches between `\r` and `\n`, and `(?dm)^` matches at the end of the input after `\n`; `recheck` takes `"\r\n"` as one line terminator for `^` as for `$`, and does not match `^` at the end of a non-empty input.
+  - Under `i`, a block with `In` (e.g. `\p{InLatin1Supplement}`) does not match the case variants of its characters, unlike the other properties; `recheck` matches them.
+  - In a look-behind, `.` with `s` reads `\r` alone before the end of the look-behind (e.g. `(?s)\r(?<=.)` matches `"\r\n"`); `recheck` reads `"\r\n"` as one character there too.
+  - An escape class or a property right after a `-` or `&` between classes joins the class after the operator (e.g. `[[ab]-[a]\w]` matches nothing); `recheck` adds it after the operation (`[b\w]`).
+  - A range after a `-` or `&` that is a character (e.g. `[a&-c]`) begins at the character before them (`[a&a-c]`), and `[&-c]` is an error; `recheck` begins it at the `-` or `&` (e.g. `[a&-c]` is `a` and the range from `&` to `c`).
+
+## Runtime-Attack Verification
+
+- Command: `c++ <file>.cpp -o <file> -licui18n -licuuc -licudata` once, and then the compiled program.
+- Matching: `uregex_find` from the start, with ICU's default limits (no time limit, and a backtrack stack of 8,000,000 bytes).
+- Engine limits: `U_REGEX_TIME_OUT`.
+- Engine errors: `U_REGEX_STACK_OVERFLOW`, `U_MEMORY_ALLOCATION_ERROR`.
+- Environment variable: `RECHECK_ICU`.
+
+`RECHECK_ICU` replaces `c++` with a command line of a C++ compiler, which finds ICU's headers and libraries.
+`recheck` adds the program, `-o`, the compiled program and ICU's libraries after it.
+For example, the following uses ICU of Homebrew.
+
+```console
+$ export RECHECK_ICU="c++ -I$(brew --prefix icu4c@79)/include -L$(brew --prefix icu4c@79)/lib"
+$ recheck --dialect=icu --runtime-attack-timeout=1s '/^(a|a)*$/'
+```
+
+`recheck` compiles the program once for each command line and version of the compiler, and the next runs reuse the compiled program.
+ICU's libraries out of the default paths of the dynamic linker also need a run path that the libraries use too (e.g. `-Wl,--disable-new-dtags,-rpath,/opt/icu/lib` on Linux).
+A failed compilation makes the runtime-attack verification fail with an `unexpected` error telling the output of the compiler.

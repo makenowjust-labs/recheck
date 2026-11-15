@@ -1,9 +1,9 @@
 package codes.quine.labs.recheck.exec
 
 import java.nio.file.Files
+import java.nio.file.attribute.FileTime
 import java.nio.file.attribute.PosixFilePermissions
-
-import codes.quine.labs.recheck.common.UnexpectedException
+import java.util.concurrent.TimeUnit
 
 class SourceDirectorySuite extends munit.FunSuite:
 
@@ -12,39 +12,39 @@ class SourceDirectorySuite extends munit.FunSuite:
     assert(Files.isDirectory(dir))
     assertEquals(Files.getPosixFilePermissions(dir), PosixFilePermissions.fromString("rwx------"))
 
-  test("SourceDirectory.path"):
-    // The content is unique to this test, so that no other run writes the same file.
-    val source = SourceFile("Foo.java", s"class Foo {} // ${System.nanoTime()}")
-    val file = SourceDirectory.path(source)
-    val changed = SourceDirectory.path(source.copy(content = source.content + " "))
+  test("SourceDirectory.reopen"):
+    val dir = Files.createTempDirectory("recheck-exec-")
     try
-      assertEquals(file.getParent, SourceDirectory.directory)
-      assert(clue(file.getFileName.toString).matches("Foo-[0-9a-f]{16}\\.java"))
-      assertEquals(Files.readString(file), source.content)
-      val modified = Files.getLastModifiedTime(file)
-      assertEquals(SourceDirectory.path(source), file)
-      assertEquals(Files.getLastModifiedTime(file), modified)
-      // A changed file is written again.
-      Files.writeString(file, "broken")
-      assertEquals(SourceDirectory.path(source), file)
-      assertEquals(Files.readString(file), source.content)
-      assertNotEquals(changed, file)
-    finally
-      Files.deleteIfExists(file)
-      Files.deleteIfExists(changed)
+      assertEquals(SourceDirectory.reopen(dir), dir)
+      // A directory that is gone is opened again.
+      assertEquals(SourceDirectory.reopen(dir.resolve("missing")), SourceDirectory.directory)
+    finally Files.delete(dir)
 
-  test("SourceDirectory.path: a file that cannot be written"):
-    val source = SourceFile("Foo.java", s"class Foo {} // ${System.nanoTime()}")
-    val file = SourceDirectory.path(source)
-    Files.delete(file)
-    // A non-empty directory at the path of the file cannot be replaced.
-    val inner = Files.createFile(Files.createDirectory(file).resolve("inner"))
+  test("SourceDirectory.deleteLeftovers"):
+    val old = Files.createTempDirectory(SourceDirectory.directory, "compile-")
+    Files.createFile(old.resolve("output"))
+    Files.setLastModifiedTime(old, FileTime.fromMillis(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2)))
+    val young = Files.createTempDirectory(SourceDirectory.directory, "compile-")
     try
-      val ex = intercept[UnexpectedException](SourceDirectory.path(source))
-      assert(clue(ex.getMessage).startsWith(s"cannot write `$file`: "))
-    finally
-      Files.deleteIfExists(inner)
-      Files.deleteIfExists(file)
+      SourceDirectory.deleteLeftovers()
+      assert(!Files.exists(old))
+      // A directory of a compilation that may be running stays.
+      assert(Files.isDirectory(young))
+    finally SourceDirectory.delete(young)
+
+  test("SourceDirectory.outputPath"):
+    val source = SourceFile("Foo.cpp", "int main() {}")
+    val output = SourceDirectory.outputPath(source, Seq("c++", "-lfoo"), "c++ 1")
+    assertEquals(output.getParent, SourceDirectory.directory)
+    assert(clue(output.getFileName.toString).matches("Foo-[0-9a-f]{16}"))
+    assertEquals(SourceDirectory.outputPath(source, Seq("c++", "-lfoo"), "c++ 1"), output)
+    // Another command line, version or source has another output.
+    assertNotEquals(SourceDirectory.outputPath(source, Seq("c++ -O", "-lfoo"), "c++ 1"), output)
+    assertNotEquals(SourceDirectory.outputPath(source, Seq("c++", "-lfoo"), "c++ 2"), output)
+    assertNotEquals(
+      SourceDirectory.outputPath(source.copy(content = "int main() { }"), Seq("c++", "-lfoo"), "c++ 1"),
+      output
+    )
 
   test("SourceDirectory.sharedDirectory"):
     val parent = Files.createTempDirectory("recheck-exec-")

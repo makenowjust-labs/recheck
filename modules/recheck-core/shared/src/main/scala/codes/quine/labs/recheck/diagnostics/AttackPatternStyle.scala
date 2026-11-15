@@ -29,12 +29,13 @@ object AttackPatternStyle:
     val bytes = mode == UnitMode.Byte
     dialect match
       case Dialect.JavaScript => JavaScript(unicode = mode == UnitMode.UTF16CodePoint)
-      case _: Dialect.Python  => Python(bytes)
-      case _: Dialect.Ruby    => Ruby(bytes)
-      case Dialect.Java       => Java
-      case Dialect.DotNet     => CSharp
-      case _: Dialect.Perl    => Perl
-      case Dialect.PCRE       => PHP(bytes)
+      // C++ has no expression repeating a string, so Python's literals show Boost.Regex's bytes or code points.
+      case _: Dialect.Python | _: Dialect.PythonRegex | _: Dialect.BoostRegex => Python(bytes)
+      case _: Dialect.Ruby                                                    => Ruby(bytes)
+      case Dialect.Java | Dialect.ICU                                         => Java
+      case Dialect.DotNet                                                     => CSharp
+      case _: Dialect.Perl                                                    => Perl
+      case Dialect.PCRE                                                       => PHP(bytes)
 
   /** JavaScript is a JavaScript style specifier, e.g. `'a'.repeat(31) + '\x00'`.
     *

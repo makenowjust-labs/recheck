@@ -85,6 +85,27 @@ object IRCaseEquivalence:
       val above = set.diff(Byte)
       asciiFold.closure(set.intersect(Byte)).union(CaseMapping.SimpleFold.closure(above).diff(Byte)).restrict(mode)
 
+  /** PythonRegex is python-regex's simple case folding, where `I`, `i`, `İ` and `ı` match without transitivity.
+    *
+    * Two of them match when one is a simple case mapping of the other: `I` matches `i` and `ı`, `i` matches `I` and
+    * `İ`, but `ı` does not match `i`, and `İ` does not match `I`.
+    */
+  final case class PythonRegex(mode: UnitMode) extends IRCaseEquivalence:
+
+    def closure(set: CharSet): CharSet =
+      val turkic = set.intersect(TurkicIChars).iterator.map(TurkicI).toSeq
+      CharSet.union(CaseMapping.SimpleFold.closure(set.diff(TurkicIChars)) +: turkic).restrict(mode)
+
+  /** The characters that each of `I`, `i`, `İ` and `ı` matches in python-regex. */
+  private val TurkicI: Map[UChar, CharSet] = Map(
+    0x49 -> CharSet.of(0x49, 0x69, 0x131),
+    0x69 -> CharSet.of(0x49, 0x69, 0x130),
+    0x130 -> CharSet.of(0x69, 0x130),
+    0x131 -> CharSet.of(0x49, 0x131)
+  )
+
+  private val TurkicIChars: CharSet = CharSet.of(TurkicI.keys.toSeq*)
+
   private val ASCII: CharSet = CharSet.range(0, 0x7f)
 
   private val Byte: CharSet = CharSet.range(0, 0xff)

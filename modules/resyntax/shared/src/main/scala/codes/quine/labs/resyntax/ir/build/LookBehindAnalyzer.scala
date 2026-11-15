@@ -14,6 +14,8 @@ import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.Reference
+import codes.quine.labs.resyntax.charset.FullCaseFolding
+import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UTF8Encoding
 import codes.quine.labs.resyntax.ir.build.LookBehindAnalyzer.*
 
@@ -63,6 +65,12 @@ private[build] final class LookBehindAnalyzer(
           if w.min != w.max || w.max == Inf then fail("Look-behind requires fixed-width pattern", lookBehind)
       case IRLookBehindRule.Ruby =>
         if !isValidRubyLookBehind(body, negative) then fail("Invalid pattern in look-behind", lookBehind)
+      case IRLookBehindRule.ICU =>
+        if icuMaxLength(body) >= ICUMaxLength then
+          fail("Look-behind does not have a bounded maximum length", lookBehind)
+      case IRLookBehindRule.BoostRegex =>
+        val fixed = width(body, Set.empty).exists(w => w.min == w.max && w.max != Inf)
+        if isBoostRegexForbidden(body) || !fixed then fail("Look-behind requires fixed-length pattern", lookBehind)
 
   /** Determines how the engine matches the body of a valid look-behind.
     *
@@ -87,7 +95,8 @@ private[build] final class LookBehindAnalyzer(
         val starts = startRange(body)
         val min = perlAcceptMin(body).fold(starts.min)(n => starts.min.min(toLength(n)))
         IRLookBehindMatch.Forward(Seq(starts.copy(min = min)))
-      case IRLookBehindRule.Python => IRLookBehindMatch.Forward(Seq(startRange(body)))
+      case IRLookBehindRule.Python | IRLookBehindRule.ICU | IRLookBehindRule.BoostRegex =>
+        IRLookBehindMatch.Forward(Seq(startRange(body)))
       // Each top-level alternative of Ruby's look-behind has a fixed width, so matching it backward is the same.
       case IRLookBehindRule.Ruby => IRLookBehindMatch.Backward
 
@@ -148,8 +157,11 @@ private[build] final class LookBehindAnalyzer(
         case _                            => None
     case NodeData.Caret | NodeData.Dollar           => Some(Width(0, 0))
     case NodeData.Literal(_) | NodeData.Class(_, _) => Some(charWidth(Seq(node)))
-    case NodeData.Dot                               => Some(Width(1, 1))
-    case NodeData.Backslash(kind)                   =>
+    // ICU's `.` with `s` reads `\r\n` as one character.
+    case NodeData.Dot =>
+      val crlf = featureSet.dotAllMatchesCRLF && table.charFlagsOf(node).exists(_.dotAll)
+      Some(Width(1, if crlf then 2 else 1))
+    case NodeData.Backslash(kind) =>
       kind match
         case BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)  => Some(Width(1, 2))
         case BackslashKind.EscapeClass(EscapeClassKind.GraphemeCluster) => Some(Width(1, Inf))
@@ -229,6 +241,79 @@ private[build] final class LookBehindAnalyzer(
             width(child, visiting + index)
         if recursions == before then groupWidths(index) = widths
         widths
+
+  /** Returns the maximum length of the node in UTF-16 units as ICU's `maxMatchLength` of `regexcmp.cpp` counts it, or
+    * [[Inf]].
+    *
+    * A class, an escape class and `.` count two units, a back-reference, `\X` and an unbounded repeat are unbounded, a
+    * look-ahead counts as a consuming group, and a look-behind counts nothing.
+    */
+  private def icuMaxLength(node: Node): Long = node.data match
+    case NodeData.Disjunction(nodes)          => nodes.map(icuMaxLength).max
+    case NodeData.Sequence(nodes)             => icuSequenceMaxLength(nodes)
+    case NodeData.Repeat(node, quantifier, _) =>
+      val (_, max) = bounds(quantifier)
+      if max == Inf then Inf else mul(icuMaxLength(node), max)
+    case NodeData.Group(_: GroupKind.PositiveLookBehind | _: GroupKind.NegativeLookBehind, _) => 0
+    case NodeData.Group(_, node)                                                              => icuMaxLength(node)
+    case NodeData.Literal(_)                                 => icuLiteralMaxLength(Seq(node))
+    case NodeData.Dot | NodeData.Class(_, _)                 => 2
+    case NodeData.Backslash(_: BackslashKind.BackslashValue) => icuLiteralMaxLength(Seq(node))
+    case NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.GraphemeCluster)) => Inf
+    case NodeData.Backslash(_: BackslashKind.EscapeClass)                               => 2
+    case NodeData.Backslash(_: BackslashKind.EscapeBackReference)                       => Inf
+    case _                                                                              => 0
+
+  /** Returns the maximum length of the nodes in a row for ICU, where the literals in a row are a string. */
+  private def icuSequenceMaxLength(nodes: Seq[Node]): Long =
+    var length = 0L
+    var rest = nodes
+    while rest.nonEmpty do
+      val (literals, others) = rest.span(icuLiteralValue(_).isDefined)
+      if literals.nonEmpty then length = add(length, icuLiteralMaxLength(literals))
+      if others.nonEmpty then length = add(length, icuMaxLength(others.head))
+      rest = others.drop(1)
+    length
+
+  /** Returns the maximum length of a string of ICU's literals, which counts its UTF-16 units, or under `i` the units of
+    * its full case folding and at least two (e.g. `(?i)a` is two, `(?i)ab` is two, and `(?i)ß` is two by `ss`).
+    */
+  private def icuLiteralMaxLength(nodes: Seq[Node]): Long =
+    val values = nodes.flatMap(icuLiteralValue)
+    def units(values: Seq[Int]): Long = values.map(UTF16Encoding.encode(_).length.toLong).sum
+
+    nodes.headOption.flatMap(table.charFlagsOf) match
+      case Some(flags) if flags.ignoreCase =>
+        val folded = units(values.flatMap(FullCaseFolding(_).iterator))
+        if values.size == 1 then folded.max(2) else folded
+      case _ => units(values)
+
+  /** Returns the value of the node if it is a literal, which makes a string with the literals next to it in ICU. */
+  private def icuLiteralValue(node: Node): Option[Int] = node.data match
+    case NodeData.Literal(value)                                 => Some(value)
+    case NodeData.Backslash(value: BackslashKind.BackslashValue) => Some(value.value)
+    case _                                                       => None
+
+  /** Checks whether Boost.Regex's look-behind has a node that `calculate_backstep` rejects: a back-reference, or a
+    * repeat of other than a character or of a varying count (e.g. `(?:ab){2}` and `a{1,2}`).
+    *
+    * A look-around inside is not checked, which has its own rule.
+    */
+  private def isBoostRegexForbidden(node: Node): Boolean = node.data match
+    case NodeData.Group(_: GroupKind.LookAround, _)               => false
+    case NodeData.Backslash(_: BackslashKind.EscapeBackReference) => true
+    case NodeData.Repeat(child, quantifier, _)                    =>
+      val (min, max) = bounds(quantifier)
+      min != max || !isBoostRegexCharacter(child)
+    case _ => NodeKey.children(node).exists(isBoostRegexForbidden)
+
+  /** Checks whether the node matches one character, which Boost.Regex's look-behind can repeat. */
+  private def isBoostRegexCharacter(node: Node): Boolean = node.data match
+    case NodeData.Literal(_) | NodeData.Dot | NodeData.Class(_, _) => true
+    case NodeData.Backslash(_: BackslashKind.BackslashValue)       => true
+    case NodeData.Backslash(BackslashKind.EscapeClass(kind))       =>
+      kind != EscapeClassKind.GeneralNewline && kind != EscapeClassKind.GraphemeCluster
+    case _ => false
 
   /** Checks Onigmo's restriction: each top-level alternative has a fixed length, and some nodes are forbidden. */
   private def isValidRubyLookBehind(body: Node, negative: Boolean): Boolean =
@@ -406,6 +491,11 @@ private[build] object LookBehindAnalyzer:
 
   /** Cap is the length beyond which a length is unbounded, which is far beyond the dialects' limits. */
   private val Cap: Long = 1L << 40
+
+  /** ICUMaxLength is the length of ICU's look-behind that is too long, 2^24 UTF-16 units, which does not fit in the 24
+    * bits of its operand.
+    */
+  private val ICUMaxLength: Long = 1L << 24
 
   /** JavaMaxReps is `Pattern.MAX_REPS`. */
   private val JavaMaxReps: Int = Int.MaxValue

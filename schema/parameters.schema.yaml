@@ -183,7 +183,7 @@ properties:
       See [Dialects](/docs/usage/dialects) for the dialects and their settings.
     oneOf:
       - type: string
-        enum: ["javascript", "java", "dotnet", "pcre", "python", "ruby", "perl"]
+        enum: ["javascript", "java", "dotnet", "pcre", "python", "python-regex", "ruby", "perl", "icu", "boost-regex"]
       - type: object
         title: "JavaScript"
         properties:
@@ -222,6 +222,19 @@ properties:
         additionalProperties: false
         x-scala-type: "Dialect.Python"
       - type: object
+        title: "Python regex"
+        properties:
+          name: { const: "python-regex" }
+          type:
+            title: "Python regex Type"
+            enum: ["str", "bytes"]
+            default: "str"
+            x-scala-type: "Dialect.Python.Type"
+            x-cli-help: "The string type."
+        required: ["name"]
+        additionalProperties: false
+        x-scala-type: "Dialect.PythonRegex"
+      - type: object
         title: "Ruby"
         properties:
           name: { const: "ruby" }
@@ -253,6 +266,25 @@ properties:
         required: ["name"]
         additionalProperties: false
         x-scala-type: "Dialect.Perl"
+      - type: object
+        title: "ICU"
+        properties:
+          name: { const: "icu" }
+        required: ["name"]
+        additionalProperties: false
+      - type: object
+        title: "Boost.Regex"
+        properties:
+          name: { const: "boost-regex" }
+          type:
+            title: "Boost.Regex Type"
+            enum: ["char", "u32regex"]
+            default: "char"
+            x-scala-type: "Dialect.BoostRegex.Type"
+            x-cli-help: "The character type."
+        required: ["name"]
+        additionalProperties: false
+        x-scala-type: "Dialect.BoostRegex"
     default: "javascript"
     x-scala-type: "Dialect"
     x-typescript-type: "DialectParameter"
@@ -509,6 +541,22 @@ properties:
     x-cli: "random-seed"
     x-since: "4.0.0"
 
+  runtimeAttackCompileTimeout:
+    title: "Runtime Attack Compile Timeout"
+    description: |-
+      The upper limit of the time to compile the program of the runtime attack.
+
+      Some dialects compile the program before running it (e.g. `java` and `dotnet`), after the command printing the version of the runtime (see [Runtime-Attack Verification](/docs/usage/runtime-attack-verification#runtime-command)).
+      This time limits both, which do not count toward `timeout`.
+      A compilation that does not finish within this time makes the result `unknown` with the `unexpected` error.
+      It has no limit if it is infinite in Scala or `null` in TypeScript.
+    type: [integer, "null"]
+    default: 60000
+    x-unit: "milliseconds"
+    x-scala-type: "Duration"
+    x-cli: "runtime-attack-compile-timeout"
+    x-since: "5.0.0"
+
   runtimeAttackLimit:
     title: "Runtime Attack Limit"
     description: |-
@@ -580,6 +628,7 @@ properties:
       When it is exceeded, the result is `unknown` with the `timeout` error.
       It has no limit if it is infinite in Scala or `null` in TypeScript.
       The time starts when the check starts, not while the check waits in a queue.
+      The compilation of the program of a runtime attack does not count, and `runtimeAttackCompileTimeout` limits it instead (see [Runtime-Attack Verification](/docs/usage/runtime-attack-verification#runtime-command)).
       In TypeScript, it is in milliseconds.
     type: [integer, "null"]
     default: 10000

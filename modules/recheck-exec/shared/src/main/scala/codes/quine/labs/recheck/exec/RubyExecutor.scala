@@ -1,5 +1,6 @@
 package codes.quine.labs.recheck.exec
 
+import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 
 import codes.quine.labs.recheck.common.Context
@@ -10,8 +11,12 @@ import codes.quine.labs.recheck.common.Context
   */
 object RubyExecutor extends Executor.Stdin("ruby", "RECHECK_RUBY", Seq("--disable-gems")):
 
-  override def exec(input: String, timeout: Option[FiniteDuration], marker: String, env: Map[String, String])(using
-      Context
-  ): ExecResult =
+  override def exec(
+      input: String,
+      timeout: Option[FiniteDuration],
+      compileTimeout: Duration,
+      marker: String,
+      env: Map[String, String]
+  )(using Context): ExecResult =
     // `ruby -` reads the program in the encoding of the locale by default.
-    super.exec("# encoding: UTF-8\n" + input, timeout, marker, env)
+    super.exec("# encoding: UTF-8\n" + input, timeout, compileTimeout, marker, env)

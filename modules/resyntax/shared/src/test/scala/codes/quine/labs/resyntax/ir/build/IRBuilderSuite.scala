@@ -7,11 +7,13 @@ import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.AssertNameStyle
 import codes.quine.labs.resyntax.ast.BackReferenceStyle
 import codes.quine.labs.resyntax.ast.BackslashKind
+import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
 import codes.quine.labs.resyntax.ast.BoundaryModifier
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
 import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.NameStyle
 import codes.quine.labs.resyntax.ast.Node
@@ -403,7 +405,7 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   )
   checkPattern("(a)(?i)\\1", "", Perl(), Ruby()): pattern =>
     val Sequence(Seq(_, _, IRNode(BackReference(_, _, folding), _))) = pattern.node.data: @unchecked
-    assertEquals(folding, IRBackReferenceFolding.Full(0))
+    assertEquals(folding, IRBackReferenceFolding.Full(0, foldsDottedCapitalI = true))
   check("(?<x>a)\\k<x+0>", "", Ruby())(
     Sequence(
       Capture(1, Some("x"), char('a')),
@@ -490,8 +492,150 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
     assert(patternOf(Ruby()).captures.unsetWhileOpen)
     assertEquals(
       patternOf(PCRE).emptyIteration,
-      IREmptyIterationSemantics(IREmptyIteration.ExitFromMin, IREmptyIteration.Ignore)
+      IREmptyIterationSemantics(IREmptyIteration.ExitFromMin, IREmptyIteration.Ignore, countsReferencedCaptures = false)
     )
     assertEquals(patternOf(Python()).emptyIteration.bounded, IREmptyIteration.ExitOptional)
+    assertEquals(
+      patternOf(PythonRegex()).emptyIteration,
+      IREmptyIterationSemantics(IREmptyIteration.ExitAll, IREmptyIteration.ExitAll, countsReferencedCaptures = true)
+    )
     assertEquals(patternOf(Perl()).backtrackControl, IRBacktrackControlSemantics(true, true))
     assertEquals(patternOf(PCRE).backtrackControl, IRBacktrackControlSemantics(false, false))
+
+  // python-regex validates the versions anywhere, and the encodings at the end of the pattern out of groups.
+  error("(?V0)(?V1)a", "", PythonRegex())("VERSION0 and VERSION1 flags are incompatible")
+  error("(?V1)a", "V0", PythonRegex())("VERSION0 and VERSION1 flags are incompatible")
+  error("(?a)(?u)", "", PythonRegex())("ASCII, LOCALE and UNICODE flags are incompatible")
+  error("(?a)|(?L)", "", PythonRegex())("ASCII, LOCALE and UNICODE flags are incompatible")
+  error("(?u)", "a", PythonRegex())("ASCII, LOCALE and UNICODE flags are incompatible")
+  error("(?u)", "", PythonRegex(Python.Type.Bytes))("Cannot use UNICODE flag with a bytes pattern")
+  check("(?a)(?-a)(?u)", "", PythonRegex())(Sequence(Empty, Empty, Empty))
+  check("(?a:(?u))", "", PythonRegex())(Empty)
+  check("(?u:)", "", PythonRegex(Python.Type.Bytes))(Empty)
+
+  // python-regex's `p` (POSIX) and `r` (REVERSE) change the whole matching, and `w` (WORD) the boundaries and lines.
+  check("a(?r)", "", PythonRegex())(
+    Unsupported(NodeData.Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(nonDestructive = true), None))))
+  )
+  check("(?p:a)", "", PythonRegex())(
+    Unsupported(
+      NodeData.Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(preserve = true), None)), Node(NodeData.Literal('a')))
+    )
+  )
+  check("a", "p", PythonRegex())(
+    Unsupported(NodeData.Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(preserve = true), None))))
+  )
+  check("(?be)a", "", PythonRegex())(Sequence(Empty, char('a')))
+  check("(?w)\\b", "", PythonRegex())(
+    Sequence(Empty, Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.Boundary(None)))))
+  )
+  check("(?w:.^$)a", "", PythonRegex())(
+    Sequence(Sequence(Unsupported(NodeData.Dot), Unsupported(NodeData.Caret), Unsupported(NodeData.Dollar)), char('a'))
+  )
+
+  // python-regex's `\m` and `\M`.
+  checkWith("\\m\\M", "", PythonRegex())(_ =>
+    val word = build("\\w", "", PythonRegex()).node.data.asInstanceOf[Chars].set
+    Sequence(
+      Sequence(Assert(IRAssertKind.WordBoundary(word)), LookAhead(false, Chars(word))),
+      Sequence(Assert(IRAssertKind.WordBoundary(word)), LookBehind(false, Chars(word)))
+    )
+  )
+
+  // python-regex's conditionals, `(*PRUNE)`, `(*SKIP)` and fuzzy constraints are unsupported, but `(*FAIL)` is not.
+  check("(a)(?(1)b)", "", PythonRegex())(
+    Sequence(
+      Capture(1, None, char('a')),
+      Unsupported(NodeData.Command(CommandKind.Conditional(ConditionalTest.Indexed(1), NodeData.Literal('b'))))
+    )
+  )
+  check("(*PRUNE)", "", PythonRegex())(
+    Unsupported(NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Prune), None)))
+  )
+  check("(*FAIL)", "", PythonRegex())(Chars(CharSet.empty))
+  check("a{e}", "", PythonRegex())(Unsupported(NodeData.Command(CommandKind.Fuzzy(NodeData.Literal('a'), "e"))))
+
+  // ICU's `\b` skips the characters of `Grapheme_Extend` and `Cf`, and `(?w)` makes it UAX #29's (ICU 79.1).
+  locally:
+    val marks = IRClassLookup.icuWordMarks
+    check("\\b", "", ICU)(Assert(IRAssertKind.MarkWordBoundary(marks.bases, marks)))
+    check("\\B", "", ICU)(Assert(IRAssertKind.NotMarkWordBoundary(marks.bases, marks)))
+    test("IRBuilder.build: ICU's word marks"):
+      assert(marks.marks.contains(0x00ad) && marks.marks.contains(0x0301) && marks.marks.contains(0x200d))
+      assert(marks.bases.contains('a') && marks.bases.contains('_') && !marks.bases.contains(0x200d))
+  check("\\b", "w", ICU)(Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.Boundary(None)))))
+  check("(?w:\\B)", "", ICU)(Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.NonBoundary(None)))))
+  check("^", "w", ICU)(Assert(IRAssertKind.TextBegin))
+  // ICU's look-behind tries the starts by the lengths in characters, where a literal under `i` may be its folding.
+  check("(?<=ab)", "", ICU)(
+    LookBehind(false, Sequence(char('a'), char('b')), Forward(Seq(IRLookBehindStartRange(2, 2))))
+  )
+  checkPattern("(?<=ß)", "i", ICU): pattern =>
+    val LookBehind(_, _, m) = pattern.node.data: @unchecked
+    assertEquals(m, Forward(Seq(IRLookBehindStartRange(0, 2))))
+  checkPattern("(?<=.\\p{L})", "s", ICU): pattern =>
+    val LookBehind(_, _, m) = pattern.node.data: @unchecked
+    assertEquals(m, Forward(Seq(IRLookBehindStartRange(2, 3))))
+  // ICU repeats a bounded repetition without checking an empty iteration.
+  test("IRBuilder.build: ICU's empty iterations"):
+    assertEquals(
+      build("a", "", ICU).emptyIteration,
+      IREmptyIterationSemantics(IREmptyIteration.ExitFromMin, IREmptyIteration.Ignore, false)
+    )
+
+  // Boost.Regex's verbs but `(*FAIL)` and its conditionals are unsupported (Boost.Regex 1.92.0).
+  check("(*FAIL)(*F)", "", BoostRegex())(Sequence(Chars(CharSet.empty), Chars(CharSet.empty)))
+  check("(*ACCEPT)", "", BoostRegex())(
+    Unsupported(NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Accept), None)))
+  )
+  check("(a)(?(1)b)", "", BoostRegex())(
+    Sequence(
+      Capture(1, None, char('a')),
+      Unsupported(NodeData.Command(CommandKind.Conditional(ConditionalTest.Indexed(1), NodeData.Literal('b'))))
+    )
+  )
+  // `\<` and `\>` are the start and the end of a word, `` \` `` and `\'` the begin and the end of the input, and `\C`
+  // is `.`.
+  check("\\<\\>\\`\\'", "", BoostRegex())(
+    Sequence(
+      Sequence(Assert(IRAssertKind.WordBoundary(ASCIIWord)), LookAhead(false, Chars(ASCIIWord))),
+      Sequence(Assert(IRAssertKind.WordBoundary(ASCIIWord)), LookBehind(false, Chars(ASCIIWord))),
+      Assert(IRAssertKind.TextBegin),
+      Assert(IRAssertKind.TextEnd)
+    )
+  )
+  check("[[:<:]]", "", BoostRegex())(
+    Sequence(Assert(IRAssertKind.WordBoundary(ASCIIWord)), LookAhead(false, Chars(ASCIIWord)))
+  )
+  // The negations of `[[:<:]]` and `[[:>:]]` are ignored.
+  check("[^[:<:]][[:^>:]]", "", BoostRegex())(
+    Sequence(
+      Sequence(Assert(IRAssertKind.WordBoundary(ASCIIWord)), LookAhead(false, Chars(ASCIIWord))),
+      Sequence(Assert(IRAssertKind.WordBoundary(ASCIIWord)), LookBehind(false, Chars(ASCIIWord)))
+    )
+  )
+  // A quantifier repeats `(?i)` as an empty group, whose flag reaches the rest.
+  check("a(?i)+b", "", BoostRegex())(
+    Sequence(char('a'), Repeat(Empty, Unbounded(1, Greedy)), Chars(CharSet.of('b', 'B')))
+  )
+  check("\\C", "S", BoostRegex())(Chars(UnitMode.Byte.universe.diff(CharSet.of('\n', '\f', '\r'))))
+  // `\X` is a character but a combining one and the combining ones after it, of the old table of Boost.Regex.
+  check("\\X", "", BoostRegex())(Chars(UnitMode.Byte.universe))
+  locally:
+    val combining = IRClassLookup.boostRegexCombining
+    check("\\X", "", BoostRegex(BoostRegex.Type.U32Regex))(
+      Atomic(
+        Sequence(Chars(combining.complement(UnitMode.ScalarValue)), Repeat(Chars(combining), Unbounded(0, Greedy)))
+      )
+    )
+    test("IRBuilder.build: Boost.Regex's combining characters"):
+      assert(combining.contains(0x0300) && combining.contains(0xfe23) && !combining.contains(0x0362))
+  // Boost.Regex ends a repetition after an empty iteration, as `check_null_repeat` sets its count to the maximum.
+  test("IRBuilder.build: Boost.Regex's empty iterations"):
+    assertEquals(
+      build("a", "", BoostRegex()).emptyIteration,
+      IREmptyIterationSemantics(IREmptyIteration.ExitAll, IREmptyIteration.ExitAll, false)
+    )
+  check("(?<=ab)", "", BoostRegex())(
+    LookBehind(false, Sequence(char('a'), char('b')), Forward(Seq(IRLookBehindStartRange(2, 2))))
+  )

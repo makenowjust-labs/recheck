@@ -149,6 +149,7 @@ object Diagnostics:
   private def show(dialect: Dialect): String =
     val settings = dialect match
       case Dialect.Python(tpe)        => Seq(s"type: ${tpe.name}")
+      case Dialect.PythonRegex(tpe)   => Seq(s"type: ${tpe.name}")
       case Dialect.Ruby(encoding)     => Seq(s"encoding: ${encoding.name}")
       case Dialect.Perl(utf8, source) => Seq(s"utf8: $utf8", s"source: ${source.name}")
       case _                          => Seq.empty

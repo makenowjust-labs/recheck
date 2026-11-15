@@ -10,6 +10,14 @@ sealed abstract class ClassItemData extends Product with Serializable:
         ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
       case (ClassItemData.ClassDiff(ll, lr), ClassItemData.ClassDiff(rl, rr)) =>
         ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
+      case (ClassItemData.ClassNestIntersection(ll, lr), ClassItemData.ClassNestIntersection(rl, rr)) =>
+        ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
+      case (ClassItemData.ClassNestDiff(ll, lr), ClassItemData.ClassNestDiff(rl, rr)) =>
+        ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
+      case (ClassItemData.ClassSymmetricDiff(ll, lr), ClassItemData.ClassSymmetricDiff(rl, rr)) =>
+        ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
+      case (ClassItemData.ClassExplicitUnion(ll, lr), ClassItemData.ClassExplicitUnion(rl, rr)) =>
+        ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
       case (ClassItemData.ClassNest(li, l), ClassItemData.ClassNest(ri, r)) =>
         li == ri && l.equalsWithoutLoc(r)
       case (ClassItemData.ClassRange(ll, lr), ClassItemData.ClassRange(rl, rr)) =>
@@ -42,6 +50,46 @@ object ClassItemData:
 
     def apply(left: ClassItemData, right: ClassItemData): ClassDiff = ClassDiff(ClassItem(left), ClassItem(right))
 
+  /** ClassNestIntersection is ICU's intersection `&` with a nested class (e.g. `[[a-z]&[aeiou]]`).
+    *
+    * Its left is the items before it in the union, as it binds as tightly as a union, unlike `&&`.
+    */
+  final case class ClassNestIntersection(left: ClassItem, right: ClassItem) extends ClassItemData
+
+  object ClassNestIntersection:
+
+    def apply(left: ClassItemData, right: ClassItemData): ClassNestIntersection =
+      ClassNestIntersection(ClassItem(left), ClassItem(right))
+
+  /** ClassNestDiff is ICU's difference `-` with a nested class (e.g. `[[a-z]-[aeiou]]`).
+    *
+    * Its left is the items before it in the union, as it binds as tightly as a union, unlike `--`.
+    */
+  final case class ClassNestDiff(left: ClassItem, right: ClassItem) extends ClassItemData
+
+  object ClassNestDiff:
+
+    def apply(left: ClassItemData, right: ClassItemData): ClassNestDiff =
+      ClassNestDiff(ClassItem(left), ClassItem(right))
+
+  /** ClassSymmetricDiff is python-regex's symmetric difference (e.g. `[a-c~~b-d]`). */
+  final case class ClassSymmetricDiff(left: ClassItem, right: ClassItem) extends ClassItemData
+
+  object ClassSymmetricDiff:
+
+    def apply(left: ClassItemData, right: ClassItemData): ClassSymmetricDiff =
+      ClassSymmetricDiff(ClassItem(left), ClassItem(right))
+
+  /** ClassExplicitUnion is python-regex's union operator `||` (e.g. `[a-c||x]`), unlike the implicit union of the items
+    * in a row.
+    */
+  final case class ClassExplicitUnion(left: ClassItem, right: ClassItem) extends ClassItemData
+
+  object ClassExplicitUnion:
+
+    def apply(left: ClassItemData, right: ClassItemData): ClassExplicitUnion =
+      ClassExplicitUnion(ClassItem(left), ClassItem(right))
+
   final case class ClassNest(invert: Boolean, item: ClassItem) extends ClassItemData
 
   object ClassNest:
@@ -49,6 +97,12 @@ object ClassItemData:
     def apply(invert: Boolean, item: ClassItemData): ClassNest = ClassNest(invert, ClassItem(item))
 
   final case class ClassPOSIX(invert: Boolean, name: String) extends ClassItemData
+
+  /** ClassCollatingElement is POSIX's collating element `[.name.]` in a class (e.g. `[[.space.]]`). */
+  final case class ClassCollatingElement(name: String) extends ClassItemData
+
+  /** ClassEquivalence is POSIX's equivalence class `[=name=]` in a class (e.g. `[[=a=]]`). */
+  final case class ClassEquivalence(name: String) extends ClassItemData
 
   final case class ClassRange(begin: ClassItem.Value, end: ClassItem.Value) extends ClassItemData
 

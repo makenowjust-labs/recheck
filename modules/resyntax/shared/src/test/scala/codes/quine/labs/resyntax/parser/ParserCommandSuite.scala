@@ -281,3 +281,107 @@ class ParserCommandSuite extends munit.FunSuite with ParserHelper:
   check("(*TURKISH_CASING)", "u", PCRE)(Command(StartOption("TURKISH_CASING", None)))
   error("(*UCP)(*TURKISH_CASING)", "", PCRE)("Invalid group at 8")
   error("(*COMMITx)", "", PCRE)("Invalid group at 8")
+
+  // python-regex's fuzzy constraints, and the literal `{` otherwise (regex 2026.9.29).
+  check("a{e<=1}", "", PythonRegex())(Command(Fuzzy(Literal('a'), "e<=1")))
+  check("a{e}", "", PythonRegex())(Command(Fuzzy(Literal('a'), "e")))
+  check("a{1<=e<2}", "", PythonRegex())(Command(Fuzzy(Literal('a'), "1<=e<2")))
+  check("a{1<e<=2}", "", PythonRegex())(Command(Fuzzy(Literal('a'), "1<e<=2")))
+  check("a{2i}", "", PythonRegex())(Sequence(Literal('a'), Literal('{'), Literal('2'), Literal('i'), Literal('}')))
+  check("a{i<=1,d<=1}", "", PythonRegex())(Command(Fuzzy(Literal('a'), "i<=1,d<=1")))
+  check("a{2i+2d<5,e}", "", PythonRegex())(Command(Fuzzy(Literal('a'), "2i+2d<5,e")))
+  check("a{e<=1:[a-z]}", "", PythonRegex())(Command(Fuzzy(Literal('a'), "e<=1:[a-z]")))
+  check("a{e:\\d}", "", PythonRegex())(Command(Fuzzy(Literal('a'), "e:\\d")))
+  check("a{e:x}", "", PythonRegex())(Command(Fuzzy(Literal('a'), "e:x")))
+  check("(?x)a{ e }", "", PythonRegex()):
+    Sequence(
+      Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None))),
+      Command(Fuzzy(Literal('a'), " e "))
+    )
+  checkPrinted("a(?i){e}", "a{e}(?i)", "", PythonRegex()):
+    Sequence(
+      Command(Fuzzy(Literal('a'), "e")),
+      Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None)))
+    )
+  check("a{1<e}", "", PythonRegex()):
+    Sequence(Literal('a'), Literal('{'), Literal('1'), Literal('<'), Literal('e'), Literal('}'))
+  check("a{1<x<2}", "", PythonRegex()):
+    Sequence(
+      Literal('a'),
+      Literal('{'),
+      Literal('1'),
+      Literal('<'),
+      Literal('x'),
+      Literal('<'),
+      Literal('2'),
+      Literal('}')
+    )
+  check("a{2<e}", "", PythonRegex()):
+    Sequence(Literal('a'), Literal('{'), Literal('2'), Literal('<'), Literal('e'), Literal('}'))
+  check("a{e,x}", "", PythonRegex()):
+    Sequence(Literal('a'), Literal('{'), Literal('e'), Literal(','), Literal('x'), Literal('}'))
+  check("a{2i+x<=1}", "", PythonRegex()):
+    Sequence(
+      Literal('a'),
+      Literal('{'),
+      Literal('2'),
+      Repeat(Literal('i'), Plus(Greedy)),
+      Literal('x'),
+      Literal('<'),
+      Literal('='),
+      Literal('1'),
+      Literal('}')
+    )
+  error("a{e:(}", "", PythonRegex())("Expected character set at 4")
+  error("a{e<3", "", PythonRegex())("Expected } at 5")
+  error("a{e<=x}", "", PythonRegex())("Bad fuzzy cost limit at 5")
+  error("a{e<0}", "", PythonRegex())("Bad fuzzy cost limit at 4")
+  error("a{2<=e<=1}", "", PythonRegex())("Bad fuzzy cost limit at 8")
+  error("a{2i<=0,2d<1}", "", PythonRegex())("More than one cost equation at 8")
+  error("a{2i+i<=1}", "", PythonRegex())("Repeated fuzzy cost at 5")
+  error("a{i+d<=1}", "", PythonRegex())("Expected } at 3")
+  error("a{2i<x}", "", PythonRegex())("Bad fuzzy cost limit at 5")
+  error("a{2i<0}", "", PythonRegex())("Bad fuzzy cost limit at 5")
+  error("{e}", "", PythonRegex())("Nothing to repeat at 3")
+  error("a*{e}", "", PythonRegex())("Nested quantifier at 5")
+  error("a{e}*", "", PythonRegex())("Nothing to repeat at 4")
+
+  // python-regex's verbs.
+  check("(*FAIL)", "", PythonRegex())(Command(BacktrackControl(Some(Fail), None)))
+  check("(*F)", "", PythonRegex())(Command(BacktrackControl(Some(F), None)))
+  check("(*PRUNE)", "", PythonRegex())(Command(BacktrackControl(Some(Prune), None)))
+  check("(*SKIP)", "", PythonRegex())(Command(BacktrackControl(Some(Skip), None)))
+  checkPrinted("(* FAIL )", "(*FAIL)", "x", PythonRegex())(Command(BacktrackControl(Some(Fail), None)))
+  error("(*COMMIT)", "", PythonRegex())("Unknown verb at 2")
+  error("(*)", "", PythonRegex())("Nothing to repeat at 1")
+  error("(*1)", "", PythonRegex())("Nothing to repeat at 1")
+  error("(*FAIL", "", PythonRegex())("Unclosed group at 6")
+
+  // python-regex's conditionals and calls.
+  check("(?(DEFINE)a|b)", "", PythonRegex())(Command(Conditional(Define, Literal('a'), Literal('b'))))
+  check("(?(?=a)a|b)", "", PythonRegex()):
+    Command(Conditional(LookAround(PositiveLookAhead(Symbolic), Literal('a')), Literal('a'), Literal('b')))
+  checkPrinted("(?P&n)", "(?P>n)", "", PythonRegex())(Command(PNamedCall("n")))
+  error("(?P&n)", "", Python())("Invalid group at 3")
+  check("(?R)", "", PythonRegex())(Command(RCall))
+  check("(?1)", "", PythonRegex())(Command(IndexedCall(1)))
+  check("(?-1)", "", PythonRegex())(Command(RelativeCall(-1)))
+  check("(?&n)", "", PythonRegex())(Command(NamedCall("n")))
+
+  // Boost.Regex's verbs have no names, and its `(?#` without `)` is a comment to the end (Boost.Regex 1.92.0).
+  check("(*FAIL)(*F)(*ACCEPT)(*COMMIT)(*PRUNE)(*SKIP)(*THEN)", "", BoostRegex()):
+    Sequence(
+      Seq(Fail, F, Accept, Commit, Prune, Skip, Then).map(kind => Command(BacktrackControl(Some(kind), None)))*
+    )
+  error("(*SKIP:x)", "", BoostRegex())("Invalid group at 0")
+  error("(*FA)", "", BoostRegex())("Invalid group at 0")
+  // The AST does not keep whether a comment at the end has its `)`.
+  checkPrinted("a(?#c", "a(?#c)", "", BoostRegex())(Sequence(Literal('a'), Command(Comment("c"))))
+  check("(?(1)a|b)(?(<n>)a)(?(?=a)a)(?(R)a)(?(DEFINE)a)", "", BoostRegex()):
+    Sequence(
+      Command(Conditional(Indexed(1), Literal('a'), Literal('b'))),
+      Command(Conditional(Named(Angle, "n"), Literal('a'))),
+      Command(Conditional(LookAround(PositiveLookAhead(Symbolic), Literal('a')), Literal('a'))),
+      Command(Conditional(RRecursion, Literal('a'))),
+      Command(Conditional(Define, Literal('a')))
+    )

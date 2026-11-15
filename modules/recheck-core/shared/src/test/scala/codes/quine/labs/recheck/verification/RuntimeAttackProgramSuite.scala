@@ -3,12 +3,15 @@ package codes.quine.labs.recheck.verification
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.exec.BoostRegexExecutor
 import codes.quine.labs.recheck.exec.DotNetExecutor
+import codes.quine.labs.recheck.exec.ICUExecutor
 import codes.quine.labs.recheck.exec.JavaExecutor
 import codes.quine.labs.recheck.exec.NodeExecutor
 import codes.quine.labs.recheck.exec.PHPExecutor
 import codes.quine.labs.recheck.exec.PerlExecutor
 import codes.quine.labs.recheck.exec.PythonExecutor
+import codes.quine.labs.recheck.exec.PythonRegexExecutor
 import codes.quine.labs.recheck.exec.RubyExecutor
 import codes.quine.labs.recheck.exec.SourceFile
 import codes.quine.labs.resyntax.charset.UString
@@ -38,11 +41,13 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
   def generate(source: String, flags: String, dialect: Dialect, attack: AttackPattern = attack): RuntimeAttackProgram =
     RuntimeAttackProgram.generate(source, flags, dialect, modeOf(source, flags, dialect), attack).toOption.get
 
-  /** Returns the program file of the executor of a Java or .NET program. */
+  /** Returns the program file of the executor of a Java, .NET, ICU or Boost.Regex program. */
   def programFile(program: RuntimeAttackProgram): SourceFile = program.executor match
-    case JavaExecutor(file)   => file
-    case DotNetExecutor(file) => file
-    case executor             => fail(s"no program file: $executor")
+    case JavaExecutor(file)          => file
+    case DotNetExecutor(file)        => file
+    case ICUExecutor(file)           => file
+    case BoostRegexExecutor(file, _) => file
+    case executor                    => fail(s"no program file: $executor")
 
   /** Returns the line of the script starting with the prefix. */
   def line(program: RuntimeAttackProgram, prefix: String): String =
@@ -97,6 +102,42 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     assertEquals(line(bytes, "regex"), "regex = re.compile(b'\\xe9a', 0)")
     assertEquals(line(bytes, "string"), "string = b'\\xe9' * 3 + b'\\x00'")
 
+  test("RuntimeAttackProgram.generate: python-regex"):
+    val program = generate("f'o\\.", "iV1x", Dialect.PythonRegex())
+    assertEquals(program.executor, PythonRegexExecutor)
+    assertEquals(
+      program.script,
+      """|import locale, platform, sys, time
+         |locale.setlocale(locale.LC_ALL, 'C')
+         |try:
+         |    import regex
+         |except ImportError as e:
+         |    sys.stderr.write('The `regex` package is not available for ' + sys.executable + ' (' + str(e) + ')\n')
+         |    sys.exit(1)
+         |sys.stdout.write('recheck:runtime python-regex ' + regex.__version__ + ' (python ' + platform.python_version() + ')\n')
+         |pattern = regex.compile('f\'o\\.', regex.I | regex.V1 | regex.X)
+         |string = 'x' + 'y' * 2 + 'z'
+         |sys.stdout.write('recheck:start\n')
+         |sys.stdout.flush()
+         |start = time.perf_counter_ns()
+         |try:
+         |    pattern.search(string)
+         |except (RecursionError, MemoryError) as e:
+         |    sys.stdout.write('recheck:engine-error ' + type(e).__name__ + '\n')
+         |    sys.exit(0)
+         |sys.stdout.write('recheck:time ' + str((time.perf_counter_ns() - start) // 1000000) + '\n')
+         |""".stripMargin
+    )
+    assertEquals(
+      line(generate("a", "abefmprswV0", Dialect.PythonRegex()), "pattern"),
+      "pattern = regex.compile('a', regex.A | regex.B | regex.E | regex.F | regex.M | regex.P | regex.R | regex.S | " +
+        "regex.W | regex.V0)"
+    )
+    assertEquals(line(generate("a", "L", Dialect.PythonRegex()), "pattern"), "pattern = regex.compile('a', regex.L)")
+    val bytes = generate("éa", "", Dialect.PythonRegex(Dialect.Python.Type.Bytes), nonASCII)
+    assertEquals(line(bytes, "pattern"), "pattern = regex.compile(b'\\xe9a', 0)")
+    assertEquals(line(bytes, "string"), "string = b'\\xe9' * 3 + b'\\x00'")
+
   test("RuntimeAttackProgram.generate: Ruby"):
     val program = generate("a#{b}\"", "ix", Dialect.Ruby())
     assertEquals(program.executor, RubyExecutor)
@@ -147,6 +188,40 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     assertEquals(programFile(program).name, "RecheckRuntimeAttack.cs")
     assertEquals(program.script, "in\n0066006f006f\n1:0078\n2:0079\n1:007a\n")
     assert(programFile(program).content.contains("\nCultureInfo.CurrentCulture = CultureInfo.InvariantCulture;\n"))
+
+  test("RuntimeAttackProgram.generate: ICU"):
+    val program = generate("f\"oo\\d\r", "dimswx", Dialect.ICU)
+    assertEquals(program.executor, ICUExecutor(programFile(program)))
+    assertEquals(programFile(program).name, "RecheckRuntimeAttack.cpp")
+    assertEquals(program.script, "dimswx\n00660022006f006f005c0064000d\n1:0078\n2:0079\n1:007a\n")
+    assert(
+      programFile(program).content
+        .contains("std::istringstream lines(std::string(std::istreambuf_iterator<char>(std::cin), {}));")
+    )
+    assert(programFile(program).content.contains("case 'w': flags |= UREGEX_UWORD; break;"))
+
+  test("RuntimeAttackProgram.generate: Boost.Regex"):
+    // The flags are the syntax options, and the units are bytes over `char` and code points in `u32regex`.
+    val program = generate("\u00e9\\d", "MNSScix", Dialect.BoostRegex())
+    assertEquals(program.executor, BoostRegexExecutor(programFile(program), hasICU = false))
+    assertEquals(programFile(program).name, "RecheckRuntimeAttack.cpp")
+    assertEquals(
+      program.script,
+      "MNScix\n000000c3000000a90000005c00000064\n1:00000078\n2:00000079\n1:0000007a\n"
+    )
+    val content = programFile(program).content
+    assert(content.contains("case 'N': options |= boost::regbase::newline_alt; break;"))
+    assert(content.contains("boost::regex_search(subject, match, regex);"))
+    assert(!content.contains("ICU"))
+    val u32 = generate("\u00e9\\x{1F600}", "", Dialect.BoostRegex(Dialect.BoostRegex.Type.U32Regex), nonASCII)
+    assertEquals(u32.executor, BoostRegexExecutor(programFile(u32), hasICU = true))
+    assertEquals(
+      u32.script,
+      "-\n000000e90000005c000000780000007b00000031000000460000003600000030000000300000007d\n3:000000e9\n1:00000000\n"
+    )
+    val u32Content = programFile(u32).content
+    assert(u32Content.contains("#include <boost/regex/icu.hpp>"))
+    assert(u32Content.contains("boost::u32regex_search(input.cbegin(), input.cend(), match, regex);"))
 
   test("RuntimeAttackProgram.generate: the data of Java and .NET"):
     val repeat =
@@ -305,6 +380,7 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     assertEquals(js.content, "// Run: node runtime-attack.cjs\n" + generate("foo", "", Dialect.JavaScript).script)
     assertEquals(script("foo", Dialect.Python()).command, "python3 -I runtime-attack.py")
     assert(script("foo", Dialect.Python()).content.startsWith("# Run: python3 -I runtime-attack.py\nimport "))
+    assertEquals(script("foo", Dialect.PythonRegex()).command, "python3 -I runtime-attack.py")
     assertEquals(script("foo", Dialect.Ruby()).command, "ruby --disable-gems runtime-attack.rb")
     assertEquals(script("foo", Dialect.Perl()).command, "perl runtime-attack.pl")
     assert(script("foo", Dialect.Perl()).content.startsWith("# Run: perl runtime-attack.pl\nuse utf8;\n"))
@@ -323,25 +399,55 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     assertEquals(dotnet.command, "dotnet run runtime-attack.cs")
     assert(dotnet.content.startsWith("// Run: dotnet run runtime-attack.cs\nusing "))
     assert(clue(dotnet.content).contains("var lines = \"-\\n0066006f006f\\n1:0078\\n2:0079\\n1:007a\\n\".Split("))
+    // ICU's program has the data in itself.
+    val icu = script("foo", Dialect.ICU)
+    assertEquals(
+      icu.command,
+      "c++ runtime-attack.cpp -o runtime-attack -licui18n -licuuc -licudata && ./runtime-attack"
+    )
+    assert(icu.content.startsWith(s"// Run: ${icu.command}\n#define "))
+    assert(
+      clue(icu.content).contains(
+        "std::istringstream lines(std::string(\"-\\n0066006f006f\\n1:0078\\n2:0079\\n1:007a\\n\"));"
+      )
+    )
     assert(RuntimeAttackProgram.generateScript("a$x", "", Dialect.Perl(), UnitMode.CodePoint, attack).isLeft)
+    // Boost.Regex's program has the data in itself too.
+    val boost = script("foo", Dialect.BoostRegex())
+    assertEquals(boost.command, "c++ runtime-attack.cpp -o runtime-attack && ./runtime-attack")
+    assert(boost.content.startsWith(s"// Run: ${boost.command}\n#include <boost/regex.hpp>\n"))
+    assert(clue(boost.content).contains("std::istringstream lines(std::string(\"-\\n000000660000006f0000006f\\n"))
+    val boostICU = script("foo", Dialect.BoostRegex(Dialect.BoostRegex.Type.U32Regex))
+    assertEquals(
+      boostICU.command,
+      "c++ runtime-attack.cpp -o runtime-attack -licui18n -licuuc -licudata && ./runtime-attack"
+    )
     // Java splits long data into literals, since a string constant has at most 65535 bytes.
     val long = script("a" * 2500, Dialect.Java).content
     assert(clue(long).contains("String[] lines = String.join(\"\", \"-\\n00610061"))
     assert(long.contains("006100\", \"61\\n1:0078\\n2:0079\\n1:007a\\n\").split("))
+    // ICU joins the literals of long data in C++.
+    val longICU = script("a" * 2500, Dialect.ICU).content
+    assert(clue(longICU).contains("std::istringstream lines(std::string(\"-\\n00610061"))
+    assert(longICU.contains("006100\"\n    \"61\\n1:0078\\n2:0079\\n1:007a\\n\"));"))
 
   test("RuntimeAttackProgram.generate: the variables of the runtimes"):
     val dialects = Seq(
       Dialect.JavaScript,
       Dialect.Python(Dialect.Python.Type.Bytes),
+      Dialect.PythonRegex(),
       Dialect.Ruby(),
       Dialect.Java,
       Dialect.DotNet,
       Dialect.Perl(utf8 = false, source = PerlSource.String),
-      Dialect.PCRE
+      Dialect.PCRE,
+      Dialect.ICU,
+      Dialect.BoostRegex()
     )
     assertEquals(
       dialects.map(d => generate("a", "", d).executor.variable),
-      Seq("NODE", "PYTHON", "RUBY", "JAVA", "DOTNET", "PERL", "PHP").map("RECHECK_" + _)
+      Seq("NODE", "PYTHON", "PYTHON_REGEX", "RUBY", "JAVA", "DOTNET", "PERL", "PHP", "ICU", "BOOST_REGEX")
+        .map("RECHECK_" + _)
     )
 
   test("RuntimeAttackProgram.generate: empty attack string"):

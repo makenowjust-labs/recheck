@@ -21,6 +21,7 @@ package codes.quine.labs.resyntax.ast
   *   "?~|" Sequence "|" Node
   *   "?~|" Sequence
   *   "?~|"
+  *   Node "{" FuzzyConstraint "}"
   * }}}
   */
 sealed abstract class CommandKind extends Product with Serializable:
@@ -34,6 +35,8 @@ sealed abstract class CommandKind extends Product with Serializable:
       al.equalsWithoutLoc(ar) && el.equalsWithoutLoc(er)
     case (CommandKind.AbsenceStopper(l), CommandKind.AbsenceStopper(r)) =>
       l.equalsWithoutLoc(r)
+    case (CommandKind.Fuzzy(l, cl), CommandKind.Fuzzy(r, cr)) =>
+      l.equalsWithoutLoc(r) && cl == cr
     case (l, r) => l == r
 
 object CommandKind:
@@ -123,3 +126,10 @@ object CommandKind:
 
   /** StartOption is an option setting at the start of a pattern (e.g. `(*UTF)` or `(*LIMIT_MATCH=10)`). */
   final case class StartOption(name: String, value: Option[Int]) extends CommandKind
+
+  /** Fuzzy is python-regex's fuzzy constraint on a node, with the text of the constraint (e.g. `e<=1` of `a{e<=1}`). */
+  final case class Fuzzy(node: Node, constraint: String) extends CommandKind
+
+  object Fuzzy:
+
+    def apply(node: NodeData, constraint: String): Fuzzy = Fuzzy(Node(node), constraint)

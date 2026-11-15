@@ -29,6 +29,7 @@ private[build] object NodeKey:
         case CommandKind.Conditional(test, yes, no)     => testNodes(test) ++ (yes +: no.toSeq)
         case CommandKind.AbsenceExpression(absent, exp) => Seq(absent, exp)
         case CommandKind.AbsenceStopper(absent)         => Seq(absent)
+        case CommandKind.Fuzzy(node, _)                 => Seq(node)
         case _                                          => Seq.empty
     case _ => Seq.empty
 
