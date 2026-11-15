@@ -20,7 +20,7 @@ final case class FlagSet(
     notEmptyAtStart: Boolean = false,
     // `J` (PCRE)
     dupNames: Boolean = false,
-    // `L` (Python, python-regex)
+    // `L` (Boost.Regex, Python, python-regex)
     localeUpper: Boolean = false,
     // `M` (Boost.Regex)
     noMultiline: Boolean = false,
@@ -196,7 +196,7 @@ object FlagSet:
         validateFlag(dialect.isPCRE)
         flagSet.copy(dupNames = true)
       case 'L' =>
-        validateFlag(dialect.isPython || isPythonRegex)
+        validateFlag(isBoostRegex || dialect.isPython || isPythonRegex)
         flagSet.copy(localeUpper = true)
       case 'M' =>
         validateFlag(isBoostRegex)

@@ -505,7 +505,7 @@ object RuntimeAttackProgram:
     */
   // The method of the matching will be `match_continuous` for a match at the start, and `regex_match` for a full match.
   private def boostRegex(pattern: UString, flags: String, dialect: Dialect.BoostRegex, attack: AttackPattern) =
-    val options = flags.distinct.filter(c => "EIMNSZcipx".contains(c))
+    val options = flags.distinct.filter(c => "EILMNSZcipx".contains(c))
     val executor =
       if hasICU(dialect) then BoostRegexExecutor(BoostRegexICUSource, hasICU = true)
       else BoostRegexExecutor(BoostRegexSource, hasICU = false)
@@ -579,6 +579,7 @@ object RuntimeAttackProgram:
         |    switch (c) {
         |      case 'E': flags |= boost::match_not_null; break;
         |      case 'I': flags |= boost::regex_constants::match_not_initial_null; break;
+        |      case 'L': flags |= boost::match_single_line; break;
         |      case 'M': options |= boost::regbase::no_mod_m; break;
         |      case 'N': options |= boost::regbase::newline_alt; break;
         |      case 'S': options |= boost::regbase::no_mod_s; break;

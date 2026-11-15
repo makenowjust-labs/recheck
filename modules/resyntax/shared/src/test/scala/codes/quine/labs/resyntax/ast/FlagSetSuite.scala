@@ -111,11 +111,13 @@ class FlagSetSuite extends munit.FunSuite:
 
   // Boost.Regex's flags are its syntax options, where `i` is `icase` and `x` is `mod_x`.
   // The others are `M` (`no_mod_m`), `N` (`newline_alt`), `S` (`no_mod_s`) and `c` (`collate`), and the match flags
-  // `E` (`match_not_null`), `I` (`match_not_initial_null`), `Z` (`match_not_dot_null`) and `p` (`match_posix`).
-  check("EIMNSZcipx", BoostRegex()): f =>
+  // `E` (`match_not_null`), `I` (`match_not_initial_null`), `L` (`match_single_line`), `Z` (`match_not_dot_null`) and
+  // `p` (`match_posix`).
+  check("EILMNSZcipx", BoostRegex()): f =>
     f == FlagSet(
       notEmpty = true,
       notEmptyAtStart = true,
+      localeUpper = true,
       noMultiline = true,
       newlineAlternation = true,
       analyze = true,

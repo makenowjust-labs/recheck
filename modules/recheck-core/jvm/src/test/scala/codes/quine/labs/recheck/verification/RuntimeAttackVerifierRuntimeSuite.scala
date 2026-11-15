@@ -253,6 +253,11 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
     val dotNull = verify("^(?:.|\\x00)*b", "", Dialect.BoostRegex(), nulls, env = boostRegexEnv)
     assert(clue(dotNull.result).isInstanceOf[RuntimeAttackResult.EngineLimit])
     assertFinish(verify("^(?:.|\\x00)*b", "Z", Dialect.BoostRegex(), nulls, env = boostRegexEnv))
+    // `L` (`match_single_line`) makes `^` match only at the start, even with `(?m)`.
+    val lines = attack("\n", 1000, "")
+    val multiline = verify("(?m)^(?:\\n|x)*b", "", Dialect.BoostRegex(), lines, env = boostRegexEnv)
+    assert(clue(multiline.result).isInstanceOf[RuntimeAttackResult.EngineLimit])
+    assertFinish(verify("(?m)^(?:\\n|x)*b", "L", Dialect.BoostRegex(), lines, env = boostRegexEnv))
     // The limit grows with the length of the pattern, so a long one makes a polynomial attack slow.
     val long = s"^a*a*${"(?:z)?" * 50}$$"
     val slow = verify(long, "", Dialect.BoostRegex(), attack("a", 100_000, "b"), env = boostRegexEnv)

@@ -761,13 +761,14 @@ private[build] class IRBuilder(
     case AssertKind.Boundary(Some(_)) | AssertKind.NonBoundary(Some(_)) =>
       IRNodeData.Unsupported(node.data)
 
+  // Boost.Regex's `L` (`match_single_line`) makes `^` and `$` see no line even with `(?m)`.
   def buildCaret(): IRNodeData =
-    if featureSet.caretIsLineBegin || context.multiline then
+    if !featureSet.singleLine && (featureSet.caretIsLineBegin || context.multiline) then
       IRNodeData.Assert(IRAssertKind.LineBegin(context.lineTerminators, featureSet.lineBeginAtEnd))
     else IRNodeData.Assert(IRAssertKind.TextBegin)
 
   def buildDollar(): IRNodeData =
-    if featureSet.dollarIsLineEnd || context.multiline then
+    if !featureSet.singleLine && (featureSet.dollarIsLineEnd || context.multiline) then
       IRNodeData.Assert(IRAssertKind.LineEnd(context.lineTerminators))
     else if featureSet.dollarIsChompTextEnd then IRNodeData.Assert(IRAssertKind.ChompTextEnd(context.lineTerminators))
     else IRNodeData.Assert(IRAssertKind.TextEnd)

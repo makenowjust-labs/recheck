@@ -59,18 +59,19 @@ The matching unit is `byte` for `char` (the default `type`), and `scalar-value` 
 
 `recheck` supports the following syntax options and match flags of Boost.Regex, written as these flag letters.
 
-| Flag | Option                   | Inline  | Notes                                                                                                    |
-| ---- | ------------------------ | ------- | -------------------------------------------------------------------------------------------------------- |
-| `i`  | `icase`                  | `(?i)`  |                                                                                                          |
-| `x`  | `mod_x`                  | `(?x)`  |                                                                                                          |
-| `M`  | `no_mod_m`               | `(?-m)` | `^` and `$` match at the line terminators without it.                                                    |
-| `S`  | `no_mod_s`               | `(?-s)` | `.` matches the line terminators without it.                                                             |
-| `N`  | `newline_alt`            |         | A line feed in the pattern is `\|`.                                                                      |
-| `c`  | `collate`                |         | Not supported with a range of a class.                                                                   |
-| `p`  | `match_posix`            |         | The longest match at a start position. An error with `(*COMMIT)`, `(*PRUNE)`, `(*SKIP)` or `(*THEN)`.    |
-| `E`  | `match_not_null`         |         | Rejects an empty match.                                                                                  |
-| `I`  | `match_not_initial_null` |         | Rejects an empty match at the start of the input.                                                        |
-| `Z`  | `match_not_dot_null`     |         | `.` does not match NUL, even with `(?s)`.                                                                |
+| Flag | Option                   | Inline  | Notes                                                                                                 |
+| ---- | ------------------------ | ------- | ----------------------------------------------------------------------------------------------------- |
+| `i`  | `icase`                  | `(?i)`  |                                                                                                       |
+| `x`  | `mod_x`                  | `(?x)`  |                                                                                                       |
+| `M`  | `no_mod_m`               | `(?-m)` | `^` and `$` match at the line terminators without it.                                                 |
+| `S`  | `no_mod_s`               | `(?-s)` | `.` matches the line terminators without it.                                                          |
+| `N`  | `newline_alt`            |         | A line feed in the pattern is `\|`.                                                                   |
+| `c`  | `collate`                |         | Not supported with a range of a class.                                                                |
+| `p`  | `match_posix`            |         | The longest match at a start position. An error with `(*COMMIT)`, `(*PRUNE)`, `(*SKIP)` or `(*THEN)`. |
+| `E`  | `match_not_null`         |         | Rejects an empty match.                                                                               |
+| `I`  | `match_not_initial_null` |         | Rejects an empty match at the start of the input.                                                     |
+| `Z`  | `match_not_dot_null`     |         | `.` does not match NUL, even with `(?s)`.                                                             |
+| `L`  | `match_single_line`      |         | `^` and `$` match only at the start and the end of the input, even with `(?m)`.                       |
 
 As in Boost.Regex, `^` and `$` are multi-line and `.` matches the line terminators by default, and `$` without multi-line matches only at the end, as `\z` does.
 The line terminators are `\n`, `\f` and `\r`, and also U+0085, U+2028 and U+2029 in `u32regex`, and neither `^` nor `$` matches between `\r` and `\n`.

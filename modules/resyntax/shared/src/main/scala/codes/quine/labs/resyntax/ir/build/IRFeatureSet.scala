@@ -13,6 +13,8 @@ final case class IRFeatureSet(
     caretIsLineBegin: Boolean,
     // Ruby
     dollarIsLineEnd: Boolean,
+    // Boost.Regex (with `L`)
+    singleLine: Boolean,
     // .NET, ICU, Java, PCRE (without `D`), Perl, Python, python-regex, Ruby
     dollarIsChompTextEnd: Boolean,
     // Python, python-regex
@@ -498,6 +500,7 @@ object IRFeatureSet:
     IRFeatureSet(
       caretIsLineBegin = isRuby,
       dollarIsLineEnd = isRuby,
+      singleLine = isBoostRegex && flagSet.localeUpper,
       dollarIsChompTextEnd = isDotNet || isICU || isJava || isPCRE && !flagSet.dollarEndOnly || isPerl || isPython ||
         isPythonRegex || isRuby,
       upperEndIsTextEnd = isPython || isPythonRegex,
