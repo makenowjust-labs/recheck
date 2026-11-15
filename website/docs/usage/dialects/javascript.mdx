@@ -98,7 +98,7 @@ Status        : vulnerable
 Complexity    : 2nd degree polynomial (fuzz)
 Attack string : '«∆0∆0'.repeat(24495)
 Hotspot       : /«(\w+|[^∆]*∆\w+∆[^»]*)»/
-Runtime attack: confirmed (timed out on node v26.13.0, timeout: 1000 ms)
+Runtime attack: confirmed (timed out on node v26.13.1, timeout: 1000 ms)
 Checker       : fuzz
 
 Upper bound:
@@ -108,7 +108,7 @@ Upper bound:
 Refuted attacks:
 - Complexity    : 2nd degree polynomial
   Attack string : '«\x00'.repeat(38730)
-  Runtime attack: refuted (finished in 0 ms on node v26.13.0, timeout: 1000 ms)
+  Runtime attack: refuted (finished in 0 ms on node v26.13.1, timeout: 1000 ms)
 ```
 
 ## Runtime-Attack Verification

@@ -127,7 +127,7 @@ export type RefutedAttack = {
  */
 export type RuntimeAttack = {
   /**
-   * The runtime name and version, e.g. `"node v26.13.0"`.
+   * The runtime name and version, e.g. `"node v26.13.1"`.
    */
   runtime: string;
   /**
