@@ -132,6 +132,23 @@ test("reports a release that cannot be loaded", async ({ page }) => {
   await expect(resultTitles(page)).toHaveCount(0);
 });
 
+test("reports a check that fails", async ({ page }) => {
+  await page.route(CDN_MODULE, (route) =>
+    route.fulfill({
+      body: 'export const check = async () => { throw new Error("broken"); };',
+      contentType: "text/javascript",
+      headers: { "access-control-allow-origin": "*" },
+    }),
+  );
+  await open(page);
+  await check(page);
+  await expect(page.locator(".alert--danger")).toContainText(
+    /^Failed to check with recheck v.*: broken$/,
+  );
+  await expect(resultTitles(page)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Check" })).toBeEnabled();
+});
+
 test("offers the dialects of the selected build", async ({ page }) => {
   await open(page);
   const version = page.getByLabel("recheck version");
