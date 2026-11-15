@@ -244,6 +244,20 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
     val posix = verify("(a|a)*", "p", Dialect.BoostRegex(), attack("a", 31, "\u0000"), env = boostRegexEnv)
     assert(clue(posix.result).isInstanceOf[RuntimeAttackResult.EngineLimit])
     assertFinish(verify("(a|a)*", "", Dialect.BoostRegex(), attack("a", 31, "\u0000"), env = boostRegexEnv))
+    // `E` (`match_not_null`) and `I` (`match_not_initial_null`) reject the empty match at the start.
+    for flags <- Seq("E", "I") do
+      val notNull = verify("(?:|(?:a|a)*c)", flags, Dialect.BoostRegex(), attack("a", 31, ""), env = boostRegexEnv)
+      assert(clue(notNull.result).isInstanceOf[RuntimeAttackResult.EngineLimit])
+    // `Z` (`match_not_dot_null`) makes `.` fail at NUL, which `\x00` alone matches.
+    val nulls = attack("\u0000", 31, "!")
+    val dotNull = verify("^(?:.|\\x00)*b", "", Dialect.BoostRegex(), nulls, env = boostRegexEnv)
+    assert(clue(dotNull.result).isInstanceOf[RuntimeAttackResult.EngineLimit])
+    assertFinish(verify("^(?:.|\\x00)*b", "Z", Dialect.BoostRegex(), nulls, env = boostRegexEnv))
+    // `L` (`match_single_line`) makes `^` match only at the start, even with `(?m)`.
+    val lines = attack("\n", 1000, "")
+    val multiline = verify("(?m)^(?:\\n|x)*b", "", Dialect.BoostRegex(), lines, env = boostRegexEnv)
+    assert(clue(multiline.result).isInstanceOf[RuntimeAttackResult.EngineLimit])
+    assertFinish(verify("(?m)^(?:\\n|x)*b", "L", Dialect.BoostRegex(), lines, env = boostRegexEnv))
     // The limit grows with the length of the pattern, so a long one makes a polynomial attack slow.
     val long = s"^a*a*${"(?:z)?" * 50}$$"
     val slow = verify(long, "", Dialect.BoostRegex(), attack("a", 100_000, "b"), env = boostRegexEnv)

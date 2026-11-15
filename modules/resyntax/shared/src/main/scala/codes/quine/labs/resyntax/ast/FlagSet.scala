@@ -14,9 +14,13 @@ final case class FlagSet(
     anchored: Boolean = false,
     // `D` (PCRE)
     dollarEndOnly: Boolean = false,
+    // `E` (Boost.Regex)
+    notEmpty: Boolean = false,
+    // `I` (Boost.Regex)
+    notEmptyAtStart: Boolean = false,
     // `J` (PCRE)
     dupNames: Boolean = false,
-    // `L` (Python, python-regex)
+    // `L` (Boost.Regex, Python, python-regex)
     localeUpper: Boolean = false,
     // `M` (Boost.Regex)
     noMultiline: Boolean = false,
@@ -32,6 +36,8 @@ final case class FlagSet(
     version1: Boolean = false,
     // `X` (PCRE)
     extra: Boolean = false,
+    // `Z` (Boost.Regex)
+    notDotNull: Boolean = false,
     // `a` (PCRE, Perl, Python, python-regex, Ruby)
     ascii: Boolean = false,
     // `aa` (Perl)
@@ -93,6 +99,8 @@ final case class FlagSet(
     Seq(
       anchored -> "A",
       dollarEndOnly -> "D",
+      notEmpty -> "E",
+      notEmptyAtStart -> "I",
       dupNames -> "J",
       localeUpper -> "L",
       noMultiline -> "M",
@@ -102,6 +110,7 @@ final case class FlagSet(
       version0 -> "V0",
       version1 -> "V1",
       extra -> "X",
+      notDotNull -> "Z",
       (ascii && !asciiRestrict) -> "a",
       asciiRestrict -> "aa",
       asciiDigit -> "aD",
@@ -177,11 +186,17 @@ object FlagSet:
       case 'D' =>
         validateFlag(dialect.isPCRE)
         flagSet.copy(dollarEndOnly = true)
+      case 'E' =>
+        validateFlag(isBoostRegex)
+        flagSet.copy(notEmpty = true)
+      case 'I' =>
+        validateFlag(isBoostRegex)
+        flagSet.copy(notEmptyAtStart = true)
       case 'J' =>
         validateFlag(dialect.isPCRE)
         flagSet.copy(dupNames = true)
       case 'L' =>
-        validateFlag(dialect.isPython || isPythonRegex)
+        validateFlag(isBoostRegex || dialect.isPython || isPythonRegex)
         flagSet.copy(localeUpper = true)
       case 'M' =>
         validateFlag(isBoostRegex)
@@ -201,6 +216,9 @@ object FlagSet:
       case 'X' =>
         validateFlag(dialect.isPCRE)
         flagSet.copy(extra = true)
+      case 'Z' =>
+        validateFlag(isBoostRegex)
+        flagSet.copy(notDotNull = true)
       case 'a' =>
         validateFlag(dialect.isPerl || dialect.isPython || isPythonRegex || dialect.isRuby)
         rubyCharset(flagSet).copy(ascii = true, asciiRestrict = flagSet.asciiRestrict || count >= 2 && dialect.isPerl)

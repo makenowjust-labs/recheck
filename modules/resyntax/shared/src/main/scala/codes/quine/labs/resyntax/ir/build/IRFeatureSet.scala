@@ -13,6 +13,8 @@ final case class IRFeatureSet(
     caretIsLineBegin: Boolean,
     // Ruby
     dollarIsLineEnd: Boolean,
+    // Boost.Regex (with `L`)
+    singleLine: Boolean,
     // .NET, ICU, Java, PCRE (without `D`), Perl, Python, python-regex, Ruby
     dollarIsChompTextEnd: Boolean,
     // Python, python-regex
@@ -183,6 +185,8 @@ final case class IRFeatureSet(
     hasBoostRegexGraphemeCluster: Boolean,
     // Boost.Regex
     readsCodeUnitAsDot: Boolean,
+    // Boost.Regex (with `Z`)
+    dotExcludesNull: Boolean,
     // python-regex
     masksOctalEscapeByCharset: Boolean,
     // python-regex
@@ -199,6 +203,8 @@ final case class IRFeatureSet(
     anchored: Boolean,
     // Boost.Regex (with `p`), python-regex (with `p`)
     longestMatch: Boolean,
+    // Boost.Regex (with `E`): Anywhere, Boost.Regex (with `I`): AtStart, PCRE (with `(*NOTEMPTY)`): Anywhere, PCRE (with `(*NOTEMPTY_ATSTART)`): AtStart, the others: Never
+    notEmpty: IRNotEmpty,
     // PCRE (with `(*UCP)`)
     ucp: Boolean,
     // PCRE (with `(*CASELESS_RESTRICT)`)
@@ -494,6 +500,7 @@ object IRFeatureSet:
     IRFeatureSet(
       caretIsLineBegin = isRuby,
       dollarIsLineEnd = isRuby,
+      singleLine = isBoostRegex && flagSet.localeUpper,
       dollarIsChompTextEnd = isDotNet || isICU || isJava || isPCRE && !flagSet.dollarEndOnly || isPerl || isPython ||
         isPythonRegex || isRuby,
       upperEndIsTextEnd = isPython || isPythonRegex,
@@ -654,6 +661,7 @@ object IRFeatureSet:
       hasCharsetGraphemeCluster = isPythonRegex,
       hasBoostRegexGraphemeCluster = isBoostRegex,
       readsCodeUnitAsDot = isBoostRegex,
+      dotExcludesNull = isBoostRegex && flagSet.notDotNull,
       masksOctalEscapeByCharset = isPythonRegex,
       allowsWideEscapeInByteMode = isPythonRegex,
       hasUnsupportedWordFlag = isPythonRegex,
@@ -662,6 +670,11 @@ object IRFeatureSet:
       validatesCharName = isICU || isJava || isPython || isPythonRegex,
       anchored = isJavaScript && flagSet.sticky || isPCRE && flagSet.anchored,
       longestMatch = (isBoostRegex || isPythonRegex) && flagSet.preserve,
+      notEmpty =
+        if isBoostRegex && flagSet.notEmpty || isPCRE && startOptions.contains("NOTEMPTY") then IRNotEmpty.Anywhere
+        else if isBoostRegex && flagSet.notEmptyAtStart || isPCRE && startOptions.contains("NOTEMPTY_ATSTART") then
+          IRNotEmpty.AtStart
+        else IRNotEmpty.Never,
       ucp = isPCRE && startOptions.contains("UCP"),
       caselessRestrict = isPCRE && startOptions.contains("CASELESS_RESTRICT"),
       turkishCasing = isPCRE && startOptions.contains("TURKISH_CASING"),

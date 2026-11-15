@@ -70,6 +70,9 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
   check("^$", "M", BoostRegex())(Sequence(Assert(TextBegin), Assert(TextEnd)))
   check("(?-m)^(?m)^", "", BoostRegex()):
     Sequence(Empty, Assert(TextBegin), Empty, Assert(LineBegin(LT.BoostRegexChar, AfterTerminator)))
+  // `L` (`match_single_line`) makes `^` and `$` the start and the end of the input, even with `(?m)`.
+  check("^$(?m)^$", "L", BoostRegex()):
+    Sequence(Assert(TextBegin), Assert(TextEnd), Empty, Assert(TextBegin), Assert(TextEnd))
   check("\\Z", "", BoostRegex()):
     val terminators = IRNodeData.Repeat(IRNode(Chars(CharSet.of('\n', '\f', '\r'))), IRQuantifier.Unbounded(0, Greedy))
     IRNodeData.LookAhead(false, Sequence(terminators, Assert(TextEnd)))

@@ -95,7 +95,7 @@ object IRBuilder:
       featureSet.anchored,
       featureSet.longestMatch,
       mode,
-      notEmpty(starts)
+      featureSet.notEmpty
     )
 
   /** Returns the node without what only its source has: the blanks of the extended mode are removed, Ruby's `\u{...}`
@@ -397,11 +397,6 @@ object IRBuilder:
         case _                                            => false
       .collect { case NodeData.Command(CommandKind.StartOption(name, _)) => name }
       .toSeq
-
-  private def notEmpty(startOptions: Seq[String]): IRNotEmpty =
-    if startOptions.contains("NOTEMPTY") then IRNotEmpty.Anywhere
-    else if startOptions.contains("NOTEMPTY_ATSTART") then IRNotEmpty.AtStart
-    else IRNotEmpty.Never
 
   private def hasCall(node: Node): Boolean =
     NodeKey.exists(node):
@@ -766,13 +761,14 @@ private[build] class IRBuilder(
     case AssertKind.Boundary(Some(_)) | AssertKind.NonBoundary(Some(_)) =>
       IRNodeData.Unsupported(node.data)
 
+  // Boost.Regex's `L` (`match_single_line`) makes `^` and `$` see no line even with `(?m)`.
   def buildCaret(): IRNodeData =
-    if featureSet.caretIsLineBegin || context.multiline then
+    if !featureSet.singleLine && (featureSet.caretIsLineBegin || context.multiline) then
       IRNodeData.Assert(IRAssertKind.LineBegin(context.lineTerminators, featureSet.lineBeginAtEnd))
     else IRNodeData.Assert(IRAssertKind.TextBegin)
 
   def buildDollar(): IRNodeData =
-    if featureSet.dollarIsLineEnd || context.multiline then
+    if !featureSet.singleLine && (featureSet.dollarIsLineEnd || context.multiline) then
       IRNodeData.Assert(IRAssertKind.LineEnd(context.lineTerminators))
     else if featureSet.dollarIsChompTextEnd then IRNodeData.Assert(IRAssertKind.ChompTextEnd(context.lineTerminators))
     else IRNodeData.Assert(IRAssertKind.TextEnd)

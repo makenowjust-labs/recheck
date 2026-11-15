@@ -400,10 +400,12 @@ object IRNotEmpty:
   /** Never rejects no match. */
   case object Never extends IRNotEmpty
 
-  /** Anywhere rejects an empty match at any position (`(*NOTEMPTY)`). */
+  /** Anywhere rejects an empty match at any position (PCRE's `(*NOTEMPTY)`, Boost.Regex's `match_not_null`). */
   case object Anywhere extends IRNotEmpty
 
-  /** AtStart rejects an empty match at the start of the search (`(*NOTEMPTY_ATSTART)`). */
+  /** AtStart rejects an empty match at the start of the search (PCRE's `(*NOTEMPTY_ATSTART)`, Boost.Regex's
+    * `match_not_initial_null`).
+    */
   case object AtStart extends IRNotEmpty
 
 /** IRBackReferenceSemantics is how back-references behave, which differs among dialects.
