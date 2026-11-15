@@ -614,8 +614,10 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           val captures = memoizedCaptures.getOrElse(frame.captures)
           failedCaptures = captures
           // A longest-match search ends at the start position once it has a match.
-          val next = backtrack(frame.fallback)
-          (if longestCaptures.isDefined && next.exists(_.barrier == Barrier.Search) then None else next) match
+          val backtracked = backtrack(frame.fallback)
+          val next: Option[Frame] =
+            if longestCaptures.isDefined && backtracked.exists(_.barrier == Barrier.Search) then None else backtracked
+          next match
             case Some(fallback) =>
               if memoizes && frame.junctionsSize > fallback.junctionsSize then
                 var junctions = frame.junctions
