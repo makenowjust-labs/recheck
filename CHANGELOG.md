@@ -58,6 +58,7 @@ Misc:
 - [#1986](https://github.com/makenowjust-labs/recheck/pull/1986) Update dependency scala to v3.10.1 ([@renovate[bot]](https://github.com/apps/renovate))
 - [#1993](https://github.com/makenowjust-labs/recheck/pull/1993) Make the Update CHANGELOG.md workflow survive stacked merges, and backfill the lost entries ([@makenowjust](https://github.com/makenowjust))
 - [#2011](https://github.com/makenowjust-labs/recheck/pull/2011) Document the optimizations of the engines that recheck does not implement ([@makenowjust](https://github.com/makenowjust))
+- [#2021](https://github.com/makenowjust-labs/recheck/pull/2021) Support .NET 11 in the dotnet dialect ([@makenowjust](https://github.com/makenowjust))
 
 # 4.6.2 (2026-10-26)
 
