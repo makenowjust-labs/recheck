@@ -53,7 +53,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
 
   val surrogateInputs: Seq[UString] = Seq(UString(0xd800, 0xdc00), UString(0xd800), UString(0xdc00, 0xd800))
 
-  // Checked with Node 26.13.0.
+  // Checked with Node 26.13.1.
   runtimeTest("JavaScript: surrogates", "node"):
     val style = AttackPatternStyle.JavaScript(unicode = false)
     for flags <- Seq("", "u") do
@@ -415,7 +415,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
       result.captures.fold("none"): captures =>
         captures.grouped(2).map(c => if c(0) < 0 || c(1) < 0 then "-" else s"${c(0)}-${c(1)}").mkString(" ")
 
-  // Checked with Node 26.13.0.
+  // Checked with Node 26.13.1.
   runtimeTest("JavaScript: back-references in an open capture", "node"):
     val style = AttackPatternStyle.JavaScript(unicode = false)
     val all = openCaptureCases ++ openCaptureBacktrackCases ++ openCaptureLookBehindCases
