@@ -68,7 +68,7 @@ final case class FlagSet(
     explicitCapture: Boolean = false,
     // `o` (Perl, Ruby)
     once: Boolean = false,
-    // `p` (Perl, python-regex)
+    // `p` (Boost.Regex, Perl, python-regex)
     preserve: Boolean = false,
     // `r` (PCRE, Perl, python-regex)
     nonDestructive: Boolean = false,
@@ -238,7 +238,7 @@ object FlagSet:
         validateFlag(dialect.isPerl || dialect.isRuby)
         flagSet.copy(once = true)
       case 'p' =>
-        validateFlag(dialect.isPerl || isPythonRegex)
+        validateFlag(isBoostRegex || dialect.isPerl || isPythonRegex)
         flagSet.copy(preserve = true)
       case 'r' =>
         validateFlag(dialect.isPCRE || dialect.isPerl || isPythonRegex)

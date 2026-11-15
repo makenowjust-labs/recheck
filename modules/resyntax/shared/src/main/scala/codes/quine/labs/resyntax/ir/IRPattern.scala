@@ -30,7 +30,7 @@ final case class IRPattern(
     /** Whether a match starts only at the starting position (JavaScript `y`, PCRE `A`). */
     anchored: Boolean,
     /** Whether a search takes the longest match at a start position, as POSIX does, instead of the first one
-      * (python-regex's `p`).
+      * (Boost.Regex's and python-regex's `p`).
       *
       * The engine still tries every path at the position, and returns the first of the longest matches. A look-around
       * and an atomic group still take the first match of their body.

@@ -110,14 +110,16 @@ class FlagSetSuite extends munit.FunSuite:
   error("u", ICU)("Unknown flag 'u' at 0")
 
   // Boost.Regex's flags are its syntax options, where `i` is `icase` and `x` is `mod_x`.
-  // The others are `M` (`no_mod_m`), `N` (`newline_alt`), `S` (`no_mod_s`) and `c` (`collate`).
-  check("MNScix", BoostRegex()): f =>
+  // The others are `M` (`no_mod_m`), `N` (`newline_alt`), `S` (`no_mod_s`) and `c` (`collate`), and `p` is the match
+  // flag `match_posix`.
+  check("MNScipx", BoostRegex()): f =>
     f == FlagSet(
       noMultiline = true,
       newlineAlternation = true,
       analyze = true,
       continue = true,
       ignoreCase = true,
+      preserve = true,
       verbose = true
     )
   error("m", BoostRegex())("Unknown flag 'm' at 0")

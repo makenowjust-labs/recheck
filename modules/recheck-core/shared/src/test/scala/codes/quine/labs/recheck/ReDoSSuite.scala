@@ -393,6 +393,13 @@ class ReDoSSuite extends munit.FunSuite:
     assertSafe(check("(a|a)*", PythonRegex()), Checker.Automaton)
     assertVulnerable(check("a*a*", PythonRegex(), "p"), AttackComplexity.Polynomial(2, false), Checker.Automaton)
     assertSafe(check("a*a*", PythonRegex()), Checker.Automaton)
+    // Boost.Regex's `p` (`match_posix`) is the same, which reaches the complexity limit at n = 14 for `(a|a)*`.
+    assertVulnerable(
+      check("(a|a)*", BoostRegex(), "p", Checker.Fuzz),
+      AttackComplexity.Exponential(true),
+      Checker.Fuzz
+    )
+    assertVulnerable(check("(a|a)*", BoostRegex(), "p"), AttackComplexity.Exponential(false), Checker.Automaton)
 
   test("ReDoS.check: unsupported syntax"):
     assertEquals(

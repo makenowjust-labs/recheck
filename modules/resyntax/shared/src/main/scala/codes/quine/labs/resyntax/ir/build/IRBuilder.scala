@@ -567,6 +567,15 @@ private[build] class IRBuilder(
     case CommandKind.Conditional(_, _, _) if featureSet.buildsConditionalAsUnsupported =>
       Left(IRNodeData.Unsupported(node.data))
     case CommandKind.Conditional(test, yes, no) => buildConditional(node, test, yes, no)
+    // Boost.Regex rejects the verbs cutting the backtracking in a search for the longest match.
+    case CommandKind.BacktrackControl(
+          Some(
+            BacktrackControlKind.Commit | BacktrackControlKind.Prune | BacktrackControlKind.Skip |
+            BacktrackControlKind.Then
+          ),
+          _
+        ) if featureSet.rejectsBacktrackControlInLongestMatch =>
+      throw new IRBuildingException("Invalid regex for POSIX-style matching", node.loc)
     case CommandKind.BacktrackControl(kind, _)
         if featureSet.buildsBacktrackControlAsUnsupported &&
           !kind.exists(k => k == BacktrackControlKind.Fail || k == BacktrackControlKind.F) =>

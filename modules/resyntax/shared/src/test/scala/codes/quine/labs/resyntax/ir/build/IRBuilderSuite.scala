@@ -606,6 +606,19 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("(*ACCEPT)", "", BoostRegex())(
     Unsupported(NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Accept), None)))
   )
+  // Boost.Regex's `p` (`match_posix`) takes the longest match, and rejects `(*COMMIT)`, `(*PRUNE)`, `(*SKIP)` and
+  // `(*THEN)`.
+  checkPattern("a", "p", BoostRegex())(pattern => assertEquals(pattern.longestMatch, true))
+  error("a|(*COMMIT)", "p", BoostRegex())("Invalid regex for POSIX-style matching at 2")
+  error("(*PRUNE)", "p", BoostRegex())("Invalid regex for POSIX-style matching at 0")
+  error("(*SKIP)", "p", BoostRegex())("Invalid regex for POSIX-style matching at 0")
+  error("(*THEN)", "p", BoostRegex())("Invalid regex for POSIX-style matching at 0")
+  check("(*ACCEPT)", "p", BoostRegex())(
+    Unsupported(NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Accept), None)))
+  )
+  check("(*PRUNE)", "", BoostRegex())(
+    Unsupported(NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Prune), None)))
+  )
   check("(a)(?(1)b)", "", BoostRegex())(
     Sequence(
       Capture(1, None, char('a')),
