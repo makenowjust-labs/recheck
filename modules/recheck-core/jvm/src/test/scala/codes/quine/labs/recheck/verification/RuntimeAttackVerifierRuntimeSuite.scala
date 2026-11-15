@@ -248,6 +248,11 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
     for flags <- Seq("E", "I") do
       val notNull = verify("(?:|(?:a|a)*c)", flags, Dialect.BoostRegex(), attack("a", 31, ""), env = boostRegexEnv)
       assert(clue(notNull.result).isInstanceOf[RuntimeAttackResult.EngineLimit])
+    // `Z` (`match_not_dot_null`) makes `.` fail at NUL, which `\x00` alone matches.
+    val nulls = attack("\u0000", 31, "!")
+    val dotNull = verify("^(?:.|\\x00)*b", "", Dialect.BoostRegex(), nulls, env = boostRegexEnv)
+    assert(clue(dotNull.result).isInstanceOf[RuntimeAttackResult.EngineLimit])
+    assertFinish(verify("^(?:.|\\x00)*b", "Z", Dialect.BoostRegex(), nulls, env = boostRegexEnv))
     // The limit grows with the length of the pattern, so a long one makes a polynomial attack slow.
     val long = s"^a*a*${"(?:z)?" * 50}$$"
     val slow = verify(long, "", Dialect.BoostRegex(), attack("a", 100_000, "b"), env = boostRegexEnv)

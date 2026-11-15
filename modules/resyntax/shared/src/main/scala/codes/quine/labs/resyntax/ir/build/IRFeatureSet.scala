@@ -183,6 +183,8 @@ final case class IRFeatureSet(
     hasBoostRegexGraphemeCluster: Boolean,
     // Boost.Regex
     readsCodeUnitAsDot: Boolean,
+    // Boost.Regex (with `Z`)
+    dotExcludesNull: Boolean,
     // python-regex
     masksOctalEscapeByCharset: Boolean,
     // python-regex
@@ -656,6 +658,7 @@ object IRFeatureSet:
       hasCharsetGraphemeCluster = isPythonRegex,
       hasBoostRegexGraphemeCluster = isBoostRegex,
       readsCodeUnitAsDot = isBoostRegex,
+      dotExcludesNull = isBoostRegex && flagSet.notDotNull,
       masksOctalEscapeByCharset = isPythonRegex,
       allowsWideEscapeInByteMode = isPythonRegex,
       hasUnsupportedWordFlag = isPythonRegex,

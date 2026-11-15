@@ -382,6 +382,12 @@ class ReDoSSuite extends munit.FunSuite:
       )
     assertSafe(check("(?:|(?:a|a)*c)", BoostRegex()), Checker.Automaton)
 
+  test("ReDoS.check: Boost.Regex's Z"):
+    // `Z` (`match_not_dot_null`) makes `.` fail at NUL, so it no longer overlaps `\x00` (the complexity limit at n = 14
+    // without it).
+    assertVulnerable(check("\\A(?:.|\\x00)*b", BoostRegex()), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check("\\A(?:.|\\x00)*b", BoostRegex(), "Z"), Checker.Automaton)
+
   test("ReDoS.check: longest match"):
     // python-regex's `p` tries every path at the start position, which doubles for each `a` even on a match (2.9 s at
     // n = 24 with regex 2026.9.29), and the first match of the others is instant.

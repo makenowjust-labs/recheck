@@ -207,17 +207,18 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
   test("RuntimeAttackProgram.generate: Boost.Regex"):
     // The flags are the syntax options and the match flags, and the units are bytes over `char` and code points in
     // `u32regex`.
-    val program = generate("\u00e9\\d", "EIMNSScipx", Dialect.BoostRegex())
+    val program = generate("\u00e9\\d", "EIMNSSZcipx", Dialect.BoostRegex())
     assertEquals(program.executor, BoostRegexExecutor(programFile(program), hasICU = false))
     assertEquals(programFile(program).name, "RecheckRuntimeAttack.cpp")
     assertEquals(
       program.script,
-      "EIMNScipx\n000000c3000000a90000005c00000064\n1:00000078\n2:00000079\n1:0000007a\n"
+      "EIMNSZcipx\n000000c3000000a90000005c00000064\n1:00000078\n2:00000079\n1:0000007a\n"
     )
     val content = programFile(program).content
     assert(content.contains("case 'N': options |= boost::regbase::newline_alt; break;"))
     assert(content.contains("case 'E': flags |= boost::match_not_null; break;"))
     assert(content.contains("case 'I': flags |= boost::regex_constants::match_not_initial_null; break;"))
+    assert(content.contains("case 'Z': flags |= boost::match_not_dot_null; break;"))
     assert(content.contains("case 'p': flags |= boost::match_posix; break;"))
     assert(content.contains("boost::regex_search(subject, match, regex, flags);"))
     assert(!content.contains("ICU"))

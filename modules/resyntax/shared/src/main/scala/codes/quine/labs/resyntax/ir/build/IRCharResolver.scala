@@ -350,14 +350,17 @@ private[build] final class IRCharResolver(
         IRNodeData.Sequence(chars(CharSet.single(0x0d)), chars(CharSet.single(0x0a))),
         IRNodeData.Sequence(chars(universe), IRNodeData.Assert(IRAssertKind.NotBetweenCRLF))
       )
-    else if flags.dotAll then chars(universe)
+    else if flags.dotAll then complement(dotExcluded)
     else
       val terminators = flags.lineTerminators
-      val set = complement(CharSet.of(terminators.chars.toSeq*))
+      val set = complement(CharSet.of(terminators.chars.toSeq*).union(dotExcluded))
       // PCRE's `(*CRLF)` makes `.` fail only at `\r` followed by `\n`.
       if terminators.crlf == LineTerminatorSet.CRLF.Sequence && !terminators.chars.contains(0x0d) then
         IRNodeData.Sequence(set, IRNodeData.Assert(IRAssertKind.NotBetweenCRLF))
       else set
+
+  /** The characters that `.` never matches, which are NUL for Boost.Regex's `Z` (`match_not_dot_null`). */
+  private def dotExcluded: CharSet = if featureSet.dotExcludesNull then CharSet.single(0) else CharSet.empty
 
   private def escapeClass(kind: EscapeClassKind, flags: IRCharFlagSet, loc: SourceLocation): IRNodeData = kind match
     case EscapeClassKind.GeneralNewline =>

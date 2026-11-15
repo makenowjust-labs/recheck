@@ -663,6 +663,11 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
     Sequence(char('a'), Repeat(Empty, Unbounded(1, Greedy)), Chars(CharSet.of('b', 'B')))
   )
   check("\\C", "S", BoostRegex())(Chars(UnitMode.Byte.universe.diff(CharSet.of('\n', '\f', '\r'))))
+  // `Z` (`match_not_dot_null`) makes `.` and `\C` fail at NUL, even with `s`.
+  locally:
+    val nonNull = Chars(UnitMode.Byte.universe.diff(CharSet.single(0)))
+    check(".\\C", "Z", BoostRegex())(Sequence(nonNull, nonNull))
+  check(".", "SZ", BoostRegex())(Chars(UnitMode.Byte.universe.diff(CharSet.of(0, '\n', '\f', '\r'))))
   // `\X` is a character but a combining one and the combining ones after it, of the old table of Boost.Regex.
   check("\\X", "", BoostRegex())(Chars(UnitMode.Byte.universe))
   locally:

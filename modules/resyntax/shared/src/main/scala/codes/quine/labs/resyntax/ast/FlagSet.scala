@@ -36,6 +36,8 @@ final case class FlagSet(
     version1: Boolean = false,
     // `X` (PCRE)
     extra: Boolean = false,
+    // `Z` (Boost.Regex)
+    notDotNull: Boolean = false,
     // `a` (PCRE, Perl, Python, python-regex, Ruby)
     ascii: Boolean = false,
     // `aa` (Perl)
@@ -108,6 +110,7 @@ final case class FlagSet(
       version0 -> "V0",
       version1 -> "V1",
       extra -> "X",
+      notDotNull -> "Z",
       (ascii && !asciiRestrict) -> "a",
       asciiRestrict -> "aa",
       asciiDigit -> "aD",
@@ -213,6 +216,9 @@ object FlagSet:
       case 'X' =>
         validateFlag(dialect.isPCRE)
         flagSet.copy(extra = true)
+      case 'Z' =>
+        validateFlag(isBoostRegex)
+        flagSet.copy(notDotNull = true)
       case 'a' =>
         validateFlag(dialect.isPerl || dialect.isPython || isPythonRegex || dialect.isRuby)
         rubyCharset(flagSet).copy(ascii = true, asciiRestrict = flagSet.asciiRestrict || count >= 2 && dialect.isPerl)
