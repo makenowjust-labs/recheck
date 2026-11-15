@@ -1004,6 +1004,33 @@ class InterpreterSuite extends munit.FunSuite:
     // An empty iteration ends the repetition even before the minimum.
     check("^(?:x?|(a)){3}", "a", pr)(Seq(g(0, 0)))
 
+  test("Interpreter.run: python-regex's longest match"):
+    // python-regex's `p` takes the longest match at a start position, and the first of the longest ones; a look-ahead
+    // and an atomic group still take their first match (regex 2026.9.29).
+    val pr = PythonRegex()
+    check("(?p)a|ab|abc", "xabcd", pr)(Seq(g(1, 4)))
+    check("a|ab|abc", "xabcd", pr)(Seq(g(1, 2)))
+    check("(?p)(a|ab)(c|bcd)(d*)", "abcd", pr)(Seq(g(0, 4), g(0, 1), g(1, 4), g(4, 4)))
+    check("(?p)(a|aa)*", "aaa", pr)(Seq(g(0, 3), g(2, 3)))
+    check("(?p)(x|xy)(y|)", "xy", pr)(Seq(g(0, 2), g(0, 1), g(1, 2)))
+    check("(?p)(?=(a|ab))(?:a|ab)", "ab", pr)(Seq(g(0, 2), g(0, 1)))
+    check("(?p)(?:a|ab)(?=(c|cd))", "abcd", pr)(Seq(g(0, 2), g(2, 3)))
+    check("(?p)(?>(a|ab))b?", "ab", pr)(Seq(g(0, 2), g(0, 1)))
+    check("(?p)(?:ab|a)(?>(b|bc))?", "abc", pr)(Seq(g(0, 2)))
+    check("(?p)\\A(?:a|ab)b?", "ab", pr)(Seq(g(0, 2)))
+    check("(?p)(?:a|ab)(?:c|bcd)$", "abcdx", pr)(NoMatch)
+
+  test("Interpreter.run: the steps of a longest match"):
+    // The search tries every path at the start position, which doubles for each character.
+    def steps(source: String, n: Int, usesAcceleration: Boolean): Int =
+      val ir = ReDoS.parse(source, "", PythonRegex())
+      val program = ProgramBuilder.build(ir, false)
+      Interpreter.run(program, ir.mode.decode("a" * n), options(program, usesAcceleration)).steps
+
+    for usesAcceleration <- Seq(false, true) do
+      assertEquals(steps("(a|a)*", 10, usesAcceleration), 10)
+      assertEquals(steps("(?p)(a|a)*", 10, usesAcceleration), 2 * steps("(?p)(a|a)*", 9, usesAcceleration) + 2)
+
   test("Interpreter.run: python-regex's case-insensitive back-references"):
     val pr = PythonRegex()
     accepts("\\A(I)\\1\\z", pr, "I\u0131", "i")

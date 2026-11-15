@@ -358,6 +358,11 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** A clock ordering the frames and the held captures. */
   private var clock: Long = 0
 
+  /** The captures of the longest match at the current start position, the first one among the same length, in a
+    * longest-match search.
+    */
+  private var longestCaptures: Option[Vector[Int]] = None
+
   /** The captures held by `cap_hold`, with the time holding them, by the index. */
   private val held: mutable.Map[Int, (Int, Int, Long)] = mutable.Map.empty
 
@@ -468,7 +473,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
               val captures =
                 if frame.captures(0) > frame.captures(1) then frame.captures.updated(0, frame.captures(1))
                 else frame.captures
-              return result(Status.Ok, Some(captures))
+              if !program.meta.longestMatch then return result(Status.Ok, Some(captures))
+              if longestCaptures.forall(_(1) < captures(1)) then longestCaptures = Some(captures)
+              true
             case Inst.Jmp(next) =>
               frame.label = next
               false
@@ -606,7 +613,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         if failed then
           val captures = memoizedCaptures.getOrElse(frame.captures)
           failedCaptures = captures
-          backtrack(frame.fallback) match
+          // A longest-match search ends at the start position once it has a match.
+          val next = backtrack(frame.fallback)
+          (if longestCaptures.isDefined && next.exists(_.barrier == Barrier.Search) then None else next) match
             case Some(fallback) =>
               if memoizes && frame.junctionsSize > fallback.junctionsSize then
                 var junctions = frame.junctions
@@ -624,7 +633,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                   d -= 1
               frame = fallback
               if held.nonEmpty then restoreHeld(frame)
-            case None => return result(Status.Fail, None)
+            case None =>
+              return longestCaptures.fold(result(Status.Fail, None))(captures => result(Status.Ok, Some(captures)))
 
     // $COVERAGE-OFF$
     sys.error("unreachable")

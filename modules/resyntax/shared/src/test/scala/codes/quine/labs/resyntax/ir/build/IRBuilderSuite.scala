@@ -529,18 +529,28 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("(?a:(?u))", "", PythonRegex())(Empty)
   check("(?u:)", "", PythonRegex(Python.Type.Bytes))(Empty)
 
-  // python-regex's `p` (POSIX) and `r` (REVERSE) change the whole matching, and `w` (WORD) the boundaries and lines.
+  // python-regex's `r` (REVERSE) changes the whole matching, and `w` (WORD) the boundaries and lines.
   check("a(?r)", "", PythonRegex())(
     Unsupported(NodeData.Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(nonDestructive = true), None))))
   )
-  check("(?p:a)", "", PythonRegex())(
+  check("(?r:a)", "", PythonRegex())(
     Unsupported(
-      NodeData.Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(preserve = true), None)), Node(NodeData.Literal('a')))
+      NodeData.Group(
+        GroupKind.InlineFlag(FlagSetDiff(FlagSet(nonDestructive = true), None)),
+        Node(NodeData.Literal('a'))
+      )
     )
   )
-  check("a", "p", PythonRegex())(
-    Unsupported(NodeData.Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(preserve = true), None))))
+  check("a", "r", PythonRegex())(
+    Unsupported(NodeData.Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(nonDestructive = true), None))))
   )
+  // python-regex's `p` (POSIX) takes the longest match in the whole pattern, even in a group.
+  check("(?p:a)", "", PythonRegex())(char('a'))
+  checkPattern("a", "p", PythonRegex())(pattern => assertEquals(pattern.longestMatch, true))
+  checkPattern("a(?p)", "", PythonRegex())(pattern => assertEquals(pattern.longestMatch, true))
+  checkPattern("(?:(?p:a))", "", PythonRegex())(pattern => assertEquals(pattern.longestMatch, true))
+  checkPattern("a", "", All*)(pattern => assertEquals(pattern.longestMatch, false))
+  checkPattern("a", "p", Perl())(pattern => assertEquals(pattern.longestMatch, false))
   check("(?be)a", "", PythonRegex())(Sequence(Empty, char('a')))
   check("(?w)\\b", "", PythonRegex())(
     Sequence(Empty, Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.Boundary(None)))))
@@ -603,6 +613,19 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("(*FAIL)(*F)", "", BoostRegex())(Sequence(Chars(CharSet.empty), Chars(CharSet.empty)))
   check("(*ACCEPT)", "", BoostRegex())(
     Unsupported(NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Accept), None)))
+  )
+  // Boost.Regex's `p` (`match_posix`) takes the longest match, and rejects `(*COMMIT)`, `(*PRUNE)`, `(*SKIP)` and
+  // `(*THEN)`.
+  checkPattern("a", "p", BoostRegex())(pattern => assertEquals(pattern.longestMatch, true))
+  error("a|(*COMMIT)", "p", BoostRegex())("Invalid regex for POSIX-style matching at 2")
+  error("(*PRUNE)", "p", BoostRegex())("Invalid regex for POSIX-style matching at 0")
+  error("(*SKIP)", "p", BoostRegex())("Invalid regex for POSIX-style matching at 0")
+  error("(*THEN)", "p", BoostRegex())("Invalid regex for POSIX-style matching at 0")
+  check("(*ACCEPT)", "p", BoostRegex())(
+    Unsupported(NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Accept), None)))
+  )
+  check("(*PRUNE)", "", BoostRegex())(
+    Unsupported(NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Prune), None)))
   )
   check("(a)(?(1)b)", "", BoostRegex())(
     Sequence(

@@ -75,20 +75,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
         )
       )
     )
-    assertEquals(
-      build("^"),
-      EpsNFA(
-        buildAlphabet(utf16),
-        Set(0, 1, 2, 3, 4),
-        0,
-        Map(
-          0 -> Eps(Seq(3, 1)),
-          1 -> LoopEnter(0, 2),
-          2 -> Consume(Set((any16, CharKind.Normal)), 0),
-          3 -> LoopExit(0, 4)
-        )
-      )
-    )
+    assertEquals(build("^"), EpsNFA(buildAlphabet(utf16), Set(0), 0, Map(0 -> Accept())))
 
   test("EpsNFABuilder.build: LineBegin, LineEnd, Sequence"):
     assertEquals(build("^$"), EpsNFA(buildAlphabet(utf16), Set(0, 1), 0, Map(0 -> Eps(Seq(1)))))
@@ -294,7 +281,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
         Map(
           0 -> Eps(Seq(3)),
           1 -> Consume(Set((CharSet.single('a'), CharKind.Normal)), 2),
-          2 -> LookAroundAccept(),
+          2 -> Accept(),
           3 -> LookAheadAssert(true, 1, 4),
           4 -> Eps(Seq(5))
         )
@@ -320,7 +307,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
               1 -> Consume(Set((CharSet.single('b'), CharKind.Normal)), 2),
               2 -> Eps(Seq(3)),
               3 -> Consume(Set((CharSet.single('a'), CharKind.Normal)), 4),
-              4 -> LookAroundAccept()
+              4 -> Accept()
             )
           )
         )
@@ -353,9 +340,9 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     // A back-reference in the group that it refers to, which would copy the group endlessly, is ε.
     assertEquals(build("(a\\1)", isSimplified = true), build("(a(?:a(?:)|))", isSimplified = true))
     def consumes(nfa: EpsNFA[Int]): Int = nfa.tau.values.count(_.isInstanceOf[Consume[?]])
-    // A match ends at its first success, so the ε-NFA does not read the rest of the input after the pattern.
-    assertEquals(consumes(build("^a", isSimplified = true)), 1)
-    assertEquals(consumes(build("^a")), 2)
+    // The simplified ε-NFA stops at the end of the pattern instead of accepting there.
+    assert(!build("^a", isSimplified = true).tau.values.toSeq.contains(Accept()))
+    assert(build("^a").tau.values.toSeq.contains(Accept()))
     // Java's `\2` without the group refers to no group, so it reads nothing.
     val missing = build("^(a)\\2$", "", Dialect.Java, isSimplified = true)
     assertEquals(consumes(missing), consumes(build("^(a)$", "", Dialect.Java)))
@@ -478,9 +465,13 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     val units = input match
       case s: String  => ReDoS.parse(source, flags, dialect).mode.decode(s).iterator.toSeq
       case u: UString => u.iterator.toSeq
+    var succeeded = false
     val last = units.foldLeft(nfa.inits.toSet): (qs, c) =>
-      qs.flatMap(q => nfa.delta.collect { case ((p, a), ps) if p == q && a.contains(c) => ps.leaves }.flatten)
-    last.exists(nfa.acceptSet.contains)
+      val bs = qs.toSeq.flatMap(q => nfa.delta.collect { case ((p, a), b) if p == q && a.contains(c) => b })
+      // A path reaching an accept succeeds whatever follows.
+      succeeded ||= bs.exists(_.succeeds(_ => false))
+      bs.flatMap(_.leaves).toSet
+    succeeded || last.exists(nfa.acceptSet.contains)
 
   /** Tests whether the automaton of the source accepts the input with its look-ahead assertions, by its look-ahead DFA.
     */
@@ -562,6 +553,48 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     interceptMessage[UnsupportedException]("look-behind assertion matched forward")(
       build("(?<=(?>a|ab)c)d", "", Dialect.PCRE)
     )
+
+  test("EpsNFABuilder.build: longest match"):
+    // A choice of the pattern tries every alternative, but the search does not.
+    val pr = Dialect.PythonRegex()
+    val nfa = build("ab|c", "p", pr)
+    assertEquals(
+      nfa,
+      EpsNFA(
+        nfa.alphabet,
+        (0 to 11).toSet,
+        8,
+        Map(
+          0 -> Consume(nfa.alphabet.refine(CharSet.single('a')), 1),
+          1 -> Eps(Seq(2)),
+          2 -> Consume(nfa.alphabet.refine(CharSet.single('b')), 3),
+          3 -> Eps(Seq(7)),
+          4 -> Consume(nfa.alphabet.refine(CharSet.single('c')), 5),
+          5 -> Eps(Seq(7)),
+          6 -> LongestEps(Seq(0, 4)),
+          7 -> Accept(),
+          8 -> Eps(Seq(11, 9)),
+          9 -> LoopEnter(0, 10),
+          10 -> Consume(nfa.alphabet.any, 8),
+          11 -> LoopExit(0, 6)
+        )
+      )
+    )
+    // The choices in a look-around or an atomic group stop at their first success.
+    def hasLongestEps(nfa: EpsNFA[Int]): Boolean =
+      (nfa.tau.values ++ nfa.lookBehind.iterator.flatMap(_.tau.values)).exists(_.isInstanceOf[LongestEps[?]])
+    assert(hasLongestEps(build("(?:ab|c)*", "p", pr)))
+    assert(!hasLongestEps(build("(?=ab|c)", "p", pr)))
+    assert(!hasLongestEps(build("(?<=ab|c)", "p", pr)))
+    assert(!hasLongestEps(build("(?>ab|c)", "p", pr)))
+    // The simplified ε-NFA explores every path anyway.
+    assert(!hasLongestEps(build("ab|c", "p", pr, isSimplified = true)))
+    // The pattern is not built twice.
+    assertEquals(build("(?:ab|c)*d", "p", pr).stateSet.size, build("(?:ab|c)*d", "", pr).stateSet.size)
+    // The copy rejecting an empty match keeps the choice, though no dialect has both.
+    val notEmpty = ReDoS.parse("(*NOTEMPTY)a|", "", Dialect.PCRE).copy(longestMatch = true)
+    val notEmptyNFA = EpsNFABuilder.build(notEmpty, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
+    assertEquals(notEmptyNFA.tau.values.count(_.isInstanceOf[LongestEps[?]]), 2)
 
   test("EpsNFABuilder.build: LookAhead with assertions guessing what follows"):
     // Python's `$` in the middle matches before a final line terminator, which the states guess.

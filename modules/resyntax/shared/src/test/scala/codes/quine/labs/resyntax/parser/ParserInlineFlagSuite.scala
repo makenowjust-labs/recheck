@@ -286,5 +286,6 @@ class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
   check("(?-)", "", BoostRegex())(Command(InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet())))))
   error("(?)", "", BoostRegex())("Invalid flag at 2")
   error("(?n)", "", BoostRegex())("Invalid flag at 2")
+  error("(?p)", "", BoostRegex())("Invalid flag at 2")
   error("(?^i)", "", BoostRegex())("Invalid group at 2")
   error("(?i-m-s)", "", BoostRegex())("Invalid flag at 5")

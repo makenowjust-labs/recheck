@@ -135,7 +135,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           2,
-          Witness(Seq((Seq(at), Seq(a, a, other2))), Seq.empty),
+          Witness(Seq((Seq(word.diff(a)), Seq(a, a, other2, a))), Seq.empty),
           Hotspot(Seq(Spot(2, 3, Hot), Spot(6, 8, Warm), Spot(10, 14, Hot)))
         )
       )
@@ -197,8 +197,8 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           2,
-          Witness(Seq((Seq.empty, Seq(a))), Seq.empty),
-          Hotspot(Seq(Spot(3, 4, Hot)))
+          Witness(Seq((Seq.empty, Seq(a))), Seq(CharSet.range(0x00, 0xff).diff(CharSet.of('a', 'b')), b)),
+          Hotspot(Seq(Spot(3, 4, Hot), Spot(8, 9, Cold)))
         )
       )
     )
@@ -315,6 +315,47 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         Exponential(Witness(Seq((Seq.empty, Seq(a))), Seq.empty), Hotspot(Seq(Spot(7, 8, Hot), Spot(9, 10, Hot))))
       )
     )
+
+  test("AutomatonChecker.check: longest match"):
+    // python-regex's `p` explores every path at a start position, even after a match, and the search retries at the
+    // next position only if the pattern does not match there.
+    val pr = Dialect.PythonRegex()
+    def degrees(source: String): (Int, Int) =
+      (degree(check(source, "", pr).get), degree(check(source, "p", pr).get))
+
+    assertEquals(degrees("a*"), (1, 1))
+    assertEquals(degrees("a*b"), (2, 2))
+    assertEquals(degrees("a*a*"), (1, 2))
+    assertEquals(degrees("(a|a)*"), (1, Int.MaxValue))
+    assertEquals(degrees("^(a|a)*$"), (Int.MaxValue, Int.MaxValue))
+    assertEquals(degrees("(a)(?:\\1|a)*"), (1, Int.MaxValue))
+    assertEquals(degrees("(?:a|(?<=a)a)*"), (1, Int.MaxValue))
+    // A look-ahead and an atomic group still stop at their first success.
+    assertEquals(degrees("(?=(a|a)*)"), (1, 1))
+    assertEquals(degrees("(?:a(?=b)|a)*"), (1, 1))
+    assertEquals(degrees("(?:a(?=a)|a)*"), (1, Int.MaxValue))
+    assertEquals(degrees("(?>(a|a)*)"), (1, 1))
+    assertEquals(degrees("(?>a|a)*"), (1, 1))
+    // The upper bound explores every path, so it bounds them from above.
+    for source <- Seq("a*a*", "(a|a)*", "(a)(?:\\1|a)*", "(?:a|(?<=a)a)*", "(?:a(?=a)|a)*") do
+      assert(degree(check(source, "p", pr, true).get) >= degree(check(source, "p", pr).get), source)
+    // The pattern succeeds where it ends, whatever follows, so the search does not retry after a match of a prefix.
+    // The match explores every path anyway, so the witness needs no suffix.
+    val a = CharSet.single('a')
+    assertEquals(
+      check("(a|a)*", "p", pr),
+      Success(
+        Exponential(Witness(Seq((Seq(a), Seq(a))), Seq.empty), Hotspot(Seq(Spot(1, 2, Hot), Spot(3, 4, Hot))))
+      )
+    )
+    assertEquals(
+      check("a*a*", "p", pr),
+      Success(
+        Polynomial(2, Witness(Seq((Seq(a), Seq(a))), Seq.empty), Hotspot(Seq(Spot(0, 1, Hot), Spot(2, 3, Hot))))
+      )
+    )
+    assertEquals(degrees("a*b?"), (1, 1))
+    assertEquals(degrees("(?:a|b)*c?"), (1, 1))
 
   test("AutomatonChecker.check: upper bound"):
     // The upper bound explores every path, even after the first success of a look-ahead or an atomic group.

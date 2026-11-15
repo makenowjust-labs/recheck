@@ -505,7 +505,7 @@ object RuntimeAttackProgram:
     */
   // The method of the matching will be `match_continuous` for a match at the start, and `regex_match` for a full match.
   private def boostRegex(pattern: UString, flags: String, dialect: Dialect.BoostRegex, attack: AttackPattern) =
-    val options = flags.distinct.filter(c => "MNScix".contains(c))
+    val options = flags.distinct.filter(c => "MNScipx".contains(c))
     val executor =
       if hasICU(dialect) then BoostRegexExecutor(BoostRegexICUSource, hasICU = true)
       else BoostRegexExecutor(BoostRegexSource, hasICU = false)
@@ -539,8 +539,8 @@ object RuntimeAttackProgram:
     val matchResults =
       if hasICU then "boost::match_results<std::vector<std::uint32_t>::const_iterator>" else "boost::smatch"
     val search =
-      if hasICU then "boost::u32regex_search(input.cbegin(), input.cend(), match, regex);"
-      else "boost::regex_search(subject, match, regex);"
+      if hasICU then "boost::u32regex_search(input.cbegin(), input.cend(), match, regex, flags);"
+      else "boost::regex_search(subject, match, regex, flags);"
     s"""|#include <boost/regex.hpp>
         |#include <boost/version.hpp>
         |$headers
@@ -574,6 +574,7 @@ object RuntimeAttackProgram:
         |  std::getline(lines, flagsLine);
         |  std::getline(lines, patternLine);
         |  boost::regbase::flag_type options = boost::regbase::perl;
+        |  boost::match_flag_type flags = boost::match_default;
         |  for (char c : flagsLine) {
         |    switch (c) {
         |      case 'M': options |= boost::regbase::no_mod_m; break;
@@ -581,6 +582,7 @@ object RuntimeAttackProgram:
         |      case 'S': options |= boost::regbase::no_mod_s; break;
         |      case 'c': options |= boost::regbase::collate; break;
         |      case 'i': options |= boost::regbase::icase; break;
+        |      case 'p': flags |= boost::match_posix; break;
         |      case 'x': options |= boost::regbase::mod_x; break;
         |      default: break;
         |    }

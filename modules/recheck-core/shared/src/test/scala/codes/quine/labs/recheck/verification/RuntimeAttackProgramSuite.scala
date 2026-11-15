@@ -205,17 +205,19 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     assert(programFile(program).content.contains("case 'w': flags |= UREGEX_UWORD; break;"))
 
   test("RuntimeAttackProgram.generate: Boost.Regex"):
-    // The flags are the syntax options, and the units are bytes over `char` and code points in `u32regex`.
-    val program = generate("\u00e9\\d", "MNSScix", Dialect.BoostRegex())
+    // The flags are the syntax options and `p` (`match_posix`), and the units are bytes over `char` and code points in
+    // `u32regex`.
+    val program = generate("\u00e9\\d", "MNSScipx", Dialect.BoostRegex())
     assertEquals(program.executor, BoostRegexExecutor(programFile(program), hasICU = false))
     assertEquals(programFile(program).name, "RecheckRuntimeAttack.cpp")
     assertEquals(
       program.script,
-      "MNScix\n000000c3000000a90000005c00000064\n1:00000078\n2:00000079\n1:0000007a\n"
+      "MNScipx\n000000c3000000a90000005c00000064\n1:00000078\n2:00000079\n1:0000007a\n"
     )
     val content = programFile(program).content
     assert(content.contains("case 'N': options |= boost::regbase::newline_alt; break;"))
-    assert(content.contains("boost::regex_search(subject, match, regex);"))
+    assert(content.contains("case 'p': flags |= boost::match_posix; break;"))
+    assert(content.contains("boost::regex_search(subject, match, regex, flags);"))
     assert(!content.contains("ICU"))
     val u32 = generate("\u00e9\\x{1F600}", "", Dialect.BoostRegex(Dialect.BoostRegex.Type.U32Regex), nonASCII)
     assertEquals(u32.executor, BoostRegexExecutor(programFile(u32), hasICU = true))
@@ -225,7 +227,7 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     )
     val u32Content = programFile(u32).content
     assert(u32Content.contains("#include <boost/regex/icu.hpp>"))
-    assert(u32Content.contains("boost::u32regex_search(input.cbegin(), input.cend(), match, regex);"))
+    assert(u32Content.contains("boost::u32regex_search(input.cbegin(), input.cend(), match, regex, flags);"))
 
   test("RuntimeAttackProgram.generate: the data of Java and .NET"):
     val repeat =

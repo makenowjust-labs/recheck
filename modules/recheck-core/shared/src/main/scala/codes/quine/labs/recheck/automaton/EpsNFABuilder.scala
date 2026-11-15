@@ -92,6 +92,9 @@ private class EpsNFABuilder(
     */
   val references: mutable.Map[Int, (Seq[Int], IRCaseEquivalence)] = mutable.Map.empty
 
+  /** Whether it takes the longest match, which the simplified ε-NFA does not tell, as it explores every path. */
+  private val longestMatch = pattern.longestMatch && !isSimplified
+
   /** A cached result of `IRPattern#needsInputTerminatorDistinction`. */
   private val needsInputTerminatorDistinction = pattern.needsInputTerminatorDistinction
 
@@ -181,18 +184,9 @@ private class EpsNFABuilder(
       i1
     else first
 
-    // A match ends at its first success, which no priority tells in the simplified ε-NFA.
-    // So it does not read the rest of the input, where a path reaching the end of the pattern stops.
-    if pattern.needsSigmaStarAtEnd && !isSimplified then
-      val loop = nextLoop()
-      val a1 = nextQ()
-      val a2 = nextQ()
-      val a3 = nextQ()
-      val a4 = nextQ()
-      emit(a0 -> Eps(Vector(a3, a1)))
-      emit(a1 -> LoopEnter(loop, a2))
-      emit(a2 -> Consume(alphabet.any, a0))
-      emit(a3 -> LoopExit(loop, a4))
+    // A match succeeds at the end of the pattern whatever follows.
+    // The simplified ε-NFA, which has no priorities telling the first success, stops there instead.
+    if pattern.needsSigmaStarAtEnd && !isSimplified then emit(a0 -> Accept())
 
     val lookBehind = Option.when(innerStates.nonEmpty)(LookBehind(innerStates.toSet, innerTau.toMap))
     EpsNFA(alphabet, (0 until counterQ).toSet -- innerStates -- unusedStates, init, tau.toMap, lookBehind)
@@ -218,6 +212,7 @@ private class EpsNFABuilder(
 
         def retarget(t: Transition[Int], f: Int => Int): Transition[Int] = t match
           case Eps(qs)                             => Eps(qs.map(f))
+          case LongestEps(qs)                      => LongestEps(qs.map(f))
           case Assert(kind, q)                     => Assert(kind, f(q))
           case Consume(set, q, loc)                => Consume(set, f(q), loc)
           case LoopEnter(loop, q)                  => LoopEnter(loop, f(q))
@@ -226,7 +221,7 @@ private class EpsNFABuilder(
           case LookBehindAssert(negative, init, q) => LookBehindAssert(negative, init, f(q))
           case AtomicEps(alternatives, last)       =>
             AtomicEps(alternatives.map((test, q) => (f(test), f(q))), f(last))
-          case LookAroundAccept()           => LookAroundAccept()
+          case Accept()                     => Accept()
           case MarkCapture(mark, q)         => MarkCapture(mark, f(q))
           case IterationEnd(loop, q, empty) => IterationEnd(loop, f(q), empty.map(f))
 
@@ -251,11 +246,15 @@ private class EpsNFABuilder(
     emit(i -> Consume(chs, a, loc))
     (i, a)
 
+  /** Returns the ε-transition of a choice, which tries every alternative in the pattern of a longest match. */
+  private def choice(qs: Seq[Int]): Transition[Int] =
+    if longestMatch && !isInLookAround then LongestEps(qs) else Eps(qs)
+
   /** Builds an ε-NFA for a choice of the alternatives in the order. */
   private def buildChoice(alternatives: Seq[() => (Int, Int)]): (Int, Int) =
     val ss = alternatives.map(_())
     val i = nextQ()
-    emit(i -> Eps(ss.map(_._1)))
+    emit(i -> choice(ss.map(_._1)))
     val a = nextQ()
     for (_, a0) <- ss do emit(a0 -> Eps(Vector(a)))
     (i, a)
@@ -308,7 +307,7 @@ private class EpsNFABuilder(
         val i = nextQ()
         val a = nextQ()
         emit(i -> LookAheadAssert(negative, i0, a))
-        emit(a0 -> LookAroundAccept())
+        emit(a0 -> Accept())
         (i, a)
       case IRNodeData.NonAtomicLookAhead(n) if isSimplified =>
         // Backtracking into it tries the continuation again for each match of the inner expression, which the cost of
@@ -325,7 +324,7 @@ private class EpsNFABuilder(
         val wasBackward = isBackward
         isBackward = true
         val ((i0, a0), _) = withPath(buildInLookAround(buildNode(reverseLookBehindInner(n))))
-        emit(a0 -> LookAroundAccept())
+        emit(a0 -> Accept())
         isBackward = wasBackward
         val i = nextQ()
         val a = nextQ()
@@ -423,8 +422,8 @@ private class EpsNFABuilder(
     *
     * A choice of the group tries the alternatives in order, and commits to the first one that reaches the end of the
     * group ([[AtomicEps]]). The test of an alternative is its state in a copy of the paths of the group, which ends
-    * with a [[LookAroundAccept]] at the end of the group, and which only the [[AtomicEps]] refer to. The last
-    * alternative has no test, since it fails within the group anyway if it does not reach the end.
+    * with an [[Accept]] at the end of the group, and which only the [[AtomicEps]] refer to. The last alternative has no
+    * test, since it fails within the group anyway if it does not reach the end.
     */
   private def buildAtomic(n: IRNode): (Int, Int) =
     val ((i0, a0), groupPath) = withPath(buildNode(n))
@@ -445,16 +444,20 @@ private class EpsNFABuilder(
         case Some(LookBehindAssert(negative, init, q1)) => LookBehindAssert(negative, init, test(q1))
         case Some(AtomicEps(alternatives, last))        =>
           AtomicEps(alternatives.map((t, q1) => (t, test(q1))), test(last))
+        // A test only tells whether the group ends, so it stops at its first success.
+        case Some(LongestEps(qs)) => Eps(qs.map(test))
         // The tests set no captures, which the alternatives set.
         case Some(MarkCapture(_, q1))            => Eps(Vector(test(q1)))
         case Some(IterationEnd(loop, q1, empty)) => IterationEnd(loop, test(q1), empty.map(test))
         // `a0` is the end of the group, which has no transition yet.
-        case Some(LookAroundAccept()) | None => LookAroundAccept()
+        case Some(Accept()) | None => Accept()
       emit(test(q) -> t)
     for q <- groupPath do
-      transitions.get(q) match
-        case Some(Eps(qs)) if qs.size > 1 => emit(q -> AtomicEps(qs.init.map(q1 => (test(q1), q1)), qs.last))
-        case _                            => ()
+      val alternatives = transitions.get(q) match
+        case Some(Eps(qs))        => qs
+        case Some(LongestEps(qs)) => qs
+        case _                    => Seq.empty
+      if alternatives.size > 1 then emit(q -> AtomicEps(alternatives.init.map(q1 => (test(q1), q1)), alternatives.last))
     (i0, a0)
 
   /** Builds EpsNFA transitions for a repetition.
@@ -551,7 +554,7 @@ private class EpsNFABuilder(
     val a1 = nextQ()
     val a = nextQ()
     val t = if strategy == BacktrackStrategy.Lazy then Vector(a1, i2) else Vector(i2, a1)
-    emit(i -> Eps(t))
+    emit(i -> choice(t))
     emit(i2 -> LoopEnter(loop, i0))
     emit(a0 -> end.fold(Eps(Vector(i)))(e => IterationEnd(loop, i, Some(e))))
     emit(a1 -> LoopExit(loop, a))
@@ -580,11 +583,11 @@ private class EpsNFABuilder(
         emit(a0 -> IterationEnd(firstLoop, checked, Some(e)))
         (entry, checked)
     later match
-      case None    => emit(checked -> Eps(t))
+      case None    => emit(checked -> choice(t))
       case Some(e) =>
         val next = nextQ()
         emit(checked -> IterationEnd(loop, next, Some(e)))
-        emit(next -> Eps(t))
+        emit(next -> choice(t))
     emit(i1 -> LoopEnter(loop, i))
     emit(a1 -> LoopExit(loop, a))
     (entry, a)
@@ -607,7 +610,7 @@ private class EpsNFABuilder(
       ra
     val i = nextQ()
     val t = if strategy == BacktrackStrategy.Lazy then Vector(a, i0) else Vector(i0, a)
-    emit(i -> Eps(t))
+    emit(i -> choice(t))
     (i, a)
 
   /** The line terminator sets that the character kinds tell, in the order of the bits. */

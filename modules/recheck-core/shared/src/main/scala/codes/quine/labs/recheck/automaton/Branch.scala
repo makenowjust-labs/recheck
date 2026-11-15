@@ -20,6 +20,9 @@ enum Branch[+Q]:
   /** Choice tries the branches in order. */
   case Choice(bs: Seq[Branch[Q]])
 
+  /** LongestChoice tries every branch in order, even after one succeeds, and succeeds if one of them does. */
+  case LongestChoice(bs: Seq[Branch[Q]])
+
   /** LookAhead runs the inner expression atomically, and continues to `cont` if it succeeds (or fails, if negative). */
   case LookAhead(negative: Boolean, inner: Branch[Q], cont: Branch[Q])
 
@@ -38,6 +41,7 @@ enum Branch[+Q]:
     case Leaf(q)                          => Vector(q)
     case Succeed                          => Vector.empty
     case Choice(bs)                       => bs.flatMap(_.leaves)
+    case LongestChoice(bs)                => bs.flatMap(_.leaves)
     case LookAhead(_, inner, cont)        => inner.leaves ++ cont.leaves
     case AtomicChoice(alternatives, last) => alternatives.flatMap(_._2.leaves) ++ last.leaves
 
@@ -46,6 +50,7 @@ enum Branch[+Q]:
     case Leaf(q)                          => Vector(q)
     case Succeed                          => Vector.empty
     case Choice(bs)                       => bs.flatMap(_.allLeaves)
+    case LongestChoice(bs)                => bs.flatMap(_.allLeaves)
     case LookAhead(_, inner, cont)        => inner.allLeaves ++ cont.allLeaves
     case AtomicChoice(alternatives, last) =>
       alternatives.flatMap((test, b) => test.allLeaves ++ b.allLeaves) ++ last.allLeaves
@@ -55,6 +60,7 @@ enum Branch[+Q]:
     case Leaf(q)                          => p(q)
     case Succeed                          => true
     case Choice(bs)                       => bs.exists(_.succeeds(p))
+    case LongestChoice(bs)                => bs.exists(_.succeeds(p))
     case LookAhead(negative, inner, cont) => inner.succeeds(p) != negative && cont.succeeds(p)
     case AtomicChoice(alternatives, last) =>
       alternatives.find(_._1.succeeds(p)).fold(last.succeeds(p))(_._2.succeeds(p))
@@ -65,6 +71,7 @@ enum Branch[+Q]:
     case Succeed => 0
     // The first branch is explored before the others.
     case Choice(bs)             => bs.headOption.fold(0)(_.minExplored)
+    case LongestChoice(bs)      => bs.map(_.minExplored).sum
     case LookAhead(_, inner, _) => inner.minExplored
     // One of the branches is the committed one.
     case AtomicChoice(alternatives, last) => (alternatives.map(_._2.minExplored) :+ last.minExplored).min
@@ -82,6 +89,9 @@ enum Branch[+Q]:
         case ((leaves, false), b)      =>
           val (bLeaves, succeeds) = b.exploreAndSucceed(p)
           (leaves ++ bLeaves, succeeds)
+    case LongestChoice(bs) =>
+      val explored = bs.map(_.exploreAndSucceed(p))
+      (explored.toVector.flatMap(_._1), explored.exists(_._2))
     case LookAhead(negative, inner, cont) =>
       val (innerLeaves, succeeds) = inner.exploreAndSucceed(p)
       if succeeds == negative then (innerLeaves, false)
@@ -102,6 +112,7 @@ enum Branch[+Q]:
     case Leaf(q)                          => f(q)
     case Succeed                          => Succeed
     case Choice(bs)                       => Branch.choice(bs.map(_.flatMap(f)))
+    case LongestChoice(bs)                => Branch.longestChoice(bs.map(_.flatMap(f)))
     case LookAhead(negative, inner, cont) => Branch.lookAhead(negative, inner.flatMap(f), cont.flatMap(f))
     case AtomicChoice(alternatives, last) =>
       Branch.atomicChoice(alternatives.map((test, b) => (test.flatMap(f), b.flatMap(f))), last.flatMap(f))
@@ -122,6 +133,17 @@ object Branch:
     before ++ after.take(1) match
       case Seq(b) => b
       case cs     => Choice(cs.toVector)
+
+  /** Builds a simplified longest choice of the branches. */
+  def longestChoice[Q](bs: Seq[Branch[Q]]): Branch[Q] =
+    val flat = bs.flatMap:
+      case LongestChoice(cs) => cs
+      case Fail              => Vector.empty
+      case b                 => Vector(b)
+    flat match
+      case Seq()  => Fail
+      case Seq(b) => b
+      case cs     => LongestChoice(cs.toVector)
 
   /** Builds a simplified look-ahead assertion. */
   def lookAhead[Q](negative: Boolean, inner: Branch[Q], cont: Branch[Q]): Branch[Q] =

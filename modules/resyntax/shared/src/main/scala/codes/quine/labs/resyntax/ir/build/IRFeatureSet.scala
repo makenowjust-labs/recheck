@@ -129,6 +129,8 @@ final case class IRFeatureSet(
     buildsBacktrackControlAsUnsupported: Boolean,
     // Boost.Regex, python-regex
     buildsConditionalAsUnsupported: Boolean,
+    // Boost.Regex (with `p`)
+    rejectsBacktrackControlInLongestMatch: Boolean,
     // .NET, JavaScript, python-regex: Unrestricted, Boost.Regex: BoostRegex, ICU: ICU, Java: Java, PCRE: PCRE, Perl: Perl, Python: Python, Ruby: Ruby
     lookBehindRule: IRLookBehindRule,
     // Perl
@@ -195,6 +197,8 @@ final case class IRFeatureSet(
     validatesCharName: Boolean,
     // JavaScript (with `y`), PCRE (with `A`)
     anchored: Boolean,
+    // Boost.Regex (with `p`), python-regex (with `p`)
+    longestMatch: Boolean,
     // PCRE (with `(*UCP)`)
     ucp: Boolean,
     // PCRE (with `(*CASELESS_RESTRICT)`)
@@ -571,6 +575,7 @@ object IRFeatureSet:
       acceptEndsAtomic = isPerl,
       buildsBacktrackControlAsUnsupported = isBoostRegex || isPythonRegex,
       buildsConditionalAsUnsupported = isBoostRegex || isPythonRegex,
+      rejectsBacktrackControlInLongestMatch = isBoostRegex && flagSet.preserve,
       lookBehindRule = dialect match
         case Dialect.DotNet | Dialect.JavaScript | _: Dialect.PythonRegex => IRLookBehindRule.Unrestricted
         case Dialect.Java                                                 => IRLookBehindRule.Java
@@ -656,6 +661,7 @@ object IRFeatureSet:
       dotAllMatchesCRLF = isICU,
       validatesCharName = isICU || isJava || isPython || isPythonRegex,
       anchored = isJavaScript && flagSet.sticky || isPCRE && flagSet.anchored,
+      longestMatch = (isBoostRegex || isPythonRegex) && flagSet.preserve,
       ucp = isPCRE && startOptions.contains("UCP"),
       caselessRestrict = isPCRE && startOptions.contains("CASELESS_RESTRICT"),
       turkishCasing = isPCRE && startOptions.contains("TURKISH_CASING"),

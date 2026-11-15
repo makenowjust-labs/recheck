@@ -107,6 +107,7 @@ final case class OrderedNFA[A, Q](
       def isChoices(b: Branch[Q]): Boolean = b match
         case Branch.Leaf(_) | Branch.Succeed => true
         case Branch.Choice(bs)               => bs.forall(isChoices)
+        case Branch.LongestChoice(bs)        => bs.forall(isChoices)
         case _                               => false
       val tested = ctx.interrupt(delta.keysIterator.filterNot(key => isChoices(delta(key))).toSet)
 

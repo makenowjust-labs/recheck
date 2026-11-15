@@ -142,7 +142,7 @@ class EpsNFASuite extends munit.FunSuite:
       0,
       Map(
         0 -> LookAheadAssert(true, 1, 2),
-        1 -> LookAroundAccept(),
+        1 -> Accept(),
         2 -> LookBehindAssert(false, 1, 3),
         3 -> AtomicEps(Seq((1, 4)), 0),
         4 -> MarkCapture(CaptureMark.Begin(0), 5),
@@ -179,7 +179,7 @@ class EpsNFASuite extends munit.FunSuite:
       immutable.SortedSet(0, 2),
       0,
       Map(0 -> LookBehindAssert(false, 1, 2)),
-      Some(LookBehind(Set(1), Map(1 -> LookAroundAccept())))
+      Some(LookBehind(Set(1), Map(1 -> Accept())))
     )
     assertEquals(
       lookBehind.toGraphviz,
@@ -199,10 +199,30 @@ class EpsNFASuite extends munit.FunSuite:
       buildAlphabet(Seq(CharSet.single('a'))),
       immutable.SortedSet(0, 1, 2, 3),
       0,
-      Map(0 -> LookAheadAssert(false, 1, 2), 1 -> LookAroundAccept(), 2 -> LookBehindAssert(true, 1, 3))
+      Map(0 -> LookAheadAssert(false, 1, 2), 1 -> Accept(), 2 -> LookBehindAssert(true, 1, 3))
     )
     assert(clue(polarities.toGraphviz).contains("\"0\" -> \"1\" [label=\"?=\"];"))
     assert(polarities.toGraphviz.contains("\"2\" -> \"1\" [label=\"?<!\"];"))
+
+    // A choice of a longest-match pattern.
+    val longest = EpsNFA(
+      buildAlphabet(Seq(CharSet.single('a'))),
+      immutable.SortedSet(0, 1, 2),
+      0,
+      Map(0 -> LongestEps(Seq(1, 2)))
+    )
+    assertEquals(
+      longest.toGraphviz,
+      """|digraph {
+         |  "" [shape=point];
+         |  "" -> "0";
+         |  "0" [shape=diamond];
+         |  "0" -> "1" [label="0 longest"];
+         |  "0" -> "2" [label="1 longest"];
+         |  "1" [shape=doublecircle];
+         |  "2" [shape=doublecircle];
+         |}""".stripMargin
+    )
 
   test("EpsNFA#mapState, EpsNFA#rename"):
     val a = Set((CharSet.single('a'), CharKind.Normal))
@@ -220,7 +240,7 @@ class EpsNFASuite extends munit.FunSuite:
         6 -> LookAheadAssert(false, 4, 7),
         7 -> LookBehindAssert(true, 8, 9)
       ),
-      Some(LookBehind(Set(8, 9), Map(8 -> AtomicEps(Seq((8, 9)), 9), 9 -> LookAroundAccept())))
+      Some(LookBehind(Set(8, 9), Map(8 -> AtomicEps(Seq((8, 9)), 9), 9 -> Accept())))
     )
     val shifted = EpsNFA(
       nfa.alphabet,
@@ -236,7 +256,7 @@ class EpsNFASuite extends munit.FunSuite:
         16 -> LookAheadAssert(false, 14, 17),
         17 -> LookBehindAssert(true, 18, 19)
       ),
-      Some(LookBehind(Set(18, 19), Map(18 -> AtomicEps(Seq((18, 19)), 19), 19 -> LookAroundAccept())))
+      Some(LookBehind(Set(18, 19), Map(18 -> AtomicEps(Seq((18, 19)), 19), 19 -> Accept())))
     )
     assertEquals(nfa.mapState(_ + 10), shifted)
     // The states of the look-behinds are renamed too.

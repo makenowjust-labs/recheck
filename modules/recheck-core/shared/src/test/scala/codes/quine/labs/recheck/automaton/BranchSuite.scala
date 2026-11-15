@@ -11,14 +11,19 @@ class BranchSuite extends munit.FunSuite:
   // A choice in an atomic group, which commits to `2` if `1` succeeds, or else to `4`.
   val atomic: Branch[Int] = AtomicChoice(Vector((Leaf(1), Leaf(2))), Leaf(4))
 
+  // A longest choice of `1`, `2|3` and `4`.
+  val longest: Branch[Int] = LongestChoice(Vector(Leaf(1), Choice(Vector(Leaf(2), Leaf(3))), Leaf(4)))
+
   test("Branch#leaves"):
     assertEquals(branch.leaves, Seq(1, 2, 3))
     assertEquals(Succeed.leaves, Seq.empty)
     assertEquals(atomic.leaves, Seq(2, 4))
+    assertEquals(longest.leaves, Seq(1, 2, 3, 4))
 
   test("Branch#allLeaves"):
     assertEquals(branch.allLeaves, Seq(1, 2, 3))
     assertEquals(atomic.allLeaves, Seq(1, 2, 4))
+    assertEquals(longest.allLeaves, Seq(1, 2, 3, 4))
 
   test("Branch#succeeds"):
     assertEquals(branch.succeeds(Set(2)), true)
@@ -28,6 +33,8 @@ class BranchSuite extends munit.FunSuite:
     assertEquals(Fail.succeeds(_ => true), false)
     assertEquals(atomic.succeeds(Set(1, 4)), false)
     assertEquals(atomic.succeeds(Set(3, 4)), true)
+    assertEquals(longest.succeeds(Set(3)), true)
+    assertEquals(longest.succeeds(Set(5)), false)
 
   test("Branch#explore"):
     assertEquals(branch.explore(Set(2)), Seq(1, 2))
@@ -39,6 +46,13 @@ class BranchSuite extends munit.FunSuite:
     assertEquals(atomic.explore(Set(3)), Seq(2, 4))
     assertEquals(atomic.explore(Set.empty), Seq(2, 4))
 
+    // A longest choice explores every branch, but an enclosing choice stops when it succeeds.
+    assertEquals(longest.explore(Set(1)), Seq(1, 2, 3, 4))
+    assertEquals(longest.explore(Set(2)), Seq(1, 2, 4))
+    assertEquals(Choice(Vector(longest, Leaf(5))).explore(Set(1)), Seq(1, 2, 3, 4))
+    assertEquals(Choice(Vector(longest, Leaf(5))).explore(Set.empty), Seq(1, 2, 3, 4, 5))
+    assertEquals(Choice(Vector(LongestChoice(Vector(Succeed, Leaf(1))), Leaf(2))).explore(_ => false), Seq(1))
+
   test("Branch#minExplored"):
     assertEquals(Leaf(1).minExplored, 1)
     assertEquals(Succeed.minExplored, 0)
@@ -47,8 +61,9 @@ class BranchSuite extends munit.FunSuite:
     assertEquals(Choice(Vector(Succeed, Leaf(1))).minExplored, 0)
     assertEquals(branch.minExplored, 1)
     assertEquals(atomic.minExplored, 1)
+    assertEquals(longest.minExplored, 3)
     // It is not over the leaves that `explore` lists, whichever leaves succeed.
-    for b <- Seq(branch, atomic); succeeding <- Set(1, 2, 3, 4).subsets() do
+    for b <- Seq(branch, atomic, longest); succeeding <- Set(1, 2, 3, 4).subsets() do
       assert(b.minExplored <= b.explore(succeeding).size, s"$b with $succeeding")
 
   test("Branch#map"):
@@ -57,6 +72,11 @@ class BranchSuite extends munit.FunSuite:
   test("Branch#flatMap"):
     assertEquals(branch.flatMap(q => if q == 1 then Fail else Leaf(q)), Choice(Vector(Leaf(2), Leaf(3))))
     assertEquals(branch.flatMap(q => if q == 1 then Succeed else Leaf(q)), Leaf(3))
+    // A success in a longest choice keeps the branches after it.
+    assertEquals(
+      longest.flatMap(q => if q == 1 then Succeed else Leaf(q)),
+      LongestChoice(Vector(Succeed, Choice(Vector(Leaf(2), Leaf(3))), Leaf(4)))
+    )
 
   test("Branch.choice"):
     assertEquals(Branch.choice(Seq(Leaf(1))), Leaf(1))
@@ -66,6 +86,15 @@ class BranchSuite extends munit.FunSuite:
     )
     assertEquals(Branch.choice(Seq(Leaf(1), Succeed, Leaf(2))), Choice(Vector(Leaf(1), Succeed)))
     assertEquals(Branch.choice(Seq.empty[Branch[Int]]), Fail)
+
+  test("Branch.longestChoice"):
+    assertEquals(Branch.longestChoice(Seq(Leaf(1))), Leaf(1))
+    assertEquals(
+      Branch.longestChoice(Seq(LongestChoice(Vector(Leaf(1), Leaf(2))), Fail, Leaf(3))),
+      LongestChoice(Vector(Leaf(1), Leaf(2), Leaf(3)))
+    )
+    assertEquals(Branch.longestChoice(Seq(Leaf(1), Succeed, Leaf(2))), LongestChoice(Vector(Leaf(1), Succeed, Leaf(2))))
+    assertEquals(Branch.longestChoice(Seq(Fail, Fail)), Fail)
 
   test("Branch.lookAhead"):
     assertEquals(Branch.lookAhead(false, Fail, Leaf(1)), Fail)

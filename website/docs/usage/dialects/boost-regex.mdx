@@ -10,7 +10,7 @@ Describes how `recheck` checks a regular expression of the `boost-regex` dialect
 
 ## Engine
 
-`recheck` follows the syntax and the semantics of the perl syntax of Boost.Regex 1.92.0 (`boost::regex_constants::perl`, which is the default and the same as `ECMAScript`), searched by `regex_search` with `match_default`.
+`recheck` follows the syntax and the semantics of the perl syntax of Boost.Regex 1.92.0 (`boost::regex_constants::perl`, which is the default and the same as `ECMAScript`), searched by `regex_search` with `match_default` and the given match flags (see [Flags and Units](#flags-and-units)).
 The POSIX syntaxes (e.g. `extended` and `basic`) are not supported.
 
 ## Settings
@@ -57,16 +57,17 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.BoostRegex(Dialect.Boos
 
 The matching unit is `byte` for `char` (the default `type`), and `scalar-value` for `u32regex` (see [Matching Units](../dialects.mdx#matching-units)).
 
-`recheck` supports the following syntax options of Boost.Regex, written as these flag letters.
+`recheck` supports the following syntax options and match flags of Boost.Regex, written as these flag letters.
 
-| Flag | Syntax option | Inline  | Notes                                                 |
-| ---- | ------------- | ------- | ----------------------------------------------------- |
-| `i`  | `icase`       | `(?i)`  |                                                       |
-| `x`  | `mod_x`       | `(?x)`  |                                                       |
-| `M`  | `no_mod_m`    | `(?-m)` | `^` and `$` match at the line terminators without it. |
-| `S`  | `no_mod_s`    | `(?-s)` | `.` matches the line terminators without it.          |
-| `N`  | `newline_alt` |         | A line feed in the pattern is `\|`.                   |
-| `c`  | `collate`     |         | Not supported with a range of a class.                |
+| Flag | Option        | Inline  | Notes                                                                                                 |
+| ---- | ------------- | ------- | ----------------------------------------------------------------------------------------------------- |
+| `i`  | `icase`       | `(?i)`  |                                                                                                       |
+| `x`  | `mod_x`       | `(?x)`  |                                                                                                       |
+| `M`  | `no_mod_m`    | `(?-m)` | `^` and `$` match at the line terminators without it.                                                 |
+| `S`  | `no_mod_s`    | `(?-s)` | `.` matches the line terminators without it.                                                          |
+| `N`  | `newline_alt` |         | A line feed in the pattern is `\|`.                                                                   |
+| `c`  | `collate`     |         | Not supported with a range of a class.                                                                |
+| `p`  | `match_posix` |         | The longest match at a start position. An error with `(*COMMIT)`, `(*PRUNE)`, `(*SKIP)` or `(*THEN)`. |
 
 As in Boost.Regex, `^` and `$` are multi-line and `.` matches the line terminators by default, and `$` without multi-line matches only at the end, as `\z` does.
 The line terminators are `\n`, `\f` and `\r`, and also U+0085, U+2028 and U+2029 in `u32regex`, and neither `^` nor `$` matches between `\r` and `\n`.
@@ -74,7 +75,7 @@ The line terminators are `\n`, `\f` and `\r`, and also U+0085, U+2028 and U+2029
 
 The other syntax options (e.g. `nosubs` and `no_empty_expressions`) do not change how a valid pattern matches, so they have no flag letter.
 `mod_s` has no flag letter either, since `.` matches the line terminators by default.
-The match flags of the search (e.g. `match_not_dot_newline`) cannot be given.
+The other match flags (e.g. `match_not_dot_newline`) cannot be given.
 
 Over `char`, the classes are of the C locale (e.g. `\w` is `[0-9A-Za-z_]`), and `i` matches the ASCII letters case-insensitively.
 In `u32regex`, the classes are of ICU's general categories as Boost.Regex defines them (e.g. `\w` is `\p{L}`, `\p{Nd}`, `\p{Mn}` and `_`), and `i` is the simple case folding.
@@ -110,7 +111,7 @@ The following constructs are not supported, and they are reported as `unsupporte
 ## Runtime-Attack Verification
 
 - Command: `c++ <file>.cpp -o <file>` once, with `-licui18n -licuuc -licudata` after it for `u32regex`, and then the compiled program.
-- Matching: `regex_search` with `match_results` (`u32regex_search` for `u32regex`) and `match_default`, with Boost.Regex's default limits.
+- Matching: `regex_search` with `match_results` (`u32regex_search` for `u32regex`), `match_default` and the given match flags, with Boost.Regex's default limits.
 - Engine limits: `error_complexity`.
 - Engine errors: `error_stack`, `std::bad_alloc`.
 - Environment variable: `RECHECK_BOOST_REGEX`.

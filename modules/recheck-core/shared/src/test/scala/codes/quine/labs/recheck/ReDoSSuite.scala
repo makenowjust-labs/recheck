@@ -373,6 +373,34 @@ class ReDoSSuite extends munit.FunSuite:
     )
     assertSafe(check("(?:|(?:a|a)*c)", PCRE), Checker.Automaton)
 
+  test("ReDoS.check: longest match"):
+    // python-regex's `p` tries every path at the start position, which doubles for each `a` even on a match (2.9 s at
+    // n = 24 with regex 2026.9.29), and the first match of the others is instant.
+    assertVulnerable(
+      check("(a|a)*", PythonRegex(), "p", Checker.Fuzz),
+      AttackComplexity.Exponential(true),
+      Checker.Fuzz
+    )
+    assertSafe(check("(a|a)*", PythonRegex(), "", Checker.Fuzz), Checker.Fuzz)
+    // The tail `.*` is tried at every split too, so the upper bound keeps it.
+    assertVulnerable(
+      check("x(?:a|b)*.*", PythonRegex(), "sp", Checker.Fuzz),
+      AttackComplexity.Polynomial(2, true),
+      Checker.Fuzz
+    )
+    // The automaton checker explores every path too, so Auto does not report them safe.
+    assertVulnerable(check("(a|a)*", PythonRegex(), "p"), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check("(a|a)*", PythonRegex()), Checker.Automaton)
+    assertVulnerable(check("a*a*", PythonRegex(), "p"), AttackComplexity.Polynomial(2, false), Checker.Automaton)
+    assertSafe(check("a*a*", PythonRegex()), Checker.Automaton)
+    // Boost.Regex's `p` (`match_posix`) is the same, which reaches the complexity limit at n = 14 for `(a|a)*`.
+    assertVulnerable(
+      check("(a|a)*", BoostRegex(), "p", Checker.Fuzz),
+      AttackComplexity.Exponential(true),
+      Checker.Fuzz
+    )
+    assertVulnerable(check("(a|a)*", BoostRegex(), "p"), AttackComplexity.Exponential(false), Checker.Automaton)
+
   test("ReDoS.check: unsupported syntax"):
     assertEquals(
       check("^(a|a)*(?R)?$", PCRE),
@@ -651,7 +679,7 @@ class ReDoSSuite extends munit.FunSuite:
     assertEquals(attack(Dialect.JavaScript, ""), "'a'.repeat(31) + 'あ'")
     assertEquals(attack(Dialect.Python(), ""), "'a' * 31 + 'あ'")
     assertEquals(attack(Dialect.Python(Dialect.Python.Type.Bytes), ""), "b'a' * 31 + b'!'")
-    assertEquals(attack(Dialect.Ruby(), "n"), "\"a\".b + \"a\".b * 31 + \"!\\n\\n\".b")
+    assertEquals(attack(Dialect.Ruby(), "n"), "\"a\".b + \"a\".b * 31 + \"!\".b")
     assertEquals(attack(Dialect.Java, ""), "\"a\".repeat(31) + \"あ\"")
     assertEquals(attack(Dialect.DotNet, ""), "string.Concat(Enumerable.Repeat(\"a\", 31)) + \"あ\"")
     assertEquals(attack(Dialect.Perl(), ""), "\"a\" x 31 . \"\\x{3042}\"")
