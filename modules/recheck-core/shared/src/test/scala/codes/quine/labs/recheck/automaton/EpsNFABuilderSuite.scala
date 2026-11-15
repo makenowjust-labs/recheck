@@ -554,6 +554,48 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       build("(?<=(?>a|ab)c)d", "", Dialect.PCRE)
     )
 
+  test("EpsNFABuilder.build: longest match"):
+    // A choice of the pattern tries every alternative, but the search does not.
+    val pr = Dialect.PythonRegex()
+    val nfa = build("ab|c", "p", pr)
+    assertEquals(
+      nfa,
+      EpsNFA(
+        nfa.alphabet,
+        (0 to 11).toSet,
+        8,
+        Map(
+          0 -> Consume(nfa.alphabet.refine(CharSet.single('a')), 1),
+          1 -> Eps(Seq(2)),
+          2 -> Consume(nfa.alphabet.refine(CharSet.single('b')), 3),
+          3 -> Eps(Seq(7)),
+          4 -> Consume(nfa.alphabet.refine(CharSet.single('c')), 5),
+          5 -> Eps(Seq(7)),
+          6 -> LongestEps(Seq(0, 4)),
+          7 -> Accept(),
+          8 -> Eps(Seq(11, 9)),
+          9 -> LoopEnter(0, 10),
+          10 -> Consume(nfa.alphabet.any, 8),
+          11 -> LoopExit(0, 6)
+        )
+      )
+    )
+    // The choices in a look-around or an atomic group stop at their first success.
+    def hasLongestEps(nfa: EpsNFA[Int]): Boolean =
+      (nfa.tau.values ++ nfa.lookBehind.iterator.flatMap(_.tau.values)).exists(_.isInstanceOf[LongestEps[?]])
+    assert(hasLongestEps(build("(?:ab|c)*", "p", pr)))
+    assert(!hasLongestEps(build("(?=ab|c)", "p", pr)))
+    assert(!hasLongestEps(build("(?<=ab|c)", "p", pr)))
+    assert(!hasLongestEps(build("(?>ab|c)", "p", pr)))
+    // The simplified ε-NFA explores every path anyway.
+    assert(!hasLongestEps(build("ab|c", "p", pr, isSimplified = true)))
+    // The pattern is not built twice.
+    assertEquals(build("(?:ab|c)*d", "p", pr).stateSet.size, build("(?:ab|c)*d", "", pr).stateSet.size)
+    // The copy rejecting an empty match keeps the choice, though no dialect has both.
+    val notEmpty = ReDoS.parse("(*NOTEMPTY)a|", "", Dialect.PCRE).copy(longestMatch = true)
+    val notEmptyNFA = EpsNFABuilder.build(notEmpty, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
+    assertEquals(notEmptyNFA.tau.values.count(_.isInstanceOf[LongestEps[?]]), 2)
+
   test("EpsNFABuilder.build: LookAhead with assertions guessing what follows"):
     // Python's `$` in the middle matches before a final line terminator, which the states guess.
     val python = Dialect.Python()

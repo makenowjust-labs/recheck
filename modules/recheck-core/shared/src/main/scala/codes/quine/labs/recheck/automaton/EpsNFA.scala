@@ -43,6 +43,10 @@ final case class EpsNFA[Q](
         case Some(Eps(qs)) =>
           sb.append(s"  ${escape(q0)} [shape=diamond];\n")
           for (q1, i) <- qs.zipWithIndex do sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=$i];\n")
+        case Some(LongestEps(qs)) =>
+          sb.append(s"  ${escape(q0)} [shape=diamond];\n")
+          for (q1, i) <- qs.zipWithIndex do
+            sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(s"$i longest")}];\n")
         case Some(Assert(k, q1)) =>
           sb.append(s"  ${escape(q0)} [shape=circle];\n")
           sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(k)}];\n")
@@ -264,6 +268,7 @@ object EpsNFA:
     /** Maps the states of this transition by the function. */
     def mapState[R](f: Q => R): Transition[R] = this match
       case Eps(qs)                             => Eps(qs.map(f))
+      case LongestEps(qs)                      => LongestEps(qs.map(f))
       case Assert(kind, q)                     => Assert(kind, f(q))
       case Consume(set, q, loc)                => Consume(set, f(q), loc)
       case LoopEnter(loop, q)                  => LoopEnter(loop, f(q))
@@ -277,6 +282,9 @@ object EpsNFA:
 
   /** Eps is an ε-NFA transition without consuming a character. */
   final case class Eps[Q](to: Seq[Q]) extends Transition[Q]
+
+  /** LongestEps is an ε-NFA transition of a choice in a longest-match pattern, which tries every one of `to`. */
+  final case class LongestEps[Q](to: Seq[Q]) extends Transition[Q]
 
   /** Assert is an ε-NFA transition with consuming no character and assertion. */
   final case class Assert[Q](kind: AssertKind, to: Q) extends Transition[Q]
@@ -474,6 +482,7 @@ object EpsNFA:
         else
           transitions.get(q) match
             case Some(Eps(qs))             => Branch.choice(qs.map(buildClosure(s0, ss, _, loops)))
+            case Some(LongestEps(qs))      => Branch.longestChoice(qs.map(buildClosure(s0, ss, _, loops)))
             case Some(Assert(k, q1))       => buildClosure(s0, ss.filter(accepts(k, s0, _)), q1, loops)
             case Some(LoopEnter(loop, q1)) =>
               if loops.contains(loop) then Branch.Fail // An ε-loop is detected.

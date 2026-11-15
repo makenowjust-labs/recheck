@@ -388,6 +388,11 @@ class ReDoSSuite extends munit.FunSuite:
       AttackComplexity.Polynomial(2, true),
       Checker.Fuzz
     )
+    // The automaton checker explores every path too, so Auto does not report them safe.
+    assertVulnerable(check("(a|a)*", PythonRegex(), "p"), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check("(a|a)*", PythonRegex()), Checker.Automaton)
+    assertVulnerable(check("a*a*", PythonRegex(), "p"), AttackComplexity.Polynomial(2, false), Checker.Automaton)
+    assertSafe(check("a*a*", PythonRegex()), Checker.Automaton)
 
   test("ReDoS.check: unsupported syntax"):
     assertEquals(

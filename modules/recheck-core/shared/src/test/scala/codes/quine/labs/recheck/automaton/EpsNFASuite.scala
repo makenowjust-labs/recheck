@@ -204,6 +204,26 @@ class EpsNFASuite extends munit.FunSuite:
     assert(clue(polarities.toGraphviz).contains("\"0\" -> \"1\" [label=\"?=\"];"))
     assert(polarities.toGraphviz.contains("\"2\" -> \"1\" [label=\"?<!\"];"))
 
+    // A choice of a longest-match pattern.
+    val longest = EpsNFA(
+      buildAlphabet(Seq(CharSet.single('a'))),
+      immutable.SortedSet(0, 1, 2),
+      0,
+      Map(0 -> LongestEps(Seq(1, 2)))
+    )
+    assertEquals(
+      longest.toGraphviz,
+      """|digraph {
+         |  "" [shape=point];
+         |  "" -> "0";
+         |  "0" [shape=diamond];
+         |  "0" -> "1" [label="0 longest"];
+         |  "0" -> "2" [label="1 longest"];
+         |  "1" [shape=doublecircle];
+         |  "2" [shape=doublecircle];
+         |}""".stripMargin
+    )
+
   test("EpsNFA#mapState, EpsNFA#rename"):
     val a = Set((CharSet.single('a'), CharKind.Normal))
     val nfa = EpsNFA(
