@@ -64,6 +64,7 @@ Misc:
 - [#2023](https://github.com/makenowjust-labs/recheck/pull/2023) Offer only the dialects of the selected build in the Playground ([@makenowjust](https://github.com/makenowjust))
 - [#2022](https://github.com/makenowjust-labs/recheck/pull/2022) Update Node to 26.13.1 ([@makenowjust](https://github.com/makenowjust))
 - [#2021](https://github.com/makenowjust-labs/recheck/pull/2021) Support .NET 11 in the dotnet dialect ([@makenowjust](https://github.com/makenowjust))
+- [#2027](https://github.com/makenowjust-labs/recheck/pull/2027) Type the next frame of a failure in the VM, whose match the exhaustivity check did not see through ([@makenowjust](https://github.com/makenowjust))
 
 # 4.6.2 (2026-10-26)
 
