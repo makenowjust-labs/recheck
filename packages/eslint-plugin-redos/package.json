@@ -45,7 +45,7 @@
     "@types/jest": "30.0.0",
     "@types/node": "26.6.6",
     "esbuild": "0.28.2",
-    "eslint": "10.14.0",
+    "eslint": "10.15.0",
     "jest": "30.5.2",
     "prettier": "3.10.1",
     "recheck-parameters": "workspace:*",
