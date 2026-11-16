@@ -88,7 +88,7 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
     val unicode = verify("^(\\w|\\w)*$", "", Dialect.Python(), attack("é", 31, "\u0000"), env = env)
     assertEquals(unicode.result, RuntimeAttackResult.Timeout)
 
-  // Checked with regex 2026.9.29 on Python 3.15.2.
+  // Checked with regex 2026.11.15 on Python 3.15.2.
   runtimeTest("python-regex", "python3"):
     val r = verify("^(a|a)*$", "", Dialect.PythonRegex(), attack("a", 31, "\u0000"))
     assertEquals(r.result, RuntimeAttackResult.Timeout)

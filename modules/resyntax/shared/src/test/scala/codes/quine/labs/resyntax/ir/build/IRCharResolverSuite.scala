@@ -749,9 +749,24 @@ class IRCharResolverSuite extends munit.FunSuite:
     ("ZWJ alone", "\u200D\u200Dx", 2)
   )
 
+  // Unicode 18's GB9c joins a linker and a consonant without a consonant before the linker, as ICU 79.1 and `regex` 2026.11.15 do.
+  // The engines above split them.
+  val Unicode18Probes: Seq[(String, Seq[Int], Int)] = Seq(
+    ("a virama and a consonant", Seq(0x094d, 0x0915, 0x0078), 2),
+    ("a virama, a mark and a consonant", Seq(0x094d, 0x0308, 0x0915, 0x0078), 3),
+    ("a letter, a virama and a consonant", Seq(0x0061, 0x094d, 0x0924, 0x0078), 3),
+    ("a Vedic linker and a consonant", Seq(0x1cf5, 0x0915, 0x0078), 2),
+    ("a Balinese conjunct", Seq(0x1b05, 0x1b44, 0x1b33, 0x1b03, 0x0078), 4),
+    ("a Zanabazar Square conjunct", Seq(0x11a3a, 0x11a0b, 0x0078), 2)
+  )
+
   for (name, input, expected) <- Probes do
     test(s"IRBuilder.build: \\X matches $name"):
       assertEquals(cluster(cp(input)), Some(expected))
+
+  for (name, input, expected) <- Unicode18Probes do
+    test(s"IRBuilder.build: \\X matches $name"):
+      assertEquals(cluster(input), Some(expected))
 
   test("IRBuilder.build: \\X is atomic"):
     for (dialect, flags) <- Seq((Java, ""), (Perl(), ""), (Ruby(), ""), (PCRE, "u")) do
@@ -822,7 +837,7 @@ class IRCharResolverSuite extends munit.FunSuite:
     assertEquals(IRCharResolver.prune(IRNode(Repeat(never, IRQuantifier.Exact(0)))), Some(IRNode(Empty)))
     assertEquals(IRCharResolver.prune(IRNode(Repeat(never, IRQuantifier.Exact(2)))), None)
 
-  // python-regex's simple case folding, where `I`, `i`, `İ` and `ı` match without transitivity (regex 2026.9.29).
+  // python-regex's simple case folding, where `I`, `i`, `İ` and `ı` match without transitivity (regex 2026.11.15).
   val PR: Dialect = PythonRegex()
   val PRBytes: Dialect = PythonRegex(Python.Type.Bytes)
   chars("I", "i", PR)(of("Iiı"))

@@ -988,7 +988,7 @@ class InterpreterSuite extends munit.FunSuite:
     check("^(?:b?(?:|(a))|b?)+", "aaca", JavaScript)(Seq(g(0, 2), g(1, 2)))
 
   test("Interpreter.run: python-regex's empty iterations"):
-    // python-regex's iteration that changes a capture that a back-reference refers to is not empty (regex 2026.9.29).
+    // python-regex's iteration that changes a capture that a back-reference refers to is not empty (regex 2026.11.15).
     val pr = PythonRegex()
     check("^(?:()|a){2}\\1$", "a", pr)(Seq(g(0, 1), g(0, 0)))
     check("^(?:()|a){0,2}\\1$", "a", pr)(Seq(g(0, 1), g(0, 0)))
@@ -1006,7 +1006,7 @@ class InterpreterSuite extends munit.FunSuite:
 
   test("Interpreter.run: python-regex's longest match"):
     // python-regex's `p` takes the longest match at a start position, and the first of the longest ones; a look-ahead
-    // and an atomic group still take their first match (regex 2026.9.29).
+    // and an atomic group still take their first match (regex 2026.11.15).
     val pr = PythonRegex()
     check("(?p)a|ab|abc", "xabcd", pr)(Seq(g(1, 4)))
     check("a|ab|abc", "xabcd", pr)(Seq(g(1, 2)))

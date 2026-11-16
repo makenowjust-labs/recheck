@@ -335,7 +335,7 @@ class IRPropertyLookupSuite extends munit.FunSuite with IRHelper:
     )
   do chars(s"\\p{$name}", "", Ruby())(expected.diff(UTF16Encoding.Surrogates))
 
-  // python-regex's properties by `lookup_property` of regex 2026.9.29.
+  // python-regex's properties by `lookup_property` of regex 2026.11.15.
   val PR: Dialect = PythonRegex()
   val Latin1: CharSet = CharSet.range(0, 0xff)
   val NonASCII: CharSet = CharSet.range(0x80, 0x10ffff)

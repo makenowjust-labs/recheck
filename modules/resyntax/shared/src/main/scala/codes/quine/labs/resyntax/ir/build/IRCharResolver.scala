@@ -394,6 +394,9 @@ private[build] final class IRCharResolver(
   /** graphemeCluster is the IR of `\X`, which matches an extended grapheme cluster by the regular expression of UAX #29
     * (Table 1b) in an atomic group.
     *
+    * It follows Unicode 18's GB9c, where a linker joins the consonant after it without a consonant before it (e.g.
+    * U+094D U+0915).
+    *
     * In byte mode, the bytes are Latin-1 characters.
     */
   private lazy val graphemeCluster: IRNodeData =
@@ -404,11 +407,11 @@ private[build] final class IRCharResolver(
     val control = gcb("Control", "CR", "LF")
     val ri = seq(c(gcb("RI")), c(gcb("RI")))
     val xpicto = seq(c(extPict), star(seq(star(c(gcb("Extend"))), c(gcb("ZWJ")), c(extPict))))
-    val linkers = star(c(incb("Extend").union(incb("Linker"))))
-    val conjunct =
-      seq(c(incb("Consonant")), plus(seq(linkers, c(incb("Linker")), linkers, c(incb("Consonant")))))
-    val core = alt(hangul, ri, xpicto, conjunct, c(control.complement(universe)))
-    val postcore = star(c(gcb("Extend", "ZWJ", "SpacingMark")))
+    def conjunct(linkers: CharSet): IRNode = seq(c(linkers), star(c(incb("Extend"))), c(incb("Consonant")))
+
+    val core = alt(hangul, ri, xpicto, conjunct(incb("Linker")), c(control.complement(universe)))
+    val postcore =
+      star(alt(conjunct(incb("Linker").intersect(gcb("Extend"))), c(gcb("Extend", "ZWJ", "SpacingMark"))))
     val cluster = alt(seq(c(gcb("CR")), c(gcb("LF"))), c(control), seq(star(c(gcb("Prepend"))), core, postcore))
     // The engines take the longest cluster and do not backtrack into it.
     IRNodeData.Atomic(IRCharResolver.prune(cluster).getOrElse(IRNode(IRNodeData.Chars(CharSet.empty))))
