@@ -1086,7 +1086,7 @@ private[build] object IRPropertyLookup:
         val result = s"$sign$num/$den"
         if result.endsWith("/1") then result.dropRight(2) else result
 
-  /** The names of the properties of python-regex 2026.9.29 (`_regex.get_properties()`) as keys, one property in a row.
+  /** The names of the properties of python-regex 2026.11.15 (`_regex.get_properties()`) as keys, one property in a row.
     */
   private val PythonRegexNames: Seq[Seq[String]] = Seq(
     Seq("ALPHABETIC", "ALPHA"),

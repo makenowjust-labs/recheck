@@ -399,8 +399,8 @@ class ReDoSSuite extends munit.FunSuite:
     assertSafe(check("(?m)^(?:\\n|x)*b", BoostRegex(), "L"), Checker.Automaton)
 
   test("ReDoS.check: longest match"):
-    // python-regex's `p` tries every path at the start position, which doubles for each `a` even on a match (2.9 s at
-    // n = 24 with regex 2026.9.29), and the first match of the others is instant.
+    // python-regex's `p` tries every path at the start position, which doubles for each `a` even on a match (3.0 s at
+    // n = 24 with regex 2026.11.15), and the first match of the others is instant.
     assertVulnerable(
       check("(a|a)*", PythonRegex(), "p", Checker.Fuzz),
       AttackComplexity.Exponential(true),
