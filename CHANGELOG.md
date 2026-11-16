@@ -42,6 +42,7 @@ Fixes:
 - [#2014](https://github.com/makenowjust-labs/recheck/pull/2014) Run Ruby without RubyGems on the runtime attack ([@makenowjust](https://github.com/makenowjust))
 - [#2013](https://github.com/makenowjust-labs/recheck/pull/2013) Enforce GC of the agent only after no check runs for a second ([@makenowjust](https://github.com/makenowjust))
 - [#2025](https://github.com/makenowjust-labs/recheck/pull/2025) Print the version once before the timeouts in the test of Platform.compile ([@makenowjust](https://github.com/makenowjust))
+- [#2028](https://github.com/makenowjust-labs/recheck/pull/2028) Follow Unicode 18's GB9c in grapheme clusters, and update regex to 2026.11.15 ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
