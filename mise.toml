@@ -1,6 +1,6 @@
 [tools]
 java = "temurin-27.0.1"
-sbt = "2.0.12"
+sbt = "2.1.0"
 node = "26.13.1"
 pnpm = "12.21.0"
 python = "3.15.2"
