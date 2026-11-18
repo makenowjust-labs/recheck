@@ -198,11 +198,11 @@ class RepairSuite extends munit.FunSuite:
   test("Repair.search: timeouts"):
     // The time runs out at the log message starting with `message`, as a slow step there would make it.
     def outOfTimeAt(message: String, timeout: FiniteDuration = 1.second): Context =
-      val started = System.nanoTime()
+      var ctx: Context = null
       val logger = new Context.Logger:
-        def apply(log: String): Unit =
-          if log.startsWith(message) then while System.nanoTime() - started <= timeout.toNanos do ()
-      Context(timeout, logger = Some(logger))
+        def apply(log: String): Unit = if log.startsWith(message) then while !ctx.isInterrupted() do ()
+      ctx = Context(timeout, logger = Some(logger))
+      ctx
 
     // The second round has no time, so the result is of the first one, which is equivalent as its edit is.
     // It is still vulnerable.
