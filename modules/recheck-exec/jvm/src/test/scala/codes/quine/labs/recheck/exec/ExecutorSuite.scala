@@ -212,7 +212,10 @@ class ExecutorSuite extends munit.FunSuite:
 
   test("Executor#exec: the compilation does not count toward the timeout"):
     val program = SourceFile("RecheckTest.sh", s"#!/bin/sh\necho \"$$(cat)\" # ${System.nanoTime()}\n")
-    withScript("my compiler", "#!/bin/sh\nsleep 1\n" + fakeCompiler.stripPrefix("#!/bin/sh\n")): compiler =>
+    withScript(
+      "my compiler",
+      "#!/bin/sh\n[ \"$1\" = --version ] || sleep 1\n" + fakeCompiler.stripPrefix("#!/bin/sh\n")
+    ): compiler =>
       val line = s"'$compiler'"
       try
         val result = ICUExecutor(program).exec("input", None, Duration.Inf, "start", Map("RECHECK_ICU" -> line))(using
