@@ -33,7 +33,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         if isUpperBound then EpsNFABuilder.buildSimplified(ir, false, Int.MaxValue).orderedNFA
         else
           EpsNFABuilder
-            .build(ir, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
+            .build(ir, Set.empty, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
             .toOrderedNFA(false, Int.MaxValue, Int.MaxValue)
             .rename
       result <- Try(
@@ -107,7 +107,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           2,
-          Witness(Seq((Seq.empty, Seq(a, a))), Seq(a, other1, a, a, a)),
+          Witness(Seq((Seq.empty, Seq(a, a))), Seq(a, a, a)),
           Hotspot(Seq(Spot(2, 4, Hot), Spot(6, 7, Warm), Spot(8, 10, Hot), Spot(12, 13, Cold)))
         )
       )
@@ -135,7 +135,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           2,
-          Witness(Seq((Seq(word.diff(a)), Seq(a, a, other2, a))), Seq.empty),
+          Witness(Seq((Seq(word.diff(a)), Seq(a, a, other2, word.diff(a)))), Seq.empty),
           Hotspot(Seq(Spot(2, 3, Hot), Spot(6, 8, Warm), Spot(10, 14, Hot)))
         )
       )
@@ -171,8 +171,8 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           3,
-          Witness(Seq((Seq(b), Seq(a)), (Seq.empty, Seq(a)), (Seq.empty, Seq(a))), Seq(b, a)),
-          Hotspot(Seq(Spot(2, 3, Hot), Spot(8, 9, Cold), Spot(9, 10, Hot)))
+          Witness(Seq((Seq.empty, Seq(a)), (Seq.empty, Seq(a)), (Seq.empty, Seq(a))), Seq(a)),
+          Hotspot(Seq(Spot(2, 3, Hot), Spot(9, 10, Hot)))
         )
       )
     )
@@ -229,7 +229,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     def degrees(source: String): Seq[Int] =
       val ir = ReDoS.parse(source, "", Dialect.JavaScript)
       val nfa = EpsNFABuilder
-        .build(ir, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
+        .build(ir, Set.empty, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
         .toOrderedNFA(false, Int.MaxValue, Int.MaxValue)
         .rename
       AutomatonChecker.check(nfa, false, Int.MaxValue, Int.MaxValue).map(degree).toSeq
@@ -259,7 +259,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       check("^.*(?<=^(?:a|a)*bc)d", ""),
       Success(
         Exponential(
-          Witness(Seq((Seq(b, a), Seq(a))), Seq(b, c, d)),
+          Witness(Seq((Seq(d, a), Seq(a))), Seq(b, c, d)),
           Hotspot(Seq(Spot(1, 2, Hot), Spot(11, 12, Hot), Spot(13, 14, Hot), Spot(16, 18, Cold)))
         )
       )

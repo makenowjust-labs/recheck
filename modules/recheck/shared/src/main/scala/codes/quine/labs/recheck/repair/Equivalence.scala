@@ -48,6 +48,9 @@ object Equivalence:
   /** The value of a begin or an end of a capture that a path does not set. */
   private[repair] val NotSet = -2
 
+  /** The state of a match that has ended before the end of the input. */
+  private[repair] val Ended = -1
+
   /** ComparedPattern is a pattern compared, as an ordered NFA marking the captures and its look-ahead DFA.
     *
     * `marking` and `lookBehindMarking` are the states of the NFA and of [[OrderedNFA.LookBehind.inner]] from which a
@@ -111,10 +114,16 @@ object Equivalence:
     */
   private[repair] final case class RestClass(a: Set[Int], b: Set[Int], startsWithLow: Boolean)
 
-  /** SideState is where a pattern is: the state of the match, and the states of the inner expressions of the positive
-    * look-aheads that still read the input, from the earliest tried.
+  /** SideState is where a pattern is: the state of the match, or [[Ended]], and the states of the inner expressions of
+    * the positive look-aheads that still read the input, from the earliest tried.
     */
-  private[repair] final case class SideState(state: Int, lookAheads: Vector[Int])
+  private[repair] final case class SideState(state: Int, lookAheads: Vector[Int]):
+
+    /** A state that still reads the input, if any. All of them have the same look-behinds succeeding. */
+    def reading: Option[Int] = if state != Ended then Some(state) else lookAheads.headOption
+
+    /** Tests whether the match succeeds on a rest, from whose class `succeeding` are the states that succeed. */
+    def succeeds(succeeding: Set[Int]): Boolean = state == Ended || succeeding.contains(state)
 
   /** SideCaptures is what a pattern sets on the begins and the ends of the compared captures.
     *
@@ -247,10 +256,12 @@ private final class Equivalence(
 
     private val laterFrom = captures.laterFrom.toArray
 
+    private val main = writers.last
+
     /** Runs the transitions on the character set, where exactly the states satisfying `p` succeed on the rest. */
     def advance(c: CharSet, p: Int => Boolean): (SideState, Vector[Int], Vector[Int]) =
-      val main = writers.last
-      for w <- writers.reverseIterator.toList do follow(w, side.nfa.markedDelta.getOrElse((w.state, c), Branch.Fail), p)
+      for w <- writers.reverseIterator.toList if w.state != Ended do
+        follow(w, side.nfa.markedDelta.getOrElse((w.state, c), Branch.Fail), p)
       // A look-ahead in the state of a later one sets the same values at the same positions before it, and one in a
       // state not marking sets none.
       val seen = mutable.Set.empty[Int]
@@ -259,7 +270,7 @@ private final class Equivalence(
 
     /** Runs the paths at the end of the input, and returns the values. */
     def finish(): Vector[Int] =
-      for w <- writers.reverseIterator.toList do
+      for w <- writers.reverseIterator.toList if w.state != Ended do
         follow(w, side.nfa.markedDeltaAtEnd.getOrElse(w.state, Branch.Fail), Set.empty)
       values.toVector
 
@@ -273,8 +284,9 @@ private final class Equivalence(
         follow(tried, inner)
       setAll(w, side.setMarks(Vector.fill(values.length)(NotSet), path.step.marks, here))
       path.step match
-        case MarkedStep.Next(_, q)           => w.state = q
-        case MarkedStep.End(_)               => remove(w)
+        case MarkedStep.Next(_, q) => w.state = q
+        // The look-aheads tried on the match still read the input after it ends.
+        case MarkedStep.End(_)               => if w eq main then w.state = Ended else remove(w)
         case MarkedStep.LookBehind(_, inner) =>
           captures.lookBehinds.get(inner).foreach(setAll(w, _))
           remove(w)
@@ -298,32 +310,34 @@ private final class Equivalence(
   /** Returns the values that the inner expressions of look-behinds tried after the character set `c` set, from the ones
     * before it.
     *
-    * `before` and `after` are the states of the pattern before and after it, and `label` is the label of the position
-    * after it.
+    * `before` and `after` are where the pattern is before and after it, and `label` is the label of the position after
+    * it. They are needed only while a path reads the input.
     */
   private def advanceLookBehinds(
       side: ComparedPattern,
       lookBehinds: Map[Int, Vector[Int]],
-      before: Int,
-      after: Int,
+      before: SideState,
+      after: SideState,
       c: CharSet,
       label: Int
   ): Map[Int, Vector[Int]] =
-    side.nfa.lookBehind.fold(Map.empty): lb =>
-      val succeeded = lb.successSets(before)
-      lb.successSets(after)
-        .intersect(side.lookBehindMarking)
-        .iterator
-        .flatMap: q =>
-          val path = findSuccessPath(lb.inner.markedDelta.getOrElse((q, c), Branch.Fail), succeeded.contains)
-          val stepValues = lookBehindValues(side, path, label)
-          // The inner expression reads the input backward, so it sets the values before these later.
-          val earlier = path.step match
-            case MarkedStep.Next(_, q0) => lookBehinds.get(q0)
-            case _                      => None
-          val values = earlier.fold(stepValues)(_.zip(stepValues).map((v0, v) => if v0 != NotSet then v0 else v))
-          Option.when(values.exists(_ != NotSet))(q -> values)
-        .toMap
+    (side.nfa.lookBehind, before.reading, after.reading) match
+      case (Some(lb), Some(state0), Some(state1)) =>
+        val succeeded = lb.successSets(state0)
+        lb.successSets(state1)
+          .intersect(side.lookBehindMarking)
+          .iterator
+          .flatMap: q =>
+            val path = findSuccessPath(lb.inner.markedDelta.getOrElse((q, c), Branch.Fail), succeeded.contains)
+            val stepValues = lookBehindValues(side, path, label)
+            // The inner expression reads the input backward, so it sets the values before these later.
+            val earlier = path.step match
+              case MarkedStep.Next(_, q0) => lookBehinds.get(q0)
+              case _                      => None
+            val values = earlier.fold(stepValues)(_.zip(stepValues).map((v0, v) => if v0 != NotSet then v0 else v))
+            Option.when(values.exists(_ != NotSet))(q -> values)
+          .toMap
+      case _ => Map.empty
 
   /** Returns the values that the inner expressions of look-behinds tried at the begin of the input set. */
   private def initialLookBehinds(side: ComparedPattern, init: Int, label: Int): Map[Int, Vector[Int]] =
@@ -362,7 +376,7 @@ private final class Equivalence(
     val label = captures.labelCount + 1
     def advance(side: ComparedPattern, at: SideState, sideCaptures: SideCaptures, c: CharSet, p: Set[Int]) =
       val (at1, values, laterFrom) = Writers(side, at, sideCaptures, here).advance(c, p.contains)
-      val lookBehinds = advanceLookBehinds(side, sideCaptures.lookBehinds, at.state, at1.state, c, label)
+      val lookBehinds = advanceLookBehinds(side, sideCaptures.lookBehinds, at, at1, c, label)
       (at1, SideCaptures(values, laterFrom, lookBehinds))
     val (a, capturesA) = advance(sideA, node.a, captures.a, atom.a, rest1.a)
     val (b, capturesB) = advance(sideB, node.b, captures.b, atom.b, rest1.b)
@@ -420,7 +434,7 @@ private final class Equivalence(
           val g = distance(node)
           // The node may be pushed again by a shorter prefix.
           if f == g + shortest(rest)._1 then
-            val (succeedsA, succeedsB) = (rest.a.contains(a.state), rest.b.contains(b.state))
+            val (succeedsA, succeedsB) = (a.succeeds(rest.a), b.succeeds(rest.b))
             if succeedsA != succeedsB then break(Some(prefixOf(node) ++ restOf(rest)))
             if succeedsA then
               if rest == end && differsAtEnd(node) then break(Some(prefixOf(node)))

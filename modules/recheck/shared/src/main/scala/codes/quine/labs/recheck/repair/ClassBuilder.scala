@@ -58,10 +58,10 @@ private[repair] object ClassBuilder:
     else if c == '-' then ClassItemData.ClassBackslashValue(BackslashKind.Unknown(c))
     else if escaped.contains(c.toChar) && c < 0x80 then escape(EscapeStyle.Single(c.toChar))
     else if c < 0x80 || mode == UnitMode.Byte then escape(EscapeStyle.Hex2)
-    else if features.hasBackslashXBracket then escape(EscapeStyle.HexBracket)
-    else if features.hasBackslashUnicodeBracket then escape(EscapeStyle.UnicodeBracket)
-    else if c <= 0xffff && features.hasBackslashUnicodeHex then escape(EscapeStyle.UnicodeHex4)
-    else if features.hasBackslashUnicodeHex8 then escape(EscapeStyle.UnicodeHex8)
+    else if features.escape.hasBackslashXBracket then escape(EscapeStyle.HexBracket)
+    else if features.escape.hasBackslashUnicodeBracket then escape(EscapeStyle.UnicodeBracket)
+    else if c <= 0xffff && features.escape.hasBackslashUnicodeHex then escape(EscapeStyle.UnicodeHex4)
+    else if features.escape.hasBackslashUnicodeHex8 then escape(EscapeStyle.UnicodeHex8)
     // Every dialect has an escape for the units of its modes.
     // $COVERAGE-OFF$
     else throw new IllegalStateException(f"no escape for U+$c%04X")

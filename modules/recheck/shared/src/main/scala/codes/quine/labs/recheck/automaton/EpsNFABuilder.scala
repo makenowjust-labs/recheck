@@ -262,7 +262,7 @@ private class EpsNFABuilder(
 
   /** Returns the ε-transition of a choice, which tries every alternative in the pattern of a longest match. */
   private def choice(qs: Seq[Int]): Transition[Int] =
-    if longestMatch && !isInLookAround then LongestEps(qs) else Eps(qs)
+    if longestMatch && !isInNegativeLookAround && !isInPositiveLookAround then LongestEps(qs) else Eps(qs)
 
   /** Builds an ε-NFA for a choice of the alternatives in the order. */
   private def buildChoice(alternatives: Seq[() => (Int, Int)]): (Int, Int) =

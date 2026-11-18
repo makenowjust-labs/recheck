@@ -624,6 +624,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     val notEmpty = ReDoS.parse("(*NOTEMPTY)a|", "", Dialect.PCRE).copy(longestMatch = true)
     val notEmptyNFA = EpsNFABuilder.build(
       notEmpty,
+      Set.empty,
       maxBackReferenceStrings = Parameters.DefaultMaxBackReferenceStrings,
       maxNFASize = Int.MaxValue
     )

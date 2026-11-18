@@ -292,11 +292,11 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
     if q.strategy != BacktrackStrategy.Greedy then None
     else
       val hasPossessive = q match
-        case Quantifier.Star(_) | Quantifier.Plus(_) => features.hasPossessiveBacktrackStrategy
-        case _                                       => features.hasPossessiveCurlyBacktrackStrategy
+        case Quantifier.Star(_) | Quantifier.Plus(_) => features.quantifier.hasPossessiveBacktrackStrategy
+        case _                                       => features.quantifier.hasPossessiveCurlyBacktrackStrategy
       if hasPossessive then
         Some(Candidate(edit(n -> Seq(repeat(child, withStrategy(q, BacktrackStrategy.Possessive))))))
-      else if features.hasAtomicGroup then
+      else if features.group.hasAtomicGroup then
         Some(Candidate(edit(n -> Seq(Node(NodeData.Group(GroupKind.Atomic(AssertNameStyle.Symbolic), n))))))
       // A repetition of an atom followed by a negative look-ahead of it reads the most, as a possessive one does.
       else
@@ -817,7 +817,7 @@ private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features:
         // The restarts of the search make `P` hot too.
         if ir.needsSigmaStarAtBegin && (repeated +: prefix).exists(n => hot(n.loc))
         if q.strategy != BacktrackStrategy.Possessive
-        cut = prefix.nonEmpty && features.hasBackslashCut
+        cut = prefix.nonEmpty && features.escape.hasBackslashCut
         if prefix.isEmpty || cut || !kept.contains(0)
         if prefix.isEmpty || endsFirst(sequence(prefix), word)
       yield (prefix, body, cut)

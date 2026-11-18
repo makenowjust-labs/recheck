@@ -11,6 +11,7 @@ import codes.quine.labs.recheck.common.TimeoutException
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
+import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.Node
@@ -358,11 +359,11 @@ private[recheck] object Repair:
       * `None` if the checker does not support it.
       */
     def of(ir: IRPattern, params: Parameters)(using ctx: Context): Option[Score] =
-      val avoidsAttack = (_: AttackComplexity.Vulnerable, _: Hotspot) => false
+      val avoidsAttack = (_: AttackComplexity.Vulnerable, _: AttackPattern, _: Hotspot) => false
       val (diagnostics, safe, _) = params.checker match
-        case Checker.Automaton => ReDoS.checkAutomaton("", "", ir, params)
-        case Checker.Fuzz      => ReDoS.checkFuzz("", "", ir, params, avoidsAttack)
-        case Checker.Auto      => ReDoS.checkAuto("", "", ir, params, avoidsAttack)
+        case Checker.Automaton => ReDoS.checkAutomaton("", "", ir, params, mutable.ArrayBuffer.empty)
+        case Checker.Fuzz      => ReDoS.checkFuzz("", "", ir, params, avoidsAttack, Seq.empty)
+        case Checker.Auto      => ReDoS.checkAuto("", "", ir, params, avoidsAttack, mutable.ArrayBuffer.empty)
       try
         diagnostics.nextOption() match
           case None        => Some(Score(Int.MaxValue, 0, Set.empty, safe().complexity))
