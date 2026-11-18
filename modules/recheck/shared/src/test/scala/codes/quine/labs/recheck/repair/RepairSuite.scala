@@ -51,6 +51,11 @@ class RepairSuite extends munit.FunSuite:
     assertEquals(search("^(a+)+$"), repaired("^(a+)$"))
     assertEquals(search("^(?:a+)+$", Dialect.Java), repaired("^a+$", Dialect.Java))
 
+  test("Repair.search: longest matches"):
+    val regex = Dialect.PythonRegex()
+    assertEquals(search("(?p)^(a+)+$", regex), repaired("(?p)^(a+)$", regex))
+    assertEquals(search("(?p)^(a|a)*$", regex), repaired("(?p)^(a)*$", regex))
+
   test("Repair.search: alternatives"):
     assertEquals(search("^(?:a|a)*$"), repaired("^a*$"))
     assertEquals(search("^(?:\\w|\\d)+$"), repaired("^(?:\\w)+$"))

@@ -129,6 +129,7 @@ final case class EpsNFA[Q](
 
       (if innerStateSet.contains(q) then innerTau.get(q) else tau.get(q)) match
         case Some(Eps(qs))                       => newTau(r) = Eps(qs.map(same))
+        case Some(LongestEps(qs))                => newTau(r) = LongestEps(qs.map(same))
         case Some(Assert(kind, q1))              => newTau(r) = Assert(kind, same(q1))
         case Some(Consume(chs, q1, loc))         => newTau(r) = Consume(chs, fresh(q1), loc)
         case Some(LoopEnter(loop, q1))           => newTau(r) = LoopEnter(loop, same(q1))

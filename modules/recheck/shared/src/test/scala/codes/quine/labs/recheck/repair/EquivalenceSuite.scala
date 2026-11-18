@@ -182,6 +182,16 @@ class EquivalenceSuite extends munit.FunSuite:
     assertEquals(counterexample(Pattern("(?>a+)b", perl), Pattern("a+b", perl), Seq((0, 0))), None)
     assertEquals(counterexample(Pattern("(?>a*)a", perl), Pattern("a+", perl), Seq.empty), Some("a"))
 
+  test("Equivalence.findCounterexample: longest matches"):
+    val regex = Dialect.PythonRegex()
+    def longest(source: String): Pattern = Pattern(s"(?p)$source", regex)
+    assertEquals(counterexample(longest("(a|ab)"), longest("(ab|a)"), Seq((0, 0), (1, 1))), None)
+    assertEquals(counterexample(Pattern("(a|ab)", regex), longest("(a|ab)"), Seq((0, 0))), Some("ab"))
+    // A longer match than the first one ends later, and a track trying one fails after it.
+    assertEquals(counterexample(longest("a|abc"), Pattern("a(?:bc)?", regex), Seq((0, 0))), None)
+    // The first of the longest matches makes the captures.
+    assertEquals(counterexample(longest("(a|ab)(c|bcd)(d*)"), longest("(ab|a)(c|bcd)(d*)"), Seq((1, 1))), Some("abcd"))
+
   test("Equivalence.findCounterexample: too large"):
     // Perl keeps the captures over the iterations, so a node may have any of them set.
     val ir = ReDoS.parse("^(?:(a)|(b)|(c)|(d)|(e)|(f)|(g)|(h))*$", "", Dialect.Perl())

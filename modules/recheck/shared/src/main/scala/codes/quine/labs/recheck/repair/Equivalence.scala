@@ -25,9 +25,10 @@ object Equivalence:
   /** Finds the shortest input on which the patterns differ, if any.
     *
     * They differ when one of them matches and the other does not, or when a pair of `captures` differs in the match,
-    * where a pair has the capture indices of `a` and `b`, and `(0, 0)` is the whole match. A capture is the last one
-    * set on the path of the match, or unset. The back-references are expanded as [[EpsNFABuilder.build]] does with
-    * `maxBackReferenceStrings`.
+    * where a pair has the capture indices of `a` and `b`, and `(0, 0)` is the whole match. The match is the first one
+    * in the order of the backtracking, or the first of the longest ones for a longest-match pattern, as the interpreter
+    * finds. A capture is the last one set on the path of the match, or unset. The back-references are expanded as
+    * [[EpsNFABuilder.build]] does with `maxBackReferenceStrings`.
     */
   def findCounterexample(
       a: IRPattern,
@@ -65,7 +66,7 @@ object Equivalence:
       lookBehindMarking: Set[Int]
   ):
 
-    /** The begins of the captures by the indices, as the indices of the values (see [[SideCaptures]]). */
+    /** The begins of the captures by the indices, as the indices of the values (see [[Track]]). */
     val beginsOf: Map[Int, Seq[Int]] = captures.zipWithIndex.groupMap(_._1)(2 * _._2)
 
     /** The ends of the captures by the indices, as the indices of the values. */
@@ -114,80 +115,96 @@ object Equivalence:
     */
   private[repair] final case class RestClass(a: Set[Int], b: Set[Int], startsWithLow: Boolean)
 
-  /** SideState is where a pattern is: the state of the match, or [[Ended]], and the states of the inner expressions of
-    * the positive look-aheads that still read the input, from the earliest tried.
-    */
-  private[repair] final case class SideState(state: Int, lookAheads: Vector[Int]):
-
-    /** A state that still reads the input, if any. All of them have the same look-behinds succeeding. */
-    def reading: Option[Int] = if state != Ended then Some(state) else lookAheads.headOption
-
-    /** Tests whether the match succeeds on a rest, from whose class `succeeding` are the states that succeed. */
-    def succeeds(succeeding: Set[Int]): Boolean = state == Ended || succeeding.contains(state)
-
-  /** SideCaptures is what a pattern sets on the begins and the ends of the compared captures.
+  /** Track is a path of the match: its state, or [[Ended]], the states of the inner expressions of the positive
+    * look-aheads tried on it that still read the input, from the earliest tried, and what they set on the begins and
+    * the ends of the compared captures.
     *
     * A value is [[Unset]] or the label of a position, which is common to the patterns. A positive look-ahead sets its
     * captures when it is tried, but the search sees them at their positions later. So `laterFrom` tells the paths that
-    * set each value later than it was set: the paths in [[SideState]], and then the match, from that index.
+    * set each value later than it was set: the look-aheads, and then the match, from that index.
+    */
+  private[repair] final case class Track(
+      state: Int,
+      lookAheads: Vector[Int],
+      values: Vector[Int],
+      laterFrom: Vector[Int]
+  )
+
+  /** SideState is where a pattern is: the tracks of the match that still read the input in the order of the
+    * backtracking, and the match that has ended, if any.
+    *
+    * A pattern takes the first path that succeeds, so it has one track. A longest-match pattern tries every one, so a
+    * track ending later makes the match then.
     *
     * `lookBehinds` are the values that the inner expression of a look-behind tried here sets, as [[NotSet]] unless it
     * does, by the initial states of [[OrderedNFA.LookBehind.inner]].
     */
-  private[repair] final case class SideCaptures(
-      values: Vector[Int],
-      laterFrom: Vector[Int],
+  private[repair] final case class SideState(
+      tracks: Vector[Track],
+      matched: Option[Track],
       lookBehinds: Map[Int, Vector[Int]]
-  )
+  ):
 
-  /** CaptureState is what the patterns set on the compared captures, and the label of the position if a value has it.
-    */
-  private[repair] final case class CaptureState(a: SideCaptures, b: SideCaptures, position: Option[Int]):
+    /** A state that still reads the input, if any. All of them have the same look-behinds succeeding. */
+    def reading: Option[Int] =
+      (tracks.iterator.flatMap(t => t.state +: t.lookAheads) ++ matched.iterator.flatMap(_.lookAheads)).nextOption()
 
-    /** The number of the labels, which are from zero. */
-    def labelCount: Int =
-      val all = Iterator(a, b).flatMap(side => side.values.iterator ++ side.lookBehinds.valuesIterator.flatten)
-      all.filter(_ >= 0).maxOption.fold(0)(_ + 1)
-
-    /** Renames the labels in the order of their appearance, so equal states are equal. */
-    def canonical: CaptureState =
-      val renamed = mutable.Map.empty[Int, Int]
-      def rename(v: Int): Int = if v < 0 then v else renamed.getOrElseUpdate(v, renamed.size)
-      def renameLookBehinds(lookBehinds: Map[Int, Vector[Int]]): Map[Int, Vector[Int]] =
-        lookBehinds.toSeq.sortBy(_._1).map((q, vs) => q -> vs.map(rename)).toMap
-      val (valuesA, valuesB) = (a.values.map(rename), b.values.map(rename))
-      val (lookBehindsA, lookBehindsB) = (renameLookBehinds(a.lookBehinds), renameLookBehinds(b.lookBehinds))
-      CaptureState(
-        SideCaptures(valuesA, a.laterFrom, lookBehindsA),
-        SideCaptures(valuesB, b.laterFrom, lookBehindsB),
-        position.flatMap(renamed.get)
-      )
+    /** Tests whether the pattern matches on a rest, from whose class `succeeding` are the states that succeed. */
+    def succeeds(succeeding: Set[Int]): Boolean = matched.nonEmpty || tracks.exists(t => succeeding.contains(t.state))
 
   /** SearchNode is a position on the paths of the matches, with the class of the rest of the input, whether the prefix
-    * ends with a high surrogate, and the captures.
+    * ends with a high surrogate, and the label of the position if a value has it.
     */
   private[repair] final case class SearchNode(
       a: SideState,
       b: SideState,
       rest: RestClass,
       endsWithHigh: Boolean,
-      captures: CaptureState
-  )
+      position: Option[Int]
+  ):
+
+    /** The number of the labels, which are from zero. */
+    def labelCount: Int =
+      def values(side: SideState): Iterator[Int] =
+        (side.tracks.iterator ++ side.matched).flatMap(_.values) ++ side.lookBehinds.valuesIterator.flatten
+      (values(a) ++ values(b)).filter(_ >= 0).maxOption.fold(0)(_ + 1)
+
+    /** Renames the labels in the order of their appearance, so equal nodes are equal. */
+    def canonical: SearchNode =
+      val renamed = mutable.Map.empty[Int, Int]
+      def rename(v: Int): Int = if v < 0 then v else renamed.getOrElseUpdate(v, renamed.size)
+      def renameTrack(t: Track): Track = t.copy(values = t.values.map(rename))
+      def renameSide(side: SideState): SideState =
+        val tracks = side.tracks.map(renameTrack)
+        val matched = side.matched.map(renameTrack)
+        val lookBehinds = side.lookBehinds.toSeq.sortBy(_._1).map((q, vs) => q -> vs.map(rename)).toMap
+        SideState(tracks, matched, lookBehinds)
+      val a1 = renameSide(a)
+      val b1 = renameSide(b)
+      SearchNode(a1, b1, rest, endsWithHigh, position.flatMap(renamed.get))
 
   /** Path is the path of a branch that a backtracking matcher succeeds by: the paths of the inner expressions of the
     * positive look-aheads on the way, and the step at its end.
     */
   private[repair] final case class Path(inners: Seq[Path], step: MarkedStep[Int])
 
-  /** Finds the path of the branch, when exactly the states satisfying `p` succeed. */
-  private[repair] def findPath(b: Branch[MarkedStep[Int]], p: Int => Boolean): Option[Path] = b match
-    case Branch.Leaf(step)                       => Option.when(step.succeeds(p))(Path(Vector.empty, step))
-    case Branch.Choice(bs)                       => bs.iterator.flatMap(findPath(_, p)).nextOption()
+  /** Finds the paths of the branch that succeed in the order of the backtracking, when exactly the states satisfying
+    * `p` succeed.
+    *
+    * A choice takes the first branch that succeeds, but a longest choice takes every one, as a longest match tries them
+    * all.
+    */
+  private[repair] def findPaths(b: Branch[MarkedStep[Int]], p: Int => Boolean): Seq[Path] = b match
+    case Branch.Leaf(step)        => if step.succeeds(p) then Seq(Path(Vector.empty, step)) else Seq.empty
+    case Branch.Choice(bs)        => bs.iterator.map(findPaths(_, p)).find(_.nonEmpty).getOrElse(Seq.empty)
+    case Branch.LongestChoice(bs) => bs.flatMap(findPaths(_, p))
     case Branch.LookAhead(negative, inner, cont) =>
-      if negative then (if inner.succeeds(_.succeeds(p)) then None else findPath(cont, p))
-      else for i <- findPath(inner, p); c <- findPath(cont, p) yield c.copy(inners = i +: c.inners)
+      if negative then (if inner.succeeds(_.succeeds(p)) then Seq.empty else findPaths(cont, p))
+      else
+        findPaths(inner, p).headOption.fold(Seq.empty): i =>
+          findPaths(cont, p).map(c => c.copy(inners = i +: c.inners))
     case Branch.AtomicChoice(alternatives, last) =>
-      findPath(alternatives.find(_._1.succeeds(_.succeeds(p))).fold(last)(_._2), p)
+      findPaths(alternatives.find(_._1.succeeds(_.succeeds(p))).fold(last)(_._2), p)
     // The marked transitions have leaves for the successes.
     // $COVERAGE-OFF$
     case Branch.Succeed => throw new IllegalStateException("Succeed in a marked transition")
@@ -240,42 +257,47 @@ private final class Equivalence(
   private def restOf(rest: RestClass): UString =
     UString.from(Iterator.unfold(rest)(r => shortest(r)._2.map((atom, r1) => (atom.set.representative, r1))))
 
-  /** Writers runs the paths of a pattern at a position, which set the captures: the inner expressions of the positive
+  /** Writers runs the paths of a track at a position, which set the captures: the inner expressions of the positive
     * look-aheads tried before, and the match. They are in the order of the times when they set the captures, where a
     * path tried by another comes just before it.
     *
     * `here` is the label of the position.
     */
-  private final class Writers(side: ComparedPattern, at: SideState, captures: SideCaptures, here: Int):
+  private final class Writers(side: ComparedPattern, track: Track, lookBehinds: Map[Int, Vector[Int]], here: Int):
 
     private final class Writer(var state: Int)
 
-    private val writers = mutable.ArrayBuffer.from(at.lookAheads.map(Writer(_)) :+ Writer(at.state))
+    private val writers = mutable.ArrayBuffer.from(track.lookAheads.map(Writer(_)) :+ Writer(track.state))
 
-    private val values = captures.values.toArray
+    private val values = track.values.toArray
 
-    private val laterFrom = captures.laterFrom.toArray
+    private val laterFrom = track.laterFrom.toArray
 
     private val main = writers.last
 
-    /** Runs the transitions on the character set, where exactly the states satisfying `p` succeed on the rest. */
-    def advance(c: CharSet, p: Int => Boolean): (SideState, Vector[Int], Vector[Int]) =
-      for w <- writers.reverseIterator.toList if w.state != Ended do
-        follow(w, side.nfa.markedDelta.getOrElse((w.state, c), Branch.Fail), p)
+    /** Runs the transitions on the character set, where the match takes `path` unless it has ended, and exactly the
+      * states satisfying `p` succeed on the rest.
+      */
+    def advance(path: Option[Path], c: CharSet, p: Int => Boolean): Track =
+      val lookAheads = writers.init.toList
+      path.foreach(follow(main, _))
+      for w <- lookAheads.reverse do
+        follow(w, findSuccessPath(side.nfa.markedDelta.getOrElse((w.state, c), Branch.Fail), p))
       // A look-ahead in the state of a later one sets the same values at the same positions before it, and one in a
       // state not marking sets none.
       val seen = mutable.Set.empty[Int]
       for w <- writers.init.reverseIterator.toList if !side.marking.contains(w.state) || !seen.add(w.state) do remove(w)
-      (SideState(main.state, writers.init.map(_.state).toVector), values.toVector, laterFrom.toVector)
+      Track(main.state, writers.init.map(_.state).toVector, values.toVector, laterFrom.toVector)
 
-    /** Runs the paths at the end of the input, and returns the values. */
-    def finish(): Vector[Int] =
-      for w <- writers.reverseIterator.toList if w.state != Ended do
-        follow(w, side.nfa.markedDeltaAtEnd.getOrElse(w.state, Branch.Fail), Set.empty)
+    /** Runs the paths at the end of the input, where the match takes `path` unless it has ended, and returns the
+      * values.
+      */
+    def finish(path: Option[Path]): Vector[Int] =
+      val lookAheads = writers.init.toList
+      path.foreach(follow(main, _))
+      for w <- lookAheads.reverse do
+        follow(w, findSuccessPath(side.nfa.markedDeltaAtEnd.getOrElse(w.state, Branch.Fail), Set.empty))
       values.toVector
-
-    private def follow(w: Writer, b: Branch[MarkedStep[Int]], p: Int => Boolean): Unit =
-      follow(w, findSuccessPath(b, p))
 
     private def follow(w: Writer, path: Path): Unit =
       for inner <- path.inners do
@@ -288,7 +310,7 @@ private final class Equivalence(
         // The look-aheads tried on the match still read the input after it ends.
         case MarkedStep.End(_)               => if w eq main then w.state = Ended else remove(w)
         case MarkedStep.LookBehind(_, inner) =>
-          captures.lookBehinds.get(inner).foreach(setAll(w, _))
+          lookBehinds.get(inner).foreach(setAll(w, _))
           remove(w)
 
     /** Sets the values other than [[NotSet]] by the path, if it sets them later than they were set. */
@@ -306,6 +328,27 @@ private final class Equivalence(
       val k = writers.indexOf(w)
       writers.remove(k)
       for s <- laterFrom.indices if k < laterFrom(s) do laterFrom(s) -= 1
+
+  /** Returns where the pattern is after the character set `c`, where exactly the states in `p` succeed on the rest, and
+    * `here` and `label` are the labels of the positions before and after it.
+    */
+  private def advance(side: ComparedPattern, at: SideState, c: CharSet, p: Set[Int], here: Int, label: Int): SideState =
+    val tracks = Vector.newBuilder[Track]
+    val seen = mutable.Set.empty[Int]
+    var endedHere = Option.empty[Track]
+    for
+      track <- at.tracks
+      path <- findPaths(side.nfa.markedDelta.getOrElse((track.state, c), Branch.Fail), p.contains)
+    do
+      val next = Writers(side, track, at.lookBehinds, here).advance(Some(path), c, p.contains)
+      // The first track ending here is longer than the match before.
+      if next.state == Ended then endedHere = endedHere.orElse(Some(next))
+      // A later track in the same state never makes the match, since an earlier one does first on the same rest.
+      else if seen.add(next.state) then tracks += next
+    val matched =
+      endedHere.orElse(at.matched.map(m => Writers(side, m, at.lookBehinds, here).advance(None, c, p.contains)))
+    val at1 = SideState(tracks.result(), matched, Map.empty)
+    at1.copy(lookBehinds = advanceLookBehinds(side, at.lookBehinds, at, at1, c, label))
 
   /** Returns the values that the inner expressions of look-behinds tried after the character set `c` set, from the ones
     * before it.
@@ -360,9 +403,9 @@ private final class Equivalence(
     def marksOf(path: Path): Seq[CaptureMark] = path.inners.flatMap(marksOf) ++ path.step.marks
     side.setMarks(Vector.fill(2 * side.captures.size)(NotSet), marksOf(path), label)
 
-  /** Finds the path of a branch from a state that succeeds. */
+  /** Finds the first path of a branch from a state that succeeds. */
   private def findSuccessPath(b: Branch[MarkedStep[Int]], p: Int => Boolean): Path =
-    findPath(b, p) match
+    findPaths(b, p).headOption match
       case Some(path) => path
       // The look-ahead DFA tells a success from the state only when the branch of the transition succeeds.
       // $COVERAGE-OFF$
@@ -371,21 +414,27 @@ private final class Equivalence(
 
   /** Returns the node after the atom, where the rest after it is of the class `rest1`. */
   private def next(node: SearchNode, atom: SharedAtom, rest1: RestClass): SearchNode =
-    val captures = node.captures
-    val here = captures.position.getOrElse(captures.labelCount)
-    val label = captures.labelCount + 1
-    def advance(side: ComparedPattern, at: SideState, sideCaptures: SideCaptures, c: CharSet, p: Set[Int]) =
-      val (at1, values, laterFrom) = Writers(side, at, sideCaptures, here).advance(c, p.contains)
-      val lookBehinds = advanceLookBehinds(side, sideCaptures.lookBehinds, at, at1, c, label)
-      (at1, SideCaptures(values, laterFrom, lookBehinds))
-    val (a, capturesA) = advance(sideA, node.a, captures.a, atom.a, rest1.a)
-    val (b, capturesB) = advance(sideB, node.b, captures.b, atom.b, rest1.b)
-    SearchNode(a, b, rest1, atom.high, CaptureState(capturesA, capturesB, Some(label)).canonical)
+    val here = node.position.getOrElse(node.labelCount)
+    val label = node.labelCount + 1
+    val a = advance(sideA, node.a, atom.a, rest1.a, here, label)
+    val b = advance(sideB, node.b, atom.b, rest1.b, here, label)
+    SearchNode(a, b, rest1, atom.high, Some(label)).canonical
+
+  /** Returns the values of the match at the end of the input, if it matches: of the first track ending there, or else
+    * of the match that has ended before.
+    */
+  private def valuesAtEnd(side: ComparedPattern, at: SideState, here: Int): Option[Vector[Int]] =
+    at.tracks.iterator
+      .flatMap: track =>
+        findPaths(side.nfa.markedDeltaAtEnd.getOrElse(track.state, Branch.Fail), Set.empty).headOption.map: path =>
+          Writers(side, track, at.lookBehinds, here).finish(Some(path))
+      .nextOption()
+      .orElse(at.matched.map(Writers(side, _, at.lookBehinds, here).finish(None)))
 
   /** Tests whether the captures differ at the end of the input. */
   private def differsAtEnd(node: SearchNode): Boolean =
-    val here = node.captures.position.getOrElse(node.captures.labelCount)
-    Writers(sideA, node.a, node.captures.a, here).finish() != Writers(sideB, node.b, node.captures.b, here).finish()
+    val here = node.position.getOrElse(node.labelCount)
+    valuesAtEnd(sideA, node.a, here) != valuesAtEnd(sideB, node.b, here)
 
   /** Finds the shortest input on which the patterns differ, by A* search over the nodes whose estimate is the shortest
     * rest of the class.
@@ -400,10 +449,10 @@ private final class Equivalence(
       case Seq(q) => q
       case qs     => throw new IllegalStateException(s"ordered NFA with ${qs.size} initial states")
     // $COVERAGE-ON$
-    def initialSide(side: ComparedPattern, init: Int): SideCaptures =
+    def initialSide(side: ComparedPattern, init: Int): SideState =
       val size = 2 * side.captures.size
-      SideCaptures(Vector.fill(size)(Unset), Vector.fill(size)(0), initialLookBehinds(side, init, 0))
-    val initial = CaptureState(initialSide(sideA, initA), initialSide(sideB, initB), Some(0)).canonical
+      val track = Track(init, Vector.empty, Vector.fill(size)(Unset), Vector.fill(size)(0))
+      SideState(Vector(track), None, initialLookBehinds(side, init, 0))
 
     val distance = mutable.Map.empty[SearchNode, Int]
     val parent = mutable.Map.empty[SearchNode, (SearchNode, SharedAtom)]
@@ -423,8 +472,8 @@ private final class Equivalence(
         Iterator.unfold(node)(n => parent.get(n).map((n1, atom) => (atom.set.representative, n1))).toSeq.reverse
       )
 
-    for rest <- shortest.keys do
-      push(SearchNode(SideState(initA, Vector.empty), SideState(initB, Vector.empty), rest, false, initial), 0, None)
+    val (a0, b0) = (initialSide(sideA, initA), initialSide(sideB, initB))
+    for rest <- shortest.keys do push(SearchNode(a0, b0, rest, false, Some(0)).canonical, 0, None)
 
     boundary:
       while queue.nonEmpty do
