@@ -25,7 +25,7 @@ import codes.quine.labs.recheck.fuzz.FuzzProgram
 import codes.quine.labs.recheck.parameters.AttackStringCharacteristics
 import codes.quine.labs.recheck.parameters.Checker
 import codes.quine.labs.recheck.parameters.Parameters
-import codes.quine.labs.recheck.verification.RuntimeAttackVerifier
+import codes.quine.labs.recheck.verification.RuntimeAttackExecutor
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException
 import codes.quine.labs.resyntax.ast.Node
@@ -472,5 +472,5 @@ object ReDoS:
       d: Diagnostics.Vulnerable
   )(using ctx: Context): Diagnostics.Vulnerable =
     val runtimeAttack =
-      RuntimeAttackVerifier.verify(source, flags, dialect, mode, d.attack, timeout, compileTimeout, sys.env)
+      RuntimeAttackExecutor.execute(source, flags, dialect, mode, d.attack, timeout, compileTimeout, sys.env)
     d.copy(runtimeAttack = runtimeAttack)

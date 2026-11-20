@@ -153,7 +153,7 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
       |  val ir = parse(source, flags, dialect)
       |  time("seed")(StaticSeeder.seed(ir, maxSimpleRepeatSize, maxNFASize, maxInitialGenerationSize, limit))
       |
-      |def verify(
+      |def execute(
       |    source: String,
       |    flags: String,
       |    attack: AttackPattern,
@@ -161,7 +161,10 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
       |    dialect: Dialect = Dialect.JavaScript
       |)(using ctx: Context): Option[RuntimeAttack] =
       |  val ir = parse(source, flags, dialect)
-      |  time("verify")(RuntimeAttackVerifier.verify(source, flags, dialect, ir.mode, attack, timeout, sys.env))
+      |  val compileTimeout = Parameters.DefaultRuntimeAttackCompileTimeout
+      |  time("execute")(
+      |    RuntimeAttackExecutor.execute(source, flags, dialect, ir.mode, attack, timeout, compileTimeout, sys.env)
+      |  )
       |
       |""".stripMargin + ParametersGen.consoleCheck((ThisBuild / baseDirectory).value),
     // Dependencies:
