@@ -400,7 +400,7 @@ class ReDoSSuite extends munit.FunSuite:
 
   test("ReDoS.check: longest match"):
     // python-regex's `p` tries every path at the start position, which doubles for each `a` even on a match (3.0 s at
-    // n = 24 with regex 2026.11.15), and the first match of the others is instant.
+    // n = 24 with regex 2026.11.18), and the first match of the others is instant.
     assertVulnerable(
       check("(a|a)*", PythonRegex(), "p", Checker.Fuzz),
       AttackComplexity.Exponential(true),

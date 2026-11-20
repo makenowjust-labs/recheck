@@ -644,7 +644,7 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   // JavaScript without `u` reads `\x` without two hexadecimal digits as `x` (Annex B).
   check("\\x1", "", JavaScript)(Sequence(Backslash(Unknown('x')), Literal('1')))
 
-  // python-regex's `\g<...>`, `\N{...}` and `\p{...}` are the letters when they are broken (regex 2026.11.15).
+  // python-regex's `\g<...>`, `\N{...}` and `\p{...}` are the letters when they are broken (regex 2026.11.18).
   check("\\g<1>", "", PythonRegex())(Backslash(EscapeBackReference(GBackReference(Angle), IndexedReference(1))))
   check("\\g<x>", "", PythonRegex())(Backslash(EscapeBackReference(GBackReference(Angle), NamedReference("x"))))
   checkPrinted("\\g <1 >", "\\g<1>", "x", PythonRegex()):

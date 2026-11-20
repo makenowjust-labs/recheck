@@ -33,7 +33,7 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   // Checked with Python 3.15.2.
   error("#\\", "x", Python())("Invalid backslash escape at 1")
   // The whitespace and the comment ends are checked with .NET 11.0.0, Java 27.0.1, PHP 8.5.12 with PCRE2 10.49,
-  // Perl 5.44.0, Python 3.15.2 and Ruby 4.0.9.
+  // Perl 5.44.0, Python 3.15.2 and Ruby 4.0.10.
   check("a\t\n\f\r b", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby()):
     Sequence(Literal('a'), Blank("\t\n\f\r "), Literal('b'))
   check("a\u000bb", "x", DotNet, Java, PCRE, Perl(), Python())(Sequence(Literal('a'), Blank("\u000b"), Literal('b')))
@@ -279,7 +279,7 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
     val node = Parser.parse("\uD800a", FlagSet.parse("u", JavaScript), JavaScript, UnitMode.UTF16CodePoint)
     assert(node.equalsWithoutLoc(Node(Sequence(Literal(0xd800), Literal('a')))), node)
 
-  // python-regex reads `{,}` as `*`, and repeats the node before inline flags and comments (regex 2026.11.15).
+  // python-regex reads `{,}` as `*`, and repeats the node before inline flags and comments (regex 2026.11.18).
   check("a{,}", "", PythonRegex())(Repeat(Node(Literal('a')), Unbounded(0, Greedy), Some("{,}")))
   // The AST keeps the inline flags after the repeat.
   checkPrinted("a(?i)*", "a*(?i)", "", PythonRegex()):

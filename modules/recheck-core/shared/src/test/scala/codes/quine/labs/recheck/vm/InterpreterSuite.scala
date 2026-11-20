@@ -500,7 +500,7 @@ class InterpreterSuite extends munit.FunSuite:
     check("^(a(?(1)b|c))+$", "acab", Ruby())(NoMatch)
     check("^(a(?(1)b|c))+$", "acac", Ruby())(Seq(g(0, 4), g(2, 4)))
     // Onigmo does not restore the end of an open capture on backtracking in it, and a reference sees the end of a
-    // failed attempt (e.g. this matches `"aba"` in Ruby 4.0.9), which is not reproduced.
+    // failed attempt (e.g. this matches `"aba"` in Ruby 4.0.10), which is not reproduced.
     check("^(a|ab\\1)*$", "aba", Ruby())(NoMatch)
     // Python's `re` sees an open capture as unset when its old end is before its new start (e.g. this matches
     // `"acxacx"` in Python 3.15.2), which is not reproduced.
@@ -988,7 +988,7 @@ class InterpreterSuite extends munit.FunSuite:
     check("^(?:b?(?:|(a))|b?)+", "aaca", JavaScript)(Seq(g(0, 2), g(1, 2)))
 
   test("Interpreter.run: python-regex's empty iterations"):
-    // python-regex's iteration that changes a capture that a back-reference refers to is not empty (regex 2026.11.15).
+    // python-regex's iteration that changes a capture that a back-reference refers to is not empty (regex 2026.11.18).
     val pr = PythonRegex()
     check("^(?:()|a){2}\\1$", "a", pr)(Seq(g(0, 1), g(0, 0)))
     check("^(?:()|a){0,2}\\1$", "a", pr)(Seq(g(0, 1), g(0, 0)))
@@ -1006,7 +1006,7 @@ class InterpreterSuite extends munit.FunSuite:
 
   test("Interpreter.run: python-regex's longest match"):
     // python-regex's `p` takes the longest match at a start position, and the first of the longest ones; a look-ahead
-    // and an atomic group still take their first match (regex 2026.11.15).
+    // and an atomic group still take their first match (regex 2026.11.18).
     val pr = PythonRegex()
     check("(?p)a|ab|abc", "xabcd", pr)(Seq(g(1, 4)))
     check("a|ab|abc", "xabcd", pr)(Seq(g(1, 2)))

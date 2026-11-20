@@ -76,7 +76,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     val model = surrogateInputs.map(s => matches(surrogates, "", Dialect.Python(), s).toString)
     assertEquals(cases(PythonExecutor, script), model)
 
-  // Checked with Ruby 4.0.9.
+  // Checked with Ruby 4.0.10.
   runtimeTest("Ruby: the character set options", "ruby"):
     // The options `a`, `d` and `u` are the inline options, the last of which wins.
     val options = Seq("" -> "", "a" -> "(?a)", "d" -> "(?d)", "u" -> "(?u)", "ua" -> "(?u)(?a)", "au" -> "(?a)(?u)")
@@ -285,7 +285,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
           |""".stripMargin
     assertEquals(cases(PythonExecutor, script), extendedModel(extendedCases, "x", Dialect.Python(), "\\Z"))
 
-  // Checked with Ruby 4.0.9.
+  // Checked with Ruby 4.0.10.
   runtimeTest("Ruby: the extended mode", "ruby"):
     val style = AttackPatternStyle.Ruby(bytes = false)
     val runs = extendedCases.map: (source, subjects) =>
@@ -695,7 +695,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
       dotNetCases.map((source, flags, subject) => s"$flags\n${utf16Hex(source)}\n${utf16Hex(subject)}\n").mkString
     assertEquals(cases(DotNetExecutor(SourceFile("Cases.cs", program)), input), dotNetModel(dotNetCases))
 
-  // Checked with Ruby 4.0.9.
+  // Checked with Ruby 4.0.10.
   runtimeTest("Ruby: back-references in an open capture", "ruby"):
     val style = AttackPatternStyle.Ruby(bytes = false)
     val all = openCaptureCases ++ openCaptureTestCases
@@ -938,7 +938,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
         |${runs.mkString("\n")}
         |""".stripMargin
 
-  // Checked with regex 2026.11.15 on Python 3.15.2.
+  // Checked with regex 2026.11.18 on Python 3.15.2.
   runtimeTest("python-regex: the syntax and the matching", "python3"):
     val script = pythonRegexScript(pythonRegexCases, UnitMode.CodePoint)
     assertEquals(
@@ -951,7 +951,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
       pythonRegexModel(pythonRegexBytesCases, Dialect.PythonRegex(Dialect.Python.Type.Bytes))
     )
 
-  // Checked with regex 2026.11.15 on Python 3.15.2.
+  // Checked with regex 2026.11.18 on Python 3.15.2.
   runtimeTest("python-regex: back-references in an open capture", "python3"):
     // python-regex refers to an open capture only in V1, and matches a look-behind backward.
     val all = openCaptureCases ++ openCaptureBacktrackCases ++ openCaptureLookBehindCases
