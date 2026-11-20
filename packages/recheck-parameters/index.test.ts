@@ -18,7 +18,9 @@ describe("propertiesFor", () => {
       names.filter((name) => name !== "dialect" && name !== "logger"),
     );
     expect(propertiesFor("playground").map(([name]) => name)).toEqual(
-      names.filter((name) => name !== "logger"),
+      names.filter(
+        (name) => name !== "logger" && name !== "runtimeAttackCommand",
+      ),
     );
   });
 

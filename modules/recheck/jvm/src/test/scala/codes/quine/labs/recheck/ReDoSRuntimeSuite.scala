@@ -47,6 +47,14 @@ class ReDoSRuntimeSuite extends munit.FunSuite with RuntimeHelper:
       )
     )
 
+  test("ReDoS.check: the command of the runtime"):
+    // The command line of the dialect runs instead of the runtime, and the one of another dialect does not.
+    val fake = "sh -c 'echo recheck:runtime fake; echo recheck:start; echo recheck:time 0' sh"
+    val commands = Map("javascript" -> fake, "ruby" -> "exit 1;")
+    ReDoS.check("^(a|a)*$", "", params.copy(checker = Checker.Automaton, runtimeAttackCommand = commands)) match
+      case d: Diagnostics.Safe => assertEquals(d.refutedAttacks.map(_.runtimeAttack.runtime), Seq("fake"))
+      case d                   => fail(s"not safe: $d")
+
   runtimeTest("ReDoS.check: Python", "python3"):
     ReDoS.check("^(a|a)*$", "", params.copy(dialect = Dialect.Python())) match
       case d: Diagnostics.Vulnerable =>

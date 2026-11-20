@@ -16,6 +16,9 @@ describe("generateTypescriptType", () => {
     expect(generateTypescriptType(properties["logger"]!)).toBe(
       "(message: string) => void",
     );
+    expect(generateTypescriptType(properties["runtimeAttackCommand"]!)).toBe(
+      '{ [name in Dialect["name"]]?: string }',
+    );
   });
 
   test("lists the values of an enum", () => {

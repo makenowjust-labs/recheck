@@ -1,5 +1,5 @@
 import type { Rule } from "eslint";
-import type { ParametersFor } from "recheck-parameters";
+import type { ParametersFor, Property } from "recheck-parameters";
 
 import { propertiesFor } from "recheck-parameters";
 
@@ -10,11 +10,23 @@ type PropertySchema = Exclude<
   unknown[] | false | undefined
 >;
 
+const schemaOf = (property: Property) => {
+  if (property.enum !== undefined) {
+    return { type: property.type, enum: property.enum };
+  }
+  if (property.properties !== undefined) {
+    return {
+      type: property.type,
+      properties: property.properties,
+      additionalProperties: false,
+    };
+  }
+  return { type: property.type };
+};
+
 export const parameterProperties = Object.fromEntries(
   propertiesFor("eslint-plugin").map(([name, property]) => [
     name,
-    property.enum === undefined
-      ? { type: property.type }
-      : { type: property.type, enum: property.enum },
+    schemaOf(property),
   ]),
 ) as Record<keyof Parameters, PropertySchema>;

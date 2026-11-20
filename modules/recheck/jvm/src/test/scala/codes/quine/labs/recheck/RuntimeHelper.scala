@@ -41,27 +41,27 @@ trait RuntimeHelper:
     dir.toFile.deleteOnExit()
     path
 
-  /** Runs the input on the runtime of the executor in the environment variables, and returns the standard output. */
-  def run(executor: Executor, input: String = "", env: Map[String, String] = Map.empty)(using munit.Location): String =
+  /** Runs the input on the runtime of the executor, or on the command line replacing it, and returns the standard
+    * output.
+    */
+  def run(executor: Executor, input: String = "", command: Option[String] = None)(using munit.Location): String =
     given Context = Context()
-    executor.exec(input, None, Duration.Inf, "", env) match
+    executor.exec(input, None, Duration.Inf, "", command) match
       case ExecResult.Exit(0, out, _) => out
-      case result                     => fail(s"`${executor.commandLine(env)}` failed: $result\n$input")
+      case result                     => fail(s"`${executor.commandLine(command)}` failed: $result\n$input")
 
-  /** Runs the input on the runtime of the executor in the environment variables, and returns the lines of the output
-    * marked by `case:`.
+  /** Runs the input on the runtime of the executor, or on the command line replacing it, and returns the lines of the
+    * output marked by `case:`.
     */
-  def cases(executor: Executor, input: String = "", env: Map[String, String] = Map.empty)(using
-      munit.Location
-  ): Seq[String] =
-    run(executor, input, env).linesIterator.collect { case s"case:$line" => line }.toSeq
+  def cases(executor: Executor, input: String = "", command: Option[String] = None)(using munit.Location): Seq[String] =
+    run(executor, input, command).linesIterator.collect { case s"case:$line" => line }.toSeq
 
-  /** The environment variable of ICU's compiler (`RECHECK_ICU`), which mise sets to the command line with the paths of
-    * the ICU 79.1 that it installs.
+  /** The command line of ICU's compiler, which mise sets as `RECHECK_TEST_ICU` with the paths of the ICU 79.1 that it
+    * installs.
     */
-  def icuEnv: Map[String, String] = sys.env.filter((key, _) => key == "RECHECK_ICU")
+  def icuCommand: Option[String] = sys.env.get("RECHECK_TEST_ICU")
 
-  /** The environment variable of Boost.Regex's compiler (`RECHECK_BOOST_REGEX`), which mise sets to the command line
-    * with the paths of the Boost.Regex 1.92.0 and the ICU 79.1 that it installs.
+  /** The command line of Boost.Regex's compiler, which mise sets as `RECHECK_TEST_BOOST_REGEX` with the paths of the
+    * Boost.Regex 1.92.0 and the ICU 79.1 that it installs.
     */
-  def boostRegexEnv: Map[String, String] = sys.env.filter((key, _) => key == "RECHECK_BOOST_REGEX")
+  def boostRegexCommand: Option[String] = sys.env.get("RECHECK_TEST_BOOST_REGEX")

@@ -24,7 +24,7 @@ object RuntimeAttackExecutor:
     * dialect or the pattern is not supported. It throws [[UnexpectedException]] when the runtime fails to run the
     * program. `compileTimeout` limits the compilation of the program, which some runtimes need.
     *
-    * The environment variables `env` may replace the command of the runtime (e.g. `RECHECK_NODE`).
+    * `command` is the command line replacing the command of the runtime, if any.
     */
   def execute(
       source: String,
@@ -34,7 +34,7 @@ object RuntimeAttackExecutor:
       attack: AttackPattern,
       timeout: Duration,
       compileTimeout: Duration,
-      env: Map[String, String]
+      command: Option[String]
   )(using ctx: Context): Option[RuntimeAttack] = ctx.interrupt:
     if timeout <= Duration.Zero || !Executor.isAvailable then None
     else
@@ -44,11 +44,11 @@ object RuntimeAttackExecutor:
           None
         case Right(program) =>
           val executor = program.executor
-          val commandLine = executor.commandLine(env)
+          val commandLine = executor.commandLine(command)
           ctx.log(s"runtime attack: command: $commandLine\n${program.script}")
-          val output =
-            executor.exec(program.script, boundTimeout(timeout), compileTimeout, RuntimeAttackProgram.StartLine, env)
-          Some(parseOutput(executor.runtime(env), commandLine, timeout, output))
+          val start = RuntimeAttackProgram.StartLine
+          val output = executor.exec(program.script, boundTimeout(timeout), compileTimeout, start, command)
+          Some(parseOutput(executor.runtime(command), commandLine, timeout, output))
 
   /** Returns the time limit of a matching for the timeout, which is bounded by the deadline of the context. */
   private[verification] def boundTimeout(timeout: Duration)(using ctx: Context): Option[FiniteDuration] = timeout match

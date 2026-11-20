@@ -1,6 +1,6 @@
 package codes.quine.labs.recheck.exec
 
-/** DotNetExecutor runs a C# program file on `dotnet` (.NET 10 SDK or later), or the command line of `RECHECK_DOTNET`.
+/** DotNetExecutor runs a C# program file on `dotnet` (.NET 10 SDK or later).
   *
   * The command builds the program as a file-based app without build servers, and runs the assembly of the build, whose
   * name is the name of the file without the extension.
@@ -8,7 +8,6 @@ package codes.quine.labs.recheck.exec
 final case class DotNetExecutor(program: SourceFile)
     extends Executor.Compiled(
       "dotnet",
-      "RECHECK_DOTNET",
       program,
       Map("DOTNET_NOLOGO" -> "1", "DOTNET_CLI_TELEMETRY_OPTOUT" -> "1")
     ):

@@ -44,28 +44,9 @@ class ExecutorSuite extends munit.FunSuite:
       boostRegexICU
     )
 
-  test("Executor#variable"):
-    assertEquals(
-      executors.map(_.variable),
-      Seq(
-        "NODE",
-        "PYTHON",
-        "PYTHON_REGEX",
-        "RUBY",
-        "JAVA",
-        "DOTNET",
-        "PERL",
-        "PHP",
-        "ICU",
-        "BOOST_REGEX",
-        "BOOST_REGEX"
-      )
-        .map("RECHECK_" + _)
-    )
-
   test("Executor#commandLine"):
     assertEquals(
-      executors.map(_.commandLine(Map.empty)),
+      executors.map(_.commandLine(None)),
       Seq(
         "node -",
         "python3 -I -",
@@ -80,25 +61,22 @@ class ExecutorSuite extends munit.FunSuite:
         "c++ RecheckTest.cpp -o RecheckTest -licui18n -licuuc -licudata && ./RecheckTest"
       )
     )
-    // The variable replaces the command, and an empty value is ignored.
-    val env = Map("RECHECK_PYTHON" -> " env LC_ALL=C python3 ", "RECHECK_RUBY" -> " ")
-    assertEquals(PythonExecutor.runtime(env), "env LC_ALL=C python3")
-    assertEquals(PythonExecutor.commandLine(env), "env LC_ALL=C python3 -I -")
-    assertEquals(RubyExecutor.runtime(env), "ruby")
+    // The replacement replaces the command.
+    val python = Some("env LC_ALL=C python3")
+    assertEquals(PythonExecutor.runtime(python), "env LC_ALL=C python3")
+    assertEquals(PythonExecutor.commandLine(python), "env LC_ALL=C python3 -I -")
+    assertEquals(RubyExecutor.runtime(None), "ruby")
+    assertEquals(PythonRegexExecutor.commandLine(Some("venv/bin/python")), "venv/bin/python -I -")
     assertEquals(
-      PythonRegexExecutor.commandLine(Map("RECHECK_PYTHON_REGEX" -> "venv/bin/python")),
-      "venv/bin/python -I -"
-    )
-    assertEquals(
-      java.commandLine(Map("RECHECK_JAVA" -> "my-java")),
+      java.commandLine(Some("my-java")),
       "my-java -m jdk.compiler/com.sun.tools.javac.Main --release 17 -d RecheckTest RecheckTest.java && my-java -cp RecheckTest RecheckTest"
     )
     assertEquals(
-      icu.commandLine(Map("RECHECK_ICU" -> "c++ -I/icu/include")),
+      icu.commandLine(Some("c++ -I/icu/include")),
       "c++ -I/icu/include RecheckTest.cpp -o RecheckTest -licui18n -licuuc -licudata && ./RecheckTest"
     )
     assertEquals(
-      boostRegex.commandLine(Map("RECHECK_BOOST_REGEX" -> "c++ -I/boost/include")),
+      boostRegex.commandLine(Some("c++ -I/boost/include")),
       "c++ -I/boost/include RecheckTest.cpp -o RecheckTest && ./RecheckTest"
     )
 
@@ -125,10 +103,10 @@ class ExecutorSuite extends munit.FunSuite:
     )
 
   test("Executor#exec"):
-    // The command runs from `PATH` without the variable.
-    object ShellExecutor extends Executor.Stdin("sh", "RECHECK_SH", stdin = Seq.empty)
+    // The command runs from `PATH` without the replacement.
+    object ShellExecutor extends Executor.Stdin("sh", stdin = Seq.empty)
     assertEquals(
-      ShellExecutor.exec("echo foo", None, Duration.Inf, "start", Map.empty),
+      ShellExecutor.exec("echo foo", None, Duration.Inf, "start", None),
       ExecResult.Exit(0, "foo\n", "")
     )
 
@@ -147,12 +125,12 @@ class ExecutorSuite extends munit.FunSuite:
   def delete(path: Path): Unit =
     if Files.exists(path) then Files.walk(path).sorted(Comparator.reverseOrder()).forEach(Files.delete)
 
-  test("Executor#exec: the variable"):
+  test("Executor#exec: the replacement"):
     // A fake runtime prints the arguments and the input.
     val content = "#!/bin/sh\nfor a in \"$@\"; do echo \"$a\"; done\ncat\n"
     withScript("my runtime", content): runtime =>
       def exec(executor: Executor): ExecResult =
-        executor.exec("input", None, Duration.Inf, "start", Map(executor.variable -> s"'$runtime'"))
+        executor.exec("input", None, Duration.Inf, "start", Some(s"'$runtime'"))
 
       assertEquals(exec(NodeExecutor), ExecResult.Exit(0, "-\ninput\n", ""))
       assertEquals(exec(PythonExecutor), ExecResult.Exit(0, "-I\n-\ninput\n", ""))
@@ -179,7 +157,7 @@ class ExecutorSuite extends munit.FunSuite:
     val compiledDotNet = DotNetExecutor(SourceFile("RecheckTest.cs", nonce))
     withScript("my runtime", content): runtime =>
       def exec(executor: Executor): Seq[String] =
-        executor.exec("input", None, Duration.Inf, "start", Map(executor.variable -> s"'$runtime'")) match
+        executor.exec("input", None, Duration.Inf, "start", Some(s"'$runtime'")) match
           case ExecResult.Exit(0, out, "") => out.linesIterator.toSeq
           case result                      => fail(s"unexpected: $result")
 
@@ -203,7 +181,7 @@ class ExecutorSuite extends munit.FunSuite:
       val line = s"'$compiler'"
       try
         assertEquals(
-          ICUExecutor(program).exec("input", None, Duration.Inf, "start", Map("RECHECK_ICU" -> line)),
+          ICUExecutor(program).exec("input", None, Duration.Inf, "start", Some(line)),
           ExecResult.Exit(0, "input\n", "")
         )
       finally
@@ -218,9 +196,10 @@ class ExecutorSuite extends munit.FunSuite:
     ): compiler =>
       val line = s"'$compiler'"
       try
-        val result = ICUExecutor(program).exec("input", None, Duration.Inf, "start", Map("RECHECK_ICU" -> line))(using
-          Context(timeout = 500.millis)
-        )
+        val result =
+          ICUExecutor(program).exec("input", None, Duration.Inf, "start", Some(line))(using
+            Context(timeout = 500.millis)
+          )
         assertEquals(result, ExecResult.Exit(0, "input\n", ""))
       finally
         val args = Seq(line, "RecheckTest.sh", "-o", "RecheckTest") ++ ICUExecutor.Libraries

@@ -543,6 +543,19 @@ class CodecSuite extends munit.FunSuite:
       Right(Parameters(dialect = Dialect.Perl()))
     )
     assert(decodeParameters.decodeJson(Json.obj("dialect" := "xxx")).isLeft)
+    // A map has the keys of the schema only.
+    val commands = Json.obj("ruby" := "env LC_ALL=C ruby", "python-regex" := "venv/bin/python")
+    assertEquals(
+      decodeParameters.decodeJson(Json.obj("runtimeAttackCommand" := commands)),
+      Right(
+        Parameters(runtimeAttackCommand = Map("ruby" -> "env LC_ALL=C ruby", "python-regex" -> "venv/bin/python"))
+      )
+    )
+    assertEquals(
+      decodeParameters.decodeJson(Json.obj("runtimeAttackCommand" := Json.obj("xxx" := "foo"))).left.map(_.message),
+      Left("Unknown key of runtimeAttackCommand: xxx")
+    )
+    assert(decodeParameters.decodeJson(Json.obj("runtimeAttackCommand" := Json.obj("ruby" := 1))).isLeft)
 
   test("codec.decodeDuration"):
     assertEquals(decodeDuration.decodeJson(Json.Null), Right(Duration.Inf))

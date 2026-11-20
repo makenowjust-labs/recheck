@@ -16,6 +16,9 @@
 #   A release (e.g. `5.0.0`) includes its prereleases, and a prerelease (e.g. `5.0.0-beta.2`) does not include the earlier
 #   ones.
 # - `x-scala-default`: the Scala value of the default when `x-scala-values` does not give it.
+# - `properties` of a parameter of `type: object`: the keys of the map from them to strings, whose default is empty.
+#   The CLI takes an entry as `<key>:<value>` by the option, which is given once for each entry and needs
+#   `x-cli-metavar`.
 #
 # Annotations of the variants of `dialect` with settings, and of their settings:
 #
@@ -546,6 +549,35 @@ properties:
     x-scala-type: "Long"
     x-cli: "random-seed"
     x-since: "4.0.0"
+
+  runtimeAttackCommand:
+    title: "Runtime Attack Command"
+    description: |-
+      The command lines of the runtimes of the runtime attack, by the names of the dialects.
+
+      The command line of a dialect replaces the command of its runtime (see [Runtime-Attack Verification](/docs/usage/runtime-attack-verification#runtime-command)).
+      The shell runs it, so it must not come from an untrusted source.
+    type: object
+    properties:
+      javascript: { type: string }
+      java: { type: string }
+      dotnet: { type: string }
+      pcre: { type: string }
+      python: { type: string }
+      python-regex: { type: string }
+      ruby: { type: string }
+      perl: { type: string }
+      icu: { type: string }
+      boost-regex: { type: string }
+    additionalProperties: false
+    default: {}
+    x-scala-type: "Map[String, String]"
+    x-scala-default: "Map.empty"
+    x-typescript-type: "{ [name in Dialect[\"name\"]]?: string }"
+    x-cli: "runtime-attack-command"
+    x-cli-metavar: "dialect:command"
+    x-exclude: ["playground"]
+    x-since: "5.0.0"
 
   runtimeAttackCompileTimeout:
     title: "Runtime Attack Compile Timeout"
