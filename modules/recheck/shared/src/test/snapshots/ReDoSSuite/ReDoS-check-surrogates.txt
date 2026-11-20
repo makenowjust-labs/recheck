@@ -66,7 +66,7 @@ Input         : /^(?:\uD800[\uD800-\uDFFF]\uDFFF|\uD800[\uD800-\uDFFF]\uDFFF)*$/
 Dialect       : python (type: str)
 Status        : vulnerable
 Complexity    : exponential
-Attack string : '\ud800\udfff' + '\udfff\ud800\ud801\udfff\ud800\ud801' * 28 + 'あ'
+Attack string : '\ud800' + '\udfff\udfff\ud800\udfff\udfff\ud800' * 28 + '\ud800'
 Hotspot       : /^(?:<hot>\uD800[\uD800-\uDFFF]\uDFFF</>|<hot>\uD800[\uD800-\uDFFF]\uDFFF</>)*$/
 Checker       : automaton
 ---

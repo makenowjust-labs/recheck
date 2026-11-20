@@ -50,7 +50,7 @@ Input         : /(?m)^(?:a|a)*(?d:$)/
 Dialect       : java
 Status        : vulnerable
 Complexity    : exponential
-Attack string : "a" + "a".repeat(31) + "\r"
+Attack string : "a" + "a".repeat(31) + "\u2028\n"
 Hotspot       : /(?m)^(?:<hot>a</>|<hot>a</>)*(?d:$)/
 Checker       : automaton
 ---
@@ -58,7 +58,7 @@ Input         : /\b(?:a|a)*(?a:\b)/
 Dialect       : python (type: str)
 Status        : vulnerable
 Complexity    : exponential
-Attack string : 'a' + 'a' * 31 + '0'
+Attack string : 'a' + 'a' * 31 + '0あ'
 Hotspot       : /\b(?:<hot>a</>|<hot>a</>)*(?a:\b)/
 Checker       : automaton
 ---
@@ -80,7 +80,7 @@ Input         : /^(?:é|é)*$/
 Dialect       : pcre
 Status        : vulnerable
 Complexity    : exponential
-Attack string : "\xC3" . str_repeat("\xA9\xC3\xA9\xC3", 29) . '!'
+Attack string : "\xC3" . str_repeat("\xA9\xC3\xA9\xC3", 29) . "\xC3"
 Hotspot       : /^(?:<hot>é</>|<hot>é</>)*$/
 Checker       : automaton
 ---
@@ -96,6 +96,6 @@ Input         : /(*CRLF)^(?:a|.)*$/
 Dialect       : pcre
 Status        : vulnerable
 Complexity    : exponential
-Attack string : "\r" . str_repeat("a\r", 30) . "\r\n\n"
+Attack string : "\n" . str_repeat("a\n", 30) . "\r\n!"
 Hotspot       : /(*CRLF)^(?:<hot>a</>|.)*$/
 Checker       : automaton

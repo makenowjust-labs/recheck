@@ -33,8 +33,13 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         if isUpperBound then EpsNFABuilder.buildSimplified(ir, false, Int.MaxValue).orderedNFA
         else
           EpsNFABuilder
-            .build(ir, Set.empty, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
-            .toOrderedNFA(false, Int.MaxValue, Int.MaxValue)
+            .build(
+              ir,
+              Set.empty,
+              maxBackReferenceStrings = Parameters.DefaultMaxBackReferenceStrings,
+              maxNFASize = Int.MaxValue
+            )
+            .toOrderedNFA(false, maxDFASize = Int.MaxValue, maxNFASize = Int.MaxValue)
             .rename
       result <- Try(
         AutomatonChecker
@@ -229,8 +234,13 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     def degrees(source: String): Seq[Int] =
       val ir = ReDoS.parse(source, "", Dialect.JavaScript)
       val nfa = EpsNFABuilder
-        .build(ir, Set.empty, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
-        .toOrderedNFA(false, Int.MaxValue, Int.MaxValue)
+        .build(
+          ir,
+          Set.empty,
+          maxBackReferenceStrings = Parameters.DefaultMaxBackReferenceStrings,
+          maxNFASize = Int.MaxValue
+        )
+        .toOrderedNFA(false, maxDFASize = Int.MaxValue, maxNFASize = Int.MaxValue)
         .rename
       AutomatonChecker.check(nfa, false, Int.MaxValue, Int.MaxValue).map(degree).toSeq
 

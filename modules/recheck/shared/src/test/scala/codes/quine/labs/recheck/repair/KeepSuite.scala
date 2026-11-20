@@ -1,8 +1,8 @@
 package codes.quine.labs.recheck
 package repair
 
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.InvalidKeepException
+import codes.quine.labs.recheck.context.Context
+import codes.quine.labs.recheck.exception.InvalidKeepException
 import codes.quine.labs.resyntax.dialect.Dialect
 
 class KeepSuite extends munit.FunSuite:

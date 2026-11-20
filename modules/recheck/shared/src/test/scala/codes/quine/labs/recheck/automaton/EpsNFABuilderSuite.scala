@@ -490,7 +490,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
 
   /** Tests whether the automaton of the source accepts the input, i.e. the source matches in the input. */
   def searches(source: String, flags: String, dialect: Dialect, input: String | UString): Boolean =
-    val nfa = build(source, flags, dialect).toOrderedNFA(false, Int.MaxValue, Int.MaxValue)
+    val nfa = build(source, flags, dialect).toOrderedNFA(false, maxDFASize = Int.MaxValue, maxNFASize = Int.MaxValue)
     val units = input match
       case s: String  => ReDoS.parse(source, flags, dialect).mode.decode(s).iterator.toSeq
       case u: UString => u.iterator.toSeq
@@ -505,7 +505,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   /** Tests whether the automaton of the source accepts the input with its look-ahead assertions, by its look-ahead DFA.
     */
   def matches(source: String, flags: String, dialect: Dialect, input: String): Boolean =
-    val nfa = build(source, flags, dialect).toOrderedNFA(false, Int.MaxValue, Int.MaxValue)
+    val nfa = build(source, flags, dialect).toOrderedNFA(false, maxDFASize = Int.MaxValue, maxNFASize = Int.MaxValue)
     val dfa = nfa.toLookAheadDFA(Int.MaxValue, Int.MaxValue)
     val units = ReDoS.parse(source, flags, dialect).mode.decode(input).iterator.toSeq
     val p = units.reverse.foldLeft(dfa.init)((p, c) => dfa.delta((p, nfa.alphabet.find(_.contains(c)).get)))

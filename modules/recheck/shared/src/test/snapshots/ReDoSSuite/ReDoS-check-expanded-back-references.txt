@@ -14,7 +14,7 @@ Input         : /^(?:-(\ba)\1|-aa)*$/
 Dialect       : javascript
 Status        : vulnerable
 Complexity    : exponential
-Attack string : '-a' + 'a-aa-a'.repeat(28) + 'あ'
+Attack string : '-aa' + '-aa-aa'.repeat(28) + 'あ'
 Hotspot       : /^(?:<hot>-</>(\b<hot>a</>)\1|<hot>-aa</>)*$/
 Checker       : automaton
 ---
@@ -22,7 +22,7 @@ Input         : /(\*|_)(?=\S)([^\r]*?\S)\1/
 Dialect       : javascript
 Status        : vulnerable
 Complexity    : 2nd degree polynomial
-Attack string : 'あ　_あ'.repeat(27387) + 'あ*'
+Attack string : '*　_あ'.repeat(27387) + '*あ*'
 Hotspot       : /(<cold>\*</>|<warm>_</>)(?=<cold>\S</>)(<hot>[^\r]</>*?<cold>\S</>)\1/
 Checker       : automaton
 ---
@@ -36,7 +36,7 @@ Input         : /^(?:(a)\1|aA)*$/i
 Dialect       : javascript
 Status        : vulnerable
 Complexity    : exponential
-Attack string : 'A' + 'aAaA'.repeat(29) + 'あ'
+Attack string : 'aA' + 'aAaA'.repeat(29) + 'あ'
 Hotspot       : /^(?:(<hot>a</>)\1|<hot>aA</>)*$/i
 Checker       : automaton
 ---

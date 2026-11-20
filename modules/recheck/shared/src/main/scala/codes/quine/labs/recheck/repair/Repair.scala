@@ -3,21 +3,23 @@ package repair
 
 import scala.collection.mutable
 
-import codes.quine.labs.recheck.common.Checker
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.InvalidRegExpException
-import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.common.TimeoutException
-import codes.quine.labs.recheck.common.UnexpectedException
-import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.automaton.Complexity
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
-import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Hotspot
+import codes.quine.labs.recheck.exception.InvalidRegExpException
+import codes.quine.labs.recheck.exception.TimeoutException
+import codes.quine.labs.recheck.exception.UnexpectedException
+import codes.quine.labs.recheck.exception.UnsupportedException
+import codes.quine.labs.recheck.parameters.Checker
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.SourceLocation
+import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.ir.IRPattern
@@ -112,9 +114,9 @@ private[recheck] object Repair:
             a.ir,
             b.ir,
             aIndices.zip(bIndices),
-            params.maxNFASize,
-            params.maxDFASize,
-            params.maxBackReferenceStrings
+            maxBackReferenceStrings = params.maxBackReferenceStrings,
+            maxDFASize = params.maxDFASize,
+            maxNFASize = params.maxNFASize
           )
           .fold(Comparison.Equivalent)(Comparison.Different(_))
       catch case _: UnsupportedException => Comparison.Unknown
@@ -127,9 +129,9 @@ private[recheck] object Repair:
             a.ir,
             b.ir,
             Seq.empty,
-            params.maxNFASize,
-            params.maxDFASize,
-            params.maxBackReferenceStrings
+            maxBackReferenceStrings = params.maxBackReferenceStrings,
+            maxDFASize = params.maxDFASize,
+            maxNFASize = params.maxNFASize
           )
           .isEmpty
       catch case _: UnsupportedException => false
@@ -359,20 +361,39 @@ private[recheck] object Repair:
       * `None` if the checker does not support it.
       */
     def of(ir: IRPattern, params: Parameters)(using ctx: Context): Option[Score] =
-      val avoidsAttack = (_: AttackComplexity.Vulnerable, _: AttackPattern, _: Hotspot) => false
-      val (diagnostics, safe, _) = params.checker match
-        case Checker.Automaton => ReDoS.checkAutomaton("", "", ir, params, mutable.ArrayBuffer.empty)
-        case Checker.Fuzz      => ReDoS.checkFuzz("", "", ir, params, avoidsAttack, Seq.empty)
-        case Checker.Auto      => ReDoS.checkAuto("", "", ir, params, avoidsAttack, mutable.ArrayBuffer.empty)
       try
-        diagnostics.nextOption() match
-          case None        => Some(Score(Int.MaxValue, 0, Set.empty, safe().complexity))
-          case Some(worst) =>
-            // The fuzz checker would run again for another one.
-            val count = if worst.checker == Checker.Fuzz then 1 else 1 + diagnostics.take(maxCount - 1).size
-            val rank = worst.complexity match
-              case _: AttackComplexity.Exponential => Int.MinValue
-              case p: AttackComplexity.Polynomial  => -p.degree
-            val spots = worst.hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Hot) => SourceLocation(s, e) }
-            Some(Score(rank, count, spots.toSet, worst.complexity))
+        params.checker match
+          case Checker.Automaton => Some(ofAutomaton(ir, params))
+          case Checker.Fuzz      => Some(ofFuzz(ir, params))
+          // Without runtime attacks, no attack is refuted, so the fuzz checker runs only if the automaton checker gives up.
+          case Checker.Auto =>
+            Some(try ofAutomaton(ir, params)
+            catch case _: UnsupportedException => ofFuzz(ir, params))
       catch case _: UnsupportedException => None
+
+    /** Scores the pattern by the vulnerable complexities that the automaton checker finds, from the worst. */
+    private def ofAutomaton(ir: IRPattern, params: Parameters)(using ctx: Context): Score =
+      val (vulnerable, rest) =
+        ReDoS.computeAutomatonComplexities(ir, params).span(_.isInstanceOf[Complexity.Vulnerable[?]])
+      val found = vulnerable.collect { case vul: Complexity.Vulnerable[UChar] => vul }.take(maxCount).toSeq
+      found.headOption match
+        case None        => Score(Int.MaxValue, 0, Set.empty, ReDoS.toSafeComplexity(rest))
+        case Some(worst) => ofAttack(worst.toAttackComplexity, worst.hotspot, found.size)
+
+    /** Scores the pattern by the first attack that the fuzz checker finds, which would run again for another one. */
+    private def ofFuzz(ir: IRPattern, params: Parameters)(using ctx: Context): Score =
+      ReDoS.checkFuzzWithoutRuntimeAttacks(ir, params) match
+        case d: Diagnostics.Vulnerable => ofAttack(d.complexity, d.hotspot, 1)
+        case d: Diagnostics.Safe       => Score(Int.MaxValue, 0, Set.empty, d.complexity)
+        // The fuzz checker throws the exceptions instead of giving the unknown diagnostics.
+        // $COVERAGE-OFF$
+        case d: Diagnostics.Unknown => throw new UnexpectedException(s"unknown diagnostics of the fuzz checker: $d")
+        // $COVERAGE-ON$
+
+    /** Scores the worst attack of the complexity and the hotspot, out of `count` attacks. */
+    private def ofAttack(complexity: AttackComplexity.Vulnerable, hotspot: Hotspot, count: Int): Score =
+      val rank = complexity match
+        case _: AttackComplexity.Exponential => Int.MinValue
+        case p: AttackComplexity.Polynomial  => -p.degree
+      val spots = hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Hot) => SourceLocation(s, e) }
+      Score(rank, count, spots.toSet, complexity)

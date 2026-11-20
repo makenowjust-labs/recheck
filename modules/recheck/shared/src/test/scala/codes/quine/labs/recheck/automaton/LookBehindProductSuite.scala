@@ -20,7 +20,8 @@ class LookBehindProductSuite extends munit.FunSuite:
       maxBackReferenceStrings = Parameters.DefaultMaxBackReferenceStrings,
       maxNFASize = Int.MaxValue
     )
-    val nfa = epsNFA.toOrderedNFA(false, Int.MaxValue, Int.MaxValue).rename.mapAlphabet(_.head)
+    val nfa =
+      epsNFA.toOrderedNFA(false, maxDFASize = Int.MaxValue, maxNFASize = Int.MaxValue).rename.mapAlphabet(_.head)
     (nfa, nfa.toNFAwLA(nfa.toLookAheadDFA(Int.MaxValue, Int.MaxValue), identity, false, Int.MaxValue))
 
   test("LookBehindProduct.build"):

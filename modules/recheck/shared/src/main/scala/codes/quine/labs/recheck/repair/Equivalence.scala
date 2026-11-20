@@ -11,9 +11,8 @@ import codes.quine.labs.recheck.automaton.DFA
 import codes.quine.labs.recheck.automaton.EpsNFABuilder
 import codes.quine.labs.recheck.automaton.MarkedStep
 import codes.quine.labs.recheck.automaton.OrderedNFA
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.context.Context
+import codes.quine.labs.recheck.exception.UnsupportedException
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.ir.IRPattern
@@ -34,14 +33,23 @@ object Equivalence:
       a: IRPattern,
       b: IRPattern,
       captures: Seq[(Int, Int)],
-      maxNFASize: Int,
+      // Parameters:
+      maxBackReferenceStrings: Int,
       maxDFASize: Int,
-      maxBackReferenceStrings: Int = Parameters.DefaultMaxBackReferenceStrings
+      maxNFASize: Int
   )(using ctx: Context): Option[UString] =
     ctx.interrupt:
-      val sideA = ComparedPattern(a, captures.map(_._1), maxNFASize, maxDFASize, maxBackReferenceStrings)
-      val sideB = ComparedPattern(b, captures.map(_._2), maxNFASize, maxDFASize, maxBackReferenceStrings)
-      new Equivalence(sideA, sideB, maxNFASize).findCounterexample()
+      def compared(pattern: IRPattern, indices: Seq[Int]): ComparedPattern =
+        ComparedPattern(
+          pattern,
+          indices,
+          maxBackReferenceStrings = maxBackReferenceStrings,
+          maxDFASize = maxDFASize,
+          maxNFASize = maxNFASize
+        )
+      val sideA = compared(a, captures.map(_._1))
+      val sideB = compared(b, captures.map(_._2))
+      new Equivalence(sideA, sideB, maxNFASize = maxNFASize).findCounterexample()
 
   /** The value of a begin or an end of a capture that is unset. */
   private[repair] val Unset = -1
@@ -81,14 +89,27 @@ object Equivalence:
 
   private[repair] object ComparedPattern:
 
-    def apply(pattern: IRPattern, captures: Seq[Int], maxNFASize: Int, maxDFASize: Int, maxBackReferenceStrings: Int)(
-        using ctx: Context
-    ): ComparedPattern =
-      val epsNFA = EpsNFABuilder.build(pattern, captures.toSet, maxNFASize, maxBackReferenceStrings)
-      val nfa = epsNFA.foldCaptureMarks.toOrderedNFA(false, maxNFASize, maxDFASize, Some(_._2)).rename
+    def apply(
+        pattern: IRPattern,
+        captures: Seq[Int],
+        // Parameters:
+        maxBackReferenceStrings: Int,
+        maxDFASize: Int,
+        maxNFASize: Int
+    )(using ctx: Context): ComparedPattern =
+      val epsNFA = EpsNFABuilder.build(
+        pattern,
+        captures.toSet,
+        maxBackReferenceStrings = maxBackReferenceStrings,
+        maxNFASize = maxNFASize
+      )
+      val nfa = epsNFA.foldCaptureMarks
+        .toOrderedNFA(false, Some(_._2), maxDFASize = maxDFASize, maxNFASize = maxNFASize)
+        .rename
       val lookBehindMarking = nfa.lookBehind.fold(Set.empty)(lb => markingStates(lb.inner, Set.empty))
       val marking = markingStates(nfa, lookBehindMarking)
-      ComparedPattern(epsNFA.alphabet, nfa, nfa.toLookAheadDFA(maxDFASize), captures, marking, lookBehindMarking)
+      val lookAhead = nfa.toLookAheadDFA(maxDFASize = maxDFASize, maxNFASize = Int.MaxValue)
+      ComparedPattern(epsNFA.alphabet, nfa, lookAhead, captures, marking, lookBehindMarking)
 
     /** Returns the states from which a path may set a capture, where `setsByLookBehind` tells whether the inner
       * expression of a look-behind from the initial state may set one.
@@ -213,6 +234,7 @@ object Equivalence:
 private final class Equivalence(
     sideA: Equivalence.ComparedPattern,
     sideB: Equivalence.ComparedPattern,
+    // Parameters:
     maxNFASize: Int
 )(using
     ctx: Context

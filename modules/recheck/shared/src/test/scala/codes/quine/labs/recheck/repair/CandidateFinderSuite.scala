@@ -1,7 +1,7 @@
 package codes.quine.labs.recheck
 package repair
 
-import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.dialect.Dialect
 

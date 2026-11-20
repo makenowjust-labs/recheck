@@ -3,11 +3,11 @@ package repair
 
 import scala.concurrent.duration.*
 
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.common.TimeoutException
-import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
+import codes.quine.labs.recheck.exception.TimeoutException
+import codes.quine.labs.recheck.exception.UnsupportedException
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.recheck.repair.Repair.Comparison
 import codes.quine.labs.recheck.repair.Repair.Result
 import codes.quine.labs.resyntax.charset.UString

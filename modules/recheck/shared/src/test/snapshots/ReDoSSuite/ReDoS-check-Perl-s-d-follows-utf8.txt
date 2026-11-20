@@ -16,6 +16,6 @@ Input         : /^(?:\w|\xE9)*$\x{100}?/
 Dialect       : perl (utf8: false, source: literal)
 Status        : vulnerable
 Complexity    : exponential
-Attack string : "0" . "\xE9" x 31 . "!"
+Attack string : "\xE9" . "\xE9" x 31 . "!"
 Hotspot       : /^(?:<hot>\w</>|<hot>\xE9</>)*$\x{100}?/
 Checker       : automaton

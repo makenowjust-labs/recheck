@@ -12,6 +12,7 @@ import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.DiagnosticsState
+import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.exception.InvalidRegExpException
 import codes.quine.labs.recheck.exception.ReDoSException
 import codes.quine.labs.recheck.exception.TimeoutException
@@ -121,7 +122,9 @@ object ReDoS:
             case Repair.Comparison.Different(input) =>
               // The captures are of the indices in each pattern, in the order of `kept`.
               def run(pattern: IRPattern, indices: Seq[Int]): Option[Seq[Option[(Int, Int)]]] =
-                val result = Interpreter.run(ProgramBuilder.build(pattern, false), input, Interpreter.Options())
+                val options =
+                  Interpreter.Options(limit = Int.MaxValue, accelerationHitRatio = params.accelerationHitRatio)
+                val result = Interpreter.run(ProgramBuilder.build(pattern, false), input, options)
                 result.captures.map(cs => indices.map(i => Option.when(cs(2 * i) >= 0)((cs(2 * i), cs(2 * i + 1)))))
 
               val counterexample = Rx.Counterexample(input, run(original.ir, kept), run(repaired.ir, captures))
@@ -150,6 +153,15 @@ object ReDoS:
         runtimeAttackCompileTimeout = params.runtimeAttackCompileTimeout,
         runtimeAttackTimeout = params.runtimeAttackTimeout
       )
+    runtimeAttackerOf(ir, params, state, execute)
+
+  /** Returns the runtime attacker of the checking of the pattern, which runs the attack strings by `execute`. */
+  private def runtimeAttackerOf(
+      ir: IRPattern,
+      params: Parameters,
+      state: DiagnosticsState,
+      execute: AttackPattern => Option[RuntimeAttack]
+  )(using ctx: Context): RuntimeAttacker =
     new RuntimeAttacker(
       state,
       execute,
@@ -160,6 +172,14 @@ object ReDoS:
       maxSize = params.maxRuntimeAttackStringSize,
       maxRefutedAttacks = params.maxRefutedAttacks
     )
+
+  /** Runs the fuzz checker as [[check]] does, but without runtime attacks, and returns its diagnostics. */
+  private[recheck] def checkFuzzWithoutRuntimeAttacks(ir: IRPattern, params: Parameters)(using
+      ctx: Context
+  ): Diagnostics =
+    val state = new DiagnosticsState("", "", params.dialect)
+    state.unitMode = Some(ir.mode)
+    checkFuzz(ir, params, state, runtimeAttackerOf(ir, params, state, _ => None), Seq.empty)
 
   /** Parses the pattern and the flags in the dialect, and builds its IR.
     *

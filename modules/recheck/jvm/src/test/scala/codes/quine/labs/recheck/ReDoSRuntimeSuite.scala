@@ -54,14 +54,14 @@ class ReDoSRuntimeSuite extends munit.FunSuite with RuntimeHelper with SnapshotH
   )
 
   testDiagnostics("ReDoS.check: the fuzz checker after the refuted attacks of the automaton checker"):
-    val source = "form.*edit_profile"
+    val source = "forms.*edit_profile"
     Seq(
       // The attacks of the automaton checker are the upper bound of the fuzz checker, which finds the same attack only.
       ReDoS.check("^(?:a|a)*$", "", auto),
       // The fuzz checker does not run when the automaton checker finds no attack, or when its attack is not refuted.
       ReDoS.check("^a*$", "", auto),
       ReDoS.check("^(?:a|a)*$", "", auto.copy(runtimeAttackTimeout = Duration.Zero)),
-      // The fuzz checker finds another attack on the repetitions of `formr`, which do not read `edit_profile`.
+      // The fuzz checker finds another attack on the repetitions of `formsi`, which do not read `edit_profile`.
       ReDoS.check(source, "", auto),
       // When the fuzz checker reaches the limit of the refuted attacks, the result is the one of the automaton checker.
       ReDoS.check(source, "", auto.copy(maxRefutedAttacks = 2)),
@@ -70,7 +70,7 @@ class ReDoSRuntimeSuite extends munit.FunSuite with RuntimeHelper with SnapshotH
     )
 
   testDiagnostics("ReDoS.check: the errors of the fuzz checker after the refuted attacks of the automaton checker"):
-    val source = "form.*edit_profile"
+    val source = "forms.*edit_profile"
     // The logger sleeps over the timeout when the fuzz checker starts.
     val sleep: Context.Logger = message => if message.startsWith("fuzz: start") then Thread.sleep(2500)
     // The logger cancels the check when the fuzz checker starts.

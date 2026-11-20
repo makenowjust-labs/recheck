@@ -1,7 +1,7 @@
 package codes.quine.labs.recheck
 package repair
 
-import codes.quine.labs.recheck.common.InvalidKeepException
+import codes.quine.labs.recheck.exception.InvalidKeepException
 import codes.quine.labs.resyntax.ir.IRCondition
 import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRPattern

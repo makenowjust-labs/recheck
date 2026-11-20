@@ -24,7 +24,7 @@ Input         : /(?:|(?:a|a)*c)/I
 Dialect       : boost-regex
 Status        : vulnerable
 Complexity    : exponential
-Attack string : b'a' + b'a' * 31 + b'!'
+Attack string : b'a' + b'a' * 31 + b'a'
 Hotspot       : /(?:|(?:<hot>a</>|<hot>a</>)*c)/I
 Checker       : automaton
 ---

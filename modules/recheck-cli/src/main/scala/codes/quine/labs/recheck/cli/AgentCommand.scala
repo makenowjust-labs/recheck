@@ -23,7 +23,6 @@ import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.recheck.repair.Keep
 import codes.quine.labs.recheck.repair.Rx
-import codes.quine.labs.resyntax.dialect.Dialect
 
 /** `recheck agent` method types. */
 object AgentCommand:

@@ -27,7 +27,7 @@ Attack string : 'a'.repeat(31) + 'あ'
 Hotspot       : /^(?:<hot>a</>|<hot>a</>)*$/
 Checker       : automaton
 ---
-Input     : /form.*edit_profile/
+Input     : /forms.*edit_profile/
 Dialect   : javascript
 Status    : safe
 Complexity: safe (fuzz)
@@ -35,17 +35,17 @@ Checker   : fuzz
 
 Upper bound:
 - Complexity: 2nd degree polynomial
-  Hotspot   : /<warm>form</><hot>.</>*<cold>edit_profile</>/
+  Hotspot   : /<warm>forms</><hot>.</>*<cold>e</>dit_profile/
 
 Refuted attacks:
 - Complexity    : 2nd degree polynomial
-  Attack string : 'dit_profileform'.repeat(14143) + 'dit_profile\u2028formedit_profile'
+  Attack string : 'dit_profileforms'.repeat(13694) + 'dit_profile'
   Runtime attack: refuted (finished in <time> ms on fake, timeout: 1000 ms)
 - Complexity    : 2nd degree polynomial (fuzz)
-  Attack string : 'formf'.repeat(24495) + '\u2028'
+  Attack string : 'formsi'.repeat(22361) + '\u2028'
   Runtime attack: refuted (finished in <time> ms on fake, timeout: 1000 ms)
 ---
-Input     : /form.*edit_profile/
+Input     : /forms.*edit_profile/
 Dialect   : javascript
 Status    : safe
 Complexity: linear
@@ -53,13 +53,13 @@ Checker   : automaton
 
 Refuted attacks:
 - Complexity    : 2nd degree polynomial
-  Attack string : 'dit_profileform'.repeat(14143) + 'dit_profile\u2028formedit_profile'
+  Attack string : 'dit_profileforms'.repeat(13694) + 'dit_profile'
   Runtime attack: refuted (finished in <time> ms on fake, timeout: 1000 ms)
 - Complexity    : 2nd degree polynomial (fuzz)
-  Attack string : 'formf'.repeat(24495) + '\u2028'
+  Attack string : 'formsi'.repeat(22361) + '\u2028'
   Runtime attack: refuted (finished in <time> ms on fake, timeout: 1000 ms)
 ---
-Input  : /form.*edit_profile/
+Input  : /forms.*edit_profile/
 Dialect: javascript
 Status : unknown
 Error  : runtime attacks refuted
@@ -67,5 +67,5 @@ Checker: automaton
 
 Refuted attacks:
 - Complexity    : 2nd degree polynomial
-  Attack string : 'dit_profileform'.repeat(14143) + 'dit_profile\u2028formedit_profile'
+  Attack string : 'dit_profileforms'.repeat(13694) + 'dit_profile'
   Runtime attack: refuted (finished in <time> ms on fake, timeout: 1000 ms)

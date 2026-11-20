@@ -3,8 +3,9 @@ package repair
 
 import scala.language.implicitConversions
 
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.context.Context
+import codes.quine.labs.recheck.exception.UnsupportedException
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.recheck.vm.Interpreter
 import codes.quine.labs.recheck.vm.ProgramBuilder
 import codes.quine.labs.resyntax.charset.UString
@@ -22,10 +23,28 @@ class EquivalenceSuite extends munit.FunSuite:
 
     /** Returns the captures of the pairs' indices of this pattern in the match by the interpreter, if it matches. */
     def extract(input: String, indices: Seq[Int]): Option[Seq[(Int, Int)]] =
-      val result = Interpreter.run(ProgramBuilder.build(ir, false), ir.mode.decode(input), Interpreter.Options())
+      val options =
+        Interpreter.Options(limit = Int.MaxValue, accelerationHitRatio = Parameters.DefaultAccelerationHitRatio)
+      val result = Interpreter.run(ProgramBuilder.build(ir, false), ir.mode.decode(input), options)
       result.captures.map(cs => indices.map(i => (cs(2 * i), cs(2 * i + 1))))
 
   given Conversion[String, Pattern] = Pattern(_)
+
+  def findCounterexample(
+      a: IRPattern,
+      b: IRPattern,
+      captures: Seq[(Int, Int)],
+      maxDFASize: Int = Int.MaxValue,
+      maxNFASize: Int = Int.MaxValue
+  ): Option[UString] =
+    Equivalence.findCounterexample(
+      a,
+      b,
+      captures,
+      maxBackReferenceStrings = Parameters.DefaultMaxBackReferenceStrings,
+      maxDFASize = maxDFASize,
+      maxNFASize = maxNFASize
+    )
 
   /** Returns the shortest counterexample, after checking that the interpreter tells the patterns apart on it, and does
     * not on the shorter inputs of the characters.
@@ -35,8 +54,7 @@ class EquivalenceSuite extends munit.FunSuite:
   ): Option[String] =
     def differs(input: String): Boolean =
       a.extract(input, captures.map(_._1)) != b.extract(input, captures.map(_._2))
-    val result =
-      Equivalence.findCounterexample(a.ir, b.ir, captures, Int.MaxValue, Int.MaxValue).map(a.ir.mode.encode)
+    val result = findCounterexample(a.ir, b.ir, captures).map(a.ir.mode.encode)
     val bound = result.fold(5)(_.length - 1)
     val shorter = (0 to bound).iterator.flatMap(n =>
       Iterator.fill(n)(chars).toSeq.foldLeft(Iterator(""))((ss, cs) => ss.flatMap(s => cs.iterator.map(s + _)))
@@ -196,6 +214,6 @@ class EquivalenceSuite extends munit.FunSuite:
     // Perl keeps the captures over the iterations, so a node may have any of them set.
     val ir = ReDoS.parse("^(?:(a)|(b)|(c)|(d)|(e)|(f)|(g)|(h))*$", "", Dialect.Perl())
     interceptMessage[UnsupportedException]("equivalence search is too large"):
-      Equivalence.findCounterexample(ir, ir, (1 to 8).map(i => (i, i)), 1000, Int.MaxValue)
+      findCounterexample(ir, ir, (1 to 8).map(i => (i, i)), maxNFASize = 1000)
     interceptMessage[UnsupportedException]("look-ahead DFA size is too large"):
-      Equivalence.findCounterexample(ir, ir, Seq((0, 0)), Int.MaxValue, 1)
+      findCounterexample(ir, ir, Seq((0, 0)), maxDFASize = 1)
