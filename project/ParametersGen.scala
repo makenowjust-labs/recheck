@@ -73,14 +73,16 @@ object ParametersGen:
     def valueName(variant: Variant): String = s"${camelCase(variant.name)}${key.capitalize}"
 
   private val typeImports: Map[String, String] = Map(
-    "AccelerationMode" -> "codes.quine.labs.recheck.common.AccelerationMode",
-    "AlphabetRepresentative" -> "codes.quine.labs.recheck.common.AlphabetRepresentative",
-    "AttackStringCharacteristics" -> "codes.quine.labs.recheck.common.AttackStringCharacteristics",
-    "Checker" -> "codes.quine.labs.recheck.common.Checker",
-    "Seeder" -> "codes.quine.labs.recheck.common.Seeder",
+    "AccelerationMode" -> "codes.quine.labs.recheck.parameters.AccelerationMode",
+    "AlphabetRepresentative" -> "codes.quine.labs.recheck.parameters.AlphabetRepresentative",
+    "AttackStringCharacteristics" -> "codes.quine.labs.recheck.parameters.AttackStringCharacteristics",
+    "Checker" -> "codes.quine.labs.recheck.parameters.Checker",
+    "Seeder" -> "codes.quine.labs.recheck.parameters.Seeder",
     "Dialect" -> "codes.quine.labs.resyntax.dialect.Dialect",
     "PerlSource" -> "codes.quine.labs.resyntax.dialect.PerlSource"
   )
+
+  private val contextImport: String = "codes.quine.labs.recheck.context.Context"
 
   private val scalaKeywords: Set[String] = Set(
     "abstract",
@@ -184,7 +186,7 @@ object ParametersGen:
 
   object Target:
 
-    case object Parameters extends Target("Parameters.scala", Seq("codes.quine.labs.recheck.common"))
+    case object Parameters extends Target("Parameters.scala", Seq("codes.quine.labs.recheck.parameters"))
     case object Codec extends Target("ParametersCodec.scala", Seq("codes.quine.labs.recheck", "codec"))
     case object CLI extends Target("ParametersOption.scala", Seq("codes.quine.labs.recheck.cli"))
 
@@ -239,12 +241,13 @@ object ParametersGen:
     val defaults = params.map: p =>
       s"""|  /** The default value of [[Parameters.${p.name}]]. */
           |  val Default${p.capitalName}: ${p.scalaType} = ${p.scalaDefault}""".stripMargin
+    val names = contextImport +: typeImportsOf(params).filterNot(_.startsWith("codes.quine.labs.recheck.parameters."))
     s"""|$header
         |${packages(Target.Parameters)}
         |
         |import scala.concurrent.duration.*
         |
-        |${imports(typeImportsOf(params).filterNot(_.startsWith("codes.quine.labs.recheck.common.")))}
+        |${imports(names)}
         |
         |/** Parameters is an immutable representation of parameters.
         |  *
@@ -278,8 +281,8 @@ object ParametersGen:
       "io.circe.Decoder",
       "io.circe.DecodingFailure.Reason.MissingField",
       "io.circe.HCursor",
-      "codes.quine.labs.recheck.common.Context",
-      "codes.quine.labs.recheck.common.Parameters"
+      contextImport,
+      "codes.quine.labs.recheck.parameters.Parameters"
     ) ++ typeImportsOf(params)
     s"""|$header
         |${packages(Target.Codec)}
@@ -347,8 +350,8 @@ object ParametersGen:
       "com.monovore.decline.Argument",
       "com.monovore.decline.Opts",
       "codes.quine.labs.recheck.cli.arguments.given",
-      "codes.quine.labs.recheck.common.Context",
-      "codes.quine.labs.recheck.common.Parameters",
+      contextImport,
+      "codes.quine.labs.recheck.parameters.Parameters",
       "scala.concurrent.duration.Duration"
     ) ++ typeImportsOf(params) ++ settingImportsOf(params)
     s"""|$header

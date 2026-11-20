@@ -5,7 +5,7 @@ import scala.concurrent.duration.*
 import scala.language.implicitConversions
 import scala.util.Try
 
-import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.fuzz.DynamicSeeder.*
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect

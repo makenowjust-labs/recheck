@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.common
+package codes.quine.labs.recheck.parameters
 
 /** Seeder is an enum values to specify a seeder to be used. */
 enum Seeder:

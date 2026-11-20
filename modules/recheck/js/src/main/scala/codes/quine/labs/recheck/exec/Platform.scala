@@ -3,8 +3,8 @@ package codes.quine.labs.recheck.exec
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.UnexpectedException
+import codes.quine.labs.recheck.context.Context
+import codes.quine.labs.recheck.exception.UnexpectedException
 
 /** Platform runs the commands of the executors, which is not supported on Scala.js. */
 private[exec] object Platform:

@@ -6,9 +6,9 @@ import scala.compiletime.uninitialized
 import scala.concurrent.duration.Duration
 import scala.util.hashing.MurmurHash3
 
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.common.TimeoutException
+import codes.quine.labs.recheck.context.Context
+import codes.quine.labs.recheck.exception.TimeoutException
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.Barrier
 import codes.quine.labs.recheck.vm.Inst.ReadKind

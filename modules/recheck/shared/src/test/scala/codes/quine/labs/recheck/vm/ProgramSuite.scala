@@ -3,7 +3,7 @@ package codes.quine.labs.recheck.vm
 import scala.language.implicitConversions
 
 import codes.quine.labs.recheck.ReDoS
-import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.dialect.Dialect

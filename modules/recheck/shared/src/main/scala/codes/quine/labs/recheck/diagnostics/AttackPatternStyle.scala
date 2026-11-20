@@ -1,7 +1,6 @@
 package codes.quine.labs.recheck
 package diagnostics
 
-import codes.quine.labs.recheck.util.NumberFormat
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UChar

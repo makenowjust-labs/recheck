@@ -3,7 +3,7 @@ package codes.quine.labs.recheck.exec
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 
-import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.context.Context
 
 /** RubyExecutor runs a Ruby program on `ruby` without RubyGems, or the command line of `RECHECK_RUBY`.
   *

@@ -8,11 +8,11 @@ import java.util.concurrent.CountDownLatch
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
-import codes.quine.labs.recheck.common.CancelException
-import codes.quine.labs.recheck.common.CancellationTokenSource
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.TimeoutException
-import codes.quine.labs.recheck.common.UnexpectedException
+import codes.quine.labs.recheck.context.CancellationTokenSource
+import codes.quine.labs.recheck.context.Context
+import codes.quine.labs.recheck.exception.CancelException
+import codes.quine.labs.recheck.exception.TimeoutException
+import codes.quine.labs.recheck.exception.UnexpectedException
 
 class PlatformSuite extends munit.FunSuite:
 

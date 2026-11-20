@@ -15,7 +15,7 @@ final case class Witness[A](pumps: Seq[(Seq[A], Seq[A])], suffix: Seq[A]):
 
   /** Builds an attack pattern string of the units of the mode with `n` times repetition.
     *
-    * It throws [[common.UnexpectedException]] as [[diagnostics.AttackPattern.build]] does.
+    * It throws [[exception.UnexpectedException]] as [[diagnostics.AttackPattern.build]] does.
     */
   def buildAttackPattern(n: Int, mode: UnitMode)(using ev: A =:= UChar): AttackPattern =
     val pumps = this.pumps.map:

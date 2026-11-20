@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.common
+package codes.quine.labs.recheck.context
 
 import scala.concurrent.duration.Deadline
 import scala.concurrent.duration.Duration
@@ -6,6 +6,9 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.duration.SECONDS
 import scala.language.experimental.macros
 import scala.quoted.*
+
+import codes.quine.labs.recheck.exception.CancelException
+import codes.quine.labs.recheck.exception.TimeoutException
 
 /** Context is an execution context which has a deadline and can be canceled.
   *

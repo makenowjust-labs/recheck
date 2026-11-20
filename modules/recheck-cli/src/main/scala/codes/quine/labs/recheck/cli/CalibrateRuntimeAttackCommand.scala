@@ -5,14 +5,14 @@ import scala.concurrent.duration.*
 import scala.util.boundary
 
 import codes.quine.labs.recheck.ReDoS
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.common.ReDoSException
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
+import codes.quine.labs.recheck.exception.ReDoSException
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.recheck.verification.RuntimeAttackVerifier
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect

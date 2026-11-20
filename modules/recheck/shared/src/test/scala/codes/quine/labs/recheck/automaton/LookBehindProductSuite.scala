@@ -2,9 +2,9 @@ package codes.quine.labs.recheck
 package automaton
 
 import codes.quine.labs.recheck.automaton.LookBehindProduct.ProductState
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.context.Context
+import codes.quine.labs.recheck.exception.UnsupportedException
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.resyntax.dialect.Dialect
 
 class LookBehindProductSuite extends munit.FunSuite:

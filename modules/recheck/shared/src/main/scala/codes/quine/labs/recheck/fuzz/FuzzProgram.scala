@@ -1,7 +1,7 @@
 package codes.quine.labs.recheck.fuzz
 
-import codes.quine.labs.recheck.common.AccelerationMode
-import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.context.Context
+import codes.quine.labs.recheck.parameters.AccelerationMode
 import codes.quine.labs.recheck.vm.Program
 import codes.quine.labs.recheck.vm.ProgramBuilder
 import codes.quine.labs.resyntax.charset.UString

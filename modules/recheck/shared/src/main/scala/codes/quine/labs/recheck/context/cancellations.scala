@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.common
+package codes.quine.labs.recheck.context
 
 /** CancellationTokenSource is a source of a cancellation token. */
 final class CancellationTokenSource:
@@ -14,7 +14,7 @@ final class CancellationTokenSource:
 final class CancellationToken:
 
   /** A mutable state being whether or not it is cancelled. */
-  @volatile private[common] var _isCancelled = false
+  @volatile private[context] var _isCancelled = false
 
   /** Whether or not it is cancelled. */
   def isCancelled(): Boolean = _isCancelled

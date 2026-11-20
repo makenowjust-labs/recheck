@@ -5,7 +5,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import scala.concurrent.duration.Duration
 
-import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.exec.Executor
 

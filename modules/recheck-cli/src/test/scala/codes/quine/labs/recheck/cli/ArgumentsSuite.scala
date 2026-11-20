@@ -6,11 +6,11 @@ import scala.concurrent.duration.Duration
 import cats.data.Validated
 
 import codes.quine.labs.recheck.cli.arguments.given
-import codes.quine.labs.recheck.common.AccelerationMode
-import codes.quine.labs.recheck.common.AlphabetRepresentative
-import codes.quine.labs.recheck.common.AttackStringCharacteristics
-import codes.quine.labs.recheck.common.Checker
-import codes.quine.labs.recheck.common.Seeder
+import codes.quine.labs.recheck.parameters.AccelerationMode
+import codes.quine.labs.recheck.parameters.AlphabetRepresentative
+import codes.quine.labs.recheck.parameters.AttackStringCharacteristics
+import codes.quine.labs.recheck.parameters.Checker
+import codes.quine.labs.recheck.parameters.Seeder
 import codes.quine.labs.resyntax.dialect.Dialect
 
 class ArgumentsSuite extends munit.FunSuite:

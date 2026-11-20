@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.common
+package codes.quine.labs.recheck.parameters
 
 /** Checker is an enum values to specify a checker to be used. */
 enum Checker:

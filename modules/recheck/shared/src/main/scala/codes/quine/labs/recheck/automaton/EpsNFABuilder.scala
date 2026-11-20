@@ -4,8 +4,8 @@ package automaton
 import scala.collection.mutable
 
 import codes.quine.labs.recheck.automaton.EpsNFA.*
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.context.Context
+import codes.quine.labs.recheck.exception.UnsupportedException
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
