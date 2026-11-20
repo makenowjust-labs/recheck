@@ -749,7 +749,7 @@ class IRCharResolverSuite extends munit.FunSuite:
     ("ZWJ alone", "\u200D\u200Dx", 2)
   )
 
-  // Unicode 18's GB9c joins a linker and a consonant without a consonant before the linker, as ICU 79.1 and `regex` 2026.11.15 do.
+  // Unicode 18's GB9c joins a linker and a consonant without a consonant before the linker, as ICU 79.1 and `regex` 2026.11.18 do.
   // The engines above split them.
   val Unicode18Probes: Seq[(String, Seq[Int], Int)] = Seq(
     ("a virama and a consonant", Seq(0x094d, 0x0915, 0x0078), 2),
@@ -837,7 +837,7 @@ class IRCharResolverSuite extends munit.FunSuite:
     assertEquals(IRCharResolver.prune(IRNode(Repeat(never, IRQuantifier.Exact(0)))), Some(IRNode(Empty)))
     assertEquals(IRCharResolver.prune(IRNode(Repeat(never, IRQuantifier.Exact(2)))), None)
 
-  // python-regex's simple case folding, where `I`, `i`, `İ` and `ı` match without transitivity (regex 2026.11.15).
+  // python-regex's simple case folding, where `I`, `i`, `İ` and `ı` match without transitivity (regex 2026.11.18).
   val PR: Dialect = PythonRegex()
   val PRBytes: Dialect = PythonRegex(Python.Type.Bytes)
   chars("I", "i", PR)(of("Iiı"))
