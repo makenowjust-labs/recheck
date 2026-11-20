@@ -1531,7 +1531,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
            |""".stripMargin
     val input =
       patterns.map((source, flags, subject) => s"$flags\n${utf16Hex(source)}\n${utf16Hex(subject)}\n").mkString
-    cases(ICUExecutor(SourceFile("Cases.cpp", program)), input, icuEnv)
+    cases(ICUExecutor(SourceFile("Cases.cpp", program)), input, icuCommand)
 
   // Checked with ICU 79.1.
   runtimeTest("ICU: the syntax and the matching", "c++"):
@@ -1582,7 +1582,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     val input = icuSets.map((flags, source) => s"$flags\n${utf16Hex(source)}\n").mkString
     val model = icuSets.map: (flags, source) =>
       chars(source, flags, Dialect.ICU).intervals.map((s, e) => f"$s%x-${e - 1}%x,").mkString
-    assertEquals(cases(ICUExecutor(SourceFile("Sets.cpp", program)), input, icuEnv), model)
+    assertEquals(cases(ICUExecutor(SourceFile("Sets.cpp", program)), input, icuCommand), model)
 
   /** The cases of Boost.Regex, `(type, flags, pattern, subject)`, which recheck models as Boost.Regex 1.92.0 matches
     * them.
@@ -1992,7 +1992,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
         s"$tpe\n$flags\n${boostRegexHex(boostRegexUnits(tpe, source))}\n${boostRegexHex(boostRegexUnits(tpe, subject))}\n"
       .mkString
     val executor = BoostRegexExecutor(SourceFile("Cases.cpp", program), hasICU = true)
-    assertEquals(cases(executor, input, boostRegexEnv), boostRegexModel(boostRegexCases))
+    assertEquals(cases(executor, input, boostRegexCommand), boostRegexModel(boostRegexCases))
 
   // Checked with Boost.Regex 1.92.0 and ICU 79.1.
   runtimeTest("Boost.Regex: the characters of the classes and the properties", "c++"):
@@ -2036,4 +2036,4 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     val model = boostRegexSets.map: (tpe, flags, source) =>
       chars(source, flags, boostRegexDialect(tpe)).intervals.map((s, e) => f"$s%x-${e - 1}%x,").mkString
     val executor = BoostRegexExecutor(SourceFile("Sets.cpp", program), hasICU = true)
-    assertEquals(cases(executor, input, boostRegexEnv), model)
+    assertEquals(cases(executor, input, boostRegexCommand), model)

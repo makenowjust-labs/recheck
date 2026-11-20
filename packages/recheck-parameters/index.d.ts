@@ -40,6 +40,9 @@ export type Property = {
   type?: string | string[];
   enum?: string[];
   oneOf?: Variant[];
+  /** The keys of a map from them to strings. */
+  properties?: Record<string, { type: "string" }>;
+  additionalProperties?: false;
   default?: unknown;
   "x-scala-type": string;
   "x-scala-values"?: Record<string, string>;

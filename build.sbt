@@ -159,12 +159,13 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
       |    flags: String,
       |    attack: AttackPattern,
       |    timeout: Duration = Duration(1, SECONDS),
-      |    dialect: Dialect = Dialect.JavaScript
+      |    dialect: Dialect = Dialect.JavaScript,
+      |    command: Option[String] = None
       |)(using ctx: Context): Option[RuntimeAttack] =
       |  val ir = parse(source, flags, dialect)
       |  val compileTimeout = Parameters.DefaultRuntimeAttackCompileTimeout
       |  time("execute")(
-      |    RuntimeAttackExecutor.execute(source, flags, dialect, ir.mode, attack, timeout, compileTimeout, sys.env)
+      |    RuntimeAttackExecutor.execute(source, flags, dialect, ir.mode, attack, timeout, compileTimeout, command)
       |  )
       |
       |""".stripMargin + ParametersGen.consoleCheck((ThisBuild / baseDirectory).value),

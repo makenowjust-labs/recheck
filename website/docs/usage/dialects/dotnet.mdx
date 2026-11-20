@@ -98,9 +98,8 @@ The `RegexOptions` `RightToLeft` and `NonBacktracking` have no flag letter, so t
 - Matching: `Regex.Match`.
 - Engine limits: none.
 - Engine errors: `OutOfMemoryException`, `InsufficientExecutionStackException`.
-- Environment variable: `RECHECK_DOTNET`.
 
 `dotnet` builds the program as a file-based app, which needs a .NET 11 SDK or later for `RegexOptions.AnyNewLine`.
-`RECHECK_DOTNET` replaces `dotnet` in both commands.
+The command line of `dotnet` in [`runtimeAttackCommand`](../parameters.mdx#runtimeattackcommand) replaces `dotnet` in both commands.
 `dotnet` builds it with the latest SDK installed, since `global.json` in the current directory does not apply.
 `recheck` builds the program once for each command line and set of the SDKs and the runtimes that `dotnet` lists, and the next runs reuse the build.

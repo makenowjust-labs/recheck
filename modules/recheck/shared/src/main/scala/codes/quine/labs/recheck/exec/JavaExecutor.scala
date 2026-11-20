@@ -1,12 +1,12 @@
 package codes.quine.labs.recheck.exec
 
-/** JavaExecutor runs a Java program file on `java` (JDK 17 or later), or the command line of `RECHECK_JAVA`, whose
-  * class has the name of the file without the extension.
+/** JavaExecutor runs a Java program file on `java` (JDK 17 or later), whose class has the name of the file without the
+  * extension.
   *
   * The command compiles the program by running `javac` of the JDK as `java -m jdk.compiler/com.sun.tools.javac.Main`,
   * so that the same JDK compiles and runs it.
   */
-final case class JavaExecutor(program: SourceFile) extends Executor.Compiled("java", "RECHECK_JAVA", program):
+final case class JavaExecutor(program: SourceFile) extends Executor.Compiled("java", program):
 
   protected val versionArgs: Seq[Seq[String]] = Seq(Seq("-version"))
 

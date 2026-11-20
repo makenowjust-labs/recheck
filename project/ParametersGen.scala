@@ -27,10 +27,14 @@ object ParametersGen:
       cli: Option[String],
       cliMetavar: Option[String],
       scalaDefaultValue: Option[String],
-      variants: Seq[Variant]
+      variants: Seq[Variant],
+      keys: Seq[String]
   ):
 
     def isDuration: Boolean = scalaType == "Duration"
+
+    /** Whether the parameter is a map from [[keys]] to strings. */
+    def isMap: Boolean = keys.nonEmpty
 
     def isLogger: Boolean = scalaType == "Option[Context.Logger]"
 
@@ -178,7 +182,8 @@ object ParametersGen:
           scalaDefaultValue = string("x-scala-default"),
           variants = Option(p.get("oneOf")).toSeq
             .flatMap(_.asInstanceOf[java.util.List[java.util.Map[String, Any]]].asScala)
-            .flatMap(readVariant)
+            .flatMap(readVariant),
+          keys = Option(p.get("properties")).toSeq.flatMap(_.asInstanceOf[java.util.Map[String, Any]].asScala.keys)
         )
 
   /** Target is a generated Scala source. */
@@ -211,6 +216,8 @@ object ParametersGen:
       case '\n' => "\\n"
       case c    => c.toString
     + "\""
+
+  private def keysLiteral(p: Param): String = s"Seq(${p.keys.map(literal).mkString(", ")})"
 
   private def packages(target: Target): String = target.pkg.map(p => s"package $p").mkString("\n")
 
@@ -265,7 +272,10 @@ object ParametersGen:
   /** Generates `ParametersCodec.scala`, the decoders of `Parameters` and its enums. */
   def codec(params: Seq[Param]): String =
     val fields = params.map: p =>
-      s"      ${p.name} <- getOrElse[${p.scalaType}](${literal(p.name)})(${p.defaultName})"
+      val get =
+        if p.isMap then s"getMapOrElse(${literal(p.name)}, ${keysLiteral(p)})"
+        else s"getOrElse[${p.scalaType}](${literal(p.name)})"
+      s"      ${p.name} <- $get(${p.defaultName})"
     val args = params.map(p => s"      ${p.name} = ${p.name}")
     val enums = params
       .filter(_.isEnum)
@@ -279,6 +289,7 @@ object ParametersGen:
     val names = Seq(
       "scala.concurrent.duration.Duration",
       "io.circe.Decoder",
+      "io.circe.DecodingFailure",
       "io.circe.DecodingFailure.Reason.MissingField",
       "io.circe.HCursor",
       contextImport,
@@ -301,6 +312,14 @@ object ParametersGen:
         |        case Left(failure) if failure.reason == MissingField => Right(fallback)
         |        case result                                          => result
         |
+        |    def getMapOrElse(key: String, keys: Seq[String])(
+        |        fallback: Map[String, String]
+        |    ): Decoder.Result[Map[String, String]] =
+        |      getOrElse[Map[String, String]](key)(fallback).flatMap: map =>
+        |        map.keys.find(!keys.contains(_)) match
+        |          case Some(unknown) => Left(DecodingFailure(s"Unknown key of $$key: $$unknown", c.history))
+        |          case None          => Right(map)
+        |
         |    for
         |${fields.mkString("\n")}
         |    yield Parameters(
@@ -317,6 +336,14 @@ object ParametersGen:
       .map: p =>
         val update = s"map(v => (p: Parameters) => p.copy(${p.name} = v))"
         if p.isLogger then s"      logger.$update"
+        else if p.isMap then
+          val option = literal(p.cli.get)
+          val metavar = literal(p.cliMetavar.getOrElse(sys.error(s"${p.name} has no x-cli-metavar")))
+          s"""|      Opts
+              |        .options[String](long = $option, help = ${literal(p.summary)}, metavar = $metavar)
+              |        .orEmpty
+              |        .mapValidated(readEntries($option, ${keysLiteral(p)}))
+              |        .$update""".stripMargin
         else
           val tpe = if p.isOption then p.scalaType.stripPrefix("Option[").stripSuffix("]") else p.scalaType
           val withDefault = if p.isOption && p.default == null then "orNone" else s"withDefault(${p.defaultName})"
@@ -347,6 +374,7 @@ object ParametersGen:
       "cats.data.Validated",
       "cats.data.ValidatedNel",
       "cats.syntax.apply.*",
+      "cats.syntax.traverse.*",
       "com.monovore.decline.Argument",
       "com.monovore.decline.Opts",
       "codes.quine.labs.recheck.cli.arguments.given",
@@ -378,6 +406,18 @@ object ParametersGen:
         |  ): ValidatedNel[String, A] =
         |    value.fold(Validated.validNel(default)): name =>
         |      Validated.fromOption(of(name), s"unknown value of --$$option: $$name").toValidatedNel
+        |
+        |  /** Returns the map of the entries of the option, each of which is one of the keys, `:` and the value. */
+        |  private def readEntries(option: String, keys: Seq[String])(
+        |      entries: List[String]
+        |  ): ValidatedNel[String, Map[String, String]] =
+        |    entries
+        |      .traverse: entry =>
+        |        entry.split(":", 2) match
+        |          case Array(key, value) if keys.contains(key) => Validated.validNel(key -> value)
+        |          case Array(key, _) => Validated.invalidNel(s"unknown key of --$$option: $$key")
+        |          case _             => Validated.invalidNel(s"invalid value of --$$option: $$entry")
+        |      .map(_.toMap)
         |
         |/** ParametersArgument provides decline's `Argument` instances of the enums of `Parameters`. */
         |object ParametersArgument:

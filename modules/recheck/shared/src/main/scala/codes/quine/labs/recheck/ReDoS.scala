@@ -79,8 +79,9 @@ object ReDoS:
   )(using ctx: Context): RuntimeAttacker =
     val timeout = params.runtimeAttackTimeout
     val compileTimeout = params.runtimeAttackCompileTimeout
+    val command = params.runtimeAttackCommand.get(params.dialect.name)
     val execute = (attack: AttackPattern) =>
-      RuntimeAttackExecutor.execute(source, flags, params.dialect, ir.mode, attack, timeout, compileTimeout, sys.env)
+      RuntimeAttackExecutor.execute(source, flags, params.dialect, ir.mode, attack, timeout, compileTimeout, command)
     new RuntimeAttacker(
       state,
       execute,

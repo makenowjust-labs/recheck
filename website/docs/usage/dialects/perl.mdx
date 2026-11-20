@@ -128,6 +128,5 @@ Enable the [runtime-attack verification](../runtime-attack-verification.mdx) to 
 - Matching: `=~`.
 - Engine limits: none.
 - Engine errors: none.
-- Environment variable: `RECHECK_PERL`.
 
 With the `literal` source, the runtime-attack verification is skipped for a pattern that would interpolate a variable or run code as a literal (e.g. `$name`, `@{...}` or `(?{ ... })`), so `runtimeAttack` is `null`, and `generate-runtime-attack-script` fails.
