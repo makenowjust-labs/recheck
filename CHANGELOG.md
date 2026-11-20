@@ -68,6 +68,7 @@ Misc:
 - [#2027](https://github.com/makenowjust-labs/recheck/pull/2027) Type the next frame of a failure in the VM, whose match the exhaustivity check did not see through ([@makenowjust](https://github.com/makenowjust))
 - [#2033](https://github.com/makenowjust-labs/recheck/pull/2033) Sleep only for the compilation in the fake compiler of ExecutorSuite ([@makenowjust](https://github.com/makenowjust))
 - [#2037](https://github.com/makenowjust-labs/recheck/pull/2037) Update Ruby to 4.0.10 and regex to 2026.11.18 ([@makenowjust](https://github.com/makenowjust))
+- [#2039](https://github.com/makenowjust-labs/recheck/pull/2039) Update regex to 2026.11.19 ([@makenowjust](https://github.com/makenowjust))
 
 # 4.6.2 (2026-10-26)
 
