@@ -27,7 +27,8 @@ object Complexity:
     def witness: Witness[A]
 
     /** The best repetition count of the pumps of the witness to take `limit` steps in at most `maxSize` characters. */
-    def bestRepeatCount(limit: Int, maxSize: Int): Int
+    def bestRepeatCount(limit: Int, maxSize: Int): Int =
+      RepeatCount.of(toAttackComplexity, limit, witness.fixedSize, witness.repeatSize, maxSize)
 
     /** Builds an attack string pattern of this, whose units are of the mode.
       *
@@ -58,13 +59,7 @@ object Complexity:
 
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Polynomial(degree, false)
 
-    def bestRepeatCount(limit: Int, maxSize: Int): Int =
-      RepeatCount.polynomial(degree, limit, witness.fixedSize, witness.repeatSize, maxSize)
-
   /** Exponential is the complexity of a RegExp that checks a match in exponential time. */
   final case class Exponential[A](witness: Witness[A], hotspot: Hotspot = Hotspot.empty) extends Vulnerable[A]:
 
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Exponential(false)
-
-    def bestRepeatCount(limit: Int, maxSize: Int): Int =
-      RepeatCount.exponential(limit, witness.fixedSize, witness.repeatSize, maxSize)

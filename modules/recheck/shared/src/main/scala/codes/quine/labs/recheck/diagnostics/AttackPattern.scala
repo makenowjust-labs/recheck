@@ -27,11 +27,7 @@ final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UStr
     * It throws [[exception.UnexpectedException]] as [[AttackPattern.build]] does.
     */
   def adjust(complexity: AttackComplexity.Vulnerable, limit: Int, maxSize: Int, mode: UnitMode): AttackPattern =
-    val n = complexity match
-      case AttackComplexity.Polynomial(degree, _) =>
-        RepeatCount.polynomial(degree, limit, fixedSize, repeatSize, maxSize)
-      case AttackComplexity.Exponential(_) =>
-        RepeatCount.exponential(limit, fixedSize, repeatSize, maxSize)
+    val n = RepeatCount.of(complexity, limit, fixedSize, repeatSize, maxSize)
     AttackPattern.build(pumps, suffix, n, mode)
 
   /** Checks whether the string is one of the mode for any repeat counts.
