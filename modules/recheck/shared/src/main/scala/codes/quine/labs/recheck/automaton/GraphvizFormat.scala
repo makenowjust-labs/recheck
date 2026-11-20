@@ -1,7 +1,7 @@
-package codes.quine.labs.recheck.util
+package codes.quine.labs.recheck.automaton
 
-/** Utilities for Graphviz. */
-object GraphvizUtil:
+/** Utilities to format Graphviz text. */
+object GraphvizFormat:
 
   /** Escapes the value for Graphviz text. */
   def escape(s: Any): String =

@@ -4,7 +4,7 @@ package automaton
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Hotspot
-import codes.quine.labs.recheck.util.RepeatUtil
+import codes.quine.labs.recheck.diagnostics.RepeatCount
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UnitMode
 
@@ -31,7 +31,7 @@ object Complexity:
 
     /** Builds an attack string pattern of this, whose units are of the mode.
       *
-      * It throws [[common.UnexpectedException]] as [[diagnostics.AttackPattern.build]] does.
+      * It throws [[exception.UnexpectedException]] as [[diagnostics.AttackPattern.build]] does.
       */
     def buildAttackPattern(attackLimit: Int, maxSize: Int, mode: UnitMode)(using ev: A =:= UChar): AttackPattern =
       witness.buildAttackPattern(bestRepeatCount(attackLimit, maxSize), mode)
@@ -59,7 +59,7 @@ object Complexity:
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Polynomial(degree, false)
 
     def bestRepeatCount(limit: Int, maxSize: Int): Int =
-      RepeatUtil.polynomial(degree, limit, witness.fixedSize, witness.repeatSize, maxSize)
+      RepeatCount.polynomial(degree, limit, witness.fixedSize, witness.repeatSize, maxSize)
 
   /** Exponential is the complexity of a RegExp that checks a match in exponential time. */
   final case class Exponential[A](witness: Witness[A], hotspot: Hotspot = Hotspot.empty) extends Vulnerable[A]:
@@ -67,4 +67,4 @@ object Complexity:
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Exponential(false)
 
     def bestRepeatCount(limit: Int, maxSize: Int): Int =
-      RepeatUtil.exponential(limit, witness.fixedSize, witness.repeatSize, maxSize)
+      RepeatCount.exponential(limit, witness.fixedSize, witness.repeatSize, maxSize)

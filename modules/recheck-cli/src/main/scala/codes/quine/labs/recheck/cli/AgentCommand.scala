@@ -15,10 +15,10 @@ import io.circe.generic.semiauto.*
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.cli.AgentCommand.*
 import codes.quine.labs.recheck.codec.given
-import codes.quine.labs.recheck.common.CancellationTokenSource
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.context.CancellationTokenSource
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.Diagnostics
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.resyntax.dialect.Dialect
 
 /** `recheck agent` method types. */

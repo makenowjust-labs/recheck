@@ -3,10 +3,9 @@ package automaton
 
 import scala.collection.mutable
 
-import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.data.Graph
 import codes.quine.labs.recheck.data.MultiSet
-import codes.quine.labs.recheck.util.GraphvizUtil.escape
 import codes.quine.labs.resyntax.ast.SourceLocation
 
 /** NFAwLA is an NFA with a look-ahead DFA (see [[OrderedNFA.toLookAheadDFA]]).
@@ -35,6 +34,8 @@ final case class NFAwLA[A, Q, P](
 
   /** Converts to Graphviz format text. */
   def toGraphviz: String =
+    import GraphvizFormat.escape
+
     val sb = new mutable.StringBuilder
 
     def showQ(qp: (Q, P)): String = escape(s"(${qp._1}, ${qp._2})")

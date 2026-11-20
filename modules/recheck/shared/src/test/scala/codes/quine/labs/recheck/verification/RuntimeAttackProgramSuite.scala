@@ -1,7 +1,7 @@
 package codes.quine.labs.recheck.verification
 
 import codes.quine.labs.recheck.ReDoS
-import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.exec.BoostRegexExecutor
 import codes.quine.labs.recheck.exec.DotNetExecutor

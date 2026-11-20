@@ -1,7 +1,7 @@
-package codes.quine.labs.recheck.util
+package codes.quine.labs.recheck.diagnostics
 
-/** RepeatUtil provides utilities for computing the best count number of repetition. */
-object RepeatUtil:
+/** RepeatCount provides the best repetition counts of an attack string. */
+object RepeatCount:
 
   /** Returns the best repetition count of polynomial time complexity on the given setting. */
   def polynomial(degree: Int, limit: Int, fixedSize: Int, repeatSize: Int, maxSize: Int): Int =

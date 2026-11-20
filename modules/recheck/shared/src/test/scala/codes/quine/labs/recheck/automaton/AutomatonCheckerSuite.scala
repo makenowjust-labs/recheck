@@ -6,11 +6,11 @@ import scala.util.Success
 import scala.util.Try
 
 import codes.quine.labs.recheck.automaton.Complexity.*
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.Hotspot.*
+import codes.quine.labs.recheck.exception.UnsupportedException
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect

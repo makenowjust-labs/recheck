@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.common
+package codes.quine.labs.recheck.context
 
 class CancellationsSuite extends munit.FunSuite:
 

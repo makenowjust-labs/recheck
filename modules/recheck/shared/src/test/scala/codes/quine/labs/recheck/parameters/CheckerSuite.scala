@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.common
+package codes.quine.labs.recheck.parameters
 
 class CheckerSuite extends munit.FunSuite:
 

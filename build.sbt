@@ -77,13 +77,14 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.*
       |import codes.quine.labs.recheck.automaton.*
       |import codes.quine.labs.recheck.codec.{*, given}
-      |import codes.quine.labs.recheck.common.*
+      |import codes.quine.labs.recheck.context.*
+      |import codes.quine.labs.recheck.exception.*
       |import codes.quine.labs.recheck.exec.*
       |import codes.quine.labs.recheck.data.*
       |import codes.quine.labs.recheck.diagnostics.*
       |import codes.quine.labs.recheck.fuzz.*
+      |import codes.quine.labs.recheck.parameters.*
       |import codes.quine.labs.recheck.verification.*
-      |import codes.quine.labs.recheck.util.*
       |import codes.quine.labs.recheck.vm.*
       |import codes.quine.labs.resyntax.ast.FlagSet
       |import codes.quine.labs.resyntax.charset.*

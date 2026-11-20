@@ -3,8 +3,8 @@ package codes.quine.labs.recheck.vm
 import scala.collection.mutable
 import scala.compiletime.uninitialized
 
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.context.Context
+import codes.quine.labs.recheck.exception.UnsupportedException
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.Barrier
 import codes.quine.labs.recheck.vm.Inst.ReadKind

@@ -175,7 +175,7 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
 
   /** Builds an attack pattern string of the units of the mode from this.
     *
-    * It throws [[common.UnexpectedException]] as [[diagnostics.AttackPattern.build]] does.
+    * It throws [[exception.UnexpectedException]] as [[diagnostics.AttackPattern.build]] does.
     */
   def toAttackPattern(mode: UnitMode): AttackPattern =
     val (pumps, suffix) = splitPumps

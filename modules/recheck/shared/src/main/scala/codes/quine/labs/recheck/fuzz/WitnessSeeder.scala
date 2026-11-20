@@ -4,8 +4,8 @@ package fuzz
 import scala.concurrent.duration.Duration
 
 import codes.quine.labs.recheck.automaton.Complexity
-import codes.quine.labs.recheck.common.AccelerationMode
-import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.context.Context
+import codes.quine.labs.recheck.parameters.AccelerationMode
 import codes.quine.labs.recheck.vm.Interpreter
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Status

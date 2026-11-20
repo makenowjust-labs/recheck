@@ -1,8 +1,7 @@
 package codes.quine.labs.recheck
 package diagnostics
 
-import codes.quine.labs.recheck.common.UnexpectedException
-import codes.quine.labs.recheck.util.RepeatUtil
+import codes.quine.labs.recheck.exception.UnexpectedException
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -25,14 +24,14 @@ final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UStr
 
   /** Adjusts repetition count in this string to the complexity.
     *
-    * It throws [[common.UnexpectedException]] as [[AttackPattern.build]] does.
+    * It throws [[exception.UnexpectedException]] as [[AttackPattern.build]] does.
     */
   def adjust(complexity: AttackComplexity.Vulnerable, limit: Int, maxSize: Int, mode: UnitMode): AttackPattern =
     val n = complexity match
       case AttackComplexity.Polynomial(degree, _) =>
-        RepeatUtil.polynomial(degree, limit, fixedSize, repeatSize, maxSize)
+        RepeatCount.polynomial(degree, limit, fixedSize, repeatSize, maxSize)
       case AttackComplexity.Exponential(_) =>
-        RepeatUtil.exponential(limit, fixedSize, repeatSize, maxSize)
+        RepeatCount.exponential(limit, fixedSize, repeatSize, maxSize)
     AttackPattern.build(pumps, suffix, n, mode)
 
   /** Checks whether the string is one of the mode for any repeat counts.
@@ -90,7 +89,7 @@ object AttackPattern:
 
   /** Builds an attack pattern of the units of the mode.
     *
-    * It throws [[common.UnexpectedException]] when a repeat count gives a string that is not one of the mode (see
+    * It throws [[exception.UnexpectedException]] when a repeat count gives a string that is not one of the mode (see
     * [[AttackPattern.admitsAnyRepeatCount]]).
     */
   def build(pumps: Seq[(UString, UString, Int)], suffix: UString, n: Int, mode: UnitMode): AttackPattern =

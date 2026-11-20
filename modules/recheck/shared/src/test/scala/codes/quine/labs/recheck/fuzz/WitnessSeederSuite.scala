@@ -3,10 +3,10 @@ package fuzz
 
 import codes.quine.labs.recheck.automaton.Complexity
 import codes.quine.labs.recheck.automaton.Witness
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.fuzz.FString.Repeat
 import codes.quine.labs.recheck.fuzz.FString.Wrap
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.dialect.Dialect
 

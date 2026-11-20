@@ -4,7 +4,7 @@ import scala.annotation.unused
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 
-import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.context.Context
 
 /** Executor runs programs on a runtime, which is a command in `PATH`.
   *

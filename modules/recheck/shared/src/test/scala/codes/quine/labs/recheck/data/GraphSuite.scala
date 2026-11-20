@@ -1,7 +1,7 @@
 package codes.quine.labs.recheck
 package data
 
-import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.context.Context
 
 class GraphSuite extends munit.FunSuite:
 

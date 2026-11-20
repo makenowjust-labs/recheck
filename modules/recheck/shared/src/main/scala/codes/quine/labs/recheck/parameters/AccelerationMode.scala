@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.common
+package codes.quine.labs.recheck.parameters
 
 /** AccelerationMode is an enum to specify a mode of acceleration of VM execution on fuzzing. */
 enum AccelerationMode:

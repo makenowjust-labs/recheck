@@ -4,14 +4,8 @@ import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.language.implicitConversions
 
-import codes.quine.labs.recheck.common.AttackStringCharacteristics
-import codes.quine.labs.recheck.common.CancellationTokenSource
-import codes.quine.labs.recheck.common.Checker
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.common.TimeoutException
-import codes.quine.labs.recheck.common.UnexpectedException
-import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.context.CancellationTokenSource
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
@@ -22,6 +16,12 @@ import codes.quine.labs.recheck.diagnostics.RefutedAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.recheck.diagnostics.UpperBound
+import codes.quine.labs.recheck.exception.TimeoutException
+import codes.quine.labs.recheck.exception.UnexpectedException
+import codes.quine.labs.recheck.exception.UnsupportedException
+import codes.quine.labs.recheck.parameters.AttackStringCharacteristics
+import codes.quine.labs.recheck.parameters.Checker
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode

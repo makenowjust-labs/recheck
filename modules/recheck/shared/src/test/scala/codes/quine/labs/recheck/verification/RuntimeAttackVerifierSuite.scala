@@ -2,11 +2,11 @@ package codes.quine.labs.recheck.verification
 
 import scala.concurrent.duration.*
 
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.UnexpectedException
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
+import codes.quine.labs.recheck.exception.UnexpectedException
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect

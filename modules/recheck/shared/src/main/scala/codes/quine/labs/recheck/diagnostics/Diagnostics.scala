@@ -1,12 +1,12 @@
 package codes.quine.labs.recheck
 package diagnostics
 
-import codes.quine.labs.recheck.common.CancelException
-import codes.quine.labs.recheck.common.InvalidRegExpException
-import codes.quine.labs.recheck.common.ReDoSException
-import codes.quine.labs.recheck.common.TimeoutException
-import codes.quine.labs.recheck.common.UnexpectedException
-import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.exception.CancelException
+import codes.quine.labs.recheck.exception.InvalidRegExpException
+import codes.quine.labs.recheck.exception.ReDoSException
+import codes.quine.labs.recheck.exception.TimeoutException
+import codes.quine.labs.recheck.exception.UnexpectedException
+import codes.quine.labs.recheck.exception.UnsupportedException
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 

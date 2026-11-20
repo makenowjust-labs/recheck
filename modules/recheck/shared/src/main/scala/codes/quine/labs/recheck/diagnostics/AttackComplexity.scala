@@ -1,8 +1,6 @@
 package codes.quine.labs.recheck
 package diagnostics
 
-import codes.quine.labs.recheck.util.NumberFormat
-
 /** AttackComplexity is a computational complexity to check a match against an input string size.
   */
 sealed abstract class AttackComplexity extends Product with Serializable:

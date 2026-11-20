@@ -2,10 +2,10 @@ package codes.quine.labs.recheck
 
 import scala.concurrent.duration.*
 
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.InvalidRegExpException
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
+import codes.quine.labs.recheck.exception.InvalidRegExpException
 import codes.quine.labs.recheck.exec.BoostRegexExecutor
 import codes.quine.labs.recheck.exec.DotNetExecutor
 import codes.quine.labs.recheck.exec.ICUExecutor

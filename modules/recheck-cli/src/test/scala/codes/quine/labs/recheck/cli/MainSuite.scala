@@ -20,12 +20,12 @@ import io.circe.syntax.*
 
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.codec.encodeDiagnostics
-import codes.quine.labs.recheck.common.Checker
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
+import codes.quine.labs.recheck.parameters.Checker
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.PerlSource

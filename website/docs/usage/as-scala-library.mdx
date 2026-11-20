@@ -75,8 +75,8 @@ import cats.effect._
 import cats.effect.unsafe.implicits.global
 
 import codes.quine.labs.recheck.ReDoS
-import codes.quine.labs.recheck.common.CancellationTokenSource
-import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.context.CancellationTokenSource
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 
 val cancellation = new CancellationTokenSource
@@ -111,8 +111,8 @@ import cats.effect._
 import cats.effect.unsafe.implicits.global
 
 import codes.quine.labs.recheck.ReDoS
-import codes.quine.labs.recheck.common.CancellationTokenSource
-import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.context.CancellationTokenSource
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 
 def cancelableCheck(source: String, flags: String, params: Parameters): IO[Diagnostics] =
