@@ -16,8 +16,3 @@ enum Checker:
     case Automaton => "automaton"
     case Fuzz      => "fuzz"
     case Auto      => "auto"
-
-object Checker:
-
-  /** Used is a type union of used checkers. */
-  type Used = Automaton.type | Fuzz.type

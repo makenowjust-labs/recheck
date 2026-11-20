@@ -37,9 +37,14 @@ class ReDoSSuite extends munit.FunSuite:
 
   /** Returns the vulnerable diagnostics of a checker followed by its safe diagnostics, with its upper bound. */
   def concat(
-      result: (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound])
+      result: (
+          Iterator[Diagnostics.Vulnerable],
+          () => Diagnostics.Safe,
+          () => Option[UpperBound],
+          () => Diagnostics.Checker
+      )
   ): Iterator[Diagnostics] =
-    val (vulnerable, safe, upperBound) = result
+    val (vulnerable, safe, upperBound, _) = result
     (vulnerable ++ Iterator(safe())).map(_.withUpperBound(upperBound()))
 
   def checkAutomaton(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
@@ -62,7 +67,7 @@ class ReDoSSuite extends munit.FunSuite:
   def check(source: String, dialect: Dialect, flags: String = "", checker: Checker = Checker.Auto): Diagnostics =
     ReDoS.check(source, flags, params.copy(dialect = dialect, checker = checker))
 
-  def assertVulnerable(d: Diagnostics, complexity: AttackComplexity.Vulnerable, checker: Checker.Used)(using
+  def assertVulnerable(d: Diagnostics, complexity: AttackComplexity.Vulnerable, checker: Diagnostics.Checker)(using
       loc: munit.Location
   ): Unit =
     d match
@@ -71,7 +76,7 @@ class ReDoSSuite extends munit.FunSuite:
         assertEquals(v.checker, checker)
       case d => fail(s"not vulnerable: $d")
 
-  def assertSafe(d: Diagnostics, checker: Checker.Used)(using loc: munit.Location): Unit =
+  def assertSafe(d: Diagnostics, checker: Diagnostics.Checker)(using loc: munit.Location): Unit =
     d match
       case s: Diagnostics.Safe => assertEquals(s.checker, checker)
       case d                   => fail(s"not safe: $d")
@@ -79,8 +84,9 @@ class ReDoSSuite extends munit.FunSuite:
   /** Asserts the safety by a linear upper bound, which the fuzz checker finds before fuzzing. */
   def assertBounded(d: Diagnostics)(using loc: munit.Location): Unit =
     d match
-      case s: Diagnostics.Safe => assertEquals((s.checker, s.complexity), (Checker.Fuzz, AttackComplexity.Safe(false)))
-      case d                   => fail(s"not safe: $d")
+      case s: Diagnostics.Safe =>
+        assertEquals((s.checker, s.complexity), (Diagnostics.Checker.Fuzz, AttackComplexity.Safe(false)))
+      case d => fail(s"not safe: $d")
 
   test("ReDoS.check"):
     assertEquals(
@@ -92,7 +98,7 @@ class ReDoSSuite extends munit.FunSuite:
         UnitMode.UTF16,
         AttackComplexity.Safe(false),
         Seq.empty,
-        Checker.Automaton
+        Diagnostics.Checker.Automaton
       )
     )
     assertEquals(
@@ -104,7 +110,7 @@ class ReDoSSuite extends munit.FunSuite:
         UnitMode.UTF16,
         AttackComplexity.Safe(false),
         Seq.empty,
-        Checker.Automaton
+        Diagnostics.Checker.Automaton
       )
     )
     assertEquals(
@@ -116,7 +122,7 @@ class ReDoSSuite extends munit.FunSuite:
         UnitMode.UTF16,
         AttackComplexity.Safe(false),
         Seq.empty,
-        Checker.Fuzz,
+        Diagnostics.Checker.Fuzz,
         Some(linearBound)
       )
     )
@@ -129,7 +135,7 @@ class ReDoSSuite extends munit.FunSuite:
         UnitMode.UTF16,
         AttackComplexity.Linear,
         Seq.empty,
-        Checker.Automaton
+        Diagnostics.Checker.Automaton
       )
     )
     assertEquals(
@@ -141,7 +147,7 @@ class ReDoSSuite extends munit.FunSuite:
         UnitMode.UTF16,
         AttackComplexity.Linear,
         Seq.empty,
-        Checker.Automaton
+        Diagnostics.Checker.Automaton
       )
     )
     assertEquals(
@@ -177,25 +183,49 @@ class ReDoSSuite extends munit.FunSuite:
 
   test("ReDoS.check: exponential patterns"):
     // Python 3.15 doubles its time for each `a` of `'a'.repeat(N) + '!'` (0.36 s at N = 22).
-    assertVulnerable(check("^(a|a)*$", Python()), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("^(a|a)*$", Python()), AttackComplexity.Exponential(false), Diagnostics.Checker.Automaton)
     // Java 27 and Ruby 4.0 (memoization) are fast on these patterns.
-    assertVulnerable(check("^(?:a|a)*$", Java), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertVulnerable(check("\\A(?:a|a)*\\z", Ruby()), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("^(?:a|a)*$", Java), AttackComplexity.Exponential(false), Diagnostics.Checker.Automaton)
+    assertVulnerable(
+      check("\\A(?:a|a)*\\z", Ruby()),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
     // Ruby's `^` and `$` are line assertions, which the automaton handles with text assertions together.
-    assertVulnerable(check("^(a|a)*$", Ruby()), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertVulnerable(check("\\A(?:a|a)*$", Ruby()), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("^(a|a)*$", Ruby()), AttackComplexity.Exponential(false), Diagnostics.Checker.Automaton)
+    assertVulnerable(check("\\A(?:a|a)*$", Ruby()), AttackComplexity.Exponential(false), Diagnostics.Checker.Automaton)
     // `$` in the middle, different line terminators and different word sets are also of the automaton.
-    assertVulnerable(check("^(?:a|a)*$\\n", Python()), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertVulnerable(check("(?m)^(?:a|a)*(?d:$)", Java), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertVulnerable(check("\\b(?:a|a)*(?a:\\b)", Python()), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(
+      check("^(?:a|a)*$\\n", Python()),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
+    assertVulnerable(
+      check("(?m)^(?:a|a)*(?d:$)", Java),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
+    assertVulnerable(
+      check("\\b(?:a|a)*(?a:\\b)", Python()),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
     // Java's `\B` holds between `a` and a non-spacing mark, which is a word character after a letter.
-    assertVulnerable(check("^a(?:\u0301|\\B\u0301)*$", Java), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(
+      check("^a(?:\u0301|\\B\u0301)*$", Java),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
     assertEquals(check("^a(?:\u0301|\\b\u0301)*$", Java).getClass, classOf[Diagnostics.Safe])
     // PCRE without `u` reads bytes; PCRE2 10.49 without JIT doubles its time for each `é`.
-    assertVulnerable(check("^(?:é|é)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertVulnerable(check("^(?:é|é)*$", PCRE, "u"), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("^(?:é|é)*$", PCRE), AttackComplexity.Exponential(false), Diagnostics.Checker.Automaton)
+    assertVulnerable(check("^(?:é|é)*$", PCRE, "u"), AttackComplexity.Exponential(false), Diagnostics.Checker.Automaton)
     // PCRE2's `.` with `(*CRLF)` fails only at `\r` before `\n` (0.38 s at n = 22 on `'a'.repeat(n) + '\r\nx'`).
-    assertVulnerable(check("(*CRLF)^(?:a|.)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(
+      check("(*CRLF)^(?:a|.)*$", PCRE),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
 
   test("ReDoS.check: surrogates"):
     // Node 26 and Java 27 read a high surrogate followed by a low surrogate as one character, so the alternatives do not
@@ -203,20 +233,24 @@ class ReDoSSuite extends munit.FunSuite:
     val pairs = "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF]|[\\uDC00-\\uDFFF])*$"
     // The fuzz checker finds the attack on overlapping alternatives right after seeding, so two iterations suffice.
     // The default ten iterations ran into the timeout under coverage instrumentation.
-    for checker <- Seq[Checker.Used](Checker.Automaton, Checker.Fuzz) do
+    for (checker, used) <- Seq(
+        Checker.Automaton -> Diagnostics.Checker.Automaton,
+        Checker.Fuzz -> Diagnostics.Checker.Fuzz
+      )
+    do
       val pairsParams = params.copy(checker = checker, maxIteration = 2)
-      assertSafe(ReDoS.check(pairs, "u", pairsParams.copy(dialect = JavaScript)), checker)
-      assertSafe(ReDoS.check(pairs, "", pairsParams.copy(dialect = Java)), checker)
-    assertVulnerable(check(pairs, JavaScript), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertVulnerable(check(pairs, Python()), AttackComplexity.Exponential(false), Checker.Automaton)
+      assertSafe(ReDoS.check(pairs, "u", pairsParams.copy(dialect = JavaScript)), used)
+      assertSafe(ReDoS.check(pairs, "", pairsParams.copy(dialect = Java)), used)
+    assertVulnerable(check(pairs, JavaScript), AttackComplexity.Exponential(false), Diagnostics.Checker.Automaton)
+    assertVulnerable(check(pairs, Python()), AttackComplexity.Exponential(false), Diagnostics.Checker.Automaton)
     // A failing suffix is never a high surrogate followed by a low surrogate, which is one character that `[^…]` matches.
     val lead = "^(?:\\uD800|\\uD800)*(?:[^\\uDC00-\\uDFFF]|$)"
-    assertSafe(check(lead, JavaScript, "u"), Checker.Automaton)
-    assertSafe(check(lead, Java), Checker.Automaton)
+    assertSafe(check(lead, JavaScript, "u"), Diagnostics.Checker.Automaton)
+    assertSafe(check(lead, Java), Diagnostics.Checker.Automaton)
     // A high surrogate, any surrogate and a low surrogate in a row have a pair in any case.
     val triple = "^(?:\\uD800[\\uD800-\\uDFFF]\\uDFFF|\\uD800[\\uD800-\\uDFFF]\\uDFFF)*$"
-    assertSafe(check(triple, JavaScript, "u"), Checker.Automaton)
-    assertVulnerable(check(triple, Python()), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check(triple, JavaScript, "u"), Diagnostics.Checker.Automaton)
+    assertVulnerable(check(triple, Python()), AttackComplexity.Exponential(false), Diagnostics.Checker.Automaton)
     // An attack takes a character other than a surrogate from a set having one, which Ruby's and PCRE's input cannot
     // have.
     for (source, dialect, flags) <- Seq(
@@ -230,57 +264,77 @@ class ReDoSSuite extends munit.FunSuite:
         case v: Diagnostics.Vulnerable =>
           assert(!v.attack.asUString.iterator.exists(c => 0xd800 <= c && c <= 0xdfff), v)
         case d => fail(s"not vulnerable: $d")
-    assertSafe(check("\\A(?:\\p{Cs}|\\p{Cs})*\\z", Ruby()), Checker.Automaton)
-    assertSafe(check("^(?:\\p{Cs}|\\p{Cs})*$", PCRE, "u"), Checker.Automaton)
+    assertSafe(check("\\A(?:\\p{Cs}|\\p{Cs})*\\z", Ruby()), Diagnostics.Checker.Automaton)
+    assertSafe(check("^(?:\\p{Cs}|\\p{Cs})*$", PCRE, "u"), Diagnostics.Checker.Automaton)
 
   test("ReDoS.check: classes folded to several characters"):
     // Ruby 4.0 (with a back-reference stopping the memoization) is exponential on `'ß'.repeat(n) + '!'` against
     // `\A()[ßx]*\1\z` (3.6 s at n = 16), where `[ßx]` matches `ß` as the class and as the foldings of `ß` and `ẞ`.
-    assertVulnerable(check("\\A[ßx]*\\z", Ruby(), "i"), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(
+      check("\\A[ßx]*\\z", Ruby(), "i"),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
     // Perl 5.44 matches `[ßx]` as `ss|[x]`, which is unambiguous, and `[ßẞ]` as `ss|ss` (0.17 s at n = 20).
-    assertSafe(check("\\A[ßx]*\\z", Perl(), "i"), Checker.Automaton)
-    assertVulnerable(check("\\A[ßẞ]*\\z", Perl(), "i"), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check("\\A[ßx]*\\z", Perl(), "i"), Diagnostics.Checker.Automaton)
+    assertVulnerable(
+      check("\\A[ßẞ]*\\z", Perl(), "i"),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
     for dialect <- Seq(Ruby(), Perl()) do
-      assertVulnerable(check("\\A(?:[ß]|ss)*\\z", dialect, "i"), AttackComplexity.Exponential(false), Checker.Automaton)
+      assertVulnerable(
+        check("\\A(?:[ß]|ss)*\\z", dialect, "i"),
+        AttackComplexity.Exponential(false),
+        Diagnostics.Checker.Automaton
+      )
 
   test("ReDoS.check: atomic groups"):
     // Java 27 is linear on the first two (and Python 3.15 and PCRE2 10.49 on the second).
     // Python and PCRE2 (without JIT) are exponential on the third, and Java is fast on it.
-    assertSafe(check("^(?>a|a)*$", Java), Checker.Automaton)
-    assertSafe(check("^(?:a++)+$", Java), Checker.Automaton)
-    assertVulnerable(check("^(?:(?>a|a)|a)*$", Java), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check("^(?>a|a)*$", Java), Diagnostics.Checker.Automaton)
+    assertSafe(check("^(?:a++)+$", Java), Diagnostics.Checker.Automaton)
+    assertVulnerable(
+      check("^(?:(?>a|a)|a)*$", Java),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
 
   // The following PCRE times are of PHP 8.5 (PCRE2 10.49) without JIT, with a large `pcre.backtrack_limit`, and with
   // `(*NO_START_OPT)` where the start optimizations skip the attempts, on `'a'.repeat(n) + '!'`.
 
   test("ReDoS.check: \\G and \\K"):
     // PCRE2 doubles its time for each `a` on these (0.37 s and 0.18 s at n = 22).
-    assertVulnerable(check("\\G(?:a|a)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertVulnerable(check("^a\\K(?:a|a)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("\\G(?:a|a)*$", PCRE), AttackComplexity.Exponential(false), Diagnostics.Checker.Automaton)
+    assertVulnerable(check("^a\\K(?:a|a)*$", PCRE), AttackComplexity.Exponential(false), Diagnostics.Checker.Automaton)
 
   test("ReDoS.check: conditionals"):
     // PCRE2 doubles its time for each `a` (0.37 s at n = 22).
-    assertVulnerable(check("^(?(?=a)(?:a|a)*$|b)", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertSafe(check("^(?(?=a)a+|b+)$", PCRE), Checker.Automaton)
+    assertVulnerable(
+      check("^(?(?=a)(?:a|a)*$|b)", PCRE),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
+    assertSafe(check("^(?(?=a)a+|b+)$", PCRE), Diagnostics.Checker.Automaton)
     // The upper bound, a choice of the branches, is linear.
     assertBounded(check("^(a)?(?(1)b+|c)$", Python()))
 
   test("ReDoS.check: backtracking control verbs"):
     // `(*FAIL)` is the empty set, which makes the match fail after the repetition (0.35 s at n = 22).
-    assertVulnerable(check("^(?:a|a)*(*F)", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertSafe(check("^(?:a|a)*", PCRE), Checker.Automaton)
+    assertVulnerable(check("^(?:a|a)*(*F)", PCRE), AttackComplexity.Exponential(false), Diagnostics.Checker.Automaton)
+    assertSafe(check("^(?:a|a)*", PCRE), Diagnostics.Checker.Automaton)
     // The verbs cut the backtracking of an exponential pattern (0.36 s at n = 22 without them, and 0.01 ms with them).
-    assertVulnerable(check("^(?:a|a)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertSafe(check("^(?:a|a)*(*COMMIT)$", PCRE), Checker.Fuzz)
-    assertSafe(check("^(?:(?:a|a)(*PRUNE))*$", PCRE), Checker.Fuzz)
-    assertSafe(check("^(?:(?:a|a)*(*THEN)b|c)", PCRE), Checker.Fuzz)
-    assertSafe(check("(?:a|a)*(*SKIP)b", Perl()), Checker.Fuzz)
-    assertVulnerable(check("(?:a|a)*b", Perl()), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("^(?:a|a)*$", PCRE), AttackComplexity.Exponential(false), Diagnostics.Checker.Automaton)
+    assertSafe(check("^(?:a|a)*(*COMMIT)$", PCRE), Diagnostics.Checker.Fuzz)
+    assertSafe(check("^(?:(?:a|a)(*PRUNE))*$", PCRE), Diagnostics.Checker.Fuzz)
+    assertSafe(check("^(?:(?:a|a)*(*THEN)b|c)", PCRE), Diagnostics.Checker.Fuzz)
+    assertSafe(check("(?:a|a)*(*SKIP)b", Perl()), Diagnostics.Checker.Fuzz)
+    assertVulnerable(check("(?:a|a)*b", Perl()), AttackComplexity.Exponential(false), Diagnostics.Checker.Automaton)
 
   test("ReDoS.check: non-atomic look-arounds"):
     // Backtracking enters the look-ahead again (0.45 s at n = 22), which an atomic one does not (0.004 ms).
-    assertVulnerable(check("^(?*(?:a|a)*)c", PCRE), AttackComplexity.Exponential(true), Checker.Fuzz)
-    assertSafe(check("^(?=(?:a|a)*)c", PCRE), Checker.Automaton)
+    assertVulnerable(check("^(?*(?:a|a)*)c", PCRE), AttackComplexity.Exponential(true), Diagnostics.Checker.Fuzz)
+    assertSafe(check("^(?=(?:a|a)*)c", PCRE), Diagnostics.Checker.Automaton)
     // The simplified automata of a non-atomic look-around bound nothing, though their cost is linear here.
     assertEquals(check("^(?*a+)b+$", PCRE).asInstanceOf[Diagnostics.Safe].complexity, AttackComplexity.Safe(true))
 
@@ -298,31 +352,47 @@ class ReDoSSuite extends munit.FunSuite:
     assert(clue(ReDoS.check("^([a-z]+)=\\1$", "", automaton)).isInstanceOf[Diagnostics.Unknown])
     // The upper bound of `(a|aa)\1*` is exponential, so the fuzz checker decides it.
     // One iteration suffices, and the default ten may run into the timeout under coverage instrumentation.
-    assertSafe(ReDoS.check("^(a|aa)\\1*$", "", bound.copy(maxIteration = 1)), Checker.Fuzz)
+    assertSafe(ReDoS.check("^(a|aa)\\1*$", "", bound.copy(maxIteration = 1)), Diagnostics.Checker.Fuzz)
     // `\1` matches what `(\ba)` matched, even where `\b` does not hold, so each block parses in two ways.
-    assertVulnerable(ReDoS.check("^(?:-(\\ba)\\1|-aa)*$", "", bound), AttackComplexity.Exponential(true), Checker.Fuzz)
+    assertVulnerable(
+      ReDoS.check("^(?:-(\\ba)\\1|-aa)*$", "", bound),
+      AttackComplexity.Exponential(true),
+      Diagnostics.Checker.Fuzz
+    )
 
   test("ReDoS.check: expanded back-references"):
     // The referred groups match finite languages, so the automaton checker decides them exactly.
-    assertSafe(check("^(['\"])[^'\"]*\\1$", JavaScript), Checker.Automaton)
-    assertSafe(check("^(a|aa)\\1*$", JavaScript), Checker.Automaton)
-    assertVulnerable(check("^(?:-(\\ba)\\1|-aa)*$", JavaScript), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check("^(['\"])[^'\"]*\\1$", JavaScript), Diagnostics.Checker.Automaton)
+    assertSafe(check("^(a|aa)\\1*$", JavaScript), Diagnostics.Checker.Automaton)
+    assertVulnerable(
+      check("^(?:-(\\ba)\\1|-aa)*$", JavaScript),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
     // Each `_` scans to the end for the same `_` after a non-space, which a space before each `_` prevents.
     assertVulnerable(
       check("(\\*|_)(?=\\S)([^\\r]*?\\S)\\1", JavaScript),
       AttackComplexity.Polynomial(2, false),
-      Checker.Automaton
+      Diagnostics.Checker.Automaton
     )
     // `aA` matches `(a)\1` only case-insensitively.
-    assertSafe(check("^(?:(a)\\1|aA)*$", JavaScript), Checker.Automaton)
-    assertVulnerable(check("^(?:(a)\\1|aA)*$", JavaScript, "i"), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check("^(?:(a)\\1|aA)*$", JavaScript), Diagnostics.Checker.Automaton)
+    assertVulnerable(
+      check("^(?:(a)\\1|aA)*$", JavaScript, "i"),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
     // A reference to an unset group matches the empty string in JavaScript, and fails in PCRE.
-    assertVulnerable(check("^(?:\\1a|a)*(b)$", JavaScript), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertSafe(check("^(?:\\1a|a)*(b)$", PCRE), Checker.Automaton)
+    assertVulnerable(
+      check("^(?:\\1a|a)*(b)$", JavaScript),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
+    assertSafe(check("^(?:\\1a|a)*(b)$", PCRE), Diagnostics.Checker.Automaton)
     // The groups matching more strings than `maxBackReferenceStrings` are not expanded.
     assertSafe(
       ReDoS.check("^(a|aa)\\1*$", "", params.copy(maxBackReferenceStrings = 1, maxIteration = 1)),
-      Checker.Fuzz
+      Diagnostics.Checker.Fuzz
     )
 
   test("ReDoS.check: upper bounds in the diagnostics"):
@@ -348,45 +418,57 @@ class ReDoSSuite extends munit.FunSuite:
     // The upper bound of `^[a-z]+@[a-z]+$` is linear.
     assertBounded(check("^[a-z]{1,64}@[a-z]{1,255}$", JavaScript))
     // The upper bound of `^(?:a|a)+$` is exponential, so the fuzz checker decides it.
-    assertVulnerable(check("^(?:a|a){1,40}$", JavaScript), AttackComplexity.Exponential(true), Checker.Fuzz)
+    assertVulnerable(check("^(?:a|a){1,40}$", JavaScript), AttackComplexity.Exponential(true), Diagnostics.Checker.Fuzz)
 
   test("ReDoS.check: too large DFA"):
     val small = params.copy(maxDFASize = 1)
     // The upper bound of `^[a-z]+$`, which builds no DFA, is linear.
     assertBounded(ReDoS.check("^[a-z]+$", "", small))
-    assertVulnerable(ReDoS.check("^(?:a|a)*$", "", small), AttackComplexity.Exponential(true), Checker.Fuzz)
+    assertVulnerable(ReDoS.check("^(?:a|a)*$", "", small), AttackComplexity.Exponential(true), Diagnostics.Checker.Fuzz)
     // The automaton checker builds the DFA of any size.
     val automaton = small.copy(checker = Checker.Automaton)
-    assertVulnerable(ReDoS.check("^(?:a|a)*$", "", automaton), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(
+      ReDoS.check("^(?:a|a)*$", "", automaton),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
 
   test("ReDoS.check: look-behinds matched forward"):
     // PCRE matches the inner expression forward from the starts of its widths, which succeeds as matching it backward.
-    assertVulnerable(check("^(?:a|(?<=a)a)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertSafe(check("^(?:(?<=a)b|a)*$", PCRE), Checker.Automaton)
+    assertVulnerable(
+      check("^(?:a|(?<=a)a)*$", PCRE),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
+    assertSafe(check("^(?:(?<=a)b|a)*$", PCRE), Diagnostics.Checker.Automaton)
 
   test("ReDoS.check: (*NOTEMPTY)"):
     // An empty match is rejected, so the engine backtracks into the other alternative (0.71 s at n = 22).
     assertVulnerable(
       check("(*NOTEMPTY)(?:|(?:a|a)*c)", PCRE),
       AttackComplexity.Exponential(false),
-      Checker.Automaton
+      Diagnostics.Checker.Automaton
     )
-    assertSafe(check("(?:|(?:a|a)*c)", PCRE), Checker.Automaton)
+    assertSafe(check("(?:|(?:a|a)*c)", PCRE), Diagnostics.Checker.Automaton)
     // Boost.Regex's `E` (`match_not_null`) and `I` (`match_not_initial_null`) are the same, which reach the complexity
     // limit at n = 14.
     for flags <- Seq("E", "I") do
       assertVulnerable(
         check("(?:|(?:a|a)*c)", BoostRegex(), flags),
         AttackComplexity.Exponential(false),
-        Checker.Automaton
+        Diagnostics.Checker.Automaton
       )
-    assertSafe(check("(?:|(?:a|a)*c)", BoostRegex()), Checker.Automaton)
+    assertSafe(check("(?:|(?:a|a)*c)", BoostRegex()), Diagnostics.Checker.Automaton)
 
   test("ReDoS.check: Boost.Regex's Z"):
     // `Z` (`match_not_dot_null`) makes `.` fail at NUL, so it no longer overlaps `\x00` (the complexity limit at n = 14
     // without it).
-    assertVulnerable(check("\\A(?:.|\\x00)*b", BoostRegex()), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertSafe(check("\\A(?:.|\\x00)*b", BoostRegex(), "Z"), Checker.Automaton)
+    assertVulnerable(
+      check("\\A(?:.|\\x00)*b", BoostRegex()),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
+    assertSafe(check("\\A(?:.|\\x00)*b", BoostRegex(), "Z"), Diagnostics.Checker.Automaton)
 
   test("ReDoS.check: Boost.Regex's L"):
     // `L` (`match_single_line`) makes `^` the start of the input even with `(?m)`, so the search does not try it at every
@@ -394,9 +476,9 @@ class ReDoSSuite extends munit.FunSuite:
     assertVulnerable(
       check("(?m)^(?:\\n|x)*b", BoostRegex(), "M"),
       AttackComplexity.Polynomial(2, false),
-      Checker.Automaton
+      Diagnostics.Checker.Automaton
     )
-    assertSafe(check("(?m)^(?:\\n|x)*b", BoostRegex(), "L"), Checker.Automaton)
+    assertSafe(check("(?m)^(?:\\n|x)*b", BoostRegex(), "L"), Diagnostics.Checker.Automaton)
 
   test("ReDoS.check: longest match"):
     // python-regex's `p` tries every path at the start position, which doubles for each `a` even on a match (3.0 s at
@@ -404,27 +486,39 @@ class ReDoSSuite extends munit.FunSuite:
     assertVulnerable(
       check("(a|a)*", PythonRegex(), "p", Checker.Fuzz),
       AttackComplexity.Exponential(true),
-      Checker.Fuzz
+      Diagnostics.Checker.Fuzz
     )
-    assertSafe(check("(a|a)*", PythonRegex(), "", Checker.Fuzz), Checker.Fuzz)
+    assertSafe(check("(a|a)*", PythonRegex(), "", Checker.Fuzz), Diagnostics.Checker.Fuzz)
     // The tail `.*` is tried at every split too, so the upper bound keeps it.
     assertVulnerable(
       check("x(?:a|b)*.*", PythonRegex(), "sp", Checker.Fuzz),
       AttackComplexity.Polynomial(2, true),
-      Checker.Fuzz
+      Diagnostics.Checker.Fuzz
     )
     // The automaton checker explores every path too, so Auto does not report them safe.
-    assertVulnerable(check("(a|a)*", PythonRegex(), "p"), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertSafe(check("(a|a)*", PythonRegex()), Checker.Automaton)
-    assertVulnerable(check("a*a*", PythonRegex(), "p"), AttackComplexity.Polynomial(2, false), Checker.Automaton)
-    assertSafe(check("a*a*", PythonRegex()), Checker.Automaton)
+    assertVulnerable(
+      check("(a|a)*", PythonRegex(), "p"),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
+    assertSafe(check("(a|a)*", PythonRegex()), Diagnostics.Checker.Automaton)
+    assertVulnerable(
+      check("a*a*", PythonRegex(), "p"),
+      AttackComplexity.Polynomial(2, false),
+      Diagnostics.Checker.Automaton
+    )
+    assertSafe(check("a*a*", PythonRegex()), Diagnostics.Checker.Automaton)
     // Boost.Regex's `p` (`match_posix`) is the same, which reaches the complexity limit at n = 14 for `(a|a)*`.
     assertVulnerable(
       check("(a|a)*", BoostRegex(), "p", Checker.Fuzz),
       AttackComplexity.Exponential(true),
-      Checker.Fuzz
+      Diagnostics.Checker.Fuzz
     )
-    assertVulnerable(check("(a|a)*", BoostRegex(), "p"), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(
+      check("(a|a)*", BoostRegex(), "p"),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
 
   test("ReDoS.check: unsupported syntax"):
     assertEquals(
@@ -436,7 +530,7 @@ class ReDoSSuite extends munit.FunSuite:
         Some(UnitMode.Byte),
         Diagnostics.ErrorKind.Unsupported("unsupported syntax (RCall) at 7"),
         Seq.empty,
-        Some(Checker.Fuzz)
+        Some(Diagnostics.Checker.Fuzz)
       )
     )
 
@@ -458,7 +552,7 @@ class ReDoSSuite extends munit.FunSuite:
     assertVulnerable(
       check("^(a|a)*$", Python(Python.Type.Bytes)),
       AttackComplexity.Exponential(false),
-      Checker.Automaton
+      Diagnostics.Checker.Automaton
     )
 
   test("ReDoS.check: the dialect of the diagnostics"):
@@ -475,12 +569,16 @@ class ReDoSSuite extends munit.FunSuite:
 
   test("ReDoS.check: Perl's /d follows utf8"):
     // `^\w*!$` takes linear time, but `^(?:\w|é)*!$` takes exponential time if `\w` matches `é`.
-    assertVulnerable(check("^(?:\\w|\\xE9)*$", Perl()), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertSafe(check("^(?:\\w|\\xE9)*$", Perl(utf8 = false)), Checker.Automaton)
+    assertVulnerable(
+      check("^(?:\\w|\\xE9)*$", Perl()),
+      AttackComplexity.Exponential(false),
+      Diagnostics.Checker.Automaton
+    )
+    assertSafe(check("^(?:\\w|\\xE9)*$", Perl(utf8 = false)), Diagnostics.Checker.Automaton)
     assertVulnerable(
       check("^(?:\\w|\\xE9)*$\\x{100}?", Perl(utf8 = false)),
       AttackComplexity.Exponential(false),
-      Checker.Automaton
+      Diagnostics.Checker.Automaton
     )
 
   test("ReDoS.verifyCandidates"):
@@ -499,7 +597,7 @@ class ReDoSSuite extends munit.FunSuite:
         Hotspot(Seq(Spot(1, 2, Hot))),
         None,
         Seq.empty,
-        Checker.Automaton
+        Diagnostics.Checker.Automaton
       )
 
     val safe = Diagnostics.Safe(
@@ -509,7 +607,7 @@ class ReDoSSuite extends munit.FunSuite:
       UnitMode.UTF16,
       AttackComplexity.Linear,
       Seq.empty,
-      Checker.Automaton
+      Diagnostics.Checker.Automaton
     )
 
     def runtimeAttack(result: RuntimeAttackResult): Option[RuntimeAttack] =
@@ -571,7 +669,7 @@ class ReDoSSuite extends munit.FunSuite:
         Some(UnitMode.UTF16),
         Diagnostics.ErrorKind.RuntimeAttacksRefuted,
         refutedAttacks,
-        Some(Checker.Automaton)
+        Some(Diagnostics.Checker.Automaton)
       )
 
     assertEquals(
@@ -590,7 +688,8 @@ class ReDoSSuite extends munit.FunSuite:
     val sets = ReDoS.characteristicSets(ir, params.attackStringCharacteristics)
     val refutedAttacks = mutable.ArrayBuffer.empty[RefutedAttack]
     val avoidsAttack = ReDoS.isRefuted(refutedAttacks, readStarts, sets, _, _, _)
-    val (candidates, fuzzSafe, fuzzUpperBound) = ReDoS.checkFuzz("^(?:a|a)*$", "", ir, params, avoidsAttack, Seq.empty)
+    val (candidates, fuzzSafe, fuzzUpperBound, _) =
+      ReDoS.checkFuzz("^(?:a|a)*$", "", ir, params, avoidsAttack, Seq.empty)
     val verify = (d: Diagnostics.Vulnerable) => d.copy(runtimeAttack = finish)
     val result = ReDoS.verifyCandidates(candidates, fuzzSafe, verify, refutedAttacks, 100, readStarts, sets)
     result.withUpperBound(fuzzUpperBound()) match
@@ -604,7 +703,7 @@ class ReDoSSuite extends munit.FunSuite:
             UnitMode.UTF16,
             AttackComplexity.Safe(true),
             Seq.empty,
-            Checker.Fuzz,
+            Diagnostics.Checker.Fuzz,
             Some(UpperBound(AttackComplexity.Exponential(false), Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot)))))
           )
         )
@@ -729,7 +828,7 @@ class ReDoSSuite extends munit.FunSuite:
           Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot))),
           None,
           Seq.empty,
-          Checker.Automaton
+          Diagnostics.Checker.Automaton
         )
       )
     )
@@ -743,7 +842,7 @@ class ReDoSSuite extends munit.FunSuite:
         UnitMode.UTF16,
         AttackComplexity.Linear,
         Seq.empty,
-        Checker.Automaton
+        Diagnostics.Checker.Automaton
       )
     )
     assertEquals(
@@ -755,7 +854,7 @@ class ReDoSSuite extends munit.FunSuite:
         UnitMode.UTF16,
         AttackComplexity.Linear,
         Seq.empty,
-        Checker.Automaton
+        Diagnostics.Checker.Automaton
       )
     )
     assertEquals(
@@ -768,7 +867,7 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Safe(false),
           Seq.empty,
-          Checker.Automaton
+          Diagnostics.Checker.Automaton
         )
       )
     )
@@ -781,7 +880,7 @@ class ReDoSSuite extends munit.FunSuite:
     )
       .next()
     assert(clue(result).isInstanceOf[Diagnostics.Vulnerable])
-    assertEquals(result.asInstanceOf[Diagnostics.Vulnerable].checker, Checker.Fuzz)
+    assertEquals(result.asInstanceOf[Diagnostics.Vulnerable].checker, Diagnostics.Checker.Fuzz)
     assertEquals(
       checkFuzz(
         ".",
@@ -796,7 +895,7 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Safe(false),
           Seq.empty,
-          Checker.Fuzz,
+          Diagnostics.Checker.Fuzz,
           Some(linearBound)
         )
       )
@@ -827,7 +926,7 @@ class ReDoSSuite extends munit.FunSuite:
           Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot))),
           None,
           Seq.empty,
-          Checker.Automaton
+          Diagnostics.Checker.Automaton
         )
       )
     )
@@ -845,7 +944,7 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Safe(true),
           Seq.empty,
-          Checker.Fuzz,
+          Diagnostics.Checker.Fuzz,
           // The bound of `^(?:a|a)+$` is exponential, though the fuzz checker finds no attack on the three repetitions.
           Some(UpperBound(AttackComplexity.Exponential(false), Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot)))))
         )
@@ -865,7 +964,7 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Safe(true),
           Seq.empty,
-          Checker.Fuzz
+          Diagnostics.Checker.Fuzz
         )
       )
     )
@@ -883,7 +982,7 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Safe(false),
           Seq.empty,
-          Checker.Fuzz,
+          Diagnostics.Checker.Fuzz,
           Some(linearBound)
         )
       )
@@ -920,7 +1019,7 @@ class ReDoSSuite extends munit.FunSuite:
             UnitMode.UTF16,
             AttackComplexity.Safe(true),
             Seq.empty,
-            Checker.Fuzz,
+            Diagnostics.Checker.Fuzz,
             Some(exponential)
           )
         )
@@ -937,11 +1036,11 @@ class ReDoSSuite extends munit.FunSuite:
         UnitMode.UTF16,
         AttackComplexity.Linear,
         Seq.empty,
-        Checker.Automaton
+        Diagnostics.Checker.Automaton
       )
     )
     diagnose("^(?:a|a)*$", params, identity) match
-      case d: Diagnostics.Vulnerable => assertEquals(d.checker, Checker.Automaton)
+      case d: Diagnostics.Vulnerable => assertEquals(d.checker, Diagnostics.Checker.Automaton)
       case d                         => fail(s"not vulnerable: $d")
 
     // The fuzz checker finds another attack on the repetitions of `formr`, which do not read `edit_profile`.
@@ -954,11 +1053,11 @@ class ReDoSSuite extends munit.FunSuite:
         UnitMode.UTF16,
         AttackComplexity.Linear,
         refutedAttacks,
-        Checker.Automaton
+        Diagnostics.Checker.Automaton
       )
     diagnose(source, params, refute) match
       case d: Diagnostics.Safe =>
-        assertEquals(d.checker, Checker.Fuzz)
+        assertEquals(d.checker, Diagnostics.Checker.Fuzz)
         assertEquals(d.refutedAttacks.map(_.complexity.isFuzz), Seq(false, true))
       case d => fail(s"not safe: $d")
 
@@ -971,7 +1070,8 @@ class ReDoSSuite extends munit.FunSuite:
 
     // It is so when the fuzz checker does not finish in time too.
     val timeout =
-      (d: Diagnostics.Vulnerable) => if d.checker == Checker.Fuzz then throw new TimeoutException("test") else refute(d)
+      (d: Diagnostics.Vulnerable) =>
+        if d.checker == Diagnostics.Checker.Fuzz then throw new TimeoutException("test") else refute(d)
     diagnose(source, params, timeout) match
       case d: Diagnostics.Safe =>
         assertEquals(d, automatonSafe(d.refutedAttacks))
@@ -980,7 +1080,7 @@ class ReDoSSuite extends munit.FunSuite:
 
     // It is so when the fuzz checker does not support the pattern too.
     val unsupported = (d: Diagnostics.Vulnerable) =>
-      if d.checker == Checker.Fuzz then throw new UnsupportedException("test") else refute(d)
+      if d.checker == Diagnostics.Checker.Fuzz then throw new UnsupportedException("test") else refute(d)
     diagnose(source, params, unsupported) match
       case d: Diagnostics.Safe =>
         assertEquals(d, automatonSafe(d.refutedAttacks))
@@ -989,16 +1089,18 @@ class ReDoSSuite extends munit.FunSuite:
 
     // Another error of the fuzz checker is the result.
     val unexpected = (d: Diagnostics.Vulnerable) =>
-      if d.checker == Checker.Fuzz then throw new UnexpectedException("test") else refute(d)
+      if d.checker == Diagnostics.Checker.Fuzz then throw new UnexpectedException("test") else refute(d)
     diagnose(source, params, unexpected) match
-      case d: Diagnostics.Unknown => assertEquals(d.error, Diagnostics.ErrorKind.Unexpected("test"))
-      case d                      => fail(s"not unknown: $d")
+      case d: Diagnostics.Unknown =>
+        assertEquals(d.error, Diagnostics.ErrorKind.Unexpected("test"))
+        assertEquals(d.checker, Some(Diagnostics.Checker.Fuzz))
+      case d => fail(s"not unknown: $d")
 
     // The automaton checker that reaches the limit by itself has attacks left, so the result is unknown.
     diagnose(source, params.copy(maxRefutedAttacks = 1), refute) match
       case d: Diagnostics.Unknown =>
         assertEquals(d.error, Diagnostics.ErrorKind.RuntimeAttacksRefuted)
-        assertEquals(d.checker, Some(Checker.Automaton))
+        assertEquals(d.checker, Some(Diagnostics.Checker.Automaton))
       case d => fail(s"not unknown: $d")
 
   val MaxNestingDepth: Int = Parser.MaxNestingDepth
