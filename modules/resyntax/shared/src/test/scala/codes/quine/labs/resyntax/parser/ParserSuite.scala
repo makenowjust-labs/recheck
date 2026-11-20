@@ -279,7 +279,7 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
     val node = Parser.parse("\uD800a", FlagSet.parse("u", JavaScript), JavaScript, UnitMode.UTF16CodePoint)
     assert(node.equalsWithoutLoc(Node(Sequence(Literal(0xd800), Literal('a')))), node)
 
-  // python-regex reads `{,}` as `*`, and repeats the node before inline flags and comments (regex 2026.11.18).
+  // python-regex reads `{,}` as `*`, and repeats the node before inline flags and comments (regex 2026.11.19).
   check("a{,}", "", PythonRegex())(Repeat(Node(Literal('a')), Unbounded(0, Greedy), Some("{,}")))
   // The AST keeps the inline flags after the repeat.
   checkPrinted("a(?i)*", "a*(?i)", "", PythonRegex()):
