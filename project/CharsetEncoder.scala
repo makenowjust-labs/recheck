@@ -1,6 +1,6 @@
 import scala.collection.mutable
 
-/** CharsetEncoder encodes integer sequences into string literals for `resyntax-charset`, which
+/** CharsetEncoder encodes integer sequences into string literals for `resyntax.charset`, which
   * `codes.quine.labs.resyntax.charset.CharsetDecoder` decodes.
   */
 object CharsetEncoder:

@@ -61,8 +61,6 @@ lazy val root = project
     execJS,
     resyntaxJVM,
     resyntaxJS,
-    resyntaxCharsetJVM,
-    resyntaxCharsetJS,
     codecJVM,
     codecJS,
     js,
@@ -174,7 +172,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
-  .dependsOn(common, exec, resyntaxCharset, resyntax)
+  .dependsOn(common, exec, resyntax)
 
 lazy val coreJVM = core.jvm
 lazy val coreJS = core.js
@@ -226,36 +224,16 @@ lazy val execJS = exec.js
 
 lazy val resyntax = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/resyntax"))
-  .dependsOn(resyntaxCharset)
   .settings(
     name := "resyntax",
     console / initialCommands := """
       |import codes.quine.labs.resyntax.*
       |import codes.quine.labs.resyntax.ast.*
+      |import codes.quine.labs.resyntax.charset.*
       |import codes.quine.labs.resyntax.dialect.*
       |import codes.quine.labs.resyntax.ir.*
       |import codes.quine.labs.resyntax.ir.build.*
       |import codes.quine.labs.resyntax.parser.*
-      |""".stripMargin,
-    // Settings for test:
-    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
-    testFrameworks += new TestFramework("munit.Framework")
-  )
-  .jsSettings(
-    coverageEnabled := false,
-    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
-      .cross(CrossVersion.for3Use2_13)
-  )
-
-lazy val resyntaxJVM = resyntax.jvm
-lazy val resyntaxJS = resyntax.js
-
-lazy val resyntaxCharset = crossProject(JVMPlatform, JSPlatform)
-  .in(file("modules/resyntax-charset"))
-  .settings(
-    name := "resyntax-charset",
-    console / initialCommands := """
-      |import codes.quine.labs.resyntax.charset.*
       |""".stripMargin,
     coverageExcludedFiles := ".*[/\\\\]src_managed[/\\\\].*",
     // Generators:
@@ -273,8 +251,8 @@ lazy val resyntaxCharset = crossProject(JVMPlatform, JSPlatform)
       .cross(CrossVersion.for3Use2_13)
   )
 
-lazy val resyntaxCharsetJVM = resyntaxCharset.jvm
-lazy val resyntaxCharsetJS = resyntaxCharset.js
+lazy val resyntaxJVM = resyntax.jvm
+lazy val resyntaxJS = resyntax.js
 
 lazy val codec = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/recheck-codec"))
