@@ -77,20 +77,26 @@ object ReDoS:
       params: Parameters,
       state: DiagnosticsState
   )(using ctx: Context): RuntimeAttacker =
-    val timeout = params.runtimeAttackTimeout
-    val compileTimeout = params.runtimeAttackCompileTimeout
-    val command = params.runtimeAttackCommand.get(params.dialect.name)
     val execute = (attack: AttackPattern) =>
-      RuntimeAttackExecutor.execute(source, flags, params.dialect, ir.mode, attack, timeout, compileTimeout, command)
+      RuntimeAttackExecutor.execute(
+        source,
+        flags,
+        params.dialect,
+        ir.mode,
+        attack,
+        runtimeAttackCommand = params.runtimeAttackCommand,
+        runtimeAttackCompileTimeout = params.runtimeAttackCompileTimeout,
+        runtimeAttackTimeout = params.runtimeAttackTimeout
+      )
     new RuntimeAttacker(
       state,
       execute,
       ir.readStartLocations(params.maxRefutedAttackPartSize),
       RuntimeAttacker.characteristicSets(ir, params.attackStringCharacteristics),
       ir.mode,
-      params.runtimeAttackLimit,
-      params.maxRuntimeAttackStringSize,
-      params.maxRefutedAttacks
+      limit = params.runtimeAttackLimit,
+      maxSize = params.maxRuntimeAttackStringSize,
+      maxRefutedAttacks = params.maxRefutedAttacks
     )
 
   /** Parses the pattern and the flags in the dialect, and builds its IR.
@@ -152,13 +158,14 @@ object ReDoS:
         ctx.log("auto: exceed maxPatternSize")
         throw UnsupportedException("The pattern is too large")
       else
-        val epsNFA = EpsNFABuilder.build(ir, maxNFASize, maxBackReferenceStrings)
-        val orderedNFA = epsNFA.toOrderedNFA(false, maxNFASize, maxDFASize).rename
+        val epsNFA =
+          EpsNFABuilder.build(ir, maxBackReferenceStrings = maxBackReferenceStrings, maxNFASize = maxNFASize)
+        val orderedNFA = epsNFA.toOrderedNFA(false, maxDFASize = maxDFASize, maxNFASize = maxNFASize).rename
         AutomatonChecker.check(
           epsNFA.restrictInputs(orderedNFA).mapAlphabet(alphabetRepresentative.of),
           false,
-          maxNFASize,
-          maxDFASize
+          maxDFASize = maxDFASize,
+          maxNFASize = maxNFASize
         )
 
     // The safe complexities follow the vulnerable ones.
@@ -168,7 +175,8 @@ object ReDoS:
         case vul: Complexity.Vulnerable[UChar] => vul
       .flatMap: vul =>
         attacks += vul
-        val attack = vul.buildAttackPattern(runtimeAttackLimit, maxRuntimeAttackStringSize, ir.mode)
+        val attack =
+          vul.buildAttackPattern(ir.mode, limit = runtimeAttackLimit, maxSize = maxRuntimeAttackStringSize)
         runtimeAttacker.attack(vul.toAttackComplexity, attack, vul.hotspot)
 
     diagnostics
@@ -198,34 +206,34 @@ object ReDoS:
       ir,
       FuzzProgram.from(ir),
       new Random(randomSeed),
-      seeder,
-      maxSimpleRepeatCount,
-      maxRepeatCount,
-      maxNFASize,
-      seedingLimit,
-      seedingTimeout,
-      incubationLimit,
-      incubationTimeout,
-      maxGeneStringSize,
-      attackLimit,
-      attackTimeout,
-      crossoverSize,
-      mutationSize,
-      maxAttackStringSize,
-      maxInitialGenerationSize,
-      maxGenerationSize,
-      maxAttackCandidates,
-      maxIteration,
-      maxDegree,
-      maxExtraDegree,
-      maxIncubationBoundedWidth,
-      maxBoostIteration,
-      boundedWidthRatio,
-      accelerationMode,
-      accelerationHitRatio,
-      alphabetRepresentative,
       runtimeAttacker,
-      automatonAttacks
+      automatonAttacks,
+      accelerationHitRatio = accelerationHitRatio,
+      accelerationMode = accelerationMode,
+      alphabetRepresentative = alphabetRepresentative,
+      attackLimit = attackLimit,
+      attackTimeout = attackTimeout,
+      boundedWidthRatio = boundedWidthRatio,
+      crossoverSize = crossoverSize,
+      incubationLimit = incubationLimit,
+      incubationTimeout = incubationTimeout,
+      maxAttackCandidates = maxAttackCandidates,
+      maxAttackStringSize = maxAttackStringSize,
+      maxBoostIteration = maxBoostIteration,
+      maxDegree = maxDegree,
+      maxExtraDegree = maxExtraDegree,
+      maxGeneStringSize = maxGeneStringSize,
+      maxGenerationSize = maxGenerationSize,
+      maxIncubationBoundedWidth = maxIncubationBoundedWidth,
+      maxInitialGenerationSize = maxInitialGenerationSize,
+      maxIteration = maxIteration,
+      maxNFASize = maxNFASize,
+      maxRepeatCount = maxRepeatCount,
+      maxSimpleRepeatCount = maxSimpleRepeatCount,
+      mutationSize = mutationSize,
+      seeder = seeder,
+      seedingLimit = seedingLimit,
+      seedingTimeout = seedingTimeout
     )
     // The fuzzing starts on the first iteration, so the diagnostics of an error in it have the upper bound.
     state.upperBound = upperBound

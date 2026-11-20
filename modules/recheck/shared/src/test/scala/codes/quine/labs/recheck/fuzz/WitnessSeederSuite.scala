@@ -21,20 +21,27 @@ class WitnessSeederSuite extends munit.FunSuite:
     WitnessSeeder.seed(
       FuzzProgram.from(ReDoS.parse(source, "", Dialect.JavaScript)),
       complexities,
-      DefaultIncubationLimit,
-      DefaultIncubationTimeout,
-      DefaultMaxGeneStringSize,
-      DefaultMaxDegree,
-      DefaultMaxInitialGenerationSize,
-      DefaultAccelerationMode,
-      DefaultAccelerationHitRatio
+      limit = DefaultIncubationLimit,
+      timeout = DefaultIncubationTimeout,
+      maxSize = DefaultMaxGeneStringSize,
+      accelerationHitRatio = DefaultAccelerationHitRatio,
+      accelerationMode = DefaultAccelerationMode,
+      maxDegree = DefaultMaxDegree,
+      maxInitialGenerationSize = DefaultMaxInitialGenerationSize
     )
 
   /** Checks the upper bound of the pattern, which has some. */
   def upperBound(source: String): Seq[Complexity.Vulnerable[UChar]] =
     import Parameters.*
     val ir = ReDoS.parse(source, "", Dialect.JavaScript)
-    FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100, DefaultAlphabetRepresentative).get
+    val bound = FuzzChecker.upperBound(
+      ir,
+      alphabetRepresentative = DefaultAlphabetRepresentative,
+      maxInitialGenerationSize = 100,
+      maxNFASize = DefaultMaxNFASize,
+      maxRepeatCount = DefaultMaxRepeatCount
+    )
+    bound.get
 
   test("WitnessSeeder.seed"):
     val witness = Witness[UChar](Seq((Seq.empty, Seq('a'))), Seq('!'))
@@ -81,11 +88,11 @@ class WitnessSeederSuite extends munit.FunSuite:
       WitnessSeeder.suffixedSeed(
         fuzz,
         seeds,
-        DefaultIncubationLimit,
-        DefaultIncubationTimeout,
-        DefaultMaxInitialGenerationSize,
-        DefaultAccelerationMode,
-        DefaultAccelerationHitRatio
+        limit = DefaultIncubationLimit,
+        timeout = DefaultIncubationTimeout,
+        accelerationHitRatio = DefaultAccelerationHitRatio,
+        accelerationMode = DefaultAccelerationMode,
+        maxInitialGenerationSize = DefaultMaxInitialGenerationSize
       )
 
     // The match of the witness succeeds unless `xyz` follows, which makes the look-ahead fail.

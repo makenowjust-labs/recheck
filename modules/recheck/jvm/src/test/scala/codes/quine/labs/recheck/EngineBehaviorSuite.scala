@@ -17,6 +17,7 @@ import codes.quine.labs.recheck.exec.PythonExecutor
 import codes.quine.labs.recheck.exec.PythonRegexExecutor
 import codes.quine.labs.recheck.exec.RubyExecutor
 import codes.quine.labs.recheck.exec.SourceFile
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.recheck.verification.RuntimeAttackProgram
 import codes.quine.labs.recheck.vm.Interpreter
 import codes.quine.labs.recheck.vm.ProgramBuilder
@@ -33,6 +34,10 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
 
   given ctx: Context = Context()
 
+  /** The options without a limit of the steps, which record nothing. */
+  val options: Interpreter.Options =
+    Interpreter.Options(limit = Int.MaxValue, accelerationHitRatio = Parameters.DefaultAccelerationHitRatio)
+
   def chars(source: String, flags: String, dialect: Dialect): CharSet =
     def last(data: IRNodeData): CharSet = data match
       case IRNodeData.Chars(set)      => set
@@ -44,7 +49,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
   def matches(source: String, flags: String, dialect: Dialect, input: UString): Boolean =
     val ir = ReDoS.parse(source, flags, dialect)
     val program = ProgramBuilder.build(ir, false)
-    Interpreter.run(program, input, Interpreter.Options()).status == Interpreter.Status.Ok
+    Interpreter.run(program, input, options).status == Interpreter.Status.Ok
 
   def marks(chars: UString, set: CharSet): String =
     chars.iterator.map(c => if set.contains(c) then "1" else "0").mkString(" ")
@@ -258,7 +263,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
         val program = ProgramBuilder.build(ir, false)
         subjects
           .map: s =>
-            val status = Interpreter.run(program, ir.mode.decode(s), Interpreter.Options()).status
+            val status = Interpreter.run(program, ir.mode.decode(s), options).status
             if status == Interpreter.Status.Ok then "1" else "0"
           .mkString(" ")
       catch case _: InvalidRegExpException => "error"
@@ -420,7 +425,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
   def openCaptureModel(patterns: Seq[(String, Seq[String])], dialect: Dialect): Seq[String] =
     for (source, subjects) <- patterns; subject <- subjects yield
       val ir = ReDoS.parse(source, "", dialect)
-      val result = Interpreter.run(ProgramBuilder.build(ir, false), ir.mode.decode(subject), Interpreter.Options())
+      val result = Interpreter.run(ProgramBuilder.build(ir, false), ir.mode.decode(subject), options)
       result.captures.fold("none"): captures =>
         captures.grouped(2).map(c => if c(0) < 0 || c(1) < 0 then "-" else s"${c(0)}-${c(1)}").mkString(" ")
 
@@ -631,7 +636,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     patterns.map: (source, flags, subject) =>
       try
         val ir = ReDoS.parse(source, flags, Dialect.DotNet)
-        val result = Interpreter.run(ProgramBuilder.build(ir, false), ir.mode.decode(subject), Interpreter.Options())
+        val result = Interpreter.run(ProgramBuilder.build(ir, false), ir.mode.decode(subject), options)
         result.captures.filter(_ => result.status == Interpreter.Status.Ok) match
           case Some(captures) => captures.grouped(2).map(g => s"${g(0)},${g(1)}").mkString(" ")
           case None           => "none"
@@ -912,7 +917,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     patterns.map: (source, flags, subject) =>
       try
         val ir = ReDoS.parse(source, flags, dialect)
-        val result = Interpreter.run(ProgramBuilder.build(ir, false), ir.mode.decode(subject), Interpreter.Options())
+        val result = Interpreter.run(ProgramBuilder.build(ir, false), ir.mode.decode(subject), options)
         result.captures.filter(_ => result.status == Interpreter.Status.Ok) match
           case Some(captures) => captures.grouped(2).map(g => s"${g(0)},${g(1)}").mkString(" ")
           case None           => "none"
@@ -1492,7 +1497,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
       try
         val ir = ReDoS.parse(source, flags, Dialect.ICU)
         val input = ir.mode.decode(subject)
-        val result = Interpreter.run(ProgramBuilder.build(ir, false), input, Interpreter.Options())
+        val result = Interpreter.run(ProgramBuilder.build(ir, false), input, options)
         def utf16(n: Int): Int = if n < 0 then n else ir.mode.encode(input.slice(0, n)).length
 
         result.captures.filter(_ => result.status == Interpreter.Status.Ok) match
@@ -1935,7 +1940,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
       try
         val ir = ReDoS.parse(source, flags, boostRegexDialect(tpe))
         val program = ProgramBuilder.build(ir, false)
-        val result = Interpreter.run(program, boostRegexUnits(tpe, subject), Interpreter.Options())
+        val result = Interpreter.run(program, boostRegexUnits(tpe, subject), options)
         result.captures.filter(_ => result.status == Interpreter.Status.Ok) match
           case Some(captures) => captures.grouped(2).map(g => s"${g(0)},${g(1)}").mkString(" ")
           case None           => "none"

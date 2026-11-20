@@ -68,21 +68,22 @@ object Attacker:
 private[fuzz] final class Attacker(
     val pattern: IRPattern,
     val fuzz: FuzzProgram,
-    val incubationLimit: Int,
-    val incubationTimeout: Duration,
+    val runtimeAttacker: RuntimeAttacker,
+    val upperBound: Option[Seq[Complexity.Vulnerable[UChar]]],
+    // Parameters:
+    val accelerationHitRatio: Double,
+    val accelerationMode: AccelerationMode,
+    val alphabetRepresentative: AlphabetRepresentative,
     val attackLimit: Int,
     val attackTimeout: Duration,
+    val boundedWidthRatio: Double,
+    val incubationLimit: Int,
+    val incubationTimeout: Duration,
     val maxAttackStringSize: Int,
+    val maxBoostIteration: Int,
     val maxDegree: Int,
     val maxExtraDegree: Int,
-    val maxIncubationBoundedWidth: Int,
-    val maxBoostIteration: Int,
-    val boundedWidthRatio: Double,
-    val accelerationMode: AccelerationMode,
-    val accelerationHitRatio: Double,
-    val alphabetRepresentative: AlphabetRepresentative,
-    val runtimeAttacker: RuntimeAttacker,
-    val upperBound: Option[Seq[Complexity.Vulnerable[UChar]]]
+    val maxIncubationBoundedWidth: Int
 )(using val ctx: Context):
 
   import ctx.*
@@ -259,13 +260,14 @@ private[fuzz] final class Attacker(
   def stepsOn(
       str: FString,
       count: Int,
+      memoizes: Boolean,
+      // Parameters:
       limit: Int,
-      timeout: Duration,
-      memoizes: Boolean = fuzz.usesAcceleration(accelerationMode)
+      timeout: Duration
   ): Option[Long] =
     runs.getOrElseUpdate(
       (str.seq, count, limit, timeout, memoizes), {
-        val opts = Options(limit, usesAcceleration = memoizes, accelerationHitRatio = accelerationHitRatio)
+        val opts = Options(usesAcceleration = memoizes, limit = limit, accelerationHitRatio = accelerationHitRatio)
         val result = Interpreter.runWithTimeout(fuzz.program, str.copy(n = count).toUString, opts, timeout)
         Option.unless(result.status == Status.Limit || result.status == Status.Timeout)(result.steps.toLong)
       }
@@ -276,16 +278,17 @@ private[fuzz] final class Attacker(
       str: FString,
       from: Int,
       to: Int,
+      memoizes: Boolean,
+      // Parameters:
       limit: Int,
-      timeout: Duration,
-      memoizes: Boolean = fuzz.usesAcceleration(accelerationMode)
+      timeout: Duration
   ): Option[Measurement] = interrupt:
     def measureOn(start: Int, stride: Int): Option[Measurement] =
       val window = IndexedSeq.newBuilder[Long]
       var count = start
       var size = 0
       while size < measuredDegree + 3 && count <= to do
-        stepsOn(str, count, limit, timeout, memoizes) match
+        stepsOn(str, count, memoizes, limit, timeout) match
           case None    => return Some(Measurement(Growth.Exponential, start, count - stride, true))
           case Some(s) =>
             window.addOne(s)
@@ -300,19 +303,21 @@ private[fuzz] final class Attacker(
   /** Measures the growth of the steps of the string on its first repeat counts, or on the first ones beyond the bounded
     * width of the pattern up to `maxIncubationBoundedWidth` if they tell none.
     */
-  def measureFirst(str: FString, limit: Int): Option[Measurement] =
-    measure(str, 1, Int.MaxValue, limit, incubationTimeout).orElse:
+  def measureFirst(str: FString, /* Parameters: */ limit: Int): Option[Measurement] =
+    val memoizes = fuzz.usesAcceleration(accelerationMode)
+    measure(str, 1, Int.MaxValue, memoizes, limit, incubationTimeout).orElse:
       Option
         .when(boundedWidth <= maxIncubationBoundedWidth)(countBeyond(str, boundedWidth))
-        .flatMap(measure(str, _, Int.MaxValue, limit, incubationTimeout))
+        .flatMap(measure(str, _, Int.MaxValue, memoizes, limit, incubationTimeout))
 
   /** Measures the growth of the steps of the string on the repeat counts up to the largest one whose run ends, from its
     * own.
     */
   def measureBelow(str: FString): Option[Measurement] = interrupt:
+    val memoizes = fuzz.usesAcceleration(accelerationMode)
     var count = str.n
-    while count > 1 && stepsOn(str, count, measurementLimit, incubationTimeout).isEmpty do count /= 2
-    measure(str, (count - measuredDegree - 2).max(1), count, measurementLimit, incubationTimeout)
+    while count > 1 && stepsOn(str, count, memoizes, measurementLimit, incubationTimeout).isEmpty do count /= 2
+    measure(str, (count - measuredDegree - 2).max(1), count, memoizes, measurementLimit, incubationTimeout)
 
   /** Measures the growth of a candidate again with the larger limit if a run stopped on measuring it, and returns the
     * candidate with it, or `None` if the steps do not grow more than linearly.
@@ -330,7 +335,7 @@ private[fuzz] final class Attacker(
   def confirm(str: FString, measurement: Measurement, measuresAgain: Boolean = true): Option[Measurement] = interrupt:
     val memoizes = fuzz.usesAccelerationOnAttack(accelerationMode)
     if str.isConstant then
-      return Option.when(stepsOn(str, str.n, attackLimit, attackTimeout, memoizes).isEmpty)(measurement)
+      return Option.when(stepsOn(str, str.n, memoizes, attackLimit, attackTimeout).isEmpty)(measurement)
     // The steps reach the limit on the count of the attack string, so the counts to confirm end on it.
     val end = attackCount(str, measurement.growth) match
       case Some(count) => count
@@ -343,8 +348,8 @@ private[fuzz] final class Attacker(
 
     // Runs the string on the count, and tells whether the growth lasts on it: the run stops, or its steps are the ones
     // of the polynomial.
-    def lastsOn(count: Int, limit: Int): Boolean =
-      stepsOn(str, count, limit, attackTimeout, memoizes).forall: steps =>
+    def lastsOn(count: Int, /* Parameters: */ limit: Int): Boolean =
+      stepsOn(str, count, memoizes, limit, attackTimeout).forall: steps =>
         measurement.growth match
           case p: Growth.Polynomial => p.stepsOn(count) == steps
           case Growth.Exponential   => false
@@ -352,7 +357,7 @@ private[fuzz] final class Attacker(
     def measuredAgain(count: Int): Option[Measurement] =
       if !measuresAgain then None
       else
-        measure(str, count, Int.MaxValue, attackLimit, attackTimeout, memoizes)
+        measure(str, count, Int.MaxValue, memoizes, attackLimit, attackTimeout)
           .filter(_.growth.isSuperLinear)
           .flatMap(confirm(str, _, false))
 
@@ -401,7 +406,7 @@ private[fuzz] final class Attacker(
       case Growth.Exponential =>
         val repeatSize = repeatsOf(str).map(_._2).sum
         val fixedSize = (sizeOn(str, 0) min Int.MaxValue).toInt
-        Some(RepeatCount.exponential(attackLimit, fixedSize, repeatSize, maxAttackStringSize).max(1))
+        Some(RepeatCount.exponential(fixedSize, repeatSize, attackLimit, maxAttackStringSize).max(1))
       case p: Growth.Polynomial =>
         def reaches(k: Int): Boolean = p.stepsOn(p.start + k * p.stride) >= attackLimit
         // The largest count whose string fits, where every part repeats.
@@ -432,10 +437,10 @@ private[fuzz] final class Attacker(
     // The runs memoize as the ones that confirm an attack do, which gives the same heat.
     // The run on a count of many steps does not end in the timeout otherwise, and its heat lacks the parts read later.
     val opts = Options(
-      attackLimit,
       usesAcceleration = fuzz.usesAccelerationOnAttack(accelerationMode),
-      accelerationHitRatio = accelerationHitRatio,
-      needsHeatmap = true
+      needsHeatmap = true,
+      limit = attackLimit,
+      accelerationHitRatio = accelerationHitRatio
     )
     val heats = counts.map: count =>
       Interpreter.runWithTimeout(fuzz.program, str.copy(n = count).toUString, opts, incubationTimeout).heatmap

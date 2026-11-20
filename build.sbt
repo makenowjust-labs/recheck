@@ -145,39 +145,61 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
       |  val ir = parse(source, flags, dialect)
       |  val program = time("compile")(ProgramBuilder.build(ir, false))
       |  val opts = Interpreter.Options(
-      |    limit = limit,
       |    usesAcceleration = usesAcceleration,
       |    needsLoopAnalysis = needsLoopAnalysis,
       |    needsFailedPoints = needsFailedPoints,
       |    needsCoverage = needsCoverage,
-      |    needsHeatmap = needsHeatmap
+      |    needsHeatmap = needsHeatmap,
+      |    limit = limit,
+      |    accelerationHitRatio = Parameters.DefaultAccelerationHitRatio
       |  )
       |  time("run")(Interpreter.run(program, ir.mode.decode(input), opts))
       |
       |def seed(
       |    source: String,
       |    flags: String,
-      |    maxSimpleRepeatSize: Int = Parameters.DefaultMaxSimpleRepeatCount,
-      |    maxNFASize: Int = Parameters.DefaultMaxNFASize,
-      |    maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
+      |    dialect: Dialect = Dialect.JavaScript,
       |    limit: Int = Parameters.DefaultIncubationLimit,
-      |    dialect: Dialect = Dialect.JavaScript
+      |    maxSize: Int = Parameters.DefaultMaxGeneStringSize,
+      |    alphabetRepresentative: AlphabetRepresentative = Parameters.DefaultAlphabetRepresentative,
+      |    maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
+      |    maxNFASize: Int = Parameters.DefaultMaxNFASize,
+      |    maxSimpleRepeatCount: Int = Parameters.DefaultMaxSimpleRepeatCount
       |)(using ctx: Context): Set[FString] =
       |  val ir = parse(source, flags, dialect)
-      |  time("seed")(StaticSeeder.seed(ir, maxSimpleRepeatSize, maxNFASize, maxInitialGenerationSize, limit))
+      |  time("seed")(
+      |    StaticSeeder.seed(
+      |      ir,
+      |      limit = limit,
+      |      maxSize = maxSize,
+      |      alphabetRepresentative = alphabetRepresentative,
+      |      maxInitialGenerationSize = maxInitialGenerationSize,
+      |      maxNFASize = maxNFASize,
+      |      maxSimpleRepeatCount = maxSimpleRepeatCount
+      |    )
+      |  )
       |
       |def execute(
       |    source: String,
       |    flags: String,
       |    attack: AttackPattern,
-      |    timeout: Duration = Duration(1, SECONDS),
       |    dialect: Dialect = Dialect.JavaScript,
-      |    command: Option[String] = None
+      |    runtimeAttackCommand: Map[String, String] = Parameters.DefaultRuntimeAttackCommand,
+      |    runtimeAttackCompileTimeout: Duration = Parameters.DefaultRuntimeAttackCompileTimeout,
+      |    runtimeAttackTimeout: Duration = Duration(1, SECONDS)
       |)(using ctx: Context): Option[RuntimeAttack] =
       |  val ir = parse(source, flags, dialect)
-      |  val compileTimeout = Parameters.DefaultRuntimeAttackCompileTimeout
       |  time("execute")(
-      |    RuntimeAttackExecutor.execute(source, flags, dialect, ir.mode, attack, timeout, compileTimeout, command)
+      |    RuntimeAttackExecutor.execute(
+      |      source,
+      |      flags,
+      |      dialect,
+      |      ir.mode,
+      |      attack,
+      |      runtimeAttackCommand = runtimeAttackCommand,
+      |      runtimeAttackCompileTimeout = runtimeAttackCompileTimeout,
+      |      runtimeAttackTimeout = runtimeAttackTimeout
+      |    )
       |  )
       |
       |""".stripMargin + ParametersGen.consoleCheck((ThisBuild / baseDirectory).value),

@@ -45,7 +45,17 @@ class RuntimeAttackExecutorRuntimeSuite extends munit.FunSuite with RuntimeHelpe
       command: Option[String] = None
   ): RuntimeAttack =
     val mode = ReDoS.parse(source, flags, dialect).mode
-    RuntimeAttackExecutor.execute(source, flags, dialect, mode, attack, timeout, Duration.Inf, command).get
+    val runtimeAttack = RuntimeAttackExecutor.execute(
+      source,
+      flags,
+      dialect,
+      mode,
+      attack,
+      runtimeAttackCommand = command.map(dialect.name -> _).toMap,
+      runtimeAttackCompileTimeout = Duration.Inf,
+      runtimeAttackTimeout = timeout
+    )
+    runtimeAttack.get
 
   /** Creates a shell script in a new directory with a space in its name. */
   def script(name: String, body: String): Path =
@@ -330,7 +340,7 @@ class RuntimeAttackExecutorRuntimeSuite extends munit.FunSuite with RuntimeHelpe
         Dialect.JavaScript,
         UnitMode.UTF16,
         exponential,
-        10.seconds,
-        Duration.Inf,
-        None
+        runtimeAttackCommand = Map.empty,
+        runtimeAttackCompileTimeout = Duration.Inf,
+        runtimeAttackTimeout = 10.seconds
       )

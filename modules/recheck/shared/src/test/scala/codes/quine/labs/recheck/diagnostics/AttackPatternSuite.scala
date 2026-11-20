@@ -29,11 +29,11 @@ class AttackPatternSuite extends munit.FunSuite:
       UnitMode.UTF16.decode("ef"),
       1
     )
-    assertEquals(attack.adjust(AttackComplexity.Polynomial(2, true), 100, 1000, UnitMode.UTF16).n, 10)
-    assertEquals(attack.adjust(AttackComplexity.Exponential(true), 100, 1000, UnitMode.UTF16).n, 6)
+    assertEquals(attack.adjust(AttackComplexity.Polynomial(2, true), UnitMode.UTF16, 100, 1000).n, 10)
+    assertEquals(attack.adjust(AttackComplexity.Exponential(true), UnitMode.UTF16, 100, 1000).n, 6)
     val paired = AttackPattern(Seq((UString(0xd800), UString(0xdc00), 0)), UString.empty, 1)
     intercept[UnexpectedException](
-      paired.adjust(AttackComplexity.Exponential(true), 100, 1000, UnitMode.UTF16CodePoint)
+      paired.adjust(AttackComplexity.Exponential(true), UnitMode.UTF16CodePoint, 100, 1000)
     )
 
   test("AttackPattern#admitsAnyRepeatCount"):

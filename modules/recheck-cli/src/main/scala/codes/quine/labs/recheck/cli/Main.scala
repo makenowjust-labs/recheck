@@ -128,14 +128,14 @@ class Main:
   def exit(exitCode: Int): Unit = sys.exit(exitCode)
 
   /** Runs a matching on the runtime for `recheck calibrate-runtime-attack`. */
-  def runRuntimeAttack(logger: Option[Context.Logger], compileTimeout: Duration, commands: Map[String, String])(
+  def runRuntimeAttack(params: Parameters)(
       source: String,
       dialect: Dialect,
       mode: UnitMode,
       string: AttackPattern,
       timeout: FiniteDuration
   ): Option[RuntimeAttack] =
-    CalibrateRuntimeAttackCommand.run(logger, compileTimeout, commands)(source, dialect, mode, string, timeout)
+    CalibrateRuntimeAttackCommand.run(params)(source, dialect, mode, string, timeout)
   // $COVERAGE-ON$
 
   def run(args: Array[String]): Unit = command.parse(args.toSeq, sys.env) match
@@ -151,9 +151,8 @@ class Main:
         case _: Diagnostics.Vulnerable | _: Diagnostics.Unknown => exit(1)
 
     case Right(action: CalibrateRuntimeAttackAction) =>
-      val params = action.params
-      val run = runRuntimeAttack(params.logger, params.runtimeAttackCompileTimeout, params.runtimeAttackCommand)
-      CalibrateRuntimeAttackCommand.calibrate(params, action.ratio, action.time)(run) match
+      val run = runRuntimeAttack(action.params)
+      CalibrateRuntimeAttackCommand.calibrate(action.params, action.ratio, action.time)(run) match
         case Right(calibration) =>
           Console.out.println(calibration.toString)
           if calibration.timeout.isEmpty then exit(1)

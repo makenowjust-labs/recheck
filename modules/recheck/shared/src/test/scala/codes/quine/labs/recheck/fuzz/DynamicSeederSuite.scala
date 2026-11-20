@@ -7,6 +7,7 @@ import scala.util.Try
 
 import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.fuzz.DynamicSeeder.*
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 
@@ -20,7 +21,15 @@ class DynamicSeederSuite extends munit.FunSuite:
       val result = for
         ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
         fuzz = FuzzProgram.from(ir)
-      yield DynamicSeeder.seed(fuzz, timeout = Duration.Inf)
+      yield DynamicSeeder.seed(
+        fuzz,
+        limit = Parameters.DefaultSeedingLimit,
+        timeout = Duration.Inf,
+        accelerationHitRatio = Parameters.DefaultAccelerationHitRatio,
+        accelerationMode = Parameters.DefaultAccelerationMode,
+        alphabetRepresentative = Parameters.DefaultAlphabetRepresentative,
+        maxInitialGenerationSize = Parameters.DefaultMaxInitialGenerationSize
+      )
       result.get.map(_.toString)
 
     assertEquals(seed("^(a|b)$", ""), Set("''", "'a'", "'b'"))

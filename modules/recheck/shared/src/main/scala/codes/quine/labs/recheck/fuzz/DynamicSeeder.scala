@@ -7,7 +7,6 @@ import scala.concurrent.duration.Duration
 import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.parameters.AccelerationMode
 import codes.quine.labs.recheck.parameters.AlphabetRepresentative
-import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.recheck.vm.Interpreter
 import codes.quine.labs.recheck.vm.Interpreter.CoverageItem
@@ -27,12 +26,13 @@ object DynamicSeeder:
   /** Computes an initial generation of the program. */
   def seed(
       fuzz: FuzzProgram,
-      limit: Int = Parameters.DefaultSeedingLimit,
+      // Parameters:
+      limit: Int,
       timeout: Duration,
-      maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
-      accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode,
-      accelerationHitRatio: Double = Parameters.DefaultAccelerationHitRatio,
-      alphabetRepresentative: AlphabetRepresentative = Parameters.DefaultAlphabetRepresentative
+      accelerationHitRatio: Double,
+      accelerationMode: AccelerationMode,
+      alphabetRepresentative: AlphabetRepresentative,
+      maxInitialGenerationSize: Int
   )(using ctx: Context): Set[FString] = ctx.interrupt:
     import ctx.*
 
@@ -42,12 +42,12 @@ object DynamicSeeder:
     val covered = mutable.Set.empty[CoverageItem]
 
     val opts = Options(
-      limit,
       usesAcceleration = fuzz.usesAcceleration(accelerationMode),
-      accelerationHitRatio = accelerationHitRatio,
       needsLoopAnalysis = true,
       needsFailedPoints = true,
-      needsCoverage = true
+      needsCoverage = true,
+      limit = limit,
+      accelerationHitRatio = accelerationHitRatio
     )
 
     interrupt:
@@ -107,7 +107,12 @@ object DynamicSeeder:
         Seq(t.insert(pos, s))
 
     /** Builds a patch from a failed point. */
-    def build(failed: FailedPoint, alphabet: PatternAlphabet, alphabetRepresentative: AlphabetRepresentative): Patch =
+    def build(
+        failed: FailedPoint,
+        alphabet: PatternAlphabet,
+        // Parameters:
+        alphabetRepresentative: AlphabetRepresentative
+    ): Patch =
       def charsOf(pairs: Set[(CharSet, CharKind)]): Set[UChar] = pairs.map((set, _) => alphabetRepresentative.of(set))
 
       failed.kind match
