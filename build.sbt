@@ -110,12 +110,13 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
       |def parse(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): IRPattern =
       |  time("parse"):
       |    val flagSet = FlagSet.parse(flags, dialect)
-      |    val node = Parser.parse(source, flagSet, dialect)
-      |    IRBuilder.build(node, flagSet, dialect, Parser.determineUnitMode(source, flagSet, dialect))
+      |    val mode = Parser.determineUnitMode(source, flagSet, dialect)
+      |    val node = Parser.parse(source, flagSet, dialect, mode)
+      |    IRBuilder.build(node, flagSet, dialect, mode)
       |
       |def compile(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): Program =
       |  val ir = parse(source, flags, dialect)
-      |  time("compile")(ProgramBuilder.build(ir).get)
+      |  time("compile")(ProgramBuilder.build(ir, false))
       |
       |def run(
       |    source: String,
@@ -130,7 +131,7 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
       |    dialect: Dialect = Dialect.JavaScript
       |)(using ctx: Context): Interpreter.Result =
       |  val ir = parse(source, flags, dialect)
-      |  val program = time("compile")(ProgramBuilder.build(ir).get)
+      |  val program = time("compile")(ProgramBuilder.build(ir, false))
       |  val opts = Interpreter.Options(
       |    limit = limit,
       |    usesAcceleration = usesAcceleration,
