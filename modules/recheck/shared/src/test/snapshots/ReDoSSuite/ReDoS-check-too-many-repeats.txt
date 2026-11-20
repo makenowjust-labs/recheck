@@ -1,0 +1,20 @@
+Input     : /^[a-z]{1,64}@[a-z]{1,255}$/
+Dialect   : javascript
+Status    : safe
+Complexity: safe
+Checker   : fuzz
+
+Upper bound:
+- Complexity: linear
+---
+Input         : /^(?:a|a){1,40}$/
+Dialect       : javascript
+Status        : vulnerable
+Complexity    : exponential (fuzz)
+Attack string : 'a'.repeat(32) + 'あ'
+Hotspot       : /^(?:<hot>a</>|<hot>a</>){1,40}$/
+Checker       : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /^(?:<hot>a</>|<hot>a</>){1,40}$/

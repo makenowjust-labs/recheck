@@ -1,0 +1,10 @@
+Input     : /^(?:a|a)*$/
+Dialect   : javascript
+Status    : safe
+Complexity: linear
+Checker   : automaton
+
+Refuted attacks:
+- Complexity    : exponential
+  Attack string : 'a'.repeat(31) + 'あ'
+  Runtime attack: refuted (finished in <time> ms on fake, timeout: 1000 ms)

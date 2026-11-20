@@ -1,0 +1,8 @@
+Input         : /^(a|a)*$/
+Dialect       : python (type: str)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : 'a' * 31 + 'あ'
+Hotspot       : /^(<hot>a</>|<hot>a</>)*$/
+Runtime attack: confirmed (timed out on python 3.15.2, timeout: 1000 ms)
+Checker       : automaton

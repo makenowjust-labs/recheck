@@ -1,0 +1,19 @@
+Input         : /^(?*(?:a|a)*)c/
+Dialect       : pcre
+Status        : vulnerable
+Complexity    : exponential (fuzz)
+Attack string : str_repeat('a', 31)
+Hotspot       : /^(?*(?:<hot>a</>|<hot>a</>)*)c/
+Checker       : fuzz
+---
+Input     : /^(?=(?:a|a)*)c/
+Dialect   : pcre
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input     : /^(?*a+)b+$/
+Dialect   : pcre
+Status    : safe
+Complexity: safe (fuzz)
+Checker   : fuzz

@@ -1,0 +1,5 @@
+Input  : /^(a|a)*(?R)?$/
+Dialect: pcre
+Status : unknown
+Error  : unsupported (unsupported syntax (RCall) at 7)
+Checker: fuzz

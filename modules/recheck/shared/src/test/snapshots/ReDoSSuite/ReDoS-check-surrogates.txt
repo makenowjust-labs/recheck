@@ -1,0 +1,115 @@
+Input     : /^(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF]|[\uDC00-\uDFFF])*$/u
+Dialect   : javascript
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input     : /^(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF]|[\uDC00-\uDFFF])*$/
+Dialect   : java
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input     : /^(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF]|[\uDC00-\uDFFF])*$/u
+Dialect   : javascript
+Status    : safe
+Complexity: safe
+Checker   : fuzz
+
+Upper bound:
+- Complexity: linear
+---
+Input     : /^(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF]|[\uDC00-\uDFFF])*$/
+Dialect   : java
+Status    : safe
+Complexity: safe
+Checker   : fuzz
+
+Upper bound:
+- Complexity: linear
+---
+Input         : /^(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF]|[\uDC00-\uDFFF])*$/
+Dialect       : javascript
+Status        : vulnerable
+Complexity    : exponential
+Attack string : '\uD800' + '\uDC00𐀀\uD800'.repeat(29) + 'あ'
+Hotspot       : /^(?:<hot>[\uD800-\uDBFF][\uDC00-\uDFFF]</>|<hot>[\uD800-\uDBFF]</>|<hot>[\uDC00-\uDFFF]</>)*$/
+Checker       : automaton
+---
+Input         : /^(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF]|[\uDC00-\uDFFF])*$/
+Dialect       : python (type: str)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : '\ud800' + '\udc00\ud800\udc00\ud800' * 29 + 'あ'
+Hotspot       : /^(?:<hot>[\uD800-\uDBFF][\uDC00-\uDFFF]</>|<hot>[\uD800-\uDBFF]</>|<hot>[\uDC00-\uDFFF]</>)*$/
+Checker       : automaton
+---
+Input     : /^(?:\uD800|\uD800)*(?:[^\uDC00-\uDFFF]|$)/u
+Dialect   : javascript
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input     : /^(?:\uD800|\uD800)*(?:[^\uDC00-\uDFFF]|$)/
+Dialect   : java
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input     : /^(?:\uD800[\uD800-\uDFFF]\uDFFF|\uD800[\uD800-\uDFFF]\uDFFF)*$/u
+Dialect   : javascript
+Status    : safe
+Complexity: constant
+Checker   : automaton
+---
+Input         : /^(?:\uD800[\uD800-\uDFFF]\uDFFF|\uD800[\uD800-\uDFFF]\uDFFF)*$/
+Dialect       : python (type: str)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : '\ud800\udfff' + '\udfff\ud800\ud801\udfff\ud800\ud801' * 28 + 'あ'
+Hotspot       : /^(?:<hot>\uD800[\uD800-\uDFFF]\uDFFF</>|<hot>\uD800[\uD800-\uDFFF]\uDFFF</>)*$/
+Checker       : automaton
+---
+Input         : /^(?:[\uD800-\uFFFF]|[\uD800-\uFFFF])*$/u
+Dialect       : javascript
+Status        : vulnerable
+Complexity    : exponential
+Attack string : '０'.repeat(31) + 'あ'
+Hotspot       : /^(?:<hot>[\uD800-\uFFFF]</>|<hot>[\uD800-\uFFFF]</>)*$/u
+Checker       : automaton
+---
+Input         : /^(?:[\uD800-\uFFFF]|[\uD800-\uFFFF])*$/
+Dialect       : java
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "０".repeat(31) + "あ"
+Hotspot       : /^(?:<hot>[\uD800-\uFFFF]</>|<hot>[\uD800-\uFFFF]</>)*$/
+Checker       : automaton
+---
+Input         : /\A(?:[^\u0000-\u{D7FF}]|[^\u0000-\u{D7FF}])*\z/
+Dialect       : ruby (encoding: UTF-8)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "０" * 31 + "あ"
+Hotspot       : /\A(?:<hot>[^\u0000-\u{D7FF}]</>|<hot>[^\u0000-\u{D7FF}]</>)*\z/
+Checker       : automaton
+---
+Input         : /^(?:[^\x00-\x{D7FF}]|[^\x00-\x{D7FF}])*$/u
+Dialect       : pcre
+Status        : vulnerable
+Complexity    : exponential
+Attack string : str_repeat("０", 31) . "あ"
+Hotspot       : /^(?:<hot>[^\x00-\x{D7FF}]</>|<hot>[^\x00-\x{D7FF}]</>)*$/u
+Checker       : automaton
+---
+Input     : /\A(?:\p{Cs}|\p{Cs})*\z/
+Dialect   : ruby (encoding: UTF-8)
+Status    : safe
+Complexity: safe
+Checker   : automaton
+---
+Input     : /^(?:\p{Cs}|\p{Cs})*$/u
+Dialect   : pcre
+Status    : safe
+Complexity: constant
+Checker   : automaton

@@ -1,0 +1,37 @@
+Input         : /\A[ßx]*\z/i
+Dialect       : ruby (encoding: UTF-8)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "ſ" + "ſſſſ" * 29
+Hotspot       : /\A<hot>[ßx]</>*\z/i
+Checker       : automaton
+---
+Input     : /\A[ßx]*\z/i
+Dialect   : perl (utf8: true, source: literal)
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input         : /\A[ßẞ]*\z/i
+Dialect       : perl (utf8: true, source: literal)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "\x{17F}" . "\x{17F}\x{17F}\x{17F}\x{17F}" x 29
+Hotspot       : /\A<hot>[ßẞ]</>*\z/i
+Checker       : automaton
+---
+Input         : /\A(?:[ß]|ss)*\z/i
+Dialect       : ruby (encoding: UTF-8)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "ſ" + "ſſſſ" * 29
+Hotspot       : /\A(?:<hot>[ß]</>|<cold>ss</>)*\z/i
+Checker       : automaton
+---
+Input         : /\A(?:[ß]|ss)*\z/i
+Dialect       : perl (utf8: true, source: literal)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "\x{17F}" . "\x{17F}\x{17F}\x{17F}\x{17F}" x 29
+Hotspot       : /\A(?:<hot>[ß]</>|<hot>ss</>)*\z/i
+Checker       : automaton

@@ -1,0 +1,101 @@
+Input         : /^(a|a)*$/
+Dialect       : python (type: str)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : 'a' * 31 + 'あ'
+Hotspot       : /^(<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input         : /^(?:a|a)*$/
+Dialect       : java
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "a".repeat(31) + "あ"
+Hotspot       : /^(?:<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input         : /\A(?:a|a)*\z/
+Dialect       : ruby (encoding: UTF-8)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "a" * 31 + "あ"
+Hotspot       : /\A(?:<hot>a</>|<hot>a</>)*\z/
+Checker       : automaton
+---
+Input         : /^(a|a)*$/
+Dialect       : ruby (encoding: UTF-8)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "a" + "a" * 31 + "あ"
+Hotspot       : /^(<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input         : /\A(?:a|a)*$/
+Dialect       : ruby (encoding: UTF-8)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "a" + "a" * 31 + "あ"
+Hotspot       : /\A(?:<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input         : /^(?:a|a)*$\n/
+Dialect       : python (type: str)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : 'a' + 'a' * 31 + 'あ'
+Hotspot       : /^(?:<hot>a</>|<hot>a</>)*$\n/
+Checker       : automaton
+---
+Input         : /(?m)^(?:a|a)*(?d:$)/
+Dialect       : java
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "a" + "a".repeat(31) + "\r"
+Hotspot       : /(?m)^(?:<hot>a</>|<hot>a</>)*(?d:$)/
+Checker       : automaton
+---
+Input         : /\b(?:a|a)*(?a:\b)/
+Dialect       : python (type: str)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : 'a' + 'a' * 31 + '0'
+Hotspot       : /\b(?:<hot>a</>|<hot>a</>)*(?a:\b)/
+Checker       : automaton
+---
+Input         : /^a(?:́|\B́)*$/
+Dialect       : java
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "a\u0301" + "\u0301".repeat(31) + "_"
+Hotspot       : /^<cold>a</>(?:<hot>́</>|\B<hot>́</>)*$/
+Checker       : automaton
+---
+Input     : /^a(?:́|\b́)*$/
+Dialect   : java
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input         : /^(?:é|é)*$/
+Dialect       : pcre
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "\xC3" . str_repeat("\xA9\xC3\xA9\xC3", 29) . '!'
+Hotspot       : /^(?:<hot>é</>|<hot>é</>)*$/
+Checker       : automaton
+---
+Input         : /^(?:é|é)*$/u
+Dialect       : pcre
+Status        : vulnerable
+Complexity    : exponential
+Attack string : str_repeat("é", 31) . "あ"
+Hotspot       : /^(?:<hot>é</>|<hot>é</>)*$/u
+Checker       : automaton
+---
+Input         : /(*CRLF)^(?:a|.)*$/
+Dialect       : pcre
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "\r" . str_repeat("a\r", 30) . "\r\n\n"
+Hotspot       : /(*CRLF)^(?:<hot>a</>|.)*$/
+Checker       : automaton

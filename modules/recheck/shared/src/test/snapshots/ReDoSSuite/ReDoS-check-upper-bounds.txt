@@ -1,0 +1,81 @@
+Input     : /^([a-z]+)=\1$/
+Dialect   : javascript
+Status    : safe
+Complexity: safe
+Checker   : fuzz
+
+Upper bound:
+- Complexity: linear
+---
+Input     : /^(['"])[^'"]*\1$/
+Dialect   : javascript
+Status    : safe
+Complexity: safe
+Checker   : fuzz
+
+Upper bound:
+- Complexity: linear
+---
+Input     : /^a+/
+Dialect   : javascript
+Status    : safe
+Complexity: safe
+Checker   : fuzz
+
+Upper bound:
+- Complexity: linear
+---
+Input     : /./
+Dialect   : javascript
+Status    : safe
+Complexity: safe
+Checker   : fuzz
+
+Upper bound:
+- Complexity: linear
+---
+Input     : /^\w+@/
+Dialect   : javascript
+Status    : safe
+Complexity: safe
+Checker   : fuzz
+
+Upper bound:
+- Complexity: linear
+---
+Input     : /^([a-z]+)=\1$/
+Dialect   : javascript
+Status    : safe
+Complexity: safe
+Checker   : fuzz
+
+Upper bound:
+- Complexity: linear
+---
+Input  : /^([a-z]+)=\1$/
+Dialect: javascript
+Status : unknown
+Error  : unsupported (back-reference)
+Checker: automaton
+---
+Input     : /^(a|aa)\1*$/
+Dialect   : javascript
+Status    : safe
+Complexity: safe (fuzz)
+Checker   : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /^(<hot>a</>|<hot>aa</>)\1*$/
+---
+Input         : /^(?:-(\ba)\1|-aa)*$/
+Dialect       : javascript
+Status        : vulnerable
+Complexity    : exponential (fuzz)
+Attack string : '-aa'.repeat(30) + 'a'
+Hotspot       : /^(?:<hot>-</>(\b<hot>a</>)<hot>\1</>|<hot>-aa</>)*$/
+Checker       : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /^(?:<hot>-</>(\b<hot>a</>)\1|<hot>-aa</>)*$/

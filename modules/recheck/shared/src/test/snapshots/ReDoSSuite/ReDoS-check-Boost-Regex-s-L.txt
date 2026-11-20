@@ -1,0 +1,13 @@
+Input         : /(?m)^(?:\n|x)*b/M
+Dialect       : boost-regex
+Status        : vulnerable
+Complexity    : 2nd degree polynomial
+Attack string : b'\n' + b'\n' * 54773 + b'\x0cb'
+Hotspot       : /(?m)^(?:<hot>\n</>|x)*<cold>b</>/M
+Checker       : automaton
+---
+Input     : /(?m)^(?:\n|x)*b/L
+Dialect   : boost-regex
+Status    : safe
+Complexity: linear
+Checker   : automaton

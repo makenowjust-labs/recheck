@@ -1,0 +1,79 @@
+Input     : /^a$/
+Dialect   : python (type: bytes)
+Status    : safe
+Complexity: safe
+Checker   : automaton
+---
+Input         : /^(a|a)*$/
+Dialect       : python (type: bytes)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : b'a' * 31 + b'!'
+Hotspot       : /^(<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input  : /(a/
+Dialect: python (type: bytes)
+Status : unknown
+Error  : invalid RegExp (Unclosed group at 2)
+Checker: (none)
+---
+Input     : /^a$/
+Dialect   : ruby (encoding: ASCII-8BIT)
+Status    : safe
+Complexity: safe
+Checker   : automaton
+---
+Input         : /^(a|a)*$/
+Dialect       : ruby (encoding: ASCII-8BIT)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "a".b + "a".b * 31 + "!".b
+Hotspot       : /^(<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input  : /(a/
+Dialect: ruby (encoding: ASCII-8BIT)
+Status : unknown
+Error  : invalid RegExp (Unclosed group at 2)
+Checker: (none)
+---
+Input     : /^a$/
+Dialect   : perl (utf8: true, source: literal)
+Status    : safe
+Complexity: safe
+Checker   : automaton
+---
+Input         : /^(a|a)*$/
+Dialect       : perl (utf8: true, source: literal)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "a" x 31 . "\x{3042}"
+Hotspot       : /^(<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input  : /(a/
+Dialect: perl (utf8: true, source: literal)
+Status : unknown
+Error  : invalid RegExp (Unclosed group at 2)
+Checker: (none)
+---
+Input     : /^a$/
+Dialect   : perl (utf8: false, source: string)
+Status    : safe
+Complexity: safe
+Checker   : automaton
+---
+Input         : /^(a|a)*$/
+Dialect       : perl (utf8: false, source: string)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "a" x 31 . "!"
+Hotspot       : /^(<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input  : /(a/
+Dialect: perl (utf8: false, source: string)
+Status : unknown
+Error  : invalid RegExp (Unclosed group at 2)
+Checker: (none)

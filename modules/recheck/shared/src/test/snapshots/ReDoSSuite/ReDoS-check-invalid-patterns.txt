@@ -1,0 +1,5 @@
+Input  : /(?<=a+)/
+Dialect: python (type: str)
+Status : unknown
+Error  : invalid RegExp (Look-behind requires fixed-width pattern at 0)
+Checker: (none)
