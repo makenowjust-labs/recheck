@@ -103,7 +103,8 @@ object Diagnostics:
         dialect: Dialect,
         unitMode: Option[UnitMode],
         refutedAttacks: Seq[RefutedAttack],
-        ex: ReDoSException
+        ex: ReDoSException,
+        checker: Option[Checker]
     ): Diagnostics =
       val kind = ex match
         case _: TimeoutException        => ErrorKind.Timeout
@@ -111,7 +112,7 @@ object Diagnostics:
         case ex: UnsupportedException   => ErrorKind.Unsupported(ex.getMessage)
         case ex: InvalidRegExpException => ErrorKind.InvalidRegExp(ex.getMessage)
         case ex: UnexpectedException    => ErrorKind.Unexpected(ex.getMessage)
-      Unknown(source, flags, dialect, unitMode, kind, refutedAttacks, ex.checker)
+      Unknown(source, flags, dialect, unitMode, kind, refutedAttacks, checker)
 
   /** Returns the section of the upper bound after a blank line, or an empty string if there is none.
     *

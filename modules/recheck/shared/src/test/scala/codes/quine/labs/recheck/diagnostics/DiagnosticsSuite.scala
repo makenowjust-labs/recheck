@@ -268,9 +268,10 @@ class DiagnosticsSuite extends munit.FunSuite:
       Diagnostics.Unknown("", "", Dialect.JavaScript, None, Diagnostics.ErrorKind.Timeout, Seq(refutedAttack), None)
 
   test("Diagnostics.Unknown.from"):
+    val mode = Some(UnitMode.UTF16)
     assertEquals(
       Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new TimeoutException("foo")),
+        .from("", "", Dialect.JavaScript, mode, Seq(refutedAttack), new TimeoutException("foo"), Some(Checker.Fuzz)),
       Diagnostics.Unknown(
         "",
         "",
@@ -278,12 +279,11 @@ class DiagnosticsSuite extends munit.FunSuite:
         Some(UnitMode.UTF16),
         Diagnostics.ErrorKind.Timeout,
         Seq(refutedAttack),
-        None
+        Some(Checker.Fuzz)
       )
     )
     assertEquals(
-      Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new CancelException("foo")),
+      Diagnostics.Unknown.from("", "", Dialect.JavaScript, mode, Seq(refutedAttack), new CancelException("foo"), None),
       Diagnostics.Unknown(
         "",
         "",
@@ -296,7 +296,7 @@ class DiagnosticsSuite extends munit.FunSuite:
     )
     assertEquals(
       Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new InvalidRegExpException("foo")),
+        .from("", "", Dialect.JavaScript, mode, Seq(refutedAttack), new InvalidRegExpException("foo"), None),
       Diagnostics.Unknown(
         "",
         "",
@@ -309,7 +309,7 @@ class DiagnosticsSuite extends munit.FunSuite:
     )
     assertEquals(
       Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new UnsupportedException("foo")),
+        .from("", "", Dialect.JavaScript, mode, Seq(refutedAttack), new UnsupportedException("foo"), None),
       Diagnostics.Unknown(
         "",
         "",
@@ -322,7 +322,7 @@ class DiagnosticsSuite extends munit.FunSuite:
     )
     assertEquals(
       Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new UnexpectedException("foo")),
+        .from("", "", Dialect.JavaScript, mode, Seq(refutedAttack), new UnexpectedException("foo"), None),
       Diagnostics.Unknown(
         "",
         "",

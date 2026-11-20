@@ -37,9 +37,9 @@ class ReDoSSuite extends munit.FunSuite:
 
   /** Returns the vulnerable diagnostics of a checker followed by its safe diagnostics, with its upper bound. */
   def concat(
-      result: (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound])
+      result: (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound], () => Checker.Used)
   ): Iterator[Diagnostics] =
-    val (vulnerable, safe, upperBound) = result
+    val (vulnerable, safe, upperBound, _) = result
     (vulnerable ++ Iterator(safe())).map(_.withUpperBound(upperBound()))
 
   def checkAutomaton(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
@@ -590,7 +590,8 @@ class ReDoSSuite extends munit.FunSuite:
     val sets = ReDoS.characteristicSets(ir, params.attackStringCharacteristics)
     val refutedAttacks = mutable.ArrayBuffer.empty[RefutedAttack]
     val avoidsAttack = ReDoS.isRefuted(refutedAttacks, readStarts, sets, _, _, _)
-    val (candidates, fuzzSafe, fuzzUpperBound) = ReDoS.checkFuzz("^(?:a|a)*$", "", ir, params, avoidsAttack, Seq.empty)
+    val (candidates, fuzzSafe, fuzzUpperBound, _) =
+      ReDoS.checkFuzz("^(?:a|a)*$", "", ir, params, avoidsAttack, Seq.empty)
     val verify = (d: Diagnostics.Vulnerable) => d.copy(runtimeAttack = finish)
     val result = ReDoS.verifyCandidates(candidates, fuzzSafe, verify, refutedAttacks, 100, readStarts, sets)
     result.withUpperBound(fuzzUpperBound()) match
@@ -991,8 +992,10 @@ class ReDoSSuite extends munit.FunSuite:
     val unexpected = (d: Diagnostics.Vulnerable) =>
       if d.checker == Checker.Fuzz then throw new UnexpectedException("test") else refute(d)
     diagnose(source, params, unexpected) match
-      case d: Diagnostics.Unknown => assertEquals(d.error, Diagnostics.ErrorKind.Unexpected("test"))
-      case d                      => fail(s"not unknown: $d")
+      case d: Diagnostics.Unknown =>
+        assertEquals(d.error, Diagnostics.ErrorKind.Unexpected("test"))
+        assertEquals(d.checker, Some(Checker.Fuzz))
+      case d => fail(s"not unknown: $d")
 
     // The automaton checker that reaches the limit by itself has attacks left, so the result is unknown.
     diagnose(source, params.copy(maxRefutedAttacks = 1), refute) match

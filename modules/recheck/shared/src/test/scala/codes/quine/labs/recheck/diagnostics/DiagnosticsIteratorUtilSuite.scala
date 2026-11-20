@@ -21,24 +21,8 @@ class DiagnosticsIteratorUtilSuite extends munit.FunSuite:
       Checker.Automaton
     )
 
-  /** Returns no iterator, but throws the exception. */
-  def raise(ex: Exception): Iterator[Diagnostics] = throw ex
-
-  test("DiagnosticsIteratorUtil.withChecker"):
-    assertEquals(Iterator(safe("a")).withChecker(Checker.Fuzz).toList, List(safe("a")))
-    // An exception on building or iterating the diagnostics gets the checker.
-    val building = intercept[UnsupportedException]:
-      raise(new UnsupportedException("foo")).withChecker(Checker.Fuzz).toList
-    assertEquals[Option[Checker], Option[Checker]](building.checker, Some(Checker.Fuzz))
-    val iterating = intercept[UnsupportedException]:
-      (Iterator(safe("a")) ++ Iterator(throw new UnsupportedException("foo"))).withChecker(Checker.Fuzz).toList
-    assertEquals[Option[Checker], Option[Checker]](iterating.checker, Some(Checker.Fuzz))
-    // An exception having a checker keeps it.
-    val ex = new UnsupportedException("foo")
-    ex.checker = Some(Checker.Automaton)
-    val kept = intercept[UnsupportedException]:
-      raise(ex).withChecker(Checker.Fuzz).toList
-    assertEquals[Option[Checker], Option[Checker]](kept.checker, Some(Checker.Automaton))
+  /** Returns the iterator that throws the exception on the first iteration. */
+  def raise(ex: Exception): Iterator[Diagnostics] = Iterator(()).flatMap(_ => throw ex)
 
   test("DiagnosticsIteratorUtil.recoverWith"):
     val recover: PartialFunction[Throwable, Iterator[Diagnostics]] =
