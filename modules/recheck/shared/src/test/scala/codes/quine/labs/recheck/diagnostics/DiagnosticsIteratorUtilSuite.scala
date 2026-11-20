@@ -1,7 +1,6 @@
 package codes.quine.labs.recheck
 package diagnostics
 
-import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.*
@@ -18,7 +17,7 @@ class DiagnosticsIteratorUtilSuite extends munit.FunSuite:
       UnitMode.UTF16,
       AttackComplexity.Constant,
       Seq.empty,
-      Checker.Automaton
+      Diagnostics.Checker.Automaton
     )
 
   /** Returns the iterator that throws the exception on the first iteration. */

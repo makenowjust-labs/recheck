@@ -104,7 +104,7 @@ object ReDoS:
             Iterator[Diagnostics.Vulnerable],
             () => Diagnostics.Safe,
             () => Option[UpperBound],
-            () => Checker.Used
+            () => Diagnostics.Checker
         )
     ): Diagnostics =
       val (candidates, safe, upperBound, checker) = checking
@@ -130,7 +130,7 @@ object ReDoS:
       case Checker.Auto      =>
         val attacks = mutable.ArrayBuffer.empty[Complexity.Vulnerable[UChar]]
         run(checkAuto(source, flags, ir, params, avoidsAttack, attacks)) match
-          case safe: Diagnostics.Safe if safe.checker == Checker.Automaton && refutedAttacks.nonEmpty =>
+          case safe: Diagnostics.Safe if safe.checker == Diagnostics.Checker.Automaton && refutedAttacks.nonEmpty =>
             ctx.log("auto: retry with the fuzz checker")
             val retried = run(checkFuzz(source, flags, ir, params, avoidsAttack, attacks.toSeq))
             if isUnfinished(retried) then
@@ -293,7 +293,7 @@ object ReDoS:
       attacks: mutable.Buffer[Complexity.Vulnerable[UChar]]
   )(using
       ctx: Context
-  ): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound], () => Checker.Used) =
+  ): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound], () => Diagnostics.Checker) =
     import params.*
     val maxNFASize = if checker == Checker.Auto then params.maxNFASize else Int.MaxValue
     val maxDFASize = if checker == Checker.Auto then params.maxDFASize else Int.MaxValue
@@ -337,16 +337,16 @@ object ReDoS:
             vul.hotspot,
             None,
             Seq.empty,
-            Checker.Automaton
+            Diagnostics.Checker.Automaton
           )
 
     def safe(): Diagnostics.Safe =
       val complexity = rest.nextOption() match
         case Some(safe: Complexity.Safe) => safe.toAttackComplexity
         case _                           => AttackComplexity.Safe(false)
-      Diagnostics.Safe(source, flags, params.dialect, ir.mode, complexity, Seq.empty, Checker.Automaton)
+      Diagnostics.Safe(source, flags, params.dialect, ir.mode, complexity, Seq.empty, Diagnostics.Checker.Automaton)
 
-    (diagnostics, safe, () => None, () => Checker.Automaton)
+    (diagnostics, safe, () => None, () => Diagnostics.Checker.Automaton)
 
   /** Runs the fuzz checker, and returns the vulnerable diagnostics it finds, a function giving the safe diagnostics
     * once they run out, a function giving the upper bound found before fuzzing, and a function giving the checker.
@@ -364,7 +364,7 @@ object ReDoS:
       automatonAttacks: Seq[Complexity.Vulnerable[UChar]]
   )(using
       ctx: Context
-  ): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound], () => Checker.Used) =
+  ): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound], () => Diagnostics.Checker) =
     import params.*
 
     var upperBound = Option.empty[UpperBound]
@@ -421,12 +421,13 @@ object ReDoS:
             hotspot,
             None,
             Seq.empty,
-            Checker.Fuzz
+            Diagnostics.Checker.Fuzz
           )
 
     val diagnostics = Iterator(()).flatMap(_ => diagnose)
-    val safe = () => Diagnostics.Safe(source, flags, params.dialect, ir.mode, safeComplexity, Seq.empty, Checker.Fuzz)
-    (diagnostics, safe, () => upperBound, () => Checker.Fuzz)
+    val safe = () =>
+      Diagnostics.Safe(source, flags, params.dialect, ir.mode, safeComplexity, Seq.empty, Diagnostics.Checker.Fuzz)
+    (diagnostics, safe, () => upperBound, () => Diagnostics.Checker.Fuzz)
 
   /** Runs the automaton checker, or the fuzz checker if the automaton checker gives up, and returns the vulnerable
     * diagnostics they find, and functions giving the safe diagnostics and the upper bound of the checker that ran last,
@@ -443,7 +444,7 @@ object ReDoS:
       attacks: mutable.Buffer[Complexity.Vulnerable[UChar]]
   )(using
       ctx: Context
-  ): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound], () => Checker.Used) =
+  ): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe, () => Option[UpperBound], () => Diagnostics.Checker) =
     val (automaton, automatonSafe, automatonUpperBound, automatonChecker) =
       checkAutomaton(source, flags, ir, params, attacks)
     var safe = automatonSafe

@@ -43,7 +43,7 @@ class ReDoSRuntimeSuite extends munit.FunSuite with RuntimeHelper:
         Some(UnitMode.UTF16),
         Diagnostics.ErrorKind.Timeout,
         Seq.empty,
-        Some(Checker.Automaton)
+        Some(Diagnostics.Checker.Automaton)
       )
     )
 

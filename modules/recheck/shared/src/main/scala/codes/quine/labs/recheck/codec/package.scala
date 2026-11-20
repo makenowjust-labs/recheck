@@ -12,7 +12,6 @@ import io.circe.HCursor
 import io.circe.Json
 import io.circe.syntax.*
 
-import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
@@ -72,7 +71,7 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "runtimeAttack" := runtimeAttack,
         "upperBound" := upperBound,
         "refutedAttacks" := refutedAttacks.map(encodeRefutedAttack(dialect, unitMode)(_)),
-        "checker" := (checker: Checker)
+        "checker" := checker
       )
     case Diagnostics.Unknown(source, flags, dialect, unitMode, error, refutedAttacks, checker, upperBound) =>
       Json.obj(
@@ -164,12 +163,11 @@ given decodeUnitMode: Decoder[UnitMode] = Decoder[String].emap:
   case "byte"             => Right(UnitMode.Byte)
   case name               => Left(s"Unknown unit mode: $name")
 
-/** An `Encoder` for `Checker`. */
-given encodeChecker: Encoder[Checker] with
-  def apply(c: Checker): Json = c match
-    case Checker.Auto      => "auto".asJson
-    case Checker.Automaton => "automaton".asJson
-    case Checker.Fuzz      => "fuzz".asJson
+/** An `Encoder` for `Diagnostics.Checker`. */
+given encodeChecker: Encoder[Diagnostics.Checker] with
+  def apply(c: Diagnostics.Checker): Json = c match
+    case Diagnostics.Checker.Automaton => "automaton".asJson
+    case Diagnostics.Checker.Fuzz      => "fuzz".asJson
 
 /** An `Encoder` for `AttackComplexity`. */
 given encodeAttackComplexity: Encoder[AttackComplexity] with
