@@ -1,0 +1,13 @@
+Input         : /\A(?:.|\x00)*b/
+Dialect       : boost-regex
+Status        : vulnerable
+Complexity    : exponential
+Attack string : b'\x00' * 31
+Hotspot       : /\A(?:<hot>.</>|<hot>\x00</>)*b/
+Checker       : automaton
+---
+Input     : /\A(?:.|\x00)*b/Z
+Dialect   : boost-regex
+Status    : safe
+Complexity: linear
+Checker   : automaton

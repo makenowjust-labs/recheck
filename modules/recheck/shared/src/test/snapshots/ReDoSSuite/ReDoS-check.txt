@@ -1,0 +1,44 @@
+Input     : /^foo$/
+Dialect   : javascript
+Status    : safe
+Complexity: safe
+Checker   : automaton
+---
+Input     : /^foo$/
+Dialect   : javascript
+Status    : safe
+Complexity: safe
+Checker   : automaton
+---
+Input     : /^foo$/
+Dialect   : javascript
+Status    : safe
+Complexity: safe
+Checker   : fuzz
+
+Upper bound:
+- Complexity: linear
+---
+Input     : /^.*$/
+Dialect   : javascript
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input     : /(?:a|a|a)*/y
+Dialect   : javascript
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input  : //x
+Dialect: javascript
+Status : unknown
+Error  : invalid RegExp (Unknown flag 'x' at 0)
+Checker: (none)
+---
+Input  : /^foo$/
+Dialect: javascript
+Status : unknown
+Error  : timeout
+Checker: (none)

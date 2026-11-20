@@ -38,6 +38,10 @@ val generateParameters = taskKey[Seq[File]]("Generate the Scala sources of the p
 
 val generateUnicodeData = taskKey[Seq[File]]("Generate the Scala sources of the Unicode data")
 
+val generateSnapshots = taskKey[Seq[File]]("Generate the Scala source of the snapshots of the tests")
+
+val updateSnapshots = taskKey[Unit]("Replace the snapshots of the tests with the ones that the tests wrote")
+
 def parametersGenerator(targets: ParametersGen.Target*): Seq[Def.Setting[?]] = Seq(
   Compile / sourceGenerators += generateParameters.taskValue,
   generateParameters := Def.uncached {
@@ -52,7 +56,11 @@ lazy val root = project
   .in(file("."))
   .settings(
     publish / skip := true,
-    coverageEnabled := false
+    coverageEnabled := false,
+    updateSnapshots := Def.uncached {
+      val log = streams.value.log
+      SnapshotsGen.update((ThisBuild / baseDirectory).value).foreach(name => log.info(s"updated the snapshot $name"))
+    }
   )
   .aggregate(
     recheckJVM,
@@ -68,6 +76,10 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck",
     parametersGenerator(ParametersGen.Target.Parameters, ParametersGen.Target.Codec),
+    Test / sourceGenerators += generateSnapshots.taskValue,
+    generateSnapshots := Def.uncached(
+      Seq(SnapshotsGen.generate((ThisBuild / baseDirectory).value, (Test / sourceManaged).value))
+    ),
     console / initialCommands := """
       |import scala.concurrent.duration.*
       |import scala.util.{Failure, Random, Success, Try}

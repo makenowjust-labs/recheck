@@ -1,0 +1,35 @@
+Input         : /(*NOTEMPTY)(?:|(?:a|a)*c)/
+Dialect       : pcre
+Status        : vulnerable
+Complexity    : exponential
+Attack string : 'a' . str_repeat('a', 31)
+Hotspot       : /(*NOTEMPTY)(?:|(?:<hot>a</>|<hot>a</>)*c)/
+Checker       : automaton
+---
+Input     : /(?:|(?:a|a)*c)/
+Dialect   : pcre
+Status    : safe
+Complexity: safe
+Checker   : automaton
+---
+Input         : /(?:|(?:a|a)*c)/E
+Dialect       : boost-regex
+Status        : vulnerable
+Complexity    : exponential
+Attack string : b'a' + b'a' * 31
+Hotspot       : /(?:|(?:<hot>a</>|<hot>a</>)*c)/E
+Checker       : automaton
+---
+Input         : /(?:|(?:a|a)*c)/I
+Dialect       : boost-regex
+Status        : vulnerable
+Complexity    : exponential
+Attack string : b'a' + b'a' * 31 + b'!'
+Hotspot       : /(?:|(?:<hot>a</>|<hot>a</>)*c)/I
+Checker       : automaton
+---
+Input     : /(?:|(?:a|a)*c)/
+Dialect   : boost-regex
+Status    : safe
+Complexity: safe
+Checker   : automaton

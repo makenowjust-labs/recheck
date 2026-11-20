@@ -1,0 +1,13 @@
+Input         : /^(?:a|(?<=a)a)*$/
+Dialect       : pcre
+Status        : vulnerable
+Complexity    : exponential
+Attack string : 'a' . str_repeat('a', 31) . '!'
+Hotspot       : /^(?:<hot>a</>|(?<=a)<hot>a</>)*$/
+Checker       : automaton
+---
+Input     : /^(?:(?<=a)b|a)*$/
+Dialect   : pcre
+Status    : safe
+Complexity: linear
+Checker   : automaton

@@ -1,0 +1,15 @@
+Input         : /\G(?:a|a)*$/
+Dialect       : pcre
+Status        : vulnerable
+Complexity    : exponential
+Attack string : str_repeat('a', 31) . '!'
+Hotspot       : /\G(?:<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input         : /^a\K(?:a|a)*$/
+Dialect       : pcre
+Status        : vulnerable
+Complexity    : exponential
+Attack string : 'a' . str_repeat('a', 31) . '!'
+Hotspot       : /^<cold>a</>\K(?:<hot>a</>|<hot>a</>)*$/
+Checker       : automaton

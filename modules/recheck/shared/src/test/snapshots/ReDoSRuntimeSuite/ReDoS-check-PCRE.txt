@@ -1,0 +1,8 @@
+Input         : /^(a|a)*$/
+Dialect       : pcre
+Status        : vulnerable
+Complexity    : exponential
+Attack string : str_repeat('a', 31) . '!'
+Hotspot       : /^(<hot>a</>|<hot>a</>)*$/
+Runtime attack: confirmed (engine limit: Backtrack limit exhausted on php 8.5.12 (PCRE2 10.49 2026-09-28, pcre.jit=1, pcre.backtrack_limit=1000000, pcre.recursion_limit=100000), timeout: 1000 ms)
+Checker       : automaton

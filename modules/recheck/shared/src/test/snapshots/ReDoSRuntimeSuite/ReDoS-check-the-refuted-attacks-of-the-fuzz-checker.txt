@@ -1,0 +1,14 @@
+Input     : /^(?:a|a)*$/
+Dialect   : javascript
+Status    : safe
+Complexity: safe (fuzz)
+Checker   : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /^(?:<hot>a</>|<hot>a</>)*$/
+
+Refuted attacks:
+- Complexity    : exponential (fuzz)
+  Attack string : 'a'.repeat(31) + 'あ'
+  Runtime attack: refuted (finished in <time> ms on fake, timeout: 1000 ms)
