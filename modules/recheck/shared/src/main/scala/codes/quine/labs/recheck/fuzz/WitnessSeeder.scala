@@ -20,13 +20,14 @@ object WitnessSeeder:
   def seed(
       fuzz: FuzzProgram,
       complexities: Seq[Complexity.Vulnerable[UChar]],
+      // Parameters:
       limit: Int,
       timeout: Duration,
       maxSize: Int,
-      maxDegree: Int,
-      maxInitialGenerationSize: Int,
+      accelerationHitRatio: Double,
       accelerationMode: AccelerationMode,
-      accelerationHitRatio: Double
+      maxDegree: Int,
+      maxInitialGenerationSize: Int
   )(using ctx: Context): Seq[FString] = ctx.interrupt:
     // The first seeds of the witnesses come before the others, so that every witness has a seed.
     val seeds = complexities.map(buildSeeds(_, limit, maxSize, maxDegree))
@@ -34,16 +35,17 @@ object WitnessSeeder:
     witnessSeed ++ suffixedSeed(
       fuzz,
       witnessSeed,
-      limit,
-      timeout,
-      maxInitialGenerationSize,
-      accelerationMode,
-      accelerationHitRatio
+      limit = limit,
+      timeout = timeout,
+      accelerationHitRatio = accelerationHitRatio,
+      accelerationMode = accelerationMode,
+      maxInitialGenerationSize = maxInitialGenerationSize
     )
 
   /** Builds seeds from the witness of the complexity, for the complexity and for each lower degree. */
   private[fuzz] def buildSeeds(
       complexity: Complexity.Vulnerable[UChar],
+      // Parameters:
       limit: Int,
       maxSize: Int,
       maxDegree: Int
@@ -68,15 +70,16 @@ object WitnessSeeder:
   private[fuzz] def suffixedSeed(
       fuzz: FuzzProgram,
       seeds: Seq[FString],
+      // Parameters:
       limit: Int,
       timeout: Duration,
-      maxInitialGenerationSize: Int,
+      accelerationHitRatio: Double,
       accelerationMode: AccelerationMode,
-      accelerationHitRatio: Double
+      maxInitialGenerationSize: Int
   )(using ctx: Context): Seq[FString] = ctx.interrupt:
     val opts = Options(
-      limit,
       usesAcceleration = fuzz.usesAcceleration(accelerationMode),
+      limit = limit,
       accelerationHitRatio = accelerationHitRatio
     )
     val suffixes = fuzz.parts.toSeq.map(_.iterator.map(FString.Wrap(_)).toIndexedSeq)

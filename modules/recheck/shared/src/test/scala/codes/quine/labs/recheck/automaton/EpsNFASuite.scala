@@ -354,7 +354,7 @@ class EpsNFASuite extends munit.FunSuite:
       )
     )
     interceptMessage[UnsupportedException]("OrderedNFA size is too large"):
-      nfa1.toOrderedNFA(false, 1, Int.MaxValue)
+      nfa1.toOrderedNFA(false, maxDFASize = Int.MaxValue, maxNFASize = 1)
     // The begin of the input is distinguished from a line terminator for an assertion seeing the difference.
     val begin = AssertKind.LineBegin(0, IRLineBeginAtEnd.InputBegin, false, false)
     val nfa3 = nfa1.copy(tau = nfa1.tau.updated(4, Assert(begin, 0)))
@@ -362,8 +362,8 @@ class EpsNFASuite extends munit.FunSuite:
     assertEquals(inits.map(_._1), Vector(CharKindState(CharKind.Boundary)))
     val lookBehind = EpsNFABuilder.build(
       ReDoS.parse("(?<=a)b", "", Dialect.JavaScript),
-      Int.MaxValue,
-      Parameters.DefaultMaxBackReferenceStrings
+      maxBackReferenceStrings = Parameters.DefaultMaxBackReferenceStrings,
+      maxNFASize = Int.MaxValue
     )
     interceptMessage[UnsupportedException]("look-ahead DFA size is too large"):
-      lookBehind.toOrderedNFA(false, Int.MaxValue, 1)
+      lookBehind.toOrderedNFA(false, maxDFASize = 1, maxNFASize = Int.MaxValue)

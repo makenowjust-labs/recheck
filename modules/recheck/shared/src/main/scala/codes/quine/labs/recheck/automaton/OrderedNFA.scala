@@ -91,7 +91,7 @@ final case class OrderedNFA[A, Q](
     * It throws [[UnsupportedException]] when the DFA would have `maxDFASize` transitions or more, or when the NFA with
     * it would have `maxNFASize` transitions or more by their least number (see [[toNFAwLA]]).
     */
-  def toLookAheadDFA(maxDFASize: Int, maxNFASize: Int = Int.MaxValue)(using ctx: Context): DFA[A, Set[Q]] =
+  def toLookAheadDFA( /* Parameters: */ maxDFASize: Int, maxNFASize: Int)(using ctx: Context): DFA[A, Set[Q]] =
     ctx.interrupt:
       val reverseLeaves = mutable.Map.empty[(Q, A), Set[Q]].withDefaultValue(Set.empty)
       for ((q1, a) -> b) <- delta; q2 <- b.allLeaves do
@@ -174,9 +174,13 @@ final case class OrderedNFA[A, Q](
     * It throws [[UnsupportedException]] when the result would have `maxNFASize` transitions or more, before building
     * them if their least number tells it (see [[leastTransitions]]).
     */
-  def toNFAwLA[P](lookAheadDFA: DFA[A, P], statesOf: P => Set[Q], isUpperBound: Boolean, maxNFASize: Int)(using
-      ctx: Context
-  ): NFAwLA[A, Q, P] =
+  def toNFAwLA[P](
+      lookAheadDFA: DFA[A, P],
+      statesOf: P => Set[Q],
+      isUpperBound: Boolean,
+      // Parameters:
+      maxNFASize: Int
+  )(using ctx: Context): NFAwLA[A, Q, P] =
     ctx.interrupt:
       val inputs = lookAheadDFA.stateSet.filter: p =>
         isUpperBound || inputStates.isEmpty || statesOf(p).exists(inputStates.contains)

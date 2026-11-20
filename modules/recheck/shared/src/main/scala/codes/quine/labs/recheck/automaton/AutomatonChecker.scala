@@ -20,12 +20,17 @@ object AutomatonChecker:
     * With `isUpperBound`, it checks an upper bound of the complexity, where every path is explored (see
     * [[OrderedNFA.toNFAwLA]]).
     */
-  def check[A, Q](nfa: OrderedNFA[A, Q], isUpperBound: Boolean, maxNFASize: Int, maxDFASize: Int)(using
-      ctx: Context
-  ): Iterator[Complexity[A]] =
+  def check[A, Q](
+      nfa: OrderedNFA[A, Q],
+      isUpperBound: Boolean,
+      // Parameters:
+      maxDFASize: Int,
+      maxNFASize: Int
+  )(using ctx: Context): Iterator[Complexity[A]] =
     ctx.interrupt:
       val lookAheadDFA =
-        if isUpperBound then DFA.universal(nfa.alphabet, Set.empty[Q]) else nfa.toLookAheadDFA(maxDFASize, maxNFASize)
+        if isUpperBound then DFA.universal(nfa.alphabet, Set.empty[Q])
+        else nfa.toLookAheadDFA(maxDFASize = maxDFASize, maxNFASize = maxNFASize)
       // The look-ahead DFA states are numbered, since hashing their sets takes most of the time on a large NFA.
       val sets = lookAheadDFA.stateSet.toIndexedSeq
       val nfaWLA = nfa.toNFAwLA(lookAheadDFA.mapState(sets.zipWithIndex.toMap), sets, isUpperBound, maxNFASize)

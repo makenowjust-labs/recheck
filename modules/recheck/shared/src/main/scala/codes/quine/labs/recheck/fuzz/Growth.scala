@@ -43,7 +43,7 @@ object Growth:
     def show: String = "exponential"
 
   /** Returns the growth of the steps on the counts from `start` by `stride`, or `None` if they tell none. */
-  def of(start: Int, stride: Int, steps: IndexedSeq[Long], maxDegree: Int): Option[Growth] =
+  def of(start: Int, stride: Int, steps: IndexedSeq[Long], /* Parameters: */ maxDegree: Int): Option[Growth] =
     var differences = steps.map(BigInt(_))
     var firsts = Vector.empty[BigInt]
     var isPositive = true

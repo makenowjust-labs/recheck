@@ -131,7 +131,7 @@ class CalibrateRuntimeAttackCommandSuite extends munit.FunSuite:
     val mode = UnitMode.UTF16
     val string = AttackPattern(Seq((mode.decode(""), mode.decode("a"), 0)), mode.decode("!"), 3)
     // The runtime does not run without a positive timeout.
-    val run = CalibrateRuntimeAttackCommand.run(None, Duration.Inf, Map.empty)
+    val run = CalibrateRuntimeAttackCommand.run(Parameters())
     assertEquals(run("^a*$", Dialect.JavaScript, mode, string, Duration.Zero), None)
 
   test("CalibrateRuntimeAttackCommand.calibrate"):

@@ -9,7 +9,6 @@ import codes.quine.labs.recheck.data.Graph
 import codes.quine.labs.recheck.diagnostics.RepeatCount
 import codes.quine.labs.recheck.exception.UnsupportedException
 import codes.quine.labs.recheck.parameters.AlphabetRepresentative
-import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.ir.IRPattern
 
@@ -22,19 +21,20 @@ object StaticSeeder:
     */
   def seed(
       pattern: IRPattern,
-      maxSimpleRepeatSize: Int,
-      maxNFASize: Int,
-      maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
+      // Parameters:
       limit: Int,
-      maxSize: Int = Parameters.DefaultMaxGeneStringSize,
-      alphabetRepresentative: AlphabetRepresentative = Parameters.DefaultAlphabetRepresentative
+      maxSize: Int,
+      alphabetRepresentative: AlphabetRepresentative,
+      maxInitialGenerationSize: Int,
+      maxNFASize: Int,
+      maxSimpleRepeatCount: Int
   )(using
       ctx: Context
   ): Set[FString] = ctx.interrupt:
     try
       // The inner expressions of the look-behinds read forward as look-aheads, on the paths where the ambiguities are.
       val simplified = EpsNFABuilder.buildSimplified(
-        pattern.approximateRepeats(maxSimpleRepeatSize),
+        pattern.approximateRepeats(maxSimpleRepeatCount),
         lookBehindsAsLookAheads = true,
         maxNFASize
       )
@@ -51,7 +51,7 @@ object StaticSeeder:
         highs,
         lows
       )
-      seeder.seed(maxInitialGenerationSize, limit, maxSize)
+      seeder.seed(limit, maxSize, maxInitialGenerationSize)
     catch
       case ex: UnsupportedException =>
         ctx.log(s"fuzz: static seeding gives up (${ex.getMessage})")
@@ -91,13 +91,15 @@ private[fuzz] class StaticSeeder[A, Q](
       .toMap
 
   /** Generates the initial generation. */
-  def seed(maxInitialGenerationSize: Int, limit: Int, maxSize: Int)(using ev: A =:= UChar): Set[FString] =
+  def seed( /* Parameters: */ limit: Int, maxSize: Int, maxInitialGenerationSize: Int)(using
+      ev: A =:= UChar
+  ): Set[FString] =
     outsMap.iterator
       .filter(_._2.nonEmpty)
       .flatMap:
         case (q0, _) =>
-          val idas = findTinyIDA(q0).map(construct(_, RepeatCount.polynomial(2, limit, _, _, maxSize)))
-          val edas = findTinyEDA(q0).map(construct(_, RepeatCount.exponential(limit, _, _, maxSize)))
+          val idas = findTinyIDA(q0).map(construct(_, RepeatCount.polynomial(2, _, _, limit, maxSize)))
+          val edas = findTinyEDA(q0).map(construct(_, RepeatCount.exponential(_, _, limit, maxSize)))
           idas ++ edas
       .take(maxInitialGenerationSize)
       .toSet

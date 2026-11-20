@@ -118,9 +118,12 @@ final case class EpsNFA[Q](
     * whether a look-around succeeds: a look-around is a choice of its inner expression, whose end may end the match,
     * and the continuation, and a choice in an atomic group is a choice of all its alternatives.
     */
-  def toOrderedNFA(isSimplified: Boolean, maxNFASize: Int, maxDFASize: Int)(using
-      ctx: Context
-  ): OrderedNFA[CharSet, (CharKindState, Branch[Stop[Q]], Set[Int])] =
+  def toOrderedNFA(
+      isSimplified: Boolean,
+      // Parameters:
+      maxDFASize: Int,
+      maxNFASize: Int
+  )(using ctx: Context): OrderedNFA[CharSet, (CharKindState, Branch[Stop[Q]], Set[Int])] =
     ctx.interrupt:
       val kinds = (tau.values ++ lookBehind.iterator.flatMap(_.tau.values)).collect { case Assert(k, _) => k }.toSet
       val afterCRLF = kinds.exists:
@@ -238,7 +241,8 @@ final case class EpsNFA[Q](
         val indexed = nfa.mapState(index)
         // The simplified ε-NFA does not tell whether a look-behind succeeds.
         val dfa =
-          if isSimplified then DFA.universal(newAlphabet, Set.empty[Int]) else indexed.toLookAheadDFA(maxDFASize)
+          if isSimplified then DFA.universal(newAlphabet, Set.empty[Int])
+          else indexed.toLookAheadDFA(maxDFASize = maxDFASize, maxNFASize = Int.MaxValue)
         LookBehindAutomaton(indexed, dfa, inits.map((init, r) => init -> index(r)).toMap)
 
       val pattern = fragment(tau, false, lookBehindAutomaton)

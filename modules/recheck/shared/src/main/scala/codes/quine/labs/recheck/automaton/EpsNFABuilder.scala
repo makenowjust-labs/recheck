@@ -30,7 +30,12 @@ import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 object EpsNFABuilder:
 
   /** Compiles RegExp IR into ε-NFA. */
-  def build(pattern: IRPattern, maxNFASize: Int, maxBackReferenceStrings: Int)(using ctx: Context): EpsNFA[Int] =
+  def build(
+      pattern: IRPattern,
+      // Parameters:
+      maxBackReferenceStrings: Int,
+      maxNFASize: Int
+  )(using ctx: Context): EpsNFA[Int] =
     ctx.interrupt:
       val expanded = BackReferenceExpansion.groups(pattern, maxBackReferenceStrings)
       val groups = expanded.getOrElse(Set.empty)
@@ -53,15 +58,19 @@ object EpsNFABuilder:
     * With `lookBehindsAsLookAheads`, a look-behind is a look-ahead of its inner expression. It throws
     * [[UnsupportedException]] when the automata would be larger than `maxNFASize`.
     */
-  def buildSimplified(pattern: IRPattern, lookBehindsAsLookAheads: Boolean, maxNFASize: Int)(using
-      ctx: Context
-  ): Simplified =
+  def buildSimplified(
+      pattern: IRPattern,
+      lookBehindsAsLookAheads: Boolean,
+      // Parameters:
+      maxNFASize: Int
+  )(using ctx: Context): Simplified =
     ctx.interrupt:
       val alphabet = PatternAlphabet.of(pattern)
       val builder = new EpsNFABuilder(pattern, alphabet, true, lookBehindsAsLookAheads, Set.empty, false, maxNFASize)
       val epsNFA = run(builder)
       // The DFA of the look-behinds of the simplified ε-NFA has the single state.
-      Simplified(epsNFA, epsNFA.toOrderedNFA(true, maxNFASize, Int.MaxValue).rename, builder.isUpperBound)
+      val orderedNFA = epsNFA.toOrderedNFA(true, maxDFASize = Int.MaxValue, maxNFASize = maxNFASize)
+      Simplified(epsNFA, orderedNFA.rename, builder.isUpperBound)
 
   private def run(builder: EpsNFABuilder)(using ctx: Context): EpsNFA[Int] =
     val epsNFA = builder.build()
@@ -81,6 +90,7 @@ private class EpsNFABuilder(
       */
     private val marks: Set[Int],
     private val expandsBackReferences: Boolean,
+    // Parameters:
     private val maxNFASize: Int
 )(using ctx: Context):
 

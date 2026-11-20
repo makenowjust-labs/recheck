@@ -22,9 +22,9 @@ object RuntimeAttackExecutor:
     *
     * It returns `None` without running when the timeout is not positive, this platform cannot run programs, or the
     * dialect or the pattern is not supported. It throws [[UnexpectedException]] when the runtime fails to run the
-    * program. `compileTimeout` limits the compilation of the program, which some runtimes need.
+    * program. `runtimeAttackCompileTimeout` limits the compilation of the program, which some runtimes need.
     *
-    * `command` is the command line replacing the command of the runtime, if any.
+    * The command line of the dialect in `runtimeAttackCommand` replaces the command of the runtime, if any.
     */
   def execute(
       source: String,
@@ -32,11 +32,12 @@ object RuntimeAttackExecutor:
       dialect: Dialect,
       mode: UnitMode,
       attack: AttackPattern,
-      timeout: Duration,
-      compileTimeout: Duration,
-      command: Option[String]
+      // Parameters:
+      runtimeAttackCommand: Map[String, String],
+      runtimeAttackCompileTimeout: Duration,
+      runtimeAttackTimeout: Duration
   )(using ctx: Context): Option[RuntimeAttack] = ctx.interrupt:
-    if timeout <= Duration.Zero || !Executor.isAvailable then None
+    if runtimeAttackTimeout <= Duration.Zero || !Executor.isAvailable then None
     else
       RuntimeAttackProgram.generate(source, flags, dialect, mode, attack) match
         case Left(reason) =>
@@ -44,14 +45,18 @@ object RuntimeAttackExecutor:
           None
         case Right(program) =>
           val executor = program.executor
+          val command = runtimeAttackCommand.get(dialect.name)
           val commandLine = executor.commandLine(command)
           ctx.log(s"runtime attack: command: $commandLine\n${program.script}")
+          val timeout = boundTimeout(runtimeAttackTimeout)
           val start = RuntimeAttackProgram.StartLine
-          val output = executor.exec(program.script, boundTimeout(timeout), compileTimeout, start, command)
-          Some(parseOutput(executor.runtime(command), commandLine, timeout, output))
+          val output = executor.exec(program.script, timeout, runtimeAttackCompileTimeout, start, command)
+          Some(parseOutput(executor.runtime(command), commandLine, output, runtimeAttackTimeout))
 
   /** Returns the time limit of a matching for the timeout, which is bounded by the deadline of the context. */
-  private[verification] def boundTimeout(timeout: Duration)(using ctx: Context): Option[FiniteDuration] = timeout match
+  private[verification] def boundTimeout( /* Parameters: */ timeout: Duration)(using
+      ctx: Context
+  ): Option[FiniteDuration] = timeout match
     case d: FiniteDuration if (ctx.deadline eq null) || d <= ctx.deadline.timeLeft => Some(d)
     case _ => Option(ctx.deadline).map(_.timeLeft)
 
@@ -59,9 +64,13 @@ object RuntimeAttackExecutor:
     *
     * The runtime name is `name` if the output does not have it, and an error message shows the command line `command`.
     */
-  private[verification] def parseOutput(name: String, command: String, timeout: Duration, output: ExecResult)(using
-      ctx: Context
-  ): RuntimeAttack = ctx.interrupt:
+  private[verification] def parseOutput(
+      name: String,
+      command: String,
+      output: ExecResult,
+      // Parameters:
+      timeout: Duration
+  )(using ctx: Context): RuntimeAttack = ctx.interrupt:
     def line(out: String, name: String): Option[String] =
       out.linesIterator.collectFirst { case s if s.startsWith(s"$name ") => s.substring(name.length + 1) }
 
