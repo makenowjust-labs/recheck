@@ -5,7 +5,7 @@ import sbt.io.syntax.*
 import com.ibm.icu.lang.UCharacter
 import com.ibm.icu.util.ULocale
 
-/** CharsetCaseDataGen is a generator for `CaseData.scala` of `resyntax-charset`. */
+/** CharsetCaseDataGen is a generator for `CaseData.scala` of `resyntax.charset`. */
 object CharsetCaseDataGen extends UnicodeDataGen:
 
   /** Run is a part of a mapping, which maps `start + k * stride` to `start + k * stride + delta` for `k` in

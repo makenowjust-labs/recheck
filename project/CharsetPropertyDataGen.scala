@@ -8,7 +8,7 @@ import com.ibm.icu.lang.UCharacter
 import com.ibm.icu.lang.UProperty
 import com.ibm.icu.lang.UScript
 
-/** CharsetPropertyDataGen is a generator for `UnicodeData.scala` of `resyntax-charset`. */
+/** CharsetPropertyDataGen is a generator for `UnicodeData.scala` of `resyntax.charset`. */
 object CharsetPropertyDataGen extends UnicodeDataGen:
 
   val GeneralCategoryGroups: Seq[String] = Seq("C", "L", "LC", "M", "N", "P", "S", "Z")

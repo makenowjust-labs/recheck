@@ -978,7 +978,7 @@ private[build] object IRPropertyLookup:
 
   /** The contributory properties of PropList.txt (e.g. `Other_Alphabetic`), with their names. */
   private lazy val contributory: Seq[(Seq[String], CharSet)] =
-    // The data of resyntax-charset lacks them, so each is the derived property without the other parts of its definition.
+    // The data of `charset` lacks them, so each is the derived property without the other parts of its definition.
     def other(derived: String, parts: CharSet): CharSet = binary(derived).diff(parts)
 
     Seq(
@@ -1195,7 +1195,7 @@ private[build] object IRPropertyLookup:
   private lazy val pythonRegexNameIndex: Map[String, String] =
     PythonRegexNames.flatMap(names => names.map(_ -> names.head)).toMap
 
-  /** The properties of python-regex that resyntax-charset does not have, by the first key of their names. */
+  /** The properties of python-regex that `charset` does not have, by the first key of their names. */
   private lazy val pythonRegexSpecialBinary: Map[String, CharSet] =
     val alpha = binary("Alphabetic")
     Map(
@@ -1255,7 +1255,7 @@ private[build] object IRPropertyLookup:
     "WORDBREAK" -> "XX"
   )
 
-  /** The values of python-regex's `General_Category` that resyntax-charset does not have, by their keys. */
+  /** The values of python-regex's `General_Category` that `charset` does not have, by their keys. */
   private lazy val pythonRegexGeneralCategory: Map[String, CharSet] =
     Seq("C", "L", "M", "N", "P", "S", "Z").map(c => s"$c&" -> gc(c)).toMap +
       ("ASSIGNED" -> gc("Cn").complement(unicodeUniverse))
