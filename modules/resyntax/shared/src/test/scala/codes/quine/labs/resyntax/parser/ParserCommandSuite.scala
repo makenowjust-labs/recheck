@@ -289,7 +289,7 @@ class ParserCommandSuite extends munit.FunSuite with ParserHelper:
   error("(*UCP)(*TURKISH_CASING)", "", PCRE)("Invalid group at 8")
   error("(*COMMITx)", "", PCRE)("Invalid group at 8")
 
-  // python-regex's fuzzy constraints, and the literal `{` otherwise (regex 2026.11.18).
+  // python-regex's fuzzy constraints, and the literal `{` otherwise (regex 2026.11.19).
   check("a{e<=1}", "", PythonRegex())(Command(Fuzzy(Literal('a'), "e<=1")))
   check("a{e}", "", PythonRegex())(Command(Fuzzy(Literal('a'), "e")))
   check("a{1<=e<2}", "", PythonRegex())(Command(Fuzzy(Literal('a'), "1<=e<2")))

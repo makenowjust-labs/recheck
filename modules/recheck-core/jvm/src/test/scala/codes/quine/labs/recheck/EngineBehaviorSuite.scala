@@ -938,7 +938,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
         |${runs.mkString("\n")}
         |""".stripMargin
 
-  // Checked with regex 2026.11.18 on Python 3.15.2.
+  // Checked with regex 2026.11.19 on Python 3.15.2.
   runtimeTest("python-regex: the syntax and the matching", "python3"):
     val script = pythonRegexScript(pythonRegexCases, UnitMode.CodePoint)
     assertEquals(
@@ -951,7 +951,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
       pythonRegexModel(pythonRegexBytesCases, Dialect.PythonRegex(Dialect.Python.Type.Bytes))
     )
 
-  // Checked with regex 2026.11.18 on Python 3.15.2.
+  // Checked with regex 2026.11.19 on Python 3.15.2.
   runtimeTest("python-regex: back-references in an open capture", "python3"):
     // python-regex refers to an open capture only in V1, and matches a look-behind backward.
     val all = openCaptureCases ++ openCaptureBacktrackCases ++ openCaptureLookBehindCases
