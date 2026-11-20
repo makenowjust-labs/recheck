@@ -13,3 +13,6 @@ class ExceptionsSuite extends munit.FunSuite:
 
   test("InvalidRegExpException#getMessage"):
     assertEquals(new InvalidRegExpException("message").getMessage, "message")
+
+  test("RuntimeAttacksRefutedException#getMessage"):
+    assertEquals(new RuntimeAttacksRefutedException().getMessage, "runtime attacks refuted")

@@ -1,23 +1,11 @@
 package codes.quine.labs.recheck
 package diagnostics
 
-import codes.quine.labs.recheck.exception.CancelException
-import codes.quine.labs.recheck.exception.InvalidRegExpException
-import codes.quine.labs.recheck.exception.ReDoSException
-import codes.quine.labs.recheck.exception.TimeoutException
-import codes.quine.labs.recheck.exception.UnexpectedException
-import codes.quine.labs.recheck.exception.UnsupportedException
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 
 /** Diagnostics is what `ReDoS.check` reports: the evidence for judging the ReDoS risk of a RegExp, not a verdict. */
-sealed abstract class Diagnostics extends Product with Serializable:
-
-  /** Returns these diagnostics with the upper bound. */
-  def withUpperBound(upperBound: Option[UpperBound]): Diagnostics = this match
-    case d: Diagnostics.Safe       => d.copy(upperBound = upperBound)
-    case d: Diagnostics.Vulnerable => d.copy(upperBound = upperBound)
-    case d: Diagnostics.Unknown    => d.copy(upperBound = upperBound)
+sealed abstract class Diagnostics extends Product with Serializable
 
 /** Diagnostics types. */
 object Diagnostics:
@@ -91,27 +79,6 @@ object Diagnostics:
           |Error  : $error
           |Checker: ${checker.map(_.toString).getOrElse("(none)")}""".stripMargin +
         showUpperBound(source, flags, upperBound) + unitMode.fold("")(showRefutedAttacks(dialect, _, refutedAttacks))
-
-  /** Unknown utilities. */
-  object Unknown:
-
-    /** Creates the unknown diagnostics from the exception. */
-    def from(
-        source: String,
-        flags: String,
-        dialect: Dialect,
-        unitMode: Option[UnitMode],
-        refutedAttacks: Seq[RefutedAttack],
-        ex: ReDoSException,
-        checker: Option[Checker]
-    ): Diagnostics =
-      val kind = ex match
-        case _: TimeoutException        => ErrorKind.Timeout
-        case _: CancelException         => ErrorKind.Cancel
-        case ex: UnsupportedException   => ErrorKind.Unsupported(ex.getMessage)
-        case ex: InvalidRegExpException => ErrorKind.InvalidRegExp(ex.getMessage)
-        case ex: UnexpectedException    => ErrorKind.Unexpected(ex.getMessage)
-      Unknown(source, flags, dialect, unitMode, kind, refutedAttacks, checker)
 
   /** Returns the section of the upper bound after a blank line, or an empty string if there is none.
     *

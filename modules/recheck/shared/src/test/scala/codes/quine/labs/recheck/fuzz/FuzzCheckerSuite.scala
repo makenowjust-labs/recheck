@@ -12,16 +12,19 @@ import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Hotspot
+import codes.quine.labs.recheck.diagnostics.RuntimeAttack
+import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.recheck.fuzz.Attacker.Candidate
 import codes.quine.labs.recheck.fuzz.Attacker.Measurement
 import codes.quine.labs.recheck.fuzz.FuzzChecker.Trace
 import codes.quine.labs.recheck.parameters.Parameters
+import codes.quine.labs.recheck.verification.RuntimeAttackerHelper
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.ir.IRPattern
 
-class FuzzCheckerSuite extends munit.FunSuite:
+class FuzzCheckerSuite extends munit.FunSuite with RuntimeAttackerHelper:
 
   /** A default context. */
   given ctx: Context = Context()
@@ -52,7 +55,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
         attackLimit = if quick then 10_000 else Parameters.DefaultAttackLimit,
         attackTimeout = attackTimeout,
         maxIteration = maxIteration,
-        avoidsAttack = (_, _, _) => false,
+        runtimeAttacker = runtimeAttackerOf(ir),
         automatonAttacks = Seq.empty
       )
       ._1
@@ -103,7 +106,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
           seedingLimit = 10000,
           incubationLimit = 10000,
           attackLimit = 10000,
-          avoidsAttack = (_, _, _) => false,
+          runtimeAttacker = runtimeAttackerOf(ir),
           automatonAttacks = Seq.empty
         )
         ._1
@@ -124,7 +127,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
           attackLimit = 100,
           maxGeneStringSize = 5,
           maxAttackStringSize = 5,
-          avoidsAttack = (_, _, _) => false,
+          runtimeAttacker = runtimeAttackerOf(ir),
           automatonAttacks = Seq.empty
         )
         ._1
@@ -135,7 +138,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
   def checkerOf(
       ir: IRPattern,
       maxGenerationSize: Int = Parameters.DefaultMaxGenerationSize,
-      avoidsAttack: (AttackComplexity.Vulnerable, AttackPattern, Hotspot) => Boolean = (_, _, _) => false,
+      execute: AttackPattern => Option[RuntimeAttack] = _ => None,
       upperBound: Option[Seq[Complexity.Vulnerable[UChar]]] = None
   ): FuzzChecker =
     import Parameters.*
@@ -156,7 +159,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
       DefaultAccelerationMode,
       DefaultAccelerationHitRatio,
       DefaultAlphabetRepresentative,
-      avoidsAttack,
+      runtimeAttackerOf(ir, execute),
       upperBound
     )
     new FuzzChecker(
@@ -263,7 +266,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
     val ir = ReDoS.parse("^a*a*$", "", Dialect.JavaScript)
     val checker = checkerOf(ir, upperBound = Some(Seq(Complexity.Polynomial(2, witness))))
     val (results, pop) = checker.init()
-    assertEquals(results.next()._1, AttackComplexity.Polynomial(2, true))
+    assertEquals(results.next().complexity, AttackComplexity.Polynomial(2, true))
     val witnessSeed = checker.witnessSeed()
     assertEquals(pop.set.map(_.str).toSet, witnessSeed.toSet)
     // The seeds of the seeder run when the attacks run out.
@@ -272,7 +275,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
     // A candidate below the steepest growth of an exponential upper bound waits for the seeds of the seeder.
     val waiting = checkerOf(ir, upperBound = Some(Seq(Complexity.Exponential(witness))))
     val (waitingResults, waitingPop) = waiting.init()
-    assertEquals(waitingResults.next()._1, AttackComplexity.Polynomial(2, true))
+    assertEquals(waitingResults.next().complexity, AttackComplexity.Polynomial(2, true))
     assert(waiting.seederSeed(waiting.witnessSeed()).exists(str => waitingPop.set.exists(_.str == str)))
 
   test("FuzzChecker#init: the seeds of other suffixes"):
@@ -280,7 +283,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
     val ir = ReDoS.parse("^(?:a|a)*(?!.*xyz)", "", Dialect.JavaScript)
     val bound = FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100, DefaultAlphabetRepresentative)
     // The match of the witness succeeds unless `xyz` follows, which makes the look-ahead fail.
-    assertEquals(checkerOf(ir, upperBound = bound).init()._1.next()._1, AttackComplexity.Exponential(true))
+    assertEquals(checkerOf(ir, upperBound = bound).init()._1.next().complexity, AttackComplexity.Exponential(true))
 
   /** The degree of the polynomial growth, or `-1` for the exponential one. */
   def degreeOf(measurement: Measurement): Int = measurement.growth match
@@ -374,10 +377,14 @@ class FuzzCheckerSuite extends munit.FunSuite:
 
   test("FuzzChecker#Population#toGeneration: strings with an avoided attack rank last"):
     val ir = ReDoS.parse("^(a|a)*$", "", Dialect.JavaScript)
-    val avoidsAttack =
-      (c: AttackComplexity.Vulnerable, _: AttackPattern, _: Hotspot) => c == AttackComplexity.Exponential(true)
+    val finish = Some(RuntimeAttack("node v0", 1.second, RuntimeAttackResult.Finish(1.millis)))
     val attack = AttackPattern(Seq((UString(), UString('a'), 0)), UString(), 1)
-    val checker = checkerOf(ir, 2, avoidsAttack)
+    val checker = checkerOf(ir, 2, _ => finish)
+    // The runtime refutes the exponential attack.
+    assertEquals(
+      checker.attacker.runtimeAttacker.attack(AttackComplexity.Exponential(true), attack, Hotspot.empty),
+      None
+    )
     val strs = Seq(1, 2, 3).map(n => FString(n, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'))))
     val traces = strs.zip(Seq(3.0, 2.0, 1.0)).map((s, rate) => Trace(s, rate, 0, Set.empty))
     val pop = new checker.Population(0, mutable.Set.from(traces), mutable.Set.empty)
