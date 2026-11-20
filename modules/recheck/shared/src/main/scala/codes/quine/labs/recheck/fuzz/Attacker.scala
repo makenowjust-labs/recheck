@@ -8,11 +8,13 @@ import codes.quine.labs.recheck.automaton.Complexity
 import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.RepeatCount
 import codes.quine.labs.recheck.fuzz.Attacker.*
 import codes.quine.labs.recheck.parameters.AccelerationMode
 import codes.quine.labs.recheck.parameters.AlphabetRepresentative
+import codes.quine.labs.recheck.verification.RuntimeAttacker
 import codes.quine.labs.recheck.vm.Interpreter
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Status
@@ -26,7 +28,7 @@ import codes.quine.labs.resyntax.ir.IRQuantifier
 /** Attacker types and utilities. */
 object Attacker:
 
-  /** A type alias for result of attack. */
+  /** A type alias for an attack that reaches the limit on the VM. */
   type AttackResult = (AttackComplexity.Vulnerable, AttackPattern, Hotspot)
 
   /** Measurement is the growth of the steps of a string on its repeat counts from `first` to `last`, with whether a run
@@ -79,7 +81,7 @@ private[fuzz] final class Attacker(
     val accelerationMode: AccelerationMode,
     val accelerationHitRatio: Double,
     val alphabetRepresentative: AlphabetRepresentative,
-    val avoidsAttack: (AttackComplexity.Vulnerable, AttackPattern, Hotspot) => Boolean,
+    val runtimeAttacker: RuntimeAttacker,
     val upperBound: Option[Seq[Complexity.Vulnerable[UChar]]]
 )(using val ctx: Context):
 
@@ -118,8 +120,11 @@ private[fuzz] final class Attacker(
   /** The fingerprints of the candidates that [[boost]] tried. */
   val boostedFingerprints: mutable.Set[FString.Fingerprint] = mutable.Set.empty
 
-  /** Whether an attack from the string is avoided. */
-  def isAvoided(str: FString): Boolean = attacks.nonEmpty && attacks.get(str).exists(_.exists(avoidsAttack.tupled))
+  /** Whether an attack from the string is avoided, since the runtime refuted the same one. */
+  def isAvoided(str: FString): Boolean =
+    attacks
+      .getOrElse(str, Nil)
+      .exists((complexity, attack, hotspot) => runtimeAttacker.isRefuted(complexity, attack, hotspot))
 
   /** Returns the candidate of the string if its steps grow more than linearly, where `stops` tells whether its run
     * stopped on the limit or the timeout.
@@ -141,7 +146,7 @@ private[fuzz] final class Attacker(
     measurement.map(Candidate(str, _))
 
   /** Runs the attacks from the candidates, the steepest growth first. */
-  def attack(candidates: Iterator[Candidate]): Iterator[AttackResult] = interrupt:
+  def attack(candidates: Iterator[Candidate]): Iterator[Diagnostics.Vulnerable] = interrupt:
     ordered(candidates.toVector).iterator.flatMap(tryAttack)
 
   /** Returns the candidates in the order of their attacks, the steepest growth first. */
@@ -216,7 +221,7 @@ private[fuzz] final class Attacker(
     yield str.copy(n = 1).insert(pos, part)
 
   /** Runs the attack from the candidate, whose fingerprint is added to [[failedFingerprints]] if it fails. */
-  def tryAttack(candidate: Candidate): Option[AttackResult] = interrupt:
+  def tryAttack(candidate: Candidate): Option[Diagnostics.Vulnerable] = interrupt:
     val str = candidate.str
     val fingerprint = str.fingerprint
     if failedFingerprints.contains(fingerprint) then return None
@@ -237,9 +242,12 @@ private[fuzz] final class Attacker(
                 |  string: $attack""".stripMargin)
         (complexity, attack.toAttackPattern(pattern.mode), hotspotOf(str, measurement))
     result match
-      case Some(attacked) => attacks(str) = attacked :: attacks.getOrElse(str, Nil)
-      case None           => failedFingerprints.add(fingerprint)
-    result
+      case Some(attacked @ (complexity, attack, hotspot)) =>
+        attacks(str) = attacked :: attacks.getOrElse(str, Nil)
+        runtimeAttacker.attack(complexity, attack, hotspot)
+      case None =>
+        failedFingerprints.add(fingerprint)
+        None
 
   /** Returns the size of the input of the string on the repeat count. */
   def sizeOn(str: FString, count: Int): Long =

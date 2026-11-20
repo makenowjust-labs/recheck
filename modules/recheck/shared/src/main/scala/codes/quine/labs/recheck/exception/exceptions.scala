@@ -15,5 +15,8 @@ final class UnsupportedException(message: String) extends ReDoSException(message
 /** InvalidRegExpException is an exception thrown when regexp is invalid. */
 final class InvalidRegExpException(message: String) extends ReDoSException(message)
 
+/** RuntimeAttacksRefutedException is an exception thrown when the runtime refutes too many attacks. */
+final class RuntimeAttacksRefutedException extends ReDoSException("runtime attacks refuted")
+
 /** UnexpectedException is an exception thrown when unexpected error occurs. */
 final class UnexpectedException(message: String) extends ReDoSException(message)

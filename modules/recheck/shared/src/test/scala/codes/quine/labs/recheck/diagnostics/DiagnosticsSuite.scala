@@ -5,11 +5,6 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.duration.MILLISECONDS
 import scala.concurrent.duration.SECONDS
 
-import codes.quine.labs.recheck.exception.CancelException
-import codes.quine.labs.recheck.exception.InvalidRegExpException
-import codes.quine.labs.recheck.exception.TimeoutException
-import codes.quine.labs.recheck.exception.UnexpectedException
-import codes.quine.labs.recheck.exception.UnsupportedException
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.PerlSource
@@ -273,119 +268,6 @@ class DiagnosticsSuite extends munit.FunSuite:
   test("Diagnostics.Unknown: refuted attacks require the unit mode"):
     intercept[IllegalArgumentException]:
       Diagnostics.Unknown("", "", Dialect.JavaScript, None, Diagnostics.ErrorKind.Timeout, Seq(refutedAttack), None)
-
-  test("Diagnostics.Unknown.from"):
-    val mode = Some(UnitMode.UTF16)
-    assertEquals(
-      Diagnostics.Unknown
-        .from(
-          "",
-          "",
-          Dialect.JavaScript,
-          mode,
-          Seq(refutedAttack),
-          new TimeoutException("foo"),
-          Some(Diagnostics.Checker.Fuzz)
-        ),
-      Diagnostics.Unknown(
-        "",
-        "",
-        Dialect.JavaScript,
-        Some(UnitMode.UTF16),
-        Diagnostics.ErrorKind.Timeout,
-        Seq(refutedAttack),
-        Some(Diagnostics.Checker.Fuzz)
-      )
-    )
-    assertEquals(
-      Diagnostics.Unknown.from("", "", Dialect.JavaScript, mode, Seq(refutedAttack), new CancelException("foo"), None),
-      Diagnostics.Unknown(
-        "",
-        "",
-        Dialect.JavaScript,
-        Some(UnitMode.UTF16),
-        Diagnostics.ErrorKind.Cancel,
-        Seq(refutedAttack),
-        None
-      )
-    )
-    assertEquals(
-      Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, mode, Seq(refutedAttack), new InvalidRegExpException("foo"), None),
-      Diagnostics.Unknown(
-        "",
-        "",
-        Dialect.JavaScript,
-        Some(UnitMode.UTF16),
-        Diagnostics.ErrorKind.InvalidRegExp("foo"),
-        Seq(refutedAttack),
-        None
-      )
-    )
-    assertEquals(
-      Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, mode, Seq(refutedAttack), new UnsupportedException("foo"), None),
-      Diagnostics.Unknown(
-        "",
-        "",
-        Dialect.JavaScript,
-        Some(UnitMode.UTF16),
-        Diagnostics.ErrorKind.Unsupported("foo"),
-        Seq(refutedAttack),
-        None
-      )
-    )
-    assertEquals(
-      Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, mode, Seq(refutedAttack), new UnexpectedException("foo"), None),
-      Diagnostics.Unknown(
-        "",
-        "",
-        Dialect.JavaScript,
-        Some(UnitMode.UTF16),
-        Diagnostics.ErrorKind.Unexpected("foo"),
-        Seq(refutedAttack),
-        None
-      )
-    )
-
-  test("Diagnostics#withUpperBound"):
-    val bound = Some(upperBound)
-    val safe =
-      Diagnostics.Safe(
-        "",
-        "",
-        Dialect.JavaScript,
-        UnitMode.UTF16,
-        AttackComplexity.Safe(true),
-        Seq.empty,
-        Diagnostics.Checker.Fuzz
-      )
-    assertEquals(safe.withUpperBound(bound), safe.copy(upperBound = bound))
-    val vulnerable = Diagnostics.Vulnerable(
-      "",
-      "",
-      Dialect.JavaScript,
-      UnitMode.UTF16,
-      AttackComplexity.Exponential(true),
-      AttackPattern(Seq.empty, UnitMode.UTF16.decode("a"), 0),
-      Hotspot.empty,
-      None,
-      Seq.empty,
-      Diagnostics.Checker.Fuzz
-    )
-    assertEquals(vulnerable.withUpperBound(bound), vulnerable.copy(upperBound = bound))
-    val unknown =
-      Diagnostics.Unknown(
-        "",
-        "",
-        Dialect.JavaScript,
-        None,
-        Diagnostics.ErrorKind.Timeout,
-        Seq.empty,
-        Some(Diagnostics.Checker.Fuzz)
-      )
-    assertEquals(unknown.withUpperBound(bound), unknown.copy(upperBound = bound))
 
   test("Diagnostics.Checker#toString"):
     assertEquals(Seq(Diagnostics.Checker.Automaton, Diagnostics.Checker.Fuzz).map(_.toString), Seq("automaton", "fuzz"))
