@@ -38,11 +38,13 @@ val generateParameters = taskKey[Seq[File]]("Generate the Scala sources of the p
 
 val generateUnicodeData = taskKey[Seq[File]]("Generate the Scala sources of the Unicode data")
 
-def parametersGenerator(target: ParametersGen.Target): Seq[Def.Setting[?]] = Seq(
+def parametersGenerator(targets: ParametersGen.Target*): Seq[Def.Setting[?]] = Seq(
   Compile / sourceGenerators += generateParameters.taskValue,
-  generateParameters := Def.uncached(
-    Seq(ParametersGen.generate(target, (ThisBuild / baseDirectory).value, (Compile / sourceManaged).value))
-  ),
+  generateParameters := Def.uncached {
+    val root = (ThisBuild / baseDirectory).value
+    val dir = (Compile / sourceManaged).value
+    targets.map(ParametersGen.generate(_, root, dir))
+  },
   coverageExcludedFiles := ".*[/\\\\]src_managed[/\\\\].*"
 )
 
@@ -53,30 +55,28 @@ lazy val root = project
     coverageEnabled := false
   )
   .aggregate(
-    coreJVM,
-    coreJS,
-    commonJVM,
-    commonJS,
-    execJVM,
-    execJS,
+    recheckJVM,
+    recheckJS,
     resyntaxJVM,
     resyntaxJS,
-    codecJVM,
-    codecJS,
     js,
     cli
   )
 
-lazy val core = crossProject(JVMPlatform, JSPlatform)
-  .in(file("modules/recheck-core"))
+lazy val recheck = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/recheck"))
   .settings(
-    name := "recheck-core",
+    name := "recheck",
+    parametersGenerator(ParametersGen.Target.Parameters, ParametersGen.Target.Codec),
     console / initialCommands := """
       |import scala.concurrent.duration.*
       |import scala.util.{Failure, Random, Success, Try}
       |
+      |import io.circe.syntax.*
+      |
       |import codes.quine.labs.recheck.*
       |import codes.quine.labs.recheck.automaton.*
+      |import codes.quine.labs.recheck.codec.{*, given}
       |import codes.quine.labs.recheck.common.*
       |import codes.quine.labs.recheck.exec.*
       |import codes.quine.labs.recheck.data.*
@@ -163,28 +163,8 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |  time("verify")(RuntimeAttackVerifier.verify(source, flags, dialect, ir.mode, attack, timeout, sys.env))
       |
       |""".stripMargin + ParametersGen.consoleCheck((ThisBuild / baseDirectory).value),
-    // Settings for test:
-    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
-    testFrameworks += new TestFramework("munit.Framework")
-  )
-  .jsSettings(
-    coverageEnabled := false,
-    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
-      .cross(CrossVersion.for3Use2_13)
-  )
-  .dependsOn(common, exec, resyntax)
-
-lazy val coreJVM = core.jvm
-lazy val coreJS = core.js
-
-lazy val common = crossProject(JVMPlatform, JSPlatform)
-  .in(file("modules/recheck-common"))
-  .settings(
-    name := "recheck-common",
-    parametersGenerator(ParametersGen.Target.Parameters),
-    console / initialCommands := """
-      |import codes.quine.labs.recheck.common.*
-      |""".stripMargin,
+    // Dependencies:
+    libraryDependencies += "io.circe" %% "circe-core" % "0.14.17",
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -198,29 +178,8 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
   )
   .dependsOn(resyntax)
 
-lazy val commonJVM = common.jvm
-lazy val commonJS = common.js
-
-lazy val exec = crossProject(JVMPlatform, JSPlatform)
-  .in(file("modules/recheck-exec"))
-  .settings(
-    name := "recheck-exec",
-    console / initialCommands := """
-      |import codes.quine.labs.recheck.exec.*
-      |""".stripMargin,
-    // Settings for test:
-    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
-    testFrameworks += new TestFramework("munit.Framework")
-  )
-  .jsSettings(
-    coverageEnabled := false,
-    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
-      .cross(CrossVersion.for3Use2_13)
-  )
-  .dependsOn(common)
-
-lazy val execJVM = exec.jvm
-lazy val execJS = exec.js
+lazy val recheckJVM = recheck.jvm
+lazy val recheckJS = recheck.js
 
 lazy val resyntax = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/resyntax"))
@@ -254,33 +213,6 @@ lazy val resyntax = crossProject(JVMPlatform, JSPlatform)
 lazy val resyntaxJVM = resyntax.jvm
 lazy val resyntaxJS = resyntax.js
 
-lazy val codec = crossProject(JVMPlatform, JSPlatform)
-  .in(file("modules/recheck-codec"))
-  .settings(
-    name := "recheck-codec",
-    parametersGenerator(ParametersGen.Target.Codec),
-    console / initialCommands := """
-      |import io.circe.*
-      |import io.circe.syntax.*
-      |
-      |import codes.quine.labs.recheck.codec.{*, given}
-      |""".stripMargin,
-    // Dependencies:
-    libraryDependencies += "io.circe" %% "circe-core" % "0.14.17",
-    // Settings for test:
-    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
-    testFrameworks += new TestFramework("munit.Framework")
-  )
-  .jsSettings(
-    coverageEnabled := false,
-    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
-      .cross(CrossVersion.for3Use2_13)
-  )
-  .dependsOn(core)
-
-lazy val codecJVM = codec.jvm
-lazy val codecJS = codec.js
-
 lazy val js = project
   .in(file("modules/recheck-js"))
   .enablePlugins(ScalaJSPlugin)
@@ -304,7 +236,7 @@ lazy val js = project
     // Output `recheck.js` to a path independent of the Scala version.
     Compile / fullLinkJS / scalaJSLinkerOutputDirectory := (ThisBuild / baseDirectory).value / "target" / "recheck-js-opt"
   )
-  .dependsOn(coreJS, codecJS)
+  .dependsOn(recheckJS)
 
 lazy val cli = project
   .in(file("modules/recheck-cli"))
@@ -347,4 +279,4 @@ lazy val cli = project
     libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
-  .dependsOn(coreJVM, codecJVM)
+  .dependsOn(recheckJVM)
