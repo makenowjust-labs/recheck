@@ -5,14 +5,14 @@ import scala.collection.mutable
 import scala.concurrent.duration.Duration
 
 import codes.quine.labs.recheck.automaton.Complexity
-import codes.quine.labs.recheck.common.AccelerationMode
-import codes.quine.labs.recheck.common.AlphabetRepresentative
-import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Hotspot
+import codes.quine.labs.recheck.diagnostics.RepeatCount
 import codes.quine.labs.recheck.fuzz.Attacker.*
-import codes.quine.labs.recheck.util.RepeatUtil
+import codes.quine.labs.recheck.parameters.AccelerationMode
+import codes.quine.labs.recheck.parameters.AlphabetRepresentative
 import codes.quine.labs.recheck.vm.Interpreter
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Status
@@ -393,7 +393,7 @@ private[fuzz] final class Attacker(
       case Growth.Exponential =>
         val repeatSize = repeatsOf(str).map(_._2).sum
         val fixedSize = (sizeOn(str, 0) min Int.MaxValue).toInt
-        Some(RepeatUtil.exponential(attackLimit, fixedSize, repeatSize, maxAttackStringSize).max(1))
+        Some(RepeatCount.exponential(attackLimit, fixedSize, repeatSize, maxAttackStringSize).max(1))
       case p: Growth.Polynomial =>
         def reaches(k: Int): Boolean = p.stepsOn(p.start + k * p.stride) >= attackLimit
         // The largest count whose string fits, where every part repeats.

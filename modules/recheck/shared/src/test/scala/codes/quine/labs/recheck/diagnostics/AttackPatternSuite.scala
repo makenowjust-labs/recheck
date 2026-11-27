@@ -1,7 +1,7 @@
 package codes.quine.labs.recheck
 package diagnostics
 
-import codes.quine.labs.recheck.common.UnexpectedException
+import codes.quine.labs.recheck.exception.UnexpectedException
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 

@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.common
+package codes.quine.labs.recheck.parameters
 
 /** AttackStringCharacteristics is an enum to specify the characteristics of an attack string that tell an attack from a
   * refuted one.

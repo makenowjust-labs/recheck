@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.common
+package codes.quine.labs.recheck.parameters
 
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.PropertyTable

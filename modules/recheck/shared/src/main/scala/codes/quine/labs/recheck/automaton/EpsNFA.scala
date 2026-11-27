@@ -5,9 +5,8 @@ import scala.collection.mutable
 import scala.util.hashing.MurmurHash3
 
 import codes.quine.labs.recheck.automaton.EpsNFA.*
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.util.GraphvizUtil.escape
+import codes.quine.labs.recheck.context.Context
+import codes.quine.labs.recheck.exception.UnsupportedException
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
@@ -28,6 +27,8 @@ final case class EpsNFA[Q](
 
   /** Converts to Graphviz format text. */
   def toGraphviz: String =
+    import GraphvizFormat.escape
+
     val sb = new mutable.StringBuilder
 
     sb.append("digraph {\n")

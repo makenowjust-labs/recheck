@@ -2,10 +2,10 @@ package codes.quine.labs.recheck
 
 import scala.concurrent.duration.*
 
-import codes.quine.labs.recheck.common.Checker
-import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
+import codes.quine.labs.recheck.parameters.Checker
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 

@@ -4,12 +4,12 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 
 import codes.quine.labs.recheck.automaton.EpsNFABuilder
-import codes.quine.labs.recheck.common.AlphabetRepresentative
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.data.Graph
-import codes.quine.labs.recheck.util.RepeatUtil
+import codes.quine.labs.recheck.diagnostics.RepeatCount
+import codes.quine.labs.recheck.exception.UnsupportedException
+import codes.quine.labs.recheck.parameters.AlphabetRepresentative
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.ir.IRPattern
 
@@ -96,8 +96,8 @@ private[fuzz] class StaticSeeder[A, Q](
       .filter(_._2.nonEmpty)
       .flatMap:
         case (q0, _) =>
-          val idas = findTinyIDA(q0).map(construct(_, RepeatUtil.polynomial(2, limit, _, _, maxSize)))
-          val edas = findTinyEDA(q0).map(construct(_, RepeatUtil.exponential(limit, _, _, maxSize)))
+          val idas = findTinyIDA(q0).map(construct(_, RepeatCount.polynomial(2, limit, _, _, maxSize)))
+          val edas = findTinyEDA(q0).map(construct(_, RepeatCount.exponential(limit, _, _, maxSize)))
           idas ++ edas
       .take(maxInitialGenerationSize)
       .toSet

@@ -4,7 +4,6 @@ package automaton
 import scala.collection.mutable
 
 import codes.quine.labs.recheck.data.Graph
-import codes.quine.labs.recheck.util.GraphvizUtil.escape
 
 /** DFA is a [[https://en.wikipedia.org/wiki/Deterministic_finite_automaton DFA (deterministic finite automaton)]]
   * implementation.
@@ -26,6 +25,8 @@ final case class DFA[A, Q](
 
   /** Converts to Graphviz format text. */
   def toGraphviz: String =
+    import GraphvizFormat.escape
+
     val sb = new mutable.StringBuilder
 
     sb.append("digraph {\n")

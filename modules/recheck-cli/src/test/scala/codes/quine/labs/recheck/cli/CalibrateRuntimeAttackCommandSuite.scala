@@ -7,14 +7,14 @@ import codes.quine.labs.recheck.cli.CalibrateRuntimeAttackCommand.Calibration
 import codes.quine.labs.recheck.cli.CalibrateRuntimeAttackCommand.Measurement
 import codes.quine.labs.recheck.cli.CalibrateRuntimeAttackCommand.Reference
 import codes.quine.labs.recheck.cli.CalibrateRuntimeAttackCommand.References
-import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult.EngineLimit
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult.Finish
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult.Timeout
+import codes.quine.labs.recheck.exception.UnexpectedException
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 

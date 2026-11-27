@@ -9,8 +9,8 @@ import io.circe.scalajs.decodeJs
 import io.circe.syntax.*
 
 import codes.quine.labs.recheck.codec.given
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.context.Context
+import codes.quine.labs.recheck.parameters.Parameters
 
 /** ReDoSJS is a JavaScript interface of this library. */
 object ReDoSJS:

@@ -1,9 +1,9 @@
 package codes.quine.labs.recheck
 package diagnostics
 
-import codes.quine.labs.recheck.common.InvalidRegExpException
-import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.*
+import codes.quine.labs.recheck.exception.InvalidRegExpException
+import codes.quine.labs.recheck.exception.UnsupportedException
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 

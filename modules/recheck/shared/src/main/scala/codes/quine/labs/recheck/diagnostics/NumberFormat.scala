@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.util
+package codes.quine.labs.recheck.diagnostics
 
 /** Utilities to format a number. */
 object NumberFormat:

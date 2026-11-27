@@ -3,9 +3,9 @@ package fuzz
 
 import scala.language.implicitConversions
 
-import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
+import codes.quine.labs.recheck.exception.UnexpectedException
 import codes.quine.labs.recheck.fuzz.FString.*
 import codes.quine.labs.resyntax.charset.UnitMode
 

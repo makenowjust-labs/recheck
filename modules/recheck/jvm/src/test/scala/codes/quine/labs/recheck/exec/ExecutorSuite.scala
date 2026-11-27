@@ -6,7 +6,7 @@ import java.nio.file.Paths
 import java.util.Comparator
 import scala.concurrent.duration.*
 
-import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.context.Context
 
 class ExecutorSuite extends munit.FunSuite:
 

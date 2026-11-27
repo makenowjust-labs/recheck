@@ -3,7 +3,7 @@ package codes.quine.labs.recheck.fuzz
 import scala.util.Try
 
 import codes.quine.labs.recheck.ReDoS
-import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.resyntax.dialect.Dialect
 
 class StaticSeederSuite extends munit.FunSuite:

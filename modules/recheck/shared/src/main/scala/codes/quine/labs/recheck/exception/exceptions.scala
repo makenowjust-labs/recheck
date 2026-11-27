@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.common
+package codes.quine.labs.recheck.exception
 
 /** ReDoSException is a base exception class. */
 sealed abstract class ReDoSException(message: String) extends Exception(message)
