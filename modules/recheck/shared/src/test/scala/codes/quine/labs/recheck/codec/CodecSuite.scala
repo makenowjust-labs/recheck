@@ -41,7 +41,16 @@ class CodecSuite extends munit.FunSuite:
   test("codec.encodeDiagnostics"):
     assertEquals(
       encodeDiagnostics(
-        Diagnostics.Safe("a", "", Dialect.JavaScript, UnitMode.UTF16, AttackComplexity.Linear, Seq.empty, Checker.Fuzz)
+        Diagnostics
+          .Safe(
+            "a",
+            "",
+            Dialect.JavaScript,
+            UnitMode.UTF16,
+            AttackComplexity.Linear,
+            Seq.empty,
+            Diagnostics.Checker.Fuzz
+          )
       ),
       Json.obj(
         "source" := "a",
@@ -52,7 +61,7 @@ class CodecSuite extends munit.FunSuite:
         "complexity" := AttackComplexity.Linear.asInstanceOf[AttackComplexity],
         "upperBound" := Json.Null,
         "refutedAttacks" := Json.arr(),
-        "checker" := Checker.Fuzz.asInstanceOf[Checker]
+        "checker" := Diagnostics.Checker.Fuzz
       )
     )
     val upperBound = UpperBound(AttackComplexity.Polynomial(2, false), Hotspot(Seq(Hotspot.Spot(0, 1, Hotspot.Hot))))
@@ -65,7 +74,7 @@ class CodecSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Safe(true),
           Seq.empty,
-          Checker.Fuzz,
+          Diagnostics.Checker.Fuzz,
           Some(upperBound)
         )
       ).hcursor.downField("upperBound").focus,
@@ -90,7 +99,7 @@ class CodecSuite extends munit.FunSuite:
           UnitMode.CodePoint,
           AttackComplexity.Safe(true),
           Seq(refutedAttack),
-          Checker.Fuzz
+          Diagnostics.Checker.Fuzz
         )
       ).hcursor.downField("refutedAttacks").focus,
       Some(Json.arr(encodeRefutedAttack(Dialect.Python(), UnitMode.CodePoint)(refutedAttack)))
@@ -111,7 +120,7 @@ class CodecSuite extends munit.FunSuite:
           Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Hot), Hotspot.Spot(3, 4, Hotspot.Hot))),
           None,
           Seq.empty,
-          Checker.Automaton
+          Diagnostics.Checker.Automaton
         )
       ),
       Json.obj(
@@ -132,7 +141,7 @@ class CodecSuite extends munit.FunSuite:
         "runtimeAttack" := Json.Null,
         "upperBound" := Json.Null,
         "refutedAttacks" := Json.arr(),
-        "checker" := Checker.Automaton.asInstanceOf[Checker]
+        "checker" := Diagnostics.Checker.Automaton
       )
     )
     val runtimeAttack = RuntimeAttack("python 3.15.0", Duration(1000, MILLISECONDS), RuntimeAttackResult.Timeout)
@@ -148,7 +157,7 @@ class CodecSuite extends munit.FunSuite:
           Hotspot(Seq.empty),
           Some(runtimeAttack),
           Seq.empty,
-          Checker.Automaton
+          Diagnostics.Checker.Automaton
         )
       ).hcursor.downField("runtimeAttack").focus,
       Some(encodeRuntimeAttack(runtimeAttack))
@@ -178,7 +187,7 @@ class CodecSuite extends munit.FunSuite:
           Some(UnitMode.UTF16),
           ErrorKind.RuntimeAttacksRefuted,
           Seq(refutedAttack),
-          Some(Checker.Fuzz),
+          Some(Diagnostics.Checker.Fuzz),
           Some(upperBound)
         )
       ),
@@ -234,9 +243,8 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(decodeUnitMode.decodeJson("ucs2".asJson).left.map(_.message), Left("Unknown unit mode: ucs2"))
 
   test("codec.encodeChecker"):
-    assertEquals(encodeChecker(Checker.Auto), "auto".asJson)
-    assertEquals(encodeChecker(Checker.Fuzz), "fuzz".asJson)
-    assertEquals(encodeChecker(Checker.Automaton), "automaton".asJson)
+    assertEquals(encodeChecker(Diagnostics.Checker.Fuzz), "fuzz".asJson)
+    assertEquals(encodeChecker(Diagnostics.Checker.Automaton), "automaton".asJson)
 
   test("codec.encodeAttackComplexity"):
     assertEquals(

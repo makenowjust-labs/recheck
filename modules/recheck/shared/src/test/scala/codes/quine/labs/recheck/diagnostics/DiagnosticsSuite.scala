@@ -6,7 +6,6 @@ import scala.concurrent.duration.MILLISECONDS
 import scala.concurrent.duration.SECONDS
 
 import codes.quine.labs.recheck.common.CancelException
-import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.TimeoutException
 import codes.quine.labs.recheck.common.UnexpectedException
@@ -30,7 +29,15 @@ class DiagnosticsSuite extends munit.FunSuite:
   test("Diagnostics#toString"):
     assertEquals(
       Diagnostics
-        .Safe("", "", Dialect.JavaScript, UnitMode.UTF16, AttackComplexity.Constant, Seq.empty, Checker.Automaton)
+        .Safe(
+          "",
+          "",
+          Dialect.JavaScript,
+          UnitMode.UTF16,
+          AttackComplexity.Constant,
+          Seq.empty,
+          Diagnostics.Checker.Automaton
+        )
         .toString,
       s"""|Input     : //
           |Dialect   : javascript
@@ -54,7 +61,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           Hotspot.empty,
           None,
           Seq.empty,
-          Checker.Automaton
+          Diagnostics.Checker.Automaton
         )
         .toString,
       s"""|Input         : /abbc/
@@ -81,7 +88,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           Hotspot.empty,
           Some(RuntimeAttack("ruby 4.0.7", Duration(1, SECONDS), RuntimeAttackResult.Timeout)),
           Seq(refutedAttack, refutedAttack),
-          Checker.Automaton
+          Diagnostics.Checker.Automaton
         )
         .toString,
       s"""|Input         : /a*a*$$/
@@ -110,7 +117,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           UnitMode.ScalarValue,
           AttackComplexity.Linear,
           Seq(refutedAttack),
-          Checker.Fuzz
+          Diagnostics.Checker.Fuzz
         )
         .toString,
       s"""|Input     : /a*a*$$/
@@ -133,7 +140,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           Some(UnitMode.UTF16),
           Diagnostics.ErrorKind.Timeout,
           Seq.empty,
-          Some(Checker.Automaton)
+          Some(Diagnostics.Checker.Automaton)
         )
         .toString,
       s"""|Input  : //
@@ -197,7 +204,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           Some(UnitMode.ScalarValue),
           Diagnostics.ErrorKind.RuntimeAttacksRefuted,
           Seq(refutedAttack),
-          Some(Checker.Fuzz)
+          Some(Diagnostics.Checker.Fuzz)
         )
         .toString,
       s"""|Input  : /a*a*$$/
@@ -221,7 +228,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Safe(true),
           Seq(refutedAttack),
-          Checker.Fuzz,
+          Diagnostics.Checker.Fuzz,
           Some(upperBound)
         )
         .toString,
@@ -249,7 +256,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           Some(UnitMode.UTF16),
           Diagnostics.ErrorKind.Timeout,
           Seq.empty,
-          Some(Checker.Fuzz),
+          Some(Diagnostics.Checker.Fuzz),
           Some(UpperBound(AttackComplexity.Linear, Hotspot.empty))
         )
         .toString,
@@ -268,9 +275,18 @@ class DiagnosticsSuite extends munit.FunSuite:
       Diagnostics.Unknown("", "", Dialect.JavaScript, None, Diagnostics.ErrorKind.Timeout, Seq(refutedAttack), None)
 
   test("Diagnostics.Unknown.from"):
+    val mode = Some(UnitMode.UTF16)
     assertEquals(
       Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new TimeoutException("foo")),
+        .from(
+          "",
+          "",
+          Dialect.JavaScript,
+          mode,
+          Seq(refutedAttack),
+          new TimeoutException("foo"),
+          Some(Diagnostics.Checker.Fuzz)
+        ),
       Diagnostics.Unknown(
         "",
         "",
@@ -278,12 +294,11 @@ class DiagnosticsSuite extends munit.FunSuite:
         Some(UnitMode.UTF16),
         Diagnostics.ErrorKind.Timeout,
         Seq(refutedAttack),
-        None
+        Some(Diagnostics.Checker.Fuzz)
       )
     )
     assertEquals(
-      Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new CancelException("foo")),
+      Diagnostics.Unknown.from("", "", Dialect.JavaScript, mode, Seq(refutedAttack), new CancelException("foo"), None),
       Diagnostics.Unknown(
         "",
         "",
@@ -296,7 +311,7 @@ class DiagnosticsSuite extends munit.FunSuite:
     )
     assertEquals(
       Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new InvalidRegExpException("foo")),
+        .from("", "", Dialect.JavaScript, mode, Seq(refutedAttack), new InvalidRegExpException("foo"), None),
       Diagnostics.Unknown(
         "",
         "",
@@ -309,7 +324,7 @@ class DiagnosticsSuite extends munit.FunSuite:
     )
     assertEquals(
       Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new UnsupportedException("foo")),
+        .from("", "", Dialect.JavaScript, mode, Seq(refutedAttack), new UnsupportedException("foo"), None),
       Diagnostics.Unknown(
         "",
         "",
@@ -322,7 +337,7 @@ class DiagnosticsSuite extends munit.FunSuite:
     )
     assertEquals(
       Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new UnexpectedException("foo")),
+        .from("", "", Dialect.JavaScript, mode, Seq(refutedAttack), new UnexpectedException("foo"), None),
       Diagnostics.Unknown(
         "",
         "",
@@ -337,7 +352,15 @@ class DiagnosticsSuite extends munit.FunSuite:
   test("Diagnostics#withUpperBound"):
     val bound = Some(upperBound)
     val safe =
-      Diagnostics.Safe("", "", Dialect.JavaScript, UnitMode.UTF16, AttackComplexity.Safe(true), Seq.empty, Checker.Fuzz)
+      Diagnostics.Safe(
+        "",
+        "",
+        Dialect.JavaScript,
+        UnitMode.UTF16,
+        AttackComplexity.Safe(true),
+        Seq.empty,
+        Diagnostics.Checker.Fuzz
+      )
     assertEquals(safe.withUpperBound(bound), safe.copy(upperBound = bound))
     val vulnerable = Diagnostics.Vulnerable(
       "",
@@ -349,7 +372,7 @@ class DiagnosticsSuite extends munit.FunSuite:
       Hotspot.empty,
       None,
       Seq.empty,
-      Checker.Fuzz
+      Diagnostics.Checker.Fuzz
     )
     assertEquals(vulnerable.withUpperBound(bound), vulnerable.copy(upperBound = bound))
     val unknown =
@@ -360,9 +383,12 @@ class DiagnosticsSuite extends munit.FunSuite:
         None,
         Diagnostics.ErrorKind.Timeout,
         Seq.empty,
-        Some(Checker.Fuzz)
+        Some(Diagnostics.Checker.Fuzz)
       )
     assertEquals(unknown.withUpperBound(bound), unknown.copy(upperBound = bound))
+
+  test("Diagnostics.Checker#toString"):
+    assertEquals(Seq(Diagnostics.Checker.Automaton, Diagnostics.Checker.Fuzz).map(_.toString), Seq("automaton", "fuzz"))
 
   test("Diagnostics.ErrorKind#toString"):
     assertEquals(Diagnostics.ErrorKind.Timeout.toString, "timeout")

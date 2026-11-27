@@ -1,8 +1,7 @@
 package codes.quine.labs.recheck.common
 
 /** ReDoSException is a base exception class. */
-sealed abstract class ReDoSException(message: String, var checker: Option[Checker.Used] = None)
-    extends Exception(message)
+sealed abstract class ReDoSException(message: String) extends Exception(message)
 
 /** TimeoutException is an exception thrown on timeout. */
 final class TimeoutException(val source: String) extends ReDoSException(s"timeout at $source")

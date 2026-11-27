@@ -2,7 +2,6 @@ package codes.quine.labs.recheck
 package diagnostics
 
 import codes.quine.labs.recheck.common.CancelException
-import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.ReDoSException
 import codes.quine.labs.recheck.common.TimeoutException
@@ -54,7 +53,7 @@ object Diagnostics:
       hotspot: Hotspot,
       runtimeAttack: Option[RuntimeAttack],
       refutedAttacks: Seq[RefutedAttack],
-      checker: Checker.Used,
+      checker: Checker,
       upperBound: Option[UpperBound] = None
   ) extends Diagnostics:
 
@@ -103,7 +102,8 @@ object Diagnostics:
         dialect: Dialect,
         unitMode: Option[UnitMode],
         refutedAttacks: Seq[RefutedAttack],
-        ex: ReDoSException
+        ex: ReDoSException,
+        checker: Option[Checker]
     ): Diagnostics =
       val kind = ex match
         case _: TimeoutException        => ErrorKind.Timeout
@@ -111,7 +111,7 @@ object Diagnostics:
         case ex: UnsupportedException   => ErrorKind.Unsupported(ex.getMessage)
         case ex: InvalidRegExpException => ErrorKind.InvalidRegExp(ex.getMessage)
         case ex: UnexpectedException    => ErrorKind.Unexpected(ex.getMessage)
-      Unknown(source, flags, dialect, unitMode, kind, refutedAttacks, ex.checker)
+      Unknown(source, flags, dialect, unitMode, kind, refutedAttacks, checker)
 
   /** Returns the section of the upper bound after a blank line, or an empty string if there is none.
     *
@@ -154,6 +154,19 @@ object Diagnostics:
       case Dialect.Perl(utf8, source) => Seq(s"utf8: $utf8", s"source: ${source.name}")
       case _                          => Seq.empty
     if settings.isEmpty then dialect.name else settings.mkString(s"${dialect.name} (", ", ", ")")
+
+  /** Checker is the checker that gives the diagnostics. */
+  enum Checker:
+
+    /** An automaton theory based checker. */
+    case Automaton
+
+    /** A fuzzing based checker. */
+    case Fuzz
+
+    override def toString: String = this match
+      case Automaton => "automaton"
+      case Fuzz      => "fuzz"
 
   /** ErrorKind is the reason for unknown diagnostics. */
   sealed abstract class ErrorKind extends Serializable with Product
