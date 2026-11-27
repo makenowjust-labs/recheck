@@ -65,6 +65,7 @@ tester.run("no-vulnerable", rule, {
           maxSimpleRepeatCount: 30,
           mutationSize: 50,
           randomSeed: 0,
+          runtimeAttackCommand: { javascript: "node" },
           runtimeAttackLimit: 1500000000,
           runtimeAttackTimeout: -1000,
           seeder: "static",
@@ -141,4 +142,15 @@ test("no-vulnerable: the options exclude the logger and the dialect parameters",
   for (const name of ["logger", "dialect"]) {
     expect(options.properties).not.toHaveProperty(name);
   }
+});
+
+test("no-vulnerable: the option of a map has the keys of the schema only", () => {
+  const [options] = rule.meta!.schema as [
+    { properties: Record<string, unknown> },
+  ];
+  expect(options.properties["runtimeAttackCommand"]).toMatchObject({
+    type: "object",
+    properties: { javascript: { type: "string" } },
+    additionalProperties: false,
+  });
 });

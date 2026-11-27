@@ -86,7 +86,7 @@ The following constructs are not supported.
 
 - Auto-possessification.
 - The start-of-match optimizations, by which PCRE2 skips the attempts that cannot match (e.g. `(*COMMIT)abc` matches `xyzabc` in PCRE2, unless the pattern starts with `(*NO_START_OPT)`).
-- The JIT compiler (e.g. `.+\/$` is safe with the JIT, and vulnerable with `RECHECK_PHP='php -d pcre.jit=0'`).
+- The JIT compiler (e.g. `.+\/$` is safe with the JIT, and vulnerable with `--runtime-attack-command='pcre:php -d pcre.jit=0'`).
 
 Enable the [runtime-attack verification](../runtime-attack-verification.mdx) to report only the patterns that are slow on PCRE2.
 The result depends on the settings of PHP, so run it with the ones of your environment (see [Runtime Command](../runtime-attack-verification.mdx#runtime-command)).
@@ -97,6 +97,5 @@ The result depends on the settings of PHP, so run it with the ones of your envir
 - Matching: `preg_match`.
 - Engine limits: the backtrack limit.
 - Engine errors: the recursion limit and the JIT stack limit.
-- Environment variable: `RECHECK_PHP`.
 
 The program runs with PHP's default settings of `pcre.backtrack_limit`, `pcre.recursion_limit` and `pcre.jit`.

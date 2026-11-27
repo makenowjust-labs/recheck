@@ -120,14 +120,13 @@ The following constructs are not supported, and they are reported as `unsupporte
 - Matching: `search` of a compiled pattern.
 - Engine limits: none.
 - Engine errors: `RecursionError`, `MemoryError`.
-- Environment variable: `RECHECK_PYTHON_REGEX`.
 
 `-I` ignores `PYTHONPATH` and the user's site packages, so the Python needs the package in its own site packages, such as the Python of a virtual environment.
 
 ```console
 $ python3 -m venv .venv
 $ .venv/bin/pip install regex
-$ RECHECK_PYTHON_REGEX="$PWD/.venv/bin/python" recheck --dialect=python-regex '/^(a|a)*$/'
+$ recheck --dialect=python-regex --runtime-attack-command="python-regex:$PWD/.venv/bin/python" '/^(a|a)*$/'
 ```
 
 A Python without the package makes the runtime-attack verification fail with an `unexpected` error telling it.

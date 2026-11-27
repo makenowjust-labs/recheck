@@ -8,16 +8,13 @@ import codes.quine.labs.recheck.context.Context
 
 /** Executor runs programs on a runtime, which is a command in `PATH`.
   *
-  * The environment variable [[variable]] replaces the command with a command line of the shell (e.g. `env LC_ALL=C
-  * ruby`), which the arguments follow.
+  * A replacement replaces the command with a command line of the shell (e.g. `env LC_ALL=C ruby`), which the arguments
+  * follow.
   */
 sealed abstract class Executor:
 
   /** The command of the runtime. */
   def command: String
-
-  /** The environment variable of the command line replacing the command. */
-  def variable: String
 
   /** The options of the command, which precede the program. */
   def options: Seq[String]
@@ -28,16 +25,16 @@ sealed abstract class Executor:
   /** The environment variables to set in addition to the inherited ones. */
   protected def variables: Map[String, String] = Map.empty
 
-  /** Returns the command line of the runtime, which is the value of the variable or the command. */
-  def runtime(env: Map[String, String]): String = replacement(env).getOrElse(command)
+  /** Returns the command line of the runtime, which is the replacement or the command. */
+  def runtime(replacement: Option[String]): String = replacement.getOrElse(command)
 
   /** Returns the command line running the input. */
-  def commandLine(env: Map[String, String]): String = (runtime(env) +: args).mkString(" ")
+  def commandLine(replacement: Option[String]): String = (runtime(replacement) +: args).mkString(" ")
 
   /** Returns the command line running a program file of the name, which has the input in itself. */
   def scriptCommandLine(name: String): String = (command +: options :+ name).mkString(" ")
 
-  /** Runs the input on the runtime in the environment variables.
+  /** Runs the input on the runtime, whose command is replaced by the replacement, if any.
     *
     * The timeout counts from the time when the process prints the marker as a line, so that the startup of the runtime
     * is not counted. Waiting for the marker is limited only by the context. `compileTimeout` limits the compilation of
@@ -48,13 +45,9 @@ sealed abstract class Executor:
       timeout: Option[FiniteDuration],
       @unused compileTimeout: Duration,
       marker: String,
-      env: Map[String, String]
+      replacement: Option[String]
   )(using Context): ExecResult =
-    Platform.run(command, args, replacement(env), variables, input, timeout, marker)
-
-  /** Returns the command line replacing the command in the environment variables, if any. */
-  protected def replacement(env: Map[String, String]): Option[String] =
-    env.get(variable).map(_.trim).filter(_.nonEmpty)
+    Platform.run(command, args, replacement, variables, input, timeout, marker)
 
 object Executor:
 
@@ -64,7 +57,6 @@ object Executor:
   /** Stdin is an executor whose input is the program, which the command reads from the standard input. */
   abstract class Stdin private[exec] (
       val command: String,
-      val variable: String,
       val options: Seq[String] = Seq.empty,
       stdin: Seq[String] = Seq("-")
   ) extends Executor:
@@ -81,7 +73,6 @@ object Executor:
     */
   abstract class Compiled private[exec] (
       val command: String,
-      val variable: String,
       program: SourceFile,
       override protected val variables: Map[String, String] = Map.empty
   ) extends Executor:
@@ -110,7 +101,8 @@ object Executor:
     protected def entry(output: String): String = output
 
     /** Returns the command line compiling the program and running it. */
-    override def commandLine(env: Map[String, String]): String = compileRunCommandLine(runtime(env), program.name)
+    override def commandLine(replacement: Option[String]): String =
+      compileRunCommandLine(runtime(replacement), program.name)
 
     /** Returns the command line compiling a program file of the name and running it. */
     override def scriptCommandLine(name: String): String = compileRunCommandLine(command, name)
@@ -120,12 +112,12 @@ object Executor:
         timeout: Option[FiniteDuration],
         compileTimeout: Duration,
         marker: String,
-        env: Map[String, String]
+        replacement: Option[String]
     )(using ctx: Context): ExecResult =
       val output = ctx.pauseTimeout:
         Platform.compile(
           command,
-          replacement(env),
+          replacement,
           program,
           versionArgs,
           compileArgs,
@@ -134,7 +126,7 @@ object Executor:
           compileTimeout
         )
       runArgs(output) match
-        case Some(args) => Platform.run(command, args, replacement(env), variables, input, timeout, marker)
+        case Some(args) => Platform.run(command, args, replacement, variables, input, timeout, marker)
         case None       => Platform.run(output, Seq.empty, None, variables, input, timeout, marker)
 
     private def compileRunCommandLine(runtime: String, name: String): String =

@@ -175,19 +175,13 @@ const finishing =
 
 test("check: java with refuted attacks", async () => {
   backend.mockReturnValueOnce("java");
-  // Jest's `process.env` does not reach child processes, so `env` sets the variable.
   javaEnsure.mockImplementationOnce(() =>
-    agent.start("env", [
-      `RECHECK_NODE=${finishing}`,
-      "java",
-      "-jar",
-      RECHECK_JAR,
-      "agent",
-    ]),
+    agent.start("java", ["-jar", RECHECK_JAR, "agent"]),
   );
 
   const diagnostics = await main.check("^(a|a)*$", "", {
     checker: "automaton",
+    runtimeAttackCommand: { javascript: finishing },
     runtimeAttackTimeout: 1000,
   });
   expect(diagnostics).toMatchObject({

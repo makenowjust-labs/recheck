@@ -97,8 +97,7 @@ The `Pattern` flag `LITERAL` has no flag letter, so it cannot be given (`Pattern
 - Matching: `Matcher#find`.
 - Engine limits: none.
 - Engine errors: `StackOverflowError`, `OutOfMemoryError`.
-- Environment variable: `RECHECK_JAVA`.
 
 `java` compiles the program with `javac` of the JDK, so it needs a JDK 17 or later, not only a JRE.
-`RECHECK_JAVA` replaces `java` in both commands, so that the same JDK compiles and runs the program.
+The command line of `java` in [`runtimeAttackCommand`](../parameters.mdx#runtimeattackcommand) replaces `java` in both commands, so that the same JDK compiles and runs the program.
 `recheck` compiles the program once for each command line and version of `java`, and the next runs reuse the compiled program.

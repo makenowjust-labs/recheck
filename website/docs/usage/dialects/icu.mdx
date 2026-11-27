@@ -96,15 +96,14 @@ The following constructs are not supported, and they are reported as `unsupporte
 - Matching: `uregex_find` from the start, with ICU's default limits (no time limit, and a backtrack stack of 8,000,000 bytes).
 - Engine limits: `U_REGEX_TIME_OUT`.
 - Engine errors: `U_REGEX_STACK_OVERFLOW`, `U_MEMORY_ALLOCATION_ERROR`.
-- Environment variable: `RECHECK_ICU`.
 
-`RECHECK_ICU` replaces `c++` with a command line of a C++ compiler, which finds ICU's headers and libraries.
+The command line of `icu` in [`runtimeAttackCommand`](../parameters.mdx#runtimeattackcommand) replaces `c++` with a command line of a C++ compiler, which finds ICU's headers and libraries.
 `recheck` adds the program, `-o`, the compiled program and ICU's libraries after it.
 For example, the following uses ICU of Homebrew.
 
 ```console
-$ export RECHECK_ICU="c++ -I$(brew --prefix icu4c@79)/include -L$(brew --prefix icu4c@79)/lib"
-$ recheck --dialect=icu --runtime-attack-timeout=1s '/^(a|a)*$/'
+$ ICU="$(brew --prefix icu4c@79)"
+$ recheck --dialect=icu --runtime-attack-timeout=1s --runtime-attack-command="icu:c++ -I$ICU/include -L$ICU/lib" '/^(a|a)*$/'
 ```
 
 `recheck` compiles the program once for each command line and version of the compiler, and the next runs reuse the compiled program.

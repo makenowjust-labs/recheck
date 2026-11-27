@@ -441,7 +441,7 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     assert(clue(longICU).contains("std::istringstream lines(std::string(\"-\\n00610061"))
     assert(longICU.contains("006100\"\n    \"61\\n1:0078\\n2:0079\\n1:007a\\n\"));"))
 
-  test("RuntimeAttackProgram.generate: the variables of the runtimes"):
+  test("RuntimeAttackProgram.generate: the commands of the runtimes"):
     val dialects = Seq(
       Dialect.JavaScript,
       Dialect.Python(Dialect.Python.Type.Bytes),
@@ -455,9 +455,8 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
       Dialect.BoostRegex()
     )
     assertEquals(
-      dialects.map(d => generate("a", "", d).executor.variable),
-      Seq("NODE", "PYTHON", "PYTHON_REGEX", "RUBY", "JAVA", "DOTNET", "PERL", "PHP", "ICU", "BOOST_REGEX")
-        .map("RECHECK_" + _)
+      dialects.map(d => generate("a", "", d).executor.command),
+      Seq("node", "python3", "python3", "ruby", "java", "dotnet", "perl", "php", "c++", "c++")
     )
 
   test("RuntimeAttackProgram.generate: empty attack string"):

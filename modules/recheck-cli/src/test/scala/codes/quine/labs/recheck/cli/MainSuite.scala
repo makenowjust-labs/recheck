@@ -46,7 +46,11 @@ class MainSuite extends munit.FunSuite:
     val main = new Main:
       override def exit(exitCode: Int): Unit = throw new ExitException(exitCode)
 
-      override def runRuntimeAttack(logger: Option[Context.Logger], compileTimeout: Duration)(
+      override def runRuntimeAttack(
+          logger: Option[Context.Logger],
+          compileTimeout: Duration,
+          commands: Map[String, String]
+      )(
           source: String,
           dialect: Dialect,
           mode: UnitMode,
@@ -138,11 +142,30 @@ class MainSuite extends munit.FunSuite:
         Seq("--dialect=ruby", "--no-perl-utf8") -> "--no-perl-utf8 is not an option of ruby",
         Seq("--dialect=ruby", "--ruby-encoding=str") -> "unknown value of --ruby-encoding: str",
         Seq("--dialect=python", "--python-type=bytez") -> "unknown value of --python-type: bytez",
-        Seq("--dialect=python", "--python-regex-type=str") -> "--python-regex-type is not an option of python"
+        Seq("--dialect=python", "--python-regex-type=str") -> "--python-regex-type is not an option of python",
+        Seq("--runtime-attack-command=rb:ruby") -> "unknown key of --runtime-attack-command: rb",
+        Seq("--runtime-attack-command=ruby") -> "invalid value of --runtime-attack-command: ruby"
       )
     do
       val result = Main.command.parse("/foo/" +: args)
       assert(clue(result).left.exists(_.errors == List(message)))
+    // The option is given once for each dialect, and the command line may have `:`.
+    assertEquals(
+      Main.command.parse(
+        Seq(
+          "/foo/",
+          "--runtime-attack-command=ruby:env A=b:c ruby",
+          "--runtime-attack-command=python-regex:venv/python"
+        )
+      ),
+      Right(
+        Main.CheckAction(
+          InputPattern("foo", ""),
+          Parameters(runtimeAttackCommand = Map("ruby" -> "env A=b:c ruby", "python-regex" -> "venv/python")),
+          json = false
+        )
+      )
+    )
     assertEquals(
       Main.command.parse(Seq("/foo/", "--max-refuted-attacks=3")),
       Right(Main.CheckAction(InputPattern("foo", ""), Parameters(maxRefutedAttacks = 3), json = false))

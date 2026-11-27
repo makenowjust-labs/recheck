@@ -25,7 +25,7 @@ class RuntimeAttackExecutorSuite extends munit.FunSuite:
 
   test("RuntimeAttackExecutor.execute"):
     def execute(source: String, dialect: Dialect, timeout: Duration): Option[RuntimeAttack] =
-      RuntimeAttackExecutor.execute(source, "", dialect, UnitMode.CodePoint, attack, timeout, Duration.Inf, Map.empty)
+      RuntimeAttackExecutor.execute(source, "", dialect, UnitMode.CodePoint, attack, timeout, Duration.Inf, None)
 
     assertEquals(execute("foo", Dialect.Python(), Duration.MinusInf), None)
     assertEquals(execute("foo", Dialect.Python(), Duration.Zero), None)

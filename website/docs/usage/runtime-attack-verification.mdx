@@ -172,18 +172,60 @@ When the command cannot run (e.g. the runtime is not installed), the result is `
 ## Runtime Command
 
 By default, the runtime-attack verification runs the runtime of the dialect found by its name in `PATH` (e.g. `ruby` for the `ruby` dialect).
-To use another runtime, set the environment variable of the dialect (e.g. `RECHECK_RUBY`) to the command line to run instead.
-Each dialect's page (see [Dialects](dialects.mdx#supported-dialects)) lists its command and its environment variable.
+To use another runtime, set the command line to run instead for the dialect in [`runtimeAttackCommand`](parameters.mdx#runtimeattackcommand), which is a map from the names of the dialects to the command lines.
+Each dialect's page (see [Dialects](dialects.mdx#supported-dialects)) lists its command.
 `recheck` adds the dialect's arguments after the command line (e.g. `--disable-gems -` for `ruby`), as it does to the default command.
 The command runs in a directory of `recheck`, not in the current directory, so a path in the command line needs to be absolute.
 
 For example, the following uses Ruby installed in `/opt/ruby-4.0` with `--yjit`.
+The CLI takes the name of the dialect, `:` and the command line, and the option is given once for each dialect.
+
+<Tabs>
+<TabItem value="cli" label="CLI">
 
 ```console
-$ RECHECK_RUBY='/opt/ruby-4.0/bin/ruby --yjit' recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
+$ recheck --dialect=ruby --runtime-attack-timeout=1s --runtime-attack-command='ruby:/opt/ruby-4.0/bin/ruby --yjit' '/^(a|a)*$/'
 ```
 
-The environment variables work with the JavaScript library and the ESLint plugin too, since they pass their environment to `recheck`.
+</TabItem>
+<TabItem value="js" label="JavaScript">
+
+```tsx
+import { check } from "recheck";
+
+await check("^(a|a)*$", "", {
+  dialect: "ruby",
+  runtimeAttackTimeout: 1000,
+  runtimeAttackCommand: { ruby: "/opt/ruby-4.0/bin/ruby --yjit" },
+});
+```
+
+</TabItem>
+<TabItem value="scala" label="Scala">
+
+```scala
+import scala.concurrent.duration.*
+
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.parameters.Parameters
+import codes.quine.labs.resyntax.dialect.Dialect
+
+val params = Parameters(
+  dialect = Dialect.Ruby(),
+  runtimeAttackTimeout = 1.second,
+  runtimeAttackCommand = Map("ruby" -> "/opt/ruby-4.0/bin/ruby --yjit")
+)
+ReDoS.check("^(a|a)*$", "", params)
+```
+
+</TabItem>
+</Tabs>
+
+:::warning
+
+The shell runs the command line, so do not take it from an untrusted source.
+
+:::
 
 Some dialects compile the program before running it (e.g. `java` and `dotnet`).
 `recheck` compiles it once for each command line and version of the runtime, and keeps the compiled program for the next runs, even of another process.
