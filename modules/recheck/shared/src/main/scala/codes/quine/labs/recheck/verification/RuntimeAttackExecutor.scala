@@ -14,8 +14,8 @@ import codes.quine.labs.recheck.exec.Executor
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 
-/** RuntimeAttackVerifier is the implementation of runtime-attack verification. */
-object RuntimeAttackVerifier:
+/** RuntimeAttackExecutor runs the attack strings of runtime-attack verification on the runtimes. */
+object RuntimeAttackExecutor:
 
   /** Runs the attack string on the runtime of the dialect, where the pattern matches strings of the mode, and returns
     * the runtime attack.
@@ -26,7 +26,7 @@ object RuntimeAttackVerifier:
     *
     * The environment variables `env` may replace the command of the runtime (e.g. `RECHECK_NODE`).
     */
-  def verify(
+  def execute(
       source: String,
       flags: String,
       dialect: Dialect,

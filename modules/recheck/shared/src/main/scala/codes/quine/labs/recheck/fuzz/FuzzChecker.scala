@@ -10,17 +10,17 @@ import codes.quine.labs.recheck.automaton.Complexity
 import codes.quine.labs.recheck.automaton.EpsNFABuilder
 import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
-import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.UpperBound
 import codes.quine.labs.recheck.exception.UnsupportedException
-import codes.quine.labs.recheck.fuzz.Attacker.AttackResult
 import codes.quine.labs.recheck.fuzz.Attacker.Candidate
 import codes.quine.labs.recheck.fuzz.FuzzChecker.*
 import codes.quine.labs.recheck.parameters.AccelerationMode
 import codes.quine.labs.recheck.parameters.AlphabetRepresentative
 import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.recheck.parameters.Seeder
+import codes.quine.labs.recheck.verification.RuntimeAttacker
 import codes.quine.labs.recheck.vm.Interpreter
 import codes.quine.labs.recheck.vm.Interpreter.CoverageItem
 import codes.quine.labs.recheck.vm.Interpreter.Options
@@ -35,8 +35,8 @@ import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 /** ReDoS vulnerable RegExp checker based on fuzzing. */
 object FuzzChecker:
 
-  /** Checks whether RegExp is ReDoS vulnerable or not, and returns the attacks it finds, the complexity of the safety
-    * once they run out, and the upper bound, if any.
+  /** Checks whether RegExp is ReDoS vulnerable or not, and returns the diagnostics of the attacks it finds, the
+    * complexity of the safety once they run out, and the upper bound, if any.
     *
     * It checks the upper bound first (see [[upperBound]]), and it fuzzes only if the bound is not linear, from the
     * witnesses of the bound and with no attack above it.
@@ -44,9 +44,8 @@ object FuzzChecker:
     * `automatonAttacks` are the attacks that the automaton checker found, from the worst. If there is any, they are the
     * upper bound, and the bound is not checked.
     *
-    * `avoidsAttack` tells whether to avoid an attack of the complexity, the string and the hotspot, which
-    * runtime-attack verification refuted, and may change while iterating the results. Strings with an avoided attack
-    * rank below the others in the next generation.
+    * `runtimeAttacker` runs each attack, and the diagnostics are of the ones that it does not refute. Strings with a
+    * refuted attack rank below the others in the next generation.
     */
   def check(
       pattern: IRPattern,
@@ -78,11 +77,11 @@ object FuzzChecker:
       accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode,
       accelerationHitRatio: Double = Parameters.DefaultAccelerationHitRatio,
       alphabetRepresentative: AlphabetRepresentative = Parameters.DefaultAlphabetRepresentative,
-      avoidsAttack: (AttackComplexity.Vulnerable, AttackPattern, Hotspot) => Boolean,
+      runtimeAttacker: RuntimeAttacker,
       automatonAttacks: Seq[Complexity.Vulnerable[UChar]]
   )(using
       ctx: Context
-  ): (Iterator[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)], AttackComplexity.Safe, Option[UpperBound]) =
+  ): (Iterator[Diagnostics.Vulnerable], AttackComplexity.Safe, Option[UpperBound]) =
     ctx.interrupt:
       val bound =
         if automatonAttacks.nonEmpty then Some(automatonAttacks)
@@ -115,7 +114,7 @@ object FuzzChecker:
           accelerationMode,
           accelerationHitRatio,
           alphabetRepresentative,
-          avoidsAttack,
+          runtimeAttacker,
           bound
         )
         lazy val checker = new FuzzChecker(
@@ -283,7 +282,7 @@ private[fuzz] final class FuzzChecker(
   val parts: Seq[UString] = fuzz.parts.toSeq
 
   /** Runs this fuzzer. */
-  def check(): Iterator[AttackResult] = interrupt:
+  def check(): Iterator[Diagnostics.Vulnerable] = interrupt:
     log(s"fuzz: start (usesAcceleration: ${fuzz.usesAcceleration(accelerationMode)})")
 
     val (initResults, initPop) = init()
@@ -297,14 +296,14 @@ private[fuzz] final class FuzzChecker(
   /** Creates the initial generation from the seed set, where the seeds of the seeder run after the steepest attacks
     * from the seeds of the witnesses of the upper bound.
     */
-  def init(): (Iterator[AttackResult], Population) = interrupt:
+  def init(): (Iterator[Diagnostics.Vulnerable], Population) = interrupt:
     val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty)
     val seed = witnessSeed()
     seed.foreach(pop.execute)
     val fingerprints = pop.candidates.keys.toSet
     val (steepest, others) = attacker.ordered(pop.candidates.values.toVector).partition(attacker.isSteepest)
 
-    def seeded: Iterator[AttackResult] =
+    def seeded: Iterator[Diagnostics.Vulnerable] =
       seederSeed(seed).foreach(pop.execute)
       val candidates = pop.candidates.iterator.collect:
         case (fingerprint, candidate) if !fingerprints.contains(fingerprint) => candidate
@@ -371,7 +370,7 @@ private[fuzz] final class FuzzChecker(
     seed
 
   /** Iterates a generation. */
-  def iterate(i: Int, gen: Generation): (Iterator[AttackResult], Population) = interrupt:
+  def iterate(i: Int, gen: Generation): (Iterator[Diagnostics.Vulnerable], Population) = interrupt:
     val next = Population.from(gen)
     if gen.traces.isEmpty then return (Iterator.empty, next)
 

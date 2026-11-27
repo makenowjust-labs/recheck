@@ -10,24 +10,26 @@ import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.diagnostics.Diagnostics
+import codes.quine.labs.recheck.diagnostics.DiagnosticsState
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.Hotspot.*
 import codes.quine.labs.recheck.diagnostics.RefutedAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.recheck.diagnostics.UpperBound
+import codes.quine.labs.recheck.exception.RuntimeAttacksRefutedException
 import codes.quine.labs.recheck.exception.TimeoutException
 import codes.quine.labs.recheck.exception.UnexpectedException
 import codes.quine.labs.recheck.exception.UnsupportedException
 import codes.quine.labs.recheck.parameters.AttackStringCharacteristics
 import codes.quine.labs.recheck.parameters.Checker
 import codes.quine.labs.recheck.parameters.Parameters
-import codes.quine.labs.resyntax.ast.SourceLocation
-import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.recheck.verification.RuntimeAttacker
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.Dialect.*
 import codes.quine.labs.resyntax.dialect.PerlSource
+import codes.quine.labs.resyntax.ir.IRPattern
 import codes.quine.labs.resyntax.parser.Parser
 
 class ReDoSSuite extends munit.FunSuite:
@@ -35,29 +37,51 @@ class ReDoSSuite extends munit.FunSuite:
   /** A default context. */
   given ctx: Context = Context()
 
-  /** Returns the vulnerable diagnostics of a checker followed by its safe diagnostics, with its upper bound. */
-  def concat(
-      result: (
-          Iterator[Diagnostics.Vulnerable],
-          () => Diagnostics.Safe,
-          () => Option[UpperBound],
-          () => Diagnostics.Checker
-      )
-  ): Iterator[Diagnostics] =
-    val (vulnerable, safe, upperBound, _) = result
-    (vulnerable ++ Iterator(safe())).map(_.withUpperBound(upperBound()))
+  /** Execute is the runtime of a runtime attacker in the tests, which gives the result of an attack string in the state
+    * of the checking.
+    */
+  type Execute = (DiagnosticsState, AttackPattern) => Option[RuntimeAttack]
 
-  def checkAutomaton(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
+  /** The runtime that runs no attack string. */
+  val skip: Execute = (_, _) => None
+
+  /** The runtime that refutes every attack string. */
+  val refute: Execute = (_, _) => Some(RuntimeAttack("node v0", 1.second, RuntimeAttackResult.Finish(1.millis)))
+
+  /** Returns the state of a checking of the pattern and its runtime attacker, whose runtime is `execute`. */
+  def stateOf(source: String, flags: String, ir: IRPattern, params: Parameters, execute: Execute)(using
+      ctx: Context
+  ): (DiagnosticsState, RuntimeAttacker) =
+    val state = new DiagnosticsState(source, flags, params.dialect)
+    state.unitMode = Some(ir.mode)
+    val runtimeAttacker = new RuntimeAttacker(
+      state,
+      attack => execute(state, attack),
+      ir.readStartLocations(params.maxRefutedAttackPartSize),
+      RuntimeAttacker.characteristicSets(ir, params.attackStringCharacteristics),
+      ir.mode,
+      params.runtimeAttackLimit,
+      params.maxRuntimeAttackStringSize,
+      params.maxRefutedAttacks
+    )
+    (state, runtimeAttacker)
+
+  def checkAutomaton(source: String, flags: String, params: Parameters, execute: Execute = skip): Diagnostics =
     val ir = ReDoS.parse(source, flags, params.dialect)
-    concat(ReDoS.checkAutomaton(source, flags, ir, params, mutable.ArrayBuffer.empty))
+    val (state, runtimeAttacker) = stateOf(source, flags, ir, params, execute)
+    ReDoS.checkAutomaton(ir, params, state, runtimeAttacker, mutable.ArrayBuffer.empty)
 
-  def checkFuzz(source: String, flags: String, params: Parameters)(using ctx: Context): Iterator[Diagnostics] =
+  def checkFuzz(source: String, flags: String, params: Parameters, execute: Execute = skip)(using
+      ctx: Context
+  ): Diagnostics =
     val ir = ReDoS.parse(source, flags, params.dialect)(using Context())
-    concat(ReDoS.checkFuzz(source, flags, ir, params, (_, _, _) => false, Seq.empty))
+    val (state, runtimeAttacker) = stateOf(source, flags, ir, params, execute)
+    ReDoS.checkFuzz(ir, params, state, runtimeAttacker, Seq.empty)
 
-  def checkAuto(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
+  def checkAuto(source: String, flags: String, params: Parameters, execute: Execute = skip): Diagnostics =
     val ir = ReDoS.parse(source, flags, params.dialect)
-    concat(ReDoS.checkAuto(source, flags, ir, params, (_, _, _) => false, mutable.ArrayBuffer.empty))
+    val (state, runtimeAttacker) = stateOf(source, flags, ir, params, execute)
+    ReDoS.checkAuto(ir, params, state, runtimeAttacker)
 
   val params: Parameters = Parameters(randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
 
@@ -581,223 +605,12 @@ class ReDoSSuite extends munit.FunSuite:
       Diagnostics.Checker.Automaton
     )
 
-  test("ReDoS.verifyCandidates"):
-    def vulnerable(degree: Int): Diagnostics.Vulnerable =
-      Diagnostics.Vulnerable(
-        "^a*a*$",
-        "",
-        Dialect.JavaScript,
-        UnitMode.UTF16,
-        AttackComplexity.Polynomial(degree, false),
-        AttackPattern(
-          Seq((UnitMode.UTF16.decode(""), UnitMode.UTF16.decode("a"), 0)),
-          UnitMode.UTF16.decode(""),
-          10
-        ),
-        Hotspot(Seq(Spot(1, 2, Hot))),
-        None,
-        Seq.empty,
-        Diagnostics.Checker.Automaton
-      )
-
-    val safe = Diagnostics.Safe(
-      "^a*a*$",
-      "",
-      Dialect.JavaScript,
-      UnitMode.UTF16,
-      AttackComplexity.Linear,
-      Seq.empty,
-      Diagnostics.Checker.Automaton
-    )
-
-    def runtimeAttack(result: RuntimeAttackResult): Option[RuntimeAttack] =
-      Some(RuntimeAttack("node v0", 1.second, result))
-
-    val finish = runtimeAttack(RuntimeAttackResult.Finish(1.millis))
-    val timeout = runtimeAttack(RuntimeAttackResult.Timeout)
-    var pulled = 0
-    var verified = 0
-
-    def refuted(degree: Int): RefutedAttack =
-      val d = vulnerable(degree)
-      RefutedAttack(d.complexity, d.attack, d.hotspot, finish.get)
-
-    // The candidates are of the degrees, and verification gives the results in order.
-    def verifyCandidates(
-        degrees: Seq[Int],
-        results: Seq[Option[RuntimeAttack]],
-        maxRefutedAttacks: Int = 100
-    ): Diagnostics =
-      pulled = 0
-      verified = 0
-      val candidates = degrees.iterator.map: degree =>
-        pulled += 1
-        vulnerable(degree)
-      val verify = (d: Diagnostics.Vulnerable) =>
-        verified += 1
-        d.copy(runtimeAttack = results(verified - 1))
-      val refutedAttacks = mutable.ArrayBuffer.empty[RefutedAttack]
-      ReDoS.verifyCandidates(candidates, () => safe, verify, refutedAttacks, maxRefutedAttacks, Set.empty, Seq.empty)
-
-    // The refuted ones are recorded, and the safe one is the final one when the candidates run out.
-    assertEquals(
-      verifyCandidates(Seq(3, 2), Seq(finish, finish)),
-      safe.copy(refutedAttacks = Seq(refuted(3), refuted(2)))
-    )
-    assertEquals(verifyCandidates(Seq.empty, Seq.empty), safe)
-    // The first one not refuted by runtime-attack verification is the final one, and no more candidates are computed.
-    assertEquals(
-      verifyCandidates(Seq(3, 2, 2), Seq(finish, timeout)),
-      vulnerable(2).copy(runtimeAttack = timeout, refutedAttacks = Seq(refuted(3)))
-    )
-    assertEquals(pulled, 2)
-    assertEquals(verifyCandidates(Seq(3, 2), Seq(None)), vulnerable(3))
-    assertEquals(pulled, 1)
-    // The attacks of the same complexity and hotspot as a refuted one are skipped.
-    assertEquals(
-      verifyCandidates(Seq(3, 3, 2), Seq(finish, timeout)),
-      vulnerable(2).copy(runtimeAttack = timeout, refutedAttacks = Seq(refuted(3)))
-    )
-    assertEquals(verified, 2)
-
-    // It stops at the limit of refuted attacks.
-    def limit(refutedAttacks: RefutedAttack*): Diagnostics.Unknown =
-      Diagnostics.Unknown(
-        "^a*a*$",
-        "",
-        Dialect.JavaScript,
-        Some(UnitMode.UTF16),
-        Diagnostics.ErrorKind.RuntimeAttacksRefuted,
-        refutedAttacks,
-        Some(Diagnostics.Checker.Automaton)
-      )
-
-    assertEquals(
-      verifyCandidates(Seq(4, 3, 2), Seq(finish, finish), maxRefutedAttacks = 2),
-      limit(refuted(4), refuted(3))
-    )
-    assertEquals(pulled, 2)
-    // A non-positive limit stops at the first refuted attack.
-    assertEquals(verifyCandidates(Seq(3, 2), Seq(finish), maxRefutedAttacks = 0), limit(refuted(3)))
-
-    // The fuzz checker avoids the refuted attacks.
-    val params =
-      Parameters(checker = Checker.Fuzz, maxGeneStringSize = 1000, maxAttackStringSize = 1000, maxIteration = 2)
-    val ir = ReDoS.parse("^(?:a|a)*$", "", params.dialect)
-    val readStarts = ir.readStartLocations(params.maxRefutedAttackPartSize)
-    val sets = ReDoS.characteristicSets(ir, params.attackStringCharacteristics)
-    val refutedAttacks = mutable.ArrayBuffer.empty[RefutedAttack]
-    val avoidsAttack = ReDoS.isRefuted(refutedAttacks, readStarts, sets, _, _, _)
-    val (candidates, fuzzSafe, fuzzUpperBound, _) =
-      ReDoS.checkFuzz("^(?:a|a)*$", "", ir, params, avoidsAttack, Seq.empty)
-    val verify = (d: Diagnostics.Vulnerable) => d.copy(runtimeAttack = finish)
-    val result = ReDoS.verifyCandidates(candidates, fuzzSafe, verify, refutedAttacks, 100, readStarts, sets)
-    result.withUpperBound(fuzzUpperBound()) match
-      case d: Diagnostics.Safe =>
-        assertEquals(
-          d.copy(refutedAttacks = Seq.empty),
-          Diagnostics.Safe(
-            "^(?:a|a)*$",
-            "",
-            Dialect.JavaScript,
-            UnitMode.UTF16,
-            AttackComplexity.Safe(true),
-            Seq.empty,
-            Diagnostics.Checker.Fuzz,
-            Some(UpperBound(AttackComplexity.Exponential(false), Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot)))))
-          )
-        )
-        assert(d.refutedAttacks.nonEmpty)
-        val keys = d.refutedAttacks.map(r => ReDoS.AttackKey(r.complexity, r.attack, r.hotspot, readStarts, sets))
-        assertEquals(keys.distinct, keys)
-      case d => fail(s"not safe: $d")
-
-  test("ReDoS.AttackKey"):
-    val readStarts = Set(SourceLocation(0, 1), SourceLocation(2, 3), SourceLocation(4, 5), SourceLocation(6, 7))
-    def attackOf(prefix: String, pump: String, suffix: String): AttackPattern =
-      AttackPattern(
-        Seq((UnitMode.UTF16.decode(prefix), UnitMode.UTF16.decode(pump), 0)),
-        UnitMode.UTF16.decode(suffix),
-        10
-      )
-    val attack = attackOf("", "a", "")
-    def key(complexity: AttackComplexity.Vulnerable, hotspot: Hotspot): ReDoS.AttackKey =
-      ReDoS.AttackKey(complexity, attack, hotspot, readStarts, Seq.empty)
-
-    val hotspot = Hotspot(Seq(Spot(0, 1, Warm), Spot(2, 3, Cold), Spot(4, 5, Hot), Spot(6, 7, Hot)))
-    assertEquals(
-      key(AttackComplexity.Exponential(true), hotspot),
-      ReDoS.AttackKey(None, Seq(Spot(0, 1, Warm), Spot(2, 3, Cold), Spot(4, 5, Hot), Spot(6, 7, Hot)), Set.empty)
-    )
-    assertEquals(
-      key(AttackComplexity.Polynomial(2, false), hotspot),
-      key(AttackComplexity.Polynomial(2, true), hotspot)
-    )
-    assertNotEquals(
-      key(AttackComplexity.Polynomial(2, false), hotspot),
-      key(AttackComplexity.Polynomial(2, false), Hotspot(Seq(Spot(0, 1, Warm), Spot(4, 5, Hot), Spot(6, 7, Hot))))
-    )
-    assertNotEquals(
-      key(AttackComplexity.Polynomial(2, false), hotspot),
-      key(AttackComplexity.Polynomial(3, false), hotspot)
-    )
-
-    // A part is in the spots as its character read first.
-    val ir = ReDoS.parse("form.*edit_profile", "", Dialect.JavaScript)
-    val quadratic = AttackComplexity.Polynomial(2, true)
-    def partKey(partSize: Int)(spots: Spot*): ReDoS.AttackKey =
-      ReDoS.AttackKey(quadratic, attack, Hotspot(spots), ir.readStartLocations(partSize), Seq.empty)
-    val form = Seq(Spot(0, 4, Warm), Spot(4, 5, Hot))
-    assertEquals(
-      partKey(1)(form :+ Spot(6, 7, Warm)*),
-      ReDoS.AttackKey(Some(2), Seq(Spot(0, 1, Warm), Spot(4, 5, Hot), Spot(6, 7, Warm)), Set.empty)
-    )
-    assertEquals(partKey(1)(form :+ Spot(6, 12, Warm)*), partKey(1)(form :+ Spot(6, 7, Warm)*))
-    assertEquals(partKey(1)(form :+ Spot(6, 18, Warm)*), partKey(1)(form :+ Spot(6, 7, Warm)*))
-    assertNotEquals(partKey(1)(form*), partKey(1)(form :+ Spot(6, 7, Warm)*))
-    // With three characters of a part, the spots tell the first three characters read of `edit_profile` apart.
-    assertNotEquals(partKey(3)(form :+ Spot(6, 8, Warm)*), partKey(3)(form :+ Spot(6, 7, Warm)*))
-    assertNotEquals(partKey(3)(form :+ Spot(6, 9, Warm)*), partKey(3)(form :+ Spot(6, 8, Warm)*))
-    assertEquals(partKey(3)(form :+ Spot(6, 12, Warm)*), partKey(3)(form :+ Spot(6, 9, Warm)*))
-    // A spot over a part and the characters around it has each of them.
-    val around = ReDoS.parse("\\dab\\d", "", Dialect.JavaScript).readStartLocations(1)
-    assertEquals(
-      ReDoS.AttackKey(quadratic, attack, Hotspot(Seq(Spot(0, 6, Warm))), around, Seq.empty),
-      ReDoS.AttackKey(Some(2), Seq(Spot(0, 2, Warm), Spot(2, 3, Warm), Spot(4, 6, Warm)), Set.empty)
-    )
-
-    // The characteristics are the sets that have a character of the prefixes, the pumps and the suffix.
-    val sets = Seq(CharSet.single('a'), CharSet.single('b'), CharSet.single('c'), CharSet.single('d'))
-    def characteristicsOf(attack: AttackPattern): Set[Int] =
-      ReDoS.AttackKey(quadratic, attack, Hotspot.empty, Set.empty, sets).characteristics
-    assertEquals(characteristicsOf(attackOf("", "a", "")), Set(0))
-    assertEquals(characteristicsOf(attackOf("b", "aa", "d")), Set(0, 1, 3))
-    assertEquals(characteristicsOf(attackOf("", "x", "")), Set.empty)
-
-  test("ReDoS.characteristicSets"):
-    def setsOf(source: String, characteristics: AttackStringCharacteristics): Seq[CharSet] =
-      ReDoS.characteristicSets(ReDoS.parse(source, "", Dialect.JavaScript), characteristics)
-    val rest = CharSet.range(0x00, 0xffff).diff(CharSet.of('a', 'b', 'c', 'd'))
-
-    assertEquals(setsOf("ab[cd]", AttackStringCharacteristics.None), Seq.empty)
-    assertEquals(setsOf("ab[cd]", AttackStringCharacteristics.Latin1), Seq(CharSet.range(0x100, 0xffff)))
-    assertEquals(setsOf("ab[cd]", AttackStringCharacteristics.CharClass).toSet, Set(CharSet.range('c', 'd'), rest))
-    assertEquals(
-      setsOf("ab[cd]", AttackStringCharacteristics.Alphabet).toSet,
-      Set(CharSet.single('a'), CharSet.single('b'), CharSet.range('c', 'd'), rest)
-    )
-    // A set of characters that is in the set of a literal character is not of `CharClass`.
-    assertEquals(
-      setsOf("a[ab]", AttackStringCharacteristics.CharClass).toSet,
-      Set(CharSet.single('b'), CharSet.range(0x00, 0xffff).diff(CharSet.of('a', 'b')))
-    )
-
   test("ReDoS.attackStyle"):
     def attack(dialect: Dialect, flags: String, checker: Checker = Checker.Automaton): String =
       val params = Parameters(checker = checker, dialect = dialect, randomSeed = 0)
-      val ds = if checker == Checker.Automaton then checkAutomaton("^(?:a|a)*$", flags, params)
+      val diagnostics = if checker == Checker.Automaton then checkAutomaton("^(?:a|a)*$", flags, params)
       else checkFuzz("^(?:a|a)*$", flags, params)
-      val d = ds.next().asInstanceOf[Diagnostics.Vulnerable]
+      val d = diagnostics.asInstanceOf[Diagnostics.Vulnerable]
       d.attack.toString(AttackPatternStyle.of(d.dialect, d.unitMode))
 
     assertEquals(attack(Dialect.JavaScript, ""), "'a'.repeat(31) + 'あ'")
@@ -812,7 +625,7 @@ class ReDoSSuite extends munit.FunSuite:
 
   test("ReDoS.checkAutomaton"):
     assertEquals(
-      checkAutomaton("^(?:a|a)*$", "", Parameters(checker = Checker.Automaton)).next(),
+      checkAutomaton("^(?:a|a)*$", "", Parameters(checker = Checker.Automaton)),
       (
         Diagnostics.Vulnerable(
           "^(?:a|a)*$",
@@ -832,21 +645,25 @@ class ReDoSSuite extends munit.FunSuite:
         )
       )
     )
-    // The safe diagnostics after the vulnerable diagnostics have the complexity that the automaton checker finds.
+    // The safe diagnostics after the refuted attacks have the complexity that the automaton checker finds.
+    checkAutomaton("^(?:a|a)*$", "", Parameters(checker = Checker.Automaton), refute) match
+      case d: Diagnostics.Safe =>
+        assertEquals(
+          d.copy(refutedAttacks = Seq.empty),
+          Diagnostics.Safe(
+            "^(?:a|a)*$",
+            "",
+            Dialect.JavaScript,
+            UnitMode.UTF16,
+            AttackComplexity.Linear,
+            Seq.empty,
+            Diagnostics.Checker.Automaton
+          )
+        )
+        assertEquals(d.refutedAttacks.map(_.complexity), Seq(AttackComplexity.Exponential(false)))
+      case d => fail(s"not safe: $d")
     assertEquals(
-      checkAutomaton("^(?:a|a)*$", "", Parameters(checker = Checker.Automaton)).toList.last,
-      Diagnostics.Safe(
-        "^(?:a|a)*$",
-        "",
-        Dialect.JavaScript,
-        UnitMode.UTF16,
-        AttackComplexity.Linear,
-        Seq.empty,
-        Diagnostics.Checker.Automaton
-      )
-    )
-    assertEquals(
-      checkAutomaton("^(?:.|.)*$", "s", Parameters(checker = Checker.Automaton)).next(),
+      checkAutomaton("^(?:.|.)*$", "s", Parameters(checker = Checker.Automaton)),
       Diagnostics.Safe(
         "^(?:.|.)*$",
         "s",
@@ -858,17 +675,15 @@ class ReDoSSuite extends munit.FunSuite:
       )
     )
     assertEquals(
-      checkAutomaton("^.$", "", Parameters(checker = Checker.Automaton)).toList,
-      List(
-        Diagnostics.Safe(
-          "^.$",
-          "",
-          Dialect.JavaScript,
-          UnitMode.UTF16,
-          AttackComplexity.Safe(false),
-          Seq.empty,
-          Diagnostics.Checker.Automaton
-        )
+      checkAutomaton("^.$", "", Parameters(checker = Checker.Automaton)),
+      Diagnostics.Safe(
+        "^.$",
+        "",
+        Dialect.JavaScript,
+        UnitMode.UTF16,
+        AttackComplexity.Safe(false),
+        Seq.empty,
+        Diagnostics.Checker.Automaton
       )
     )
 
@@ -878,7 +693,6 @@ class ReDoSSuite extends munit.FunSuite:
       "",
       Parameters(checker = Checker.Fuzz, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
     )
-      .next()
     assert(clue(result).isInstanceOf[Diagnostics.Vulnerable])
     assertEquals(result.asInstanceOf[Diagnostics.Vulnerable].checker, Diagnostics.Checker.Fuzz)
     assertEquals(
@@ -886,31 +700,61 @@ class ReDoSSuite extends munit.FunSuite:
         ".",
         "",
         Parameters(checker = Checker.Fuzz, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
-      ).toList,
-      List(
-        Diagnostics.Safe(
-          ".",
-          "",
-          Dialect.JavaScript,
-          UnitMode.UTF16,
-          AttackComplexity.Safe(false),
-          Seq.empty,
-          Diagnostics.Checker.Fuzz,
-          Some(linearBound)
-        )
+      ),
+      Diagnostics.Safe(
+        ".",
+        "",
+        Dialect.JavaScript,
+        UnitMode.UTF16,
+        AttackComplexity.Safe(false),
+        Seq.empty,
+        Diagnostics.Checker.Fuzz,
+        Some(linearBound)
       )
     )
     interceptMessage[TimeoutException](
       "timeout at modules/recheck/shared/src/main/scala/codes/quine/labs/recheck/fuzz/FuzzProgram.scala:29"
     ) {
       val ctx = Context(timeout = Duration.MinusInf)
-      val result = checkFuzz(".", "", Parameters(timeout = Duration.MinusInf))(using ctx)
-      result.toList
+      checkFuzz(".", "", Parameters(timeout = Duration.MinusInf))(using ctx)
     }
+
+  test("ReDoS.checkFuzz: the refuted attacks"):
+    val params = Parameters(
+      checker = Checker.Fuzz,
+      maxGeneStringSize = 1000,
+      maxAttackStringSize = 1000,
+      maxIteration = 2,
+      maxRefutedAttacks = 100
+    )
+    val ir = ReDoS.parse("^(?:a|a)*$", "", params.dialect)
+    val readStarts = ir.readStartLocations(params.maxRefutedAttackPartSize)
+    val sets = RuntimeAttacker.characteristicSets(ir, params.attackStringCharacteristics)
+    // The fuzz checker avoids the refuted attacks.
+    checkFuzz("^(?:a|a)*$", "", params, refute) match
+      case d: Diagnostics.Safe =>
+        assertEquals(
+          d.copy(refutedAttacks = Seq.empty),
+          Diagnostics.Safe(
+            "^(?:a|a)*$",
+            "",
+            Dialect.JavaScript,
+            UnitMode.UTF16,
+            AttackComplexity.Safe(true),
+            Seq.empty,
+            Diagnostics.Checker.Fuzz,
+            Some(UpperBound(AttackComplexity.Exponential(false), Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot)))))
+          )
+        )
+        assert(d.refutedAttacks.nonEmpty)
+        val keys = d.refutedAttacks.map: r =>
+          RuntimeAttacker.AttackKey(r.complexity, r.attack, r.hotspot, readStarts, sets)
+        assertEquals(keys.distinct, keys)
+      case d => fail(s"not safe: $d")
 
   test("ReDoS.checkAuto"):
     assertEquals(
-      checkAuto("^(?:a|a)*$", "", Parameters(randomSeed = 0)).next(),
+      checkAuto("^(?:a|a)*$", "", Parameters(randomSeed = 0)),
       (
         Diagnostics.Vulnerable(
           "^(?:a|a)*$",
@@ -935,19 +779,17 @@ class ReDoSSuite extends munit.FunSuite:
         "^(?:a|a){3}$",
         "",
         Parameters(randomSeed = 0, maxRepeatCount = 3, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
-      ).toList,
-      List(
-        Diagnostics.Safe(
-          "^(?:a|a){3}$",
-          "",
-          Dialect.JavaScript,
-          UnitMode.UTF16,
-          AttackComplexity.Safe(true),
-          Seq.empty,
-          Diagnostics.Checker.Fuzz,
-          // The bound of `^(?:a|a)+$` is exponential, though the fuzz checker finds no attack on the three repetitions.
-          Some(UpperBound(AttackComplexity.Exponential(false), Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot)))))
-        )
+      ),
+      Diagnostics.Safe(
+        "^(?:a|a){3}$",
+        "",
+        Dialect.JavaScript,
+        UnitMode.UTF16,
+        AttackComplexity.Safe(true),
+        Seq.empty,
+        Diagnostics.Checker.Fuzz,
+        // The bound of `^(?:a|a)+$` is exponential, though the fuzz checker finds no attack on the three repetitions.
+        Some(UpperBound(AttackComplexity.Exponential(false), Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot)))))
       )
     )
     assertEquals(
@@ -955,17 +797,15 @@ class ReDoSSuite extends munit.FunSuite:
         "^(?:a|a){3,}",
         "",
         Parameters(randomSeed = 0, maxNFASize = 3, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
-      ).toList,
-      List(
-        Diagnostics.Safe(
-          "^(?:a|a){3,}",
-          "",
-          Dialect.JavaScript,
-          UnitMode.UTF16,
-          AttackComplexity.Safe(true),
-          Seq.empty,
-          Diagnostics.Checker.Fuzz
-        )
+      ),
+      Diagnostics.Safe(
+        "^(?:a|a){3,}",
+        "",
+        Dialect.JavaScript,
+        UnitMode.UTF16,
+        AttackComplexity.Safe(true),
+        Seq.empty,
+        Diagnostics.Checker.Fuzz
       )
     )
     assertEquals(
@@ -973,22 +813,20 @@ class ReDoSSuite extends munit.FunSuite:
         "^.*$",
         "",
         Parameters(randomSeed = 0, maxPatternSize = 1, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
-      ).toList,
-      List(
-        Diagnostics.Safe(
-          "^.*$",
-          "",
-          Dialect.JavaScript,
-          UnitMode.UTF16,
-          AttackComplexity.Safe(false),
-          Seq.empty,
-          Diagnostics.Checker.Fuzz,
-          Some(linearBound)
-        )
+      ),
+      Diagnostics.Safe(
+        "^.*$",
+        "",
+        Dialect.JavaScript,
+        UnitMode.UTF16,
+        AttackComplexity.Safe(false),
+        Seq.empty,
+        Diagnostics.Checker.Fuzz,
+        Some(linearBound)
       )
     )
 
-  test("ReDoS.diagnose: the fuzz checker after the refuted attacks of the automaton checker"):
+  test("ReDoS.checkAuto: the fuzz checker after the refuted attacks of the automaton checker"):
     val exponential = UpperBound(AttackComplexity.Exponential(false), Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot))))
     val params = Parameters(
       randomSeed = 0,
@@ -998,17 +836,8 @@ class ReDoSSuite extends munit.FunSuite:
       maxRefutedAttackPartSize = 1,
       attackStringCharacteristics = AttackStringCharacteristics.None
     )
-    val finish = Some(RuntimeAttack("node v0", 1.second, RuntimeAttackResult.Finish(1.millis)))
-    val refute = (d: Diagnostics.Vulnerable) => d.copy(runtimeAttack = finish)
-    def diagnose(
-        source: String,
-        params: Parameters,
-        verify: Diagnostics.Vulnerable => Diagnostics.Vulnerable
-    ): Diagnostics =
-      ReDoS.diagnose(source, "", ReDoS.parse(source, "", Dialect.JavaScript), params, verify)
-
     // The attacks of the automaton checker are the upper bound of the fuzz checker, which finds the same attack only.
-    diagnose("^(?:a|a)*$", params, refute) match
+    checkAuto("^(?:a|a)*$", "", params, refute) match
       case d: Diagnostics.Safe =>
         assertEquals(
           d.copy(refutedAttacks = Seq.empty),
@@ -1028,7 +857,7 @@ class ReDoSSuite extends munit.FunSuite:
 
     // The fuzz checker does not run when the automaton checker finds no attack, or when its attack is not refuted.
     assertEquals(
-      diagnose("^a*$", params, refute),
+      checkAuto("^a*$", "", params, refute),
       Diagnostics.Safe(
         "^a*$",
         "",
@@ -1039,7 +868,7 @@ class ReDoSSuite extends munit.FunSuite:
         Diagnostics.Checker.Automaton
       )
     )
-    diagnose("^(?:a|a)*$", params, identity) match
+    checkAuto("^(?:a|a)*$", "", params, skip) match
       case d: Diagnostics.Vulnerable => assertEquals(d.checker, Diagnostics.Checker.Automaton)
       case d                         => fail(s"not vulnerable: $d")
 
@@ -1055,53 +884,47 @@ class ReDoSSuite extends munit.FunSuite:
         refutedAttacks,
         Diagnostics.Checker.Automaton
       )
-    diagnose(source, params, refute) match
+    checkAuto(source, "", params, refute) match
       case d: Diagnostics.Safe =>
         assertEquals(d.checker, Diagnostics.Checker.Fuzz)
         assertEquals(d.refutedAttacks.map(_.complexity.isFuzz), Seq(false, true))
       case d => fail(s"not safe: $d")
 
     // When the fuzz checker reaches the limit of the refuted attacks, the result is the one of the automaton checker.
-    diagnose(source, params.copy(maxRefutedAttacks = 2), refute) match
+    checkAuto(source, "", params.copy(maxRefutedAttacks = 2), refute) match
       case d: Diagnostics.Safe =>
         assertEquals(d, automatonSafe(d.refutedAttacks))
         assertEquals(d.refutedAttacks.map(_.complexity.isFuzz), Seq(false, true))
       case d => fail(s"not safe: $d")
 
+    // The runtime refutes the attack strings of the automaton checker, and throws on the ones of the fuzz checker.
+    def throwOnFuzz(ex: => Exception): Execute =
+      (state, attack) => if state.checker.contains(Diagnostics.Checker.Fuzz) then throw ex else refute(state, attack)
+
     // It is so when the fuzz checker does not finish in time too.
-    val timeout =
-      (d: Diagnostics.Vulnerable) =>
-        if d.checker == Diagnostics.Checker.Fuzz then throw new TimeoutException("test") else refute(d)
-    diagnose(source, params, timeout) match
+    checkAuto(source, "", params, throwOnFuzz(new TimeoutException("test"))) match
       case d: Diagnostics.Safe =>
         assertEquals(d, automatonSafe(d.refutedAttacks))
         assertEquals(d.refutedAttacks.map(_.complexity.isFuzz), Seq(false))
       case d => fail(s"not safe: $d")
 
     // It is so when the fuzz checker does not support the pattern too.
-    val unsupported = (d: Diagnostics.Vulnerable) =>
-      if d.checker == Diagnostics.Checker.Fuzz then throw new UnsupportedException("test") else refute(d)
-    diagnose(source, params, unsupported) match
+    checkAuto(source, "", params, throwOnFuzz(new UnsupportedException("test"))) match
       case d: Diagnostics.Safe =>
         assertEquals(d, automatonSafe(d.refutedAttacks))
         assertEquals(d.refutedAttacks.map(_.complexity.isFuzz), Seq(false))
       case d => fail(s"not safe: $d")
 
     // Another error of the fuzz checker is the result.
-    val unexpected = (d: Diagnostics.Vulnerable) =>
-      if d.checker == Diagnostics.Checker.Fuzz then throw new UnexpectedException("test") else refute(d)
-    diagnose(source, params, unexpected) match
+    checkAuto(source, "", params, throwOnFuzz(new UnexpectedException("test"))) match
       case d: Diagnostics.Unknown =>
         assertEquals(d.error, Diagnostics.ErrorKind.Unexpected("test"))
         assertEquals(d.checker, Some(Diagnostics.Checker.Fuzz))
       case d => fail(s"not unknown: $d")
 
-    // The automaton checker that reaches the limit by itself has attacks left, so the result is unknown.
-    diagnose(source, params.copy(maxRefutedAttacks = 1), refute) match
-      case d: Diagnostics.Unknown =>
-        assertEquals(d.error, Diagnostics.ErrorKind.RuntimeAttacksRefuted)
-        assertEquals(d.checker, Some(Diagnostics.Checker.Automaton))
-      case d => fail(s"not unknown: $d")
+    // The automaton checker that reaches the limit by itself has attacks left, so the fuzz checker does not run.
+    intercept[RuntimeAttacksRefutedException]:
+      checkAuto(source, "", params.copy(maxRefutedAttacks = 1), refute)
 
   val MaxNestingDepth: Int = Parser.MaxNestingDepth
 

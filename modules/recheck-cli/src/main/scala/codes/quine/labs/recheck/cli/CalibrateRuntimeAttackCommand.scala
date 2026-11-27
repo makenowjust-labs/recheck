@@ -13,7 +13,7 @@ import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.recheck.exception.ReDoSException
 import codes.quine.labs.recheck.parameters.Parameters
-import codes.quine.labs.recheck.verification.RuntimeAttackVerifier
+import codes.quine.labs.recheck.verification.RuntimeAttackExecutor
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 
@@ -144,7 +144,7 @@ object CalibrateRuntimeAttackCommand:
       timeout: FiniteDuration
   ): Option[RuntimeAttack] =
     given Context = Context(logger = logger)
-    RuntimeAttackVerifier.verify(source, "", dialect, mode, string, timeout, compileTimeout, sys.env)
+    RuntimeAttackExecutor.execute(source, "", dialect, mode, string, timeout, compileTimeout, sys.env)
 
   /** Runs the matchings of the references by `run` in turn, again and again for the time on the clock `now` in
     * nanoseconds, or returns why they cannot be measured.

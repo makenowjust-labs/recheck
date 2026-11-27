@@ -9,12 +9,13 @@ import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.Attacker.Candidate
 import codes.quine.labs.recheck.fuzz.Attacker.Measurement
 import codes.quine.labs.recheck.parameters.Parameters
+import codes.quine.labs.recheck.verification.RuntimeAttackerHelper
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.ir.IRPattern
 
-class AttackerSuite extends munit.FunSuite:
+class AttackerSuite extends munit.FunSuite with RuntimeAttackerHelper:
 
   /** A default context. */
   given ctx: Context = Context()
@@ -43,7 +44,7 @@ class AttackerSuite extends munit.FunSuite:
       DefaultAccelerationMode,
       DefaultAccelerationHitRatio,
       DefaultAlphabetRepresentative,
-      (_, _, _) => false,
+      runtimeAttackerOf(ir),
       upperBound
     )
 
@@ -187,8 +188,8 @@ class AttackerSuite extends munit.FunSuite:
     val ir = ReDoS.parse("^(?:b*b*$|(?:c|c)*$)", "", Dialect.JavaScript)
     val attacker = attackerOf(ir)
     val results = attacker.attack(candidatesOf(attacker, repeatOf('b', 1), repeatOf('c', 1)).iterator)
-    assertEquals(results.next()._1, AttackComplexity.Exponential(true))
-    assertEquals(results.next()._1, AttackComplexity.Polynomial(2, true))
+    assertEquals(results.next().complexity, AttackComplexity.Exponential(true))
+    assertEquals(results.next().complexity, AttackComplexity.Polynomial(2, true))
 
   test("Attacker#additionsOf"):
     val attacker = attackerOf(ReDoS.parse("^a*b$", "", Dialect.JavaScript))
@@ -221,7 +222,7 @@ class AttackerSuite extends munit.FunSuite:
     val ir = ReDoS.parse("^(?:a|b)*[ab]*[ab]*[ab]*$", "", Dialect.JavaScript)
     val attacker = attackerOf(ir)
     val results = attacker.attack(candidatesOf(attacker, repeatOf('a', 1)).iterator)
-    assertEquals(results.next()._1, AttackComplexity.Polynomial(4, true))
+    assertEquals(results.next().complexity, AttackComplexity.Polynomial(4, true))
 
   test("Attacker#attack: the fingerprints of failed attacks"):
     // The steps grow quadratically up to 100 characters, and the match succeeds on longer strings (#1310).

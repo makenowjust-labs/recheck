@@ -11,7 +11,7 @@ import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 
-class RuntimeAttackVerifierSuite extends munit.FunSuite:
+class RuntimeAttackExecutorSuite extends munit.FunSuite:
 
   /** A default context. */
   given ctx: Context = Context()
@@ -23,26 +23,26 @@ class RuntimeAttackVerifierSuite extends munit.FunSuite:
       2
     )
 
-  test("RuntimeAttackVerifier.verify"):
-    def verify(source: String, dialect: Dialect, timeout: Duration): Option[RuntimeAttack] =
-      RuntimeAttackVerifier.verify(source, "", dialect, UnitMode.CodePoint, attack, timeout, Duration.Inf, Map.empty)
+  test("RuntimeAttackExecutor.execute"):
+    def execute(source: String, dialect: Dialect, timeout: Duration): Option[RuntimeAttack] =
+      RuntimeAttackExecutor.execute(source, "", dialect, UnitMode.CodePoint, attack, timeout, Duration.Inf, Map.empty)
 
-    assertEquals(verify("foo", Dialect.Python(), Duration.MinusInf), None)
-    assertEquals(verify("foo", Dialect.Python(), Duration.Zero), None)
+    assertEquals(execute("foo", Dialect.Python(), Duration.MinusInf), None)
+    assertEquals(execute("foo", Dialect.Python(), Duration.Zero), None)
     // A Perl pattern interpolating a variable is not run.
-    assertEquals(verify("a$x", Dialect.Perl(), 1.second), None)
+    assertEquals(execute("a$x", Dialect.Perl(), 1.second), None)
 
-  test("RuntimeAttackVerifier.boundTimeout"):
-    assertEquals(RuntimeAttackVerifier.boundTimeout(Duration.Inf), None)
-    assertEquals(RuntimeAttackVerifier.boundTimeout(100.seconds), Some(100.seconds))
+  test("RuntimeAttackExecutor.boundTimeout"):
+    assertEquals(RuntimeAttackExecutor.boundTimeout(Duration.Inf), None)
+    assertEquals(RuntimeAttackExecutor.boundTimeout(100.seconds), Some(100.seconds))
     val ctx50s = Context(timeout = 50.seconds)
-    assert(RuntimeAttackVerifier.boundTimeout(100.seconds)(using ctx50s).exists(_ <= 50.seconds))
-    assert(RuntimeAttackVerifier.boundTimeout(Duration.Inf)(using ctx50s).exists(_ <= 50.seconds))
-    assertEquals(RuntimeAttackVerifier.boundTimeout(1.second)(using ctx50s), Some(1.second))
+    assert(RuntimeAttackExecutor.boundTimeout(100.seconds)(using ctx50s).exists(_ <= 50.seconds))
+    assert(RuntimeAttackExecutor.boundTimeout(Duration.Inf)(using ctx50s).exists(_ <= 50.seconds))
+    assertEquals(RuntimeAttackExecutor.boundTimeout(1.second)(using ctx50s), Some(1.second))
 
-  test("RuntimeAttackVerifier.parseOutput"):
+  test("RuntimeAttackExecutor.parseOutput"):
     def parse(output: ExecResult): RuntimeAttack =
-      RuntimeAttackVerifier.parseOutput("python3", "python3 -", 1.second, output)
+      RuntimeAttackExecutor.parseOutput("python3", "python3 -", 1.second, output)
 
     assertEquals(
       parse(ExecResult.Exit(0, "recheck:runtime python 3.15.0\nrecheck:start\nrecheck:time 12\n", "")),
