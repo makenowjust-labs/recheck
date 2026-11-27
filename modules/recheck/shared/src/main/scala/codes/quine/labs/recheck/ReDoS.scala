@@ -128,7 +128,7 @@ object ReDoS:
     *
     * `attacks` collects the vulnerable complexities that it finds.
     */
-  private[recheck] def checkAutomaton(
+  private def checkAutomaton(
       ir: IRPattern,
       params: Parameters,
       state: DiagnosticsState,
@@ -185,7 +185,7 @@ object ReDoS:
     * `automatonAttacks` are the attacks that the automaton checker found, which are the upper bound if there is any
     * (see [[FuzzChecker.check]]).
     */
-  private[recheck] def checkFuzz(
+  private def checkFuzz(
       ir: IRPattern,
       params: Parameters,
       state: DiagnosticsState,
@@ -235,11 +235,11 @@ object ReDoS:
     * its diagnostics.
     *
     * When every attack of the automaton checker is refuted, the fuzz checker looks for another attack. Those attacks
-    * are its upper bound and its seeds (see [[FuzzChecker.check]]). If it does not finish, for the time, for the limit
-    * of the refuted attacks or for a pattern that it does not support, the result is the safe diagnostics of the
-    * automaton checker, with the attacks refuted by then.
+    * are its upper bound and its seeds (see [[FuzzChecker.check]]). If it does not finish, for the time or for the
+    * limit of the refuted attacks, the result is the safe diagnostics of the automaton checker, with the attacks
+    * refuted by then.
     */
-  private[recheck] def checkAuto(
+  private def checkAuto(
       ir: IRPattern,
       params: Parameters,
       state: DiagnosticsState,
@@ -247,10 +247,7 @@ object ReDoS:
   )(using ctx: Context): Diagnostics =
     def isUnfinished(d: Diagnostics): Boolean = d match
       case d: Diagnostics.Unknown =>
-        d.error match
-          case Diagnostics.ErrorKind.Timeout | Diagnostics.ErrorKind.RuntimeAttacksRefuted => true
-          case _: Diagnostics.ErrorKind.Unsupported                                        => true
-          case _                                                                           => false
+        d.error == Diagnostics.ErrorKind.Timeout || d.error == Diagnostics.ErrorKind.RuntimeAttacksRefuted
       case _ => false
 
     val attacks = mutable.ArrayBuffer.empty[Complexity.Vulnerable[UChar]]

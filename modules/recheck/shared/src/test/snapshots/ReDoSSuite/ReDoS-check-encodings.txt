@@ -1,0 +1,7 @@
+Input         : /^(a|a)*$/
+Dialect       : python (type: bytes)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : b'a' * 31 + b'!'
+Hotspot       : /^(<hot>a</>|<hot>a</>)*$/
+Checker       : automaton

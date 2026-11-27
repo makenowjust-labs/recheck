@@ -1,0 +1,65 @@
+Input     : /^(['"])[^'"]*\1$/
+Dialect   : javascript
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input     : /^(a|aa)\1*$/
+Dialect   : javascript
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input         : /^(?:-(\ba)\1|-aa)*$/
+Dialect       : javascript
+Status        : vulnerable
+Complexity    : exponential
+Attack string : '-a' + 'a-aa-a'.repeat(28) + 'あ'
+Hotspot       : /^(?:<hot>-</>(\b<hot>a</>)\1|<hot>-aa</>)*$/
+Checker       : automaton
+---
+Input         : /(\*|_)(?=\S)([^\r]*?\S)\1/
+Dialect       : javascript
+Status        : vulnerable
+Complexity    : 2nd degree polynomial
+Attack string : 'あ　_あ'.repeat(27387) + 'あ*'
+Hotspot       : /(<cold>\*</>|<warm>_</>)(?=<cold>\S</>)(<hot>[^\r]</>*?<cold>\S</>)\1/
+Checker       : automaton
+---
+Input     : /^(?:(a)\1|aA)*$/
+Dialect   : javascript
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input         : /^(?:(a)\1|aA)*$/i
+Dialect       : javascript
+Status        : vulnerable
+Complexity    : exponential
+Attack string : 'A' + 'aAaA'.repeat(29) + 'あ'
+Hotspot       : /^(?:(<hot>a</>)\1|<hot>aA</>)*$/i
+Checker       : automaton
+---
+Input         : /^(?:\1a|a)*(b)$/
+Dialect       : javascript
+Status        : vulnerable
+Complexity    : exponential
+Attack string : 'a'.repeat(31) + 'a'
+Hotspot       : /^(?:\1<hot>a</>|<hot>a</>)*(b)$/
+Checker       : automaton
+---
+Input     : /^(?:\1a|a)*(b)$/
+Dialect   : pcre
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input     : /^(a|aa)\1*$/
+Dialect   : javascript
+Status    : safe
+Complexity: safe (fuzz)
+Checker   : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /^(<hot>a</>|<hot>aa</>)\1*$/

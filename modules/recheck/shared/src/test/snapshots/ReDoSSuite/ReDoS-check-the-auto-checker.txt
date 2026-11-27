@@ -1,0 +1,32 @@
+Input         : /^(?:a|a)*$/
+Dialect       : javascript
+Status        : vulnerable
+Complexity    : exponential
+Attack string : 'a'.repeat(31) + 'あ'
+Hotspot       : /^(?:<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input     : /^(?:a|a){3}$/
+Dialect   : javascript
+Status    : safe
+Complexity: safe (fuzz)
+Checker   : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /^(?:<hot>a</>|<hot>a</>){3}$/
+---
+Input     : /^(?:a|a){3,}/
+Dialect   : javascript
+Status    : safe
+Complexity: safe (fuzz)
+Checker   : fuzz
+---
+Input     : /^.*$/
+Dialect   : javascript
+Status    : safe
+Complexity: safe
+Checker   : fuzz
+
+Upper bound:
+- Complexity: linear

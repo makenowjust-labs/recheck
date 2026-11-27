@@ -1,0 +1,29 @@
+Input     : /^(a|a)*$/
+Dialect   : ruby (encoding: UTF-8)
+Status    : safe
+Complexity: safe (fuzz)
+Checker   : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /^(<hot>a</>|<hot>a</>)*$/
+
+Refuted attacks:
+- Complexity    : exponential
+  Attack string : "a" + "a" * 31 + "あ"
+  Runtime attack: refuted (finished in <time> ms on ruby 4.0.10, timeout: 1000 ms)
+---
+Input     : /^(a|a)*$/
+Dialect   : ruby (encoding: UTF-8)
+Status    : safe
+Complexity: safe (fuzz)
+Checker   : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /^(<hot>a</>|<hot>a</>)*$/
+
+Refuted attacks:
+- Complexity    : exponential (fuzz)
+  Attack string : "a" * 31 + "あ"
+  Runtime attack: refuted (finished in <time> ms on ruby 4.0.10, timeout: 1000 ms)

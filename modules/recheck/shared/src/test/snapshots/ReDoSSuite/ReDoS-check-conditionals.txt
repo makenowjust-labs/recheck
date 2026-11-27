@@ -1,0 +1,22 @@
+Input         : /^(?(?=a)(?:a|a)*$|b)/
+Dialect       : pcre
+Status        : vulnerable
+Complexity    : exponential
+Attack string : 'a' . str_repeat('a', 31) . '!'
+Hotspot       : /^(?(?=<cold>a</>)(?:<hot>a</>|<hot>a</>)*$|b)/
+Checker       : automaton
+---
+Input     : /^(?(?=a)a+|b+)$/
+Dialect   : pcre
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input     : /^(a)?(?(1)b+|c)$/
+Dialect   : python (type: str)
+Status    : safe
+Complexity: safe
+Checker   : fuzz
+
+Upper bound:
+- Complexity: linear

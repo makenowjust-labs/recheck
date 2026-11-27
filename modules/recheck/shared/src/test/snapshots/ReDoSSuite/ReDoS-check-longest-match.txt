@@ -1,0 +1,81 @@
+Input         : /(a|a)*/p
+Dialect       : python-regex (type: str)
+Status        : vulnerable
+Complexity    : exponential (fuzz)
+Attack string : 'a' * 32 + 'あ'
+Hotspot       : /(<hot>a</>|<hot>a</>)*/p
+Checker       : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /(<hot>a</>|<hot>a</>)*/p
+---
+Input     : /(a|a)*/
+Dialect   : python-regex (type: str)
+Status    : safe
+Complexity: safe (fuzz)
+Checker   : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /(<hot>a</>|<hot>a</>)*/
+---
+Input         : /x(?:a|b)*.*/sp
+Dialect       : python-regex (type: str)
+Status        : vulnerable
+Complexity    : 2nd degree polynomial (fuzz)
+Attack string : 'x' + 'a' * 54773
+Hotspot       : /<cold>x</>(?:<hot>a</>|b)*<hot>.</>*/sp
+Checker       : fuzz
+
+Upper bound:
+- Complexity: 2nd degree polynomial
+  Hotspot   : /<cold>x</>(?:<hot>a</>|b)*<hot>.</>*/sp
+---
+Input         : /(a|a)*/p
+Dialect       : python-regex (type: str)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : 'a' + 'a' * 31
+Hotspot       : /(<hot>a</>|<hot>a</>)*/p
+Checker       : automaton
+---
+Input     : /(a|a)*/
+Dialect   : python-regex (type: str)
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input         : /a*a*/p
+Dialect       : python-regex (type: str)
+Status        : vulnerable
+Complexity    : 2nd degree polynomial
+Attack string : 'a' + 'a' * 54773
+Hotspot       : /<hot>a</>*<hot>a</>*/p
+Checker       : automaton
+---
+Input     : /a*a*/
+Dialect   : python-regex (type: str)
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input         : /(a|a)*/p
+Dialect       : boost-regex
+Status        : vulnerable
+Complexity    : exponential (fuzz)
+Attack string : b'a' * 32 + b'!'
+Hotspot       : /(<hot>a</>|<hot>a</>)*/p
+Checker       : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /(<hot>a</>|<hot>a</>)*/p
+---
+Input         : /(a|a)*/p
+Dialect       : boost-regex
+Status        : vulnerable
+Complexity    : exponential
+Attack string : b'a' + b'a' * 31
+Hotspot       : /(<hot>a</>|<hot>a</>)*/p
+Checker       : automaton

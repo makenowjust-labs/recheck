@@ -1,0 +1,25 @@
+Input     : /form.*edit_profile/
+Dialect   : javascript
+Status    : safe
+Complexity: linear
+Checker   : automaton
+
+Refuted attacks:
+- Complexity    : 2nd degree polynomial
+  Attack string : 'dit_profileform'.repeat(14143) + 'dit_profile\u2028formedit_profile'
+  Runtime attack: refuted (finished in <time> ms on fake, timeout: 1000 ms)
+---
+Input  : /form.*edit_profile/
+Dialect: javascript
+Status : unknown
+Error  : cancel
+Checker: fuzz
+
+Upper bound:
+- Complexity: 2nd degree polynomial
+  Hotspot   : /<warm>form</><hot>.</>*<cold>edit_profile</>/
+
+Refuted attacks:
+- Complexity    : 2nd degree polynomial
+  Attack string : 'dit_profileform'.repeat(14143) + 'dit_profile\u2028formedit_profile'
+  Runtime attack: refuted (finished in <time> ms on fake, timeout: 1000 ms)

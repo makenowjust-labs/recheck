@@ -26,10 +26,14 @@ trait RuntimeHelper:
   /** Checks whether the program is in `PATH`. */
   def isAvailable(program: String): Boolean = which(program).isDefined
 
+  /** Asserts that the program is in `PATH`. */
+  def assertAvailable(program: String)(using munit.Location): Unit =
+    assert(isAvailable(program), s"`$program` is not in PATH")
+
   /** Defines a test, which fails when the program is not available. */
   def runtimeTest(name: String, program: String)(body: => Unit)(using munit.Location): Unit =
     test(name):
-      assert(isAvailable(program), s"`$program` is not in PATH")
+      assertAvailable(program)
       body
 
   /** Creates a new directory having the file, and returns the file's path. */

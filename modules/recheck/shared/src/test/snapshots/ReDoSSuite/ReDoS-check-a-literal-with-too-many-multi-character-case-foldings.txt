@@ -1,0 +1,5 @@
+Input  : /ssssssss/i
+Dialect: ruby (encoding: UTF-8)
+Status : unknown
+Error  : unsupported (Too many multi-character case foldings in a literal (limit 6) at 0)
+Checker: (none)

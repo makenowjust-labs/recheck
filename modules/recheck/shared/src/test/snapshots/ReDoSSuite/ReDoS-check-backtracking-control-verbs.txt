@@ -1,0 +1,69 @@
+Input         : /^(?:a|a)*(*F)/
+Dialect       : pcre
+Status        : vulnerable
+Complexity    : exponential
+Attack string : str_repeat('a', 31)
+Hotspot       : /^(?:<hot>a</>|<hot>a</>)*(*F)/
+Checker       : automaton
+---
+Input     : /^(?:a|a)*/
+Dialect   : pcre
+Status    : safe
+Complexity: linear
+Checker   : automaton
+---
+Input         : /^(?:a|a)*$/
+Dialect       : pcre
+Status        : vulnerable
+Complexity    : exponential
+Attack string : str_repeat('a', 31) . '!'
+Hotspot       : /^(?:<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input     : /^(?:a|a)*(*COMMIT)$/
+Dialect   : pcre
+Status    : safe
+Complexity: safe (fuzz)
+Checker   : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /^(?:<hot>a</>|<hot>a</>)*(*COMMIT)$/
+---
+Input     : /^(?:(?:a|a)(*PRUNE))*$/
+Dialect   : pcre
+Status    : safe
+Complexity: safe (fuzz)
+Checker   : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /^(?:(?:<hot>a</>|<hot>a</>)(*PRUNE))*$/
+---
+Input     : /^(?:(?:a|a)*(*THEN)b|c)/
+Dialect   : pcre
+Status    : safe
+Complexity: safe (fuzz)
+Checker   : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /^(?:(?:<hot>a</>|<hot>a</>)*(*THEN)b|c)/
+---
+Input     : /(?:a|a)*(*SKIP)b/
+Dialect   : perl (utf8: true, source: literal)
+Status    : safe
+Complexity: safe (fuzz)
+Checker   : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /(?:<hot>a</>|<hot>a</>)*(*SKIP)b/
+---
+Input         : /(?:a|a)*b/
+Dialect       : perl (utf8: true, source: literal)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "a" . "a" x 31
+Hotspot       : /(?:<hot>a</>|<hot>a</>)*b/
+Checker       : automaton

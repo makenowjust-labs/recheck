@@ -1,0 +1,75 @@
+Input         : /^(?:a|a)*$/
+Dialect       : javascript
+Status        : vulnerable
+Complexity    : exponential
+Attack string : 'a'.repeat(31) + 'あ'
+Hotspot       : /^(?:<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input         : /^(?:a|a)*$/
+Dialect       : python (type: str)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : 'a' * 31 + 'あ'
+Hotspot       : /^(?:<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input         : /^(?:a|a)*$/
+Dialect       : python (type: bytes)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : b'a' * 31 + b'!'
+Hotspot       : /^(?:<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input         : /^(?:a|a)*$/n
+Dialect       : ruby (encoding: UTF-8)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "a".b + "a".b * 31 + "!".b
+Hotspot       : /^(?:<hot>a</>|<hot>a</>)*$/n
+Checker       : automaton
+---
+Input         : /^(?:a|a)*$/
+Dialect       : java
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "a".repeat(31) + "あ"
+Hotspot       : /^(?:<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input         : /^(?:a|a)*$/
+Dialect       : dotnet
+Status        : vulnerable
+Complexity    : exponential
+Attack string : string.Concat(Enumerable.Repeat("a", 31)) + "あ"
+Hotspot       : /^(?:<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input         : /^(?:a|a)*$/
+Dialect       : perl (utf8: true, source: literal)
+Status        : vulnerable
+Complexity    : exponential
+Attack string : "a" x 31 . "\x{3042}"
+Hotspot       : /^(?:<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input         : /^(?:a|a)*$/
+Dialect       : pcre
+Status        : vulnerable
+Complexity    : exponential
+Attack string : str_repeat('a', 31) . '!'
+Hotspot       : /^(?:<hot>a</>|<hot>a</>)*$/
+Checker       : automaton
+---
+Input         : /^(?:a|a)*$/
+Dialect       : python (type: str)
+Status        : vulnerable
+Complexity    : exponential (fuzz)
+Attack string : 'a' * 31 + 'あ'
+Hotspot       : /^(?:<hot>a</>|<hot>a</>)*$/
+Checker       : fuzz
+
+Upper bound:
+- Complexity: exponential
+  Hotspot   : /^(?:<hot>a</>|<hot>a</>)*$/
