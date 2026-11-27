@@ -41,6 +41,7 @@ private[automaton] object LookBehindProduct:
   def build[A, Q, P](
       nfaWLA: NFAwLA[A, Q, P],
       lookBehind: OrderedNFA.LookBehind[A, Q],
+      // Parameters:
       maxNFASize: Int
   )(using ctx: Context): NFAwLA[Option[A], ProductState[Q], P] =
     ctx.interrupt:

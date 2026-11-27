@@ -31,7 +31,12 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     val ir = ReDoS.parse(source, flags, dialect)
     val nfa =
       if isSimplified then EpsNFABuilder.buildSimplified(ir, lookBehindsAsLookAheads, Int.MaxValue).epsNFA
-      else EpsNFABuilder.build(ir, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
+      else
+        EpsNFABuilder.build(
+          ir,
+          maxBackReferenceStrings = Parameters.DefaultMaxBackReferenceStrings,
+          maxNFASize = Int.MaxValue
+        )
     def withoutLocations(tau: Map[Int, Transition[Int]]): Map[Int, Transition[Int]] =
       tau.view.mapValues {
         case t: Consume[Int] => t.copy(loc = None)
@@ -477,7 +482,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     */
   def matches(source: String, flags: String, dialect: Dialect, input: String): Boolean =
     val nfa = build(source, flags, dialect).toOrderedNFA(false, Int.MaxValue, Int.MaxValue)
-    val dfa = nfa.toLookAheadDFA(Int.MaxValue)
+    val dfa = nfa.toLookAheadDFA(Int.MaxValue, Int.MaxValue)
     val units = ReDoS.parse(source, flags, dialect).mode.decode(input).iterator.toSeq
     val p = units.reverse.foldLeft(dfa.init)((p, c) => dfa.delta((p, nfa.alphabet.find(_.contains(c)).get)))
     nfa.inits.exists(p.contains)
@@ -593,7 +598,11 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     assertEquals(build("(?:ab|c)*d", "p", pr).stateSet.size, build("(?:ab|c)*d", "", pr).stateSet.size)
     // The copy rejecting an empty match keeps the choice, though no dialect has both.
     val notEmpty = ReDoS.parse("(*NOTEMPTY)a|", "", Dialect.PCRE).copy(longestMatch = true)
-    val notEmptyNFA = EpsNFABuilder.build(notEmpty, Int.MaxValue, Parameters.DefaultMaxBackReferenceStrings)
+    val notEmptyNFA = EpsNFABuilder.build(
+      notEmpty,
+      maxBackReferenceStrings = Parameters.DefaultMaxBackReferenceStrings,
+      maxNFASize = Int.MaxValue
+    )
     assertEquals(notEmptyNFA.tau.values.count(_.isInstanceOf[LongestEps[?]]), 2)
 
   test("EpsNFABuilder.build: LookAhead with assertions guessing what follows"):

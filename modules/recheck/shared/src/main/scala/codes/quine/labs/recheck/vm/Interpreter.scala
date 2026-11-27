@@ -8,7 +8,6 @@ import scala.util.hashing.MurmurHash3
 
 import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.exception.TimeoutException
-import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.Barrier
 import codes.quine.labs.recheck.vm.Inst.ReadKind
@@ -55,7 +54,7 @@ object Interpreter:
     interpreter.run()
 
   /** Runs a program on a given input and a timeout. */
-  def runWithTimeout(program: Program, input: UString, options: Options, timeout: Duration)(using
+  def runWithTimeout(program: Program, input: UString, options: Options, /* Parameters: */ timeout: Duration)(using
       ctx: Context
   ): Result =
     timeout match
@@ -75,13 +74,14 @@ object Interpreter:
     * `accelerationHitRatio` of its lookups.
     */
   final case class Options(
-      limit: Int = Int.MaxValue,
       usesAcceleration: Boolean = false,
-      accelerationHitRatio: Double = Parameters.DefaultAccelerationHitRatio,
       needsLoopAnalysis: Boolean = false,
       needsFailedPoints: Boolean = false,
       needsCoverage: Boolean = false,
-      needsHeatmap: Boolean = false
+      needsHeatmap: Boolean = false,
+      // Parameters:
+      limit: Int,
+      accelerationHitRatio: Double
   )
 
   /** Result is a matching result. */

@@ -26,6 +26,7 @@ final class RuntimeAttacker(
     readStarts: Set[SourceLocation],
     sets: Seq[CharSet],
     mode: UnitMode,
+    // Parameters:
     limit: Int,
     maxSize: Int,
     maxRefutedAttacks: Int
@@ -45,7 +46,7 @@ final class RuntimeAttacker(
       attack: AttackPattern,
       hotspot: Hotspot
   ): Option[Diagnostics.Vulnerable] =
-    val adjusted = attack.adjust(complexity, limit, maxSize, mode)
+    val adjusted = attack.adjust(complexity, mode, limit, maxSize)
     val key = AttackKey(complexity, adjusted, hotspot, readStarts, sets)
     if refutedKeys.contains(key) then
       ctx.log("runtime attack: skip the same attack as a refuted one")
@@ -62,10 +63,14 @@ final class RuntimeAttacker(
 object RuntimeAttacker:
 
   /** Returns the sets of characters that tell an attack string from another in [[AttackKey]]. */
-  def characteristicSets(ir: IRPattern, characteristics: AttackStringCharacteristics): Seq[CharSet] =
+  def characteristicSets(
+      ir: IRPattern,
+      // Parameters:
+      attackStringCharacteristics: AttackStringCharacteristics
+  ): Seq[CharSet] =
     def atoms: Seq[CharSet] = PatternAlphabet.of(ir).pairs.map(_._1)
 
-    characteristics match
+    attackStringCharacteristics match
       case AttackStringCharacteristics.None      => Seq.empty
       case AttackStringCharacteristics.Latin1    => Seq(ir.universe.diff(CharSet.range(0x00, 0xff)))
       case AttackStringCharacteristics.CharClass =>

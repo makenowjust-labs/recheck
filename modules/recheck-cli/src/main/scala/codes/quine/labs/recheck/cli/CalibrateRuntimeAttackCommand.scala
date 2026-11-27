@@ -134,19 +134,26 @@ object CalibrateRuntimeAttackCommand:
       (header ++ references ++ summary).mkString("\n")
 
   /** Runs the string against the pattern on the runtime of the dialect within the timeout, as the runtime-attack
-    * verification does, with the compilation of the program limited by `compileTimeout` and the command lines
-    * `commands` of the dialects replacing the commands.
+    * verification of the parameters does.
     */
-  def run(logger: Option[Context.Logger], compileTimeout: Duration, commands: Map[String, String])(
+  def run(params: Parameters)(
       source: String,
       dialect: Dialect,
       mode: UnitMode,
       string: AttackPattern,
       timeout: FiniteDuration
   ): Option[RuntimeAttack] =
-    given Context = Context(logger = logger)
-    val command = commands.get(dialect.name)
-    RuntimeAttackExecutor.execute(source, "", dialect, mode, string, timeout, compileTimeout, command)
+    given Context = Context(logger = params.logger)
+    RuntimeAttackExecutor.execute(
+      source,
+      "",
+      dialect,
+      mode,
+      string,
+      runtimeAttackCommand = params.runtimeAttackCommand,
+      runtimeAttackCompileTimeout = params.runtimeAttackCompileTimeout,
+      runtimeAttackTimeout = timeout
+    )
 
   /** Runs the matchings of the references by `run` in turn, again and again for the time on the clock `now` in
     * nanoseconds, or returns why they cannot be measured.
@@ -162,7 +169,7 @@ object CalibrateRuntimeAttackCommand:
     // A string of the runtime-attack verification has the repeats for the limit, as the one of the diagnostics has.
     val (_, mode, string) = strings.head
     val quadratic = AttackComplexity.Polynomial(2, false)
-    val attack = string.adjust(quadratic, params.runtimeAttackLimit, params.maxRuntimeAttackStringSize, mode)
+    val attack = string.adjust(quadratic, mode, params.runtimeAttackLimit, params.maxRuntimeAttackStringSize)
 
     val start = now()
     def left: FiniteDuration = time - (now() - start).nanos

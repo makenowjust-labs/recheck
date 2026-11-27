@@ -27,14 +27,14 @@ object BackReferenceExpansion:
   /** Returns the groups that the back-references of the pattern refer to, if every back-reference is expanded, or
     * `None`.
     *
-    * A back-reference is expanded if the referred groups match at most `maxStrings` strings together, and neither
-    * look-arounds, atomic groups nor conditionals hold them, which would carry the captures to where the states do not.
-    * Neither does the pattern have a look-behind, nor `(*NOTEMPTY)`, and the dialect restores the captures on
+    * A back-reference is expanded if the referred groups match at most `maxBackReferenceStrings` strings together, and
+    * neither look-arounds, atomic groups nor conditionals hold them, which would carry the captures to where the states
+    * do not. Neither does the pattern have a look-behind, nor `(*NOTEMPTY)`, and the dialect restores the captures on
     * backtracking (not Perl), chooses the first set group of a name (not Ruby), and compares character by character
     * (not the full case folding). Where an iteration changing a referred group is not empty (python-regex), which the
     * states do not tell, no repetition that may match the empty string holds the groups.
     */
-  def groups(pattern: IRPattern, maxStrings: Int): Option[Set[Int]] =
+  def groups(pattern: IRPattern, /* Parameters: */ maxBackReferenceStrings: Int): Option[Set[Int]] =
     val refs = pattern.node.collect { case IRNodeData.BackReference(indices, eq, folding) => (indices, eq, folding) }
     if refs.isEmpty then return Some(Set.empty)
     val unsupported = pattern.node.exists:
@@ -54,11 +54,11 @@ object BackReferenceExpansion:
     val sizes = for g <- groups.toSeq yield
       val eq = equivalenceOf(pattern, g)
       bodies(g)
-        .map(sizeOf(_, eq, maxStrings))
+        .map(sizeOf(_, eq, maxBackReferenceStrings))
         .foldLeft(Option(1.0)): (acc, size) =>
           for a <- acc; s <- size yield a + s
     val total = sizes.foldLeft(Option(1.0))((acc, size) => for a <- acc; s <- size yield a * s)
-    Option.when(total.exists(_ <= maxStrings))(groups)
+    Option.when(total.exists(_ <= maxBackReferenceStrings))(groups)
 
   /** Tests whether a repetition whose iteration may match the empty string holds one of the groups. */
   private def hasEmptyRepeatedGroup(node: IRNode, groups: Set[Int]): Boolean = node.exists:
@@ -152,6 +152,7 @@ object BackReferenceExpansion:
       nfa: EpsNFA[Int],
       references: Map[Int, (Seq[Int], IRCaseEquivalence)],
       unsetMatchesEmpty: Boolean,
+      // Parameters:
       maxNFASize: Int
   )(using ctx: Context): EpsNFA[State] =
     ctx.interrupt:

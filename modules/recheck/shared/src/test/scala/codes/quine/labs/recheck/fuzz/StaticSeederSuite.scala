@@ -4,6 +4,7 @@ import scala.util.Try
 
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.context.Context
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.resyntax.dialect.Dialect
 
 class StaticSeederSuite extends munit.FunSuite:
@@ -15,7 +16,15 @@ class StaticSeederSuite extends munit.FunSuite:
     def seed(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): Set[String] =
       val result =
         for ir <- Try(ReDoS.parse(source, flags, dialect))
-        yield StaticSeeder.seed(ir, limit = 25000, maxSimpleRepeatSize = 10, maxNFASize = Int.MaxValue)
+        yield StaticSeeder.seed(
+          ir,
+          limit = 25000,
+          maxSize = Parameters.DefaultMaxGeneStringSize,
+          alphabetRepresentative = Parameters.DefaultAlphabetRepresentative,
+          maxInitialGenerationSize = Parameters.DefaultMaxInitialGenerationSize,
+          maxNFASize = Int.MaxValue,
+          maxSimpleRepeatCount = 10
+        )
       result.get.map(_.toString)
 
     assertEquals(seed("^a+a+$", ""), Set("'a' + 'a'.repeat(224) + 'あ'", "'a' + 'a'.repeat(15) + 'あ'"))

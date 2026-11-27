@@ -31,21 +31,21 @@ class AttackerSuite extends munit.FunSuite with RuntimeAttackerHelper:
     new Attacker(
       ir,
       FuzzProgram.from(ir),
-      DefaultIncubationLimit,
-      DefaultIncubationTimeout,
-      DefaultAttackLimit,
-      DefaultAttackTimeout,
-      DefaultMaxAttackStringSize,
-      DefaultMaxDegree,
-      maxExtraDegree,
-      DefaultMaxIncubationBoundedWidth,
-      maxBoostIteration,
-      DefaultBoundedWidthRatio,
-      DefaultAccelerationMode,
-      DefaultAccelerationHitRatio,
-      DefaultAlphabetRepresentative,
       runtimeAttackerOf(ir),
-      upperBound
+      upperBound,
+      accelerationHitRatio = DefaultAccelerationHitRatio,
+      accelerationMode = DefaultAccelerationMode,
+      alphabetRepresentative = DefaultAlphabetRepresentative,
+      attackLimit = DefaultAttackLimit,
+      attackTimeout = DefaultAttackTimeout,
+      boundedWidthRatio = DefaultBoundedWidthRatio,
+      incubationLimit = DefaultIncubationLimit,
+      incubationTimeout = DefaultIncubationTimeout,
+      maxAttackStringSize = DefaultMaxAttackStringSize,
+      maxBoostIteration = maxBoostIteration,
+      maxDegree = DefaultMaxDegree,
+      maxExtraDegree = maxExtraDegree,
+      maxIncubationBoundedWidth = DefaultMaxIncubationBoundedWidth
     )
 
   /** A witness of `^a*$` for the upper bounds in the tests. */
@@ -94,19 +94,26 @@ class AttackerSuite extends munit.FunSuite with RuntimeAttackerHelper:
   test("Attacker#stepsOn"):
     import Parameters.*
     val attacker = attackerOf(ReDoS.parse("^b*b*$", "", Dialect.JavaScript))
-    assertEquals(attacker.stepsOn(repeatOf('b', 1), 3, DefaultIncubationLimit, DefaultIncubationTimeout), Some(9L))
+    def stepsOn(str: FString, limit: Int): Option[Long] =
+      attacker.stepsOn(str, 3, attacker.fuzz.usesAcceleration(DefaultAccelerationMode), limit, DefaultIncubationTimeout)
+
+    assertEquals(stepsOn(repeatOf('b', 1), DefaultIncubationLimit), Some(9L))
     // A run that stops on the limit has no steps.
-    assertEquals(attacker.stepsOn(repeatOf('b', 1), 3, 5, DefaultIncubationTimeout), None)
+    assertEquals(stepsOn(repeatOf('b', 1), 5), None)
     // A run is remembered by its arguments, whatever the repeat count of the string is.
-    assertEquals(attacker.stepsOn(repeatOf('b', 100), 3, DefaultIncubationLimit, DefaultIncubationTimeout), Some(9L))
+    assertEquals(stepsOn(repeatOf('b', 100), DefaultIncubationLimit), Some(9L))
     assertEquals(attacker.runs.size, 2)
 
   test("Attacker#measure"):
     import Parameters.*
     val ir = ReDoS.parse("^(?:a*$|b*b*$|(?:c|c)*$|(?:dd)*(?:dd)*$)", "", Dialect.JavaScript)
     val attacker = attackerOf(ir)
+    def measureBy(attacker: Attacker, c: Char, limit: Int, to: Int): Option[Measurement] =
+      val memoizes = attacker.fuzz.usesAcceleration(DefaultAccelerationMode)
+      attacker.measure(repeatOf(c, 1), 1, to, memoizes, limit, DefaultIncubationTimeout)
+
     def measure(c: Char, limit: Int = DefaultIncubationLimit, to: Int = Int.MaxValue): Option[Measurement] =
-      attacker.measure(repeatOf(c, 1), 1, to, limit, DefaultIncubationTimeout)
+      measureBy(attacker, c, limit, to)
 
     // The fewest counts tell the growth.
     assertEquals(measure('a').map(m => (degreeOf(m), m.first, m.last, m.stops)), Some((1, 1, 4, false)))
@@ -119,9 +126,8 @@ class AttackerSuite extends munit.FunSuite with RuntimeAttackerHelper:
     // A polynomial of a degree above `maxDegree` plus `maxExtraDegree` is taken for the exponential growth.
     val quintic = ReDoS.parse("^a*a*a*a*a*$", "", Dialect.JavaScript)
     def degreeWith(maxExtraDegree: Int): Option[Int] =
-      attackerOf(quintic, maxExtraDegree = maxExtraDegree)
-        .measure(repeatOf('a', 1), 1, Int.MaxValue, DefaultIncubationLimit, DefaultIncubationTimeout)
-        .map(degreeOf)
+      val attacker = attackerOf(quintic, maxExtraDegree = maxExtraDegree)
+      measureBy(attacker, 'a', DefaultIncubationLimit, Int.MaxValue).map(degreeOf)
     assertEquals(degreeWith(DefaultMaxExtraDegree), Some(5))
     assertEquals(degreeWith(0), Some(-1))
     // The counts above `to` do not run.

@@ -10,6 +10,7 @@ import codes.quine.labs.recheck.CaseFoldingCases
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.exception.UnsupportedException
+import codes.quine.labs.recheck.parameters.Parameters
 import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.recheck.vm.Interpreter.CoverageItem
 import codes.quine.labs.recheck.vm.Interpreter.CoverageLocation
@@ -28,6 +29,10 @@ import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 
 class InterpreterSuite extends munit.FunSuite:
+
+  /** The options without a limit of the steps, which record nothing. */
+  val defaultOptions: Options =
+    Options(limit = Int.MaxValue, accelerationHitRatio = Parameters.DefaultAccelerationHitRatio)
 
   given ctx: Context = Context()
 
@@ -49,14 +54,14 @@ class InterpreterSuite extends munit.FunSuite:
     t.get
 
   def assertMatches(source: String, flags: String, input: String)(using loc: munit.Location): Unit =
-    val opts = Options()
+    val opts = defaultOptions
     assertEquals(matches(source, flags, input, opts).status, Status.Ok)
     assertEquals(matches(source, flags, input, opts.copy(usesAcceleration = true)).status, Status.Ok)
 
   def assertCaptures(source: String, flags: String, input: String)(captures: Seq[Int])(using
       loc: munit.Location
   ): Unit =
-    val opts = Options()
+    val opts = defaultOptions
     val result1 = matches(source, flags, input, opts)
     assertEquals(result1.status, Status.Ok)
     assertEquals(result1.captures, Some(captures))
@@ -65,17 +70,17 @@ class InterpreterSuite extends munit.FunSuite:
     assertEquals(result2.captures, Some(captures))
 
   def assertNotMatches(source: String, flags: String, input: String)(using loc: munit.Location): Unit =
-    val opts = Options()
+    val opts = defaultOptions
     assertEquals(matches(source, flags, input, opts).status, Status.Fail)
     assertEquals(matches(source, flags, input, opts.copy(usesAcceleration = true)).status, Status.Fail)
 
   def assertLimit(source: String, flags: String, input: String)(using loc: munit.Location): Unit =
-    val opts = Options(usesAcceleration = true)
+    val opts = defaultOptions.copy(usesAcceleration = true)
     assertEquals(matches(source, flags, input, opts).status, Status.Limit)
 
   /** Returns the options using acceleration if it is asked for and the program allows it. */
   def options(program: Program, usesAcceleration: Boolean): Options =
-    Options(usesAcceleration = usesAcceleration && program.meta.allowsMemoization)
+    defaultOptions.copy(usesAcceleration = usesAcceleration && program.meta.allowsMemoization)
 
   def runStatus(
       source: String,
@@ -143,7 +148,7 @@ class InterpreterSuite extends munit.FunSuite:
       assertEquals(runSpans(source, dialect, input, usesAcceleration), expected, s"/$source/ in $dialect on $input")
 
   test("Interpreter.run: result"):
-    val opts = Options(
+    val opts = defaultOptions.copy(
       usesAcceleration = true,
       needsLoopAnalysis = true,
       needsFailedPoints = true,
@@ -385,18 +390,18 @@ class InterpreterSuite extends munit.FunSuite:
       yield result
       t.get
 
-    assertEquals(matchesWithTimeout("^.*$", "", "xx", Options(), Duration.Inf).status, Status.Ok)
-    assertEquals(matchesWithTimeout("^.*$", "", "xx", Options(), Duration.MinusInf).status, Status.Timeout)
+    assertEquals(matchesWithTimeout("^.*$", "", "xx", defaultOptions, Duration.Inf).status, Status.Ok)
+    assertEquals(matchesWithTimeout("^.*$", "", "xx", defaultOptions, Duration.MinusInf).status, Status.Timeout)
     assertEquals(
-      matchesWithTimeout("^.*$", "", "x".repeat(10000), Options(), Duration.Zero).status,
+      matchesWithTimeout("^.*$", "", "x".repeat(10000), defaultOptions, Duration.Zero).status,
       Status.Timeout
     )
     assertEquals(
-      matchesWithTimeout("^.*$", "", "x".repeat(10000), Options(), Duration(1, MILLISECONDS)).status,
+      matchesWithTimeout("^.*$", "", "x".repeat(10000), defaultOptions, Duration(1, MILLISECONDS)).status,
       Status.Timeout
     )
     assertEquals(
-      matchesWithTimeout("^.*$", "", "xx", Options(), Duration(1000, MILLISECONDS))(using
+      matchesWithTimeout("^.*$", "", "xx", defaultOptions, Duration(1000, MILLISECONDS))(using
         Context(Duration(100, MILLISECONDS))
       ).status,
       Status.Ok
@@ -443,7 +448,9 @@ class InterpreterSuite extends munit.FunSuite:
       ("^[ab]{2,}c", Seq("abc", "ababc", "ac")),
       ("^[ab]{1,3}?c", Seq("abc", "aaac", "aaaac"))
     )
-    for (source, inputs) <- cases; input <- inputs; opts <- Seq(Options(needsHeatmap = true), Options()) do
+    for
+      (source, inputs) <- cases; input <- inputs; opts <- Seq(defaultOptions.copy(needsHeatmap = true), defaultOptions)
+    do
       val captured = source.replaceFirst("(\\[ab\\]|\\.)", "($1)")
       assertEquals(run(source, input, opts), run(captured, input, opts), clue((source, input)))
 
@@ -451,7 +458,7 @@ class InterpreterSuite extends munit.FunSuite:
     // A program omitting the captures that the pattern does not read runs in the same steps.
     def run(source: String, input: String, omitsCaptures: Boolean): Result =
       val ir = ReDoS.parse(source, "", Dialect.JavaScript)
-      Interpreter.run(ProgramBuilder.build(ir, omitsCaptures), ir.mode.decode(input), Options())
+      Interpreter.run(ProgramBuilder.build(ir, omitsCaptures), ir.mode.decode(input), defaultOptions)
     for (source, input) <- Seq(("^(a|ab)(c|bcd)(d*)$", "abcd"), ("^((a)|b)*(?:(c)|d)+$", "abacdc"), ("(x(y))?z", "xyz"))
     do
       val (recorded, omitted) = (run(source, input, false), run(source, input, true))
@@ -697,7 +704,7 @@ class InterpreterSuite extends munit.FunSuite:
   test("Interpreter.run: acceleration on a program not allowing memoization"):
     val program = ProgramBuilder.build(ReDoS.parse("a(*PRUNE)b", "", PCRE), false)
     interceptMessage[IllegalArgumentException]("requirement failed: The program does not allow memoization"):
-      Interpreter.run(program, UString.empty, Options(usesAcceleration = true))
+      Interpreter.run(program, UString.empty, defaultOptions.copy(usesAcceleration = true))
 
   test("ProgramBuilder.build: unsupported"):
     val ir = ReDoS.parse("a(?R)?", "", PCRE)

@@ -20,7 +20,6 @@ import io.circe.syntax.*
 
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.codec.encodeDiagnostics
-import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
@@ -46,11 +45,7 @@ class MainSuite extends munit.FunSuite:
     val main = new Main:
       override def exit(exitCode: Int): Unit = throw new ExitException(exitCode)
 
-      override def runRuntimeAttack(
-          logger: Option[Context.Logger],
-          compileTimeout: Duration,
-          commands: Map[String, String]
-      )(
+      override def runRuntimeAttack(params: Parameters)(
           source: String,
           dialect: Dialect,
           mode: UnitMode,

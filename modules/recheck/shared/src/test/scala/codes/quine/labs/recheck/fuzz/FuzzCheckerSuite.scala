@@ -4,7 +4,6 @@ package fuzz
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.util.Random
-import scala.util.Try
 
 import codes.quine.labs.recheck.automaton.Complexity
 import codes.quine.labs.recheck.automaton.Witness
@@ -32,6 +31,44 @@ class FuzzCheckerSuite extends munit.FunSuite with RuntimeAttackerHelper:
   /** A fixed seed random instance for deterministic test. */
   def random0: Random = new Random(0)
 
+  /** Runs the fuzz checker on the pattern with the parameters, and tests whether it finds an attack. */
+  def checkWith(source: String, flags: String, params: Parameters): Boolean =
+    val ir = ReDoS.parse(source, flags, Dialect.JavaScript)
+    val (results, _, _) = FuzzChecker.check(
+      ir,
+      FuzzProgram.from(ir),
+      random0,
+      runtimeAttackerOf(ir),
+      Seq.empty,
+      accelerationHitRatio = params.accelerationHitRatio,
+      accelerationMode = params.accelerationMode,
+      alphabetRepresentative = params.alphabetRepresentative,
+      attackLimit = params.attackLimit,
+      attackTimeout = params.attackTimeout,
+      boundedWidthRatio = params.boundedWidthRatio,
+      crossoverSize = params.crossoverSize,
+      incubationLimit = params.incubationLimit,
+      incubationTimeout = params.incubationTimeout,
+      maxAttackCandidates = params.maxAttackCandidates,
+      maxAttackStringSize = params.maxAttackStringSize,
+      maxBoostIteration = params.maxBoostIteration,
+      maxDegree = params.maxDegree,
+      maxExtraDegree = params.maxExtraDegree,
+      maxGeneStringSize = params.maxGeneStringSize,
+      maxGenerationSize = params.maxGenerationSize,
+      maxIncubationBoundedWidth = params.maxIncubationBoundedWidth,
+      maxInitialGenerationSize = params.maxInitialGenerationSize,
+      maxIteration = params.maxIteration,
+      maxNFASize = params.maxNFASize,
+      maxRepeatCount = params.maxRepeatCount,
+      maxSimpleRepeatCount = params.maxSimpleRepeatCount,
+      mutationSize = params.mutationSize,
+      seeder = params.seeder,
+      seedingLimit = params.seedingLimit,
+      seedingTimeout = params.seedingTimeout
+    )
+    results.nextOption().isDefined
+
   /** Tests whether the pattern is vulnerable. */
   def check(
       source: String,
@@ -40,27 +77,16 @@ class FuzzCheckerSuite extends munit.FunSuite with RuntimeAttackerHelper:
       maxIteration: Int = Parameters.DefaultMaxIteration,
       attackTimeout: Duration = Parameters.DefaultAttackTimeout
   ): Boolean =
-    val result = for
-      ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
-      fuzz = FuzzProgram.from(ir)
-    yield FuzzChecker
-      .check(
-        ir,
-        fuzz,
-        random = random0,
-        maxGeneStringSize = if quick then 400 else 4000,
-        maxAttackStringSize = if quick then 400 else Parameters.DefaultMaxAttackStringSize,
-        seedingLimit = if quick then 1_00 else 1_000,
-        incubationLimit = if quick then 1_000 else 10_000,
-        attackLimit = if quick then 10_000 else Parameters.DefaultAttackLimit,
-        attackTimeout = attackTimeout,
-        maxIteration = maxIteration,
-        runtimeAttacker = runtimeAttackerOf(ir),
-        automatonAttacks = Seq.empty
-      )
-      ._1
-      .nextOption()
-    result.get.isDefined
+    val params = Parameters(
+      maxGeneStringSize = if quick then 400 else 4000,
+      maxAttackStringSize = if quick then 400 else Parameters.DefaultMaxAttackStringSize,
+      seedingLimit = if quick then 1_00 else 1_000,
+      incubationLimit = if quick then 1_000 else 10_000,
+      attackLimit = if quick then 10_000 else Parameters.DefaultAttackLimit,
+      attackTimeout = attackTimeout,
+      maxIteration = maxIteration
+    )
+    checkWith(source, flags, params)
 
   test("FuzzChecker.check: constant"):
     assert(!check("^foo$", ""))
@@ -94,45 +120,12 @@ class FuzzCheckerSuite extends munit.FunSuite with RuntimeAttackerHelper:
     assert(check("^(a?){50}a{50}$", "", quick = true))
 
     // The checker can find an attack string on seeding phase.
-    assert:
-      val result = for
-        ir <- Try(ReDoS.parse("^(a?){50}a{50}$", "", Dialect.JavaScript))
-        fuzz = FuzzProgram.from(ir)
-      yield FuzzChecker
-        .check(
-          ir,
-          fuzz,
-          random0,
-          seedingLimit = 10000,
-          incubationLimit = 10000,
-          attackLimit = 10000,
-          runtimeAttacker = runtimeAttackerOf(ir),
-          automatonAttacks = Seq.empty
-        )
-        ._1
-        .nextOption()
-      result.get.isDefined
+    val seeding = Parameters(seedingLimit = 10000, incubationLimit = 10000, attackLimit = 10000)
+    assert(checkWith("^(a?){50}a{50}$", "", seeding))
 
     // The checker cannot find too small attack string
-    assert:
-      val result = for
-        ir <- Try(ReDoS.parse("^(a|a)*$", "", Dialect.JavaScript))
-        fuzz = FuzzProgram.from(ir)
-      yield FuzzChecker
-        .check(
-          ir,
-          fuzz,
-          random0,
-          incubationLimit = 100,
-          attackLimit = 100,
-          maxGeneStringSize = 5,
-          maxAttackStringSize = 5,
-          runtimeAttacker = runtimeAttackerOf(ir),
-          automatonAttacks = Seq.empty
-        )
-        ._1
-        .nextOption()
-      result.get.isEmpty
+    val small = Parameters(incubationLimit = 100, attackLimit = 100, maxGeneStringSize = 5, maxAttackStringSize = 5)
+    assert(!checkWith("^(a|a)*$", "", small))
 
   /** Builds a checker of the pattern with the default parameters, except the given ones. */
   def checkerOf(
@@ -146,59 +139,62 @@ class FuzzCheckerSuite extends munit.FunSuite with RuntimeAttackerHelper:
     val attacker = new Attacker(
       ir,
       fuzz,
-      DefaultIncubationLimit,
-      DefaultIncubationTimeout,
-      DefaultAttackLimit,
-      DefaultAttackTimeout,
-      DefaultMaxAttackStringSize,
-      DefaultMaxDegree,
-      DefaultMaxExtraDegree,
-      DefaultMaxIncubationBoundedWidth,
-      DefaultMaxBoostIteration,
-      DefaultBoundedWidthRatio,
-      DefaultAccelerationMode,
-      DefaultAccelerationHitRatio,
-      DefaultAlphabetRepresentative,
       runtimeAttackerOf(ir, execute),
-      upperBound
+      upperBound,
+      accelerationHitRatio = DefaultAccelerationHitRatio,
+      accelerationMode = DefaultAccelerationMode,
+      alphabetRepresentative = DefaultAlphabetRepresentative,
+      attackLimit = DefaultAttackLimit,
+      attackTimeout = DefaultAttackTimeout,
+      boundedWidthRatio = DefaultBoundedWidthRatio,
+      incubationLimit = DefaultIncubationLimit,
+      incubationTimeout = DefaultIncubationTimeout,
+      maxAttackStringSize = DefaultMaxAttackStringSize,
+      maxBoostIteration = DefaultMaxBoostIteration,
+      maxDegree = DefaultMaxDegree,
+      maxExtraDegree = DefaultMaxExtraDegree,
+      maxIncubationBoundedWidth = DefaultMaxIncubationBoundedWidth
     )
     new FuzzChecker(
       ir,
       fuzz,
       random0,
-      DefaultSeeder,
-      DefaultMaxSimpleRepeatCount,
-      DefaultMaxNFASize,
-      DefaultSeedingLimit,
-      DefaultSeedingTimeout,
-      DefaultIncubationLimit,
-      DefaultIncubationTimeout,
-      DefaultMaxGeneStringSize,
-      DefaultCrossoverSize,
-      DefaultMutationSize,
-      DefaultMaxInitialGenerationSize,
-      maxGenerationSize,
-      DefaultMaxAttackCandidates,
-      DefaultMaxIteration,
-      DefaultMaxDegree,
-      DefaultAccelerationMode,
-      DefaultAccelerationHitRatio,
-      DefaultAlphabetRepresentative,
       upperBound,
-      attacker
+      attacker,
+      accelerationHitRatio = DefaultAccelerationHitRatio,
+      accelerationMode = DefaultAccelerationMode,
+      alphabetRepresentative = DefaultAlphabetRepresentative,
+      crossoverSize = DefaultCrossoverSize,
+      incubationLimit = DefaultIncubationLimit,
+      incubationTimeout = DefaultIncubationTimeout,
+      maxAttackCandidates = DefaultMaxAttackCandidates,
+      maxDegree = DefaultMaxDegree,
+      maxGeneStringSize = DefaultMaxGeneStringSize,
+      maxGenerationSize = maxGenerationSize,
+      maxInitialGenerationSize = DefaultMaxInitialGenerationSize,
+      maxIteration = DefaultMaxIteration,
+      maxNFASize = DefaultMaxNFASize,
+      maxSimpleRepeatCount = DefaultMaxSimpleRepeatCount,
+      mutationSize = DefaultMutationSize,
+      seeder = DefaultSeeder,
+      seedingLimit = DefaultSeedingLimit,
+      seedingTimeout = DefaultSeedingTimeout
     )
 
   test("FuzzChecker.upperBound"):
     import Parameters.*
-    def upperBound(source: String, dialect: Dialect = Dialect.JavaScript, maxInitialGenerationSize: Int = 100) =
-      val ir = ReDoS.parse(source, "", dialect)
+    def upperBoundOf(ir: IRPattern, maxInitialGenerationSize: Int) =
       FuzzChecker.upperBound(
         ir,
-        DefaultMaxRepeatCount,
-        DefaultMaxNFASize,
-        maxInitialGenerationSize,
-        DefaultAlphabetRepresentative
+        alphabetRepresentative = DefaultAlphabetRepresentative,
+        maxInitialGenerationSize = maxInitialGenerationSize,
+        maxNFASize = DefaultMaxNFASize,
+        maxRepeatCount = DefaultMaxRepeatCount
       )
+
+    def upperBound(source: String, dialect: Dialect = Dialect.JavaScript, maxInitialGenerationSize: Int = 100) =
+      upperBoundOf(ReDoS.parse(source, "", dialect), maxInitialGenerationSize)
+
     // The bound replaces the back-reference with a copy of `a*`, so the worst is cubic.
     val cubic = upperBound("^(a*)a*\\1b").get
     assertEquals(cubic.head.toAttackComplexity, AttackComplexity.Polynomial(3, false))
@@ -214,24 +210,26 @@ class FuzzCheckerSuite extends munit.FunSuite with RuntimeAttackerHelper:
     assertEquals(upperBound("^(a?){50}a{50}$"), None)
     // The repetition of any character at the end matches any rest, so it does not make the bound quadratic.
     val tail = ReDoS.parse("^.*?(?:ab).*$", "s", Dialect.JavaScript)
-    assertEquals(
-      FuzzChecker.upperBound(tail, DefaultMaxRepeatCount, DefaultMaxNFASize, 100, DefaultAlphabetRepresentative),
-      Some(Seq.empty)
-    )
+    assertEquals(upperBoundOf(tail, 100), Some(Seq.empty))
 
   test("FuzzChecker.isLinearBeyondCounts"):
     import Parameters.*
     def isLinearBeyondCounts(source: String, boundedWidthRatio: Double = DefaultBoundedWidthRatio): Boolean =
       val ir = ReDoS.parse(source, "", Dialect.JavaScript)
-      val bound =
-        FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100, DefaultAlphabetRepresentative)
+      val bound = FuzzChecker.upperBound(
+        ir,
+        alphabetRepresentative = DefaultAlphabetRepresentative,
+        maxInitialGenerationSize = 100,
+        maxNFASize = DefaultMaxNFASize,
+        maxRepeatCount = DefaultMaxRepeatCount
+      )
       FuzzChecker.isLinearBeyondCounts(
         ir,
         bound,
-        DefaultMaxRepeatCount,
-        DefaultMaxNFASize,
-        DefaultAttackLimit,
-        boundedWidthRatio
+        attackLimit = DefaultAttackLimit,
+        boundedWidthRatio = boundedWidthRatio,
+        maxNFASize = DefaultMaxNFASize,
+        maxRepeatCount = DefaultMaxRepeatCount
       )
 
     // The steps grow quadratically only up to 100 characters after `=` (#1310).
@@ -281,7 +279,13 @@ class FuzzCheckerSuite extends munit.FunSuite with RuntimeAttackerHelper:
   test("FuzzChecker#init: the seeds of other suffixes"):
     import Parameters.*
     val ir = ReDoS.parse("^(?:a|a)*(?!.*xyz)", "", Dialect.JavaScript)
-    val bound = FuzzChecker.upperBound(ir, DefaultMaxRepeatCount, DefaultMaxNFASize, 100, DefaultAlphabetRepresentative)
+    val bound = FuzzChecker.upperBound(
+      ir,
+      alphabetRepresentative = DefaultAlphabetRepresentative,
+      maxInitialGenerationSize = 100,
+      maxNFASize = DefaultMaxNFASize,
+      maxRepeatCount = DefaultMaxRepeatCount
+    )
     // The match of the witness succeeds unless `xyz` follows, which makes the look-ahead fail.
     assertEquals(checkerOf(ir, upperBound = bound).init()._1.next().complexity, AttackComplexity.Exponential(true))
 

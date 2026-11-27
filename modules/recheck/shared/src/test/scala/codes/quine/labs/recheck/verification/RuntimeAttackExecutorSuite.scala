@@ -25,7 +25,16 @@ class RuntimeAttackExecutorSuite extends munit.FunSuite:
 
   test("RuntimeAttackExecutor.execute"):
     def execute(source: String, dialect: Dialect, timeout: Duration): Option[RuntimeAttack] =
-      RuntimeAttackExecutor.execute(source, "", dialect, UnitMode.CodePoint, attack, timeout, Duration.Inf, None)
+      RuntimeAttackExecutor.execute(
+        source,
+        "",
+        dialect,
+        UnitMode.CodePoint,
+        attack,
+        runtimeAttackCommand = Map.empty,
+        runtimeAttackCompileTimeout = Duration.Inf,
+        runtimeAttackTimeout = timeout
+      )
 
     assertEquals(execute("foo", Dialect.Python(), Duration.MinusInf), None)
     assertEquals(execute("foo", Dialect.Python(), Duration.Zero), None)
@@ -42,7 +51,7 @@ class RuntimeAttackExecutorSuite extends munit.FunSuite:
 
   test("RuntimeAttackExecutor.parseOutput"):
     def parse(output: ExecResult): RuntimeAttack =
-      RuntimeAttackExecutor.parseOutput("python3", "python3 -", 1.second, output)
+      RuntimeAttackExecutor.parseOutput("python3", "python3 -", output, 1.second)
 
     assertEquals(
       parse(ExecResult.Exit(0, "recheck:runtime python 3.15.0\nrecheck:start\nrecheck:time 12\n", "")),

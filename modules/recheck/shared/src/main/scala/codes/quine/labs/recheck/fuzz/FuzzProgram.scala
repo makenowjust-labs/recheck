@@ -12,15 +12,16 @@ import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 final case class FuzzProgram(program: Program, alphabet: PatternAlphabet, parts: Set[UString]):
 
   /** Whether the VM memoizes the failed states in the mode, which it does only where the program allows it. */
-  def usesAcceleration(mode: AccelerationMode): Boolean = mode match
+  def usesAcceleration( /* Parameters: */ accelerationMode: AccelerationMode): Boolean = accelerationMode match
     case AccelerationMode.Auto => program.meta.allowsMemoization && !program.meta.hasRef
     case AccelerationMode.On   => program.meta.allowsMemoization
     case AccelerationMode.Off  => false
 
   /** Whether the VM memoizes the failed states in the mode on a run that confirms an attack string. */
-  def usesAccelerationOnAttack(mode: AccelerationMode): Boolean = mode match
-    case AccelerationMode.Auto | AccelerationMode.On => program.meta.allowsMemoization
-    case AccelerationMode.Off                        => false
+  def usesAccelerationOnAttack( /* Parameters: */ accelerationMode: AccelerationMode): Boolean =
+    accelerationMode match
+      case AccelerationMode.Auto | AccelerationMode.On => program.meta.allowsMemoization
+      case AccelerationMode.Off                        => false
 
 object FuzzProgram:
 

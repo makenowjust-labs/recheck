@@ -27,15 +27,17 @@ object Complexity:
     def witness: Witness[A]
 
     /** The best repetition count of the pumps of the witness to take `limit` steps in at most `maxSize` characters. */
-    def bestRepeatCount(limit: Int, maxSize: Int): Int =
-      RepeatCount.of(toAttackComplexity, limit, witness.fixedSize, witness.repeatSize, maxSize)
+    def bestRepeatCount( /* Parameters: */ limit: Int, maxSize: Int): Int =
+      RepeatCount.of(toAttackComplexity, witness.fixedSize, witness.repeatSize, limit, maxSize)
 
     /** Builds an attack string pattern of this, whose units are of the mode.
       *
       * It throws [[exception.UnexpectedException]] as [[diagnostics.AttackPattern.build]] does.
       */
-    def buildAttackPattern(attackLimit: Int, maxSize: Int, mode: UnitMode)(using ev: A =:= UChar): AttackPattern =
-      witness.buildAttackPattern(bestRepeatCount(attackLimit, maxSize), mode)
+    def buildAttackPattern(mode: UnitMode, /* Parameters: */ limit: Int, maxSize: Int)(using
+        ev: A =:= UChar
+    ): AttackPattern =
+      witness.buildAttackPattern(bestRepeatCount(limit, maxSize), mode)
 
     /** Converts this into the complexity of the diagnostics. */
     def toAttackComplexity: AttackComplexity.Vulnerable
