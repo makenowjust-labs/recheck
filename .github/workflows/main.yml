@@ -36,7 +36,7 @@ jobs:
         name: Save Settings
         run: |
           setting() { sbt --server --error "print $1" | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | grep -v '^\s*$' | grep -v '^\[' | tail -n1; }
-          version="$(setting coreJVM/releaseVersion)"
+          version="$(setting recheckJVM/releaseVersion)"
           graalvm="$(setting cli/nativeImageJvm)-$(setting cli/nativeImageVersion)"
           echo "version=$version"
           echo "graalvm=$graalvm"
@@ -317,7 +317,7 @@ jobs:
       - id: check-published
         name: Check whether the version is already published
         run: |
-          if curl -sfI "https://repo1.maven.org/maven2/codes/quine/labs/recheck-core_3/${{ needs.build.outputs.version }}/" > /dev/null; then
+          if curl -sfI "https://repo1.maven.org/maven2/codes/quine/labs/recheck_3/${{ needs.build.outputs.version }}/" > /dev/null; then
             echo "published=true" >> $GITHUB_OUTPUT
           fi
       - name: Publish
